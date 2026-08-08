@@ -267,6 +267,9 @@ A directory is read **one level deep**, not recursively. Point it at the folder 
 | `CROWDSEC_API_KEY` | - | CrowdSec bouncer API key - used to read **decisions** (active bans/captchas/bypasses) |
 | `CROWDSEC_MACHINE_ID` | - | CrowdSec machine login - required to read **alerts** and to unban (delete decisions) |
 | `CROWDSEC_MACHINE_PASSWORD` | - | Password for the machine login |
+| `CROWDSEC_CLIENT_CERT` | - | Path to a TLS client certificate for a LAPI behind mTLS, replaces the API key and machine login |
+| `CROWDSEC_CLIENT_KEY` | - | Path to the client certificate's private key |
+| `CROWDSEC_CA_CERT` | - | Path to the CA certificate that signed the LAPI's own certificate (private PKI) |
 
 **Two credential types - why both?**
 
@@ -276,6 +279,8 @@ CrowdSec's LAPI uses two different authentication methods for different endpoint
 - **Machine credentials** (`CROWDSEC_MACHINE_ID` + `CROWDSEC_MACHINE_PASSWORD`) are required to read the **alerts** list and to **unban** (delete a decision). Bouncer keys cannot access these endpoints - the LAPI returns `403 access forbidden` or an empty result.
 
 Set both for the full CrowdSec tab. They are complementary, not tiered: the machine token is refused on `/v1/decisions` and the bouncer key is refused on `/v1/alerts`. With only the bouncer key you get the bans in force and nothing about who attacked you.
+
+**LAPI behind mutual TLS?** Set `CROWDSEC_CLIENT_CERT`, `CROWDSEC_CLIENT_KEY` and `CROWDSEC_CA_CERT` instead (paths as mounted inside the agent container, add the files as read-only volumes). One client certificate covers decisions and alerts when its OU is listed in both `bouncers_allowed_ou` and `agents_allowed_ou`, and the LAPI auto-provisions the bouncer and machine on first contact - no key or password needed.
 
 **Creating a machine login:**
 

@@ -443,18 +443,19 @@ func (a *App) csGetJWT(ctx context.Context) (string, error) {
 	if csJWT != "" && time.Now().Before(csJWTExpiry) {
 		return csJWT, nil
 	}
-	body, _ := json.Marshal(map[string]any{
-		"machine_id": a.cfg.CrowdSecMachineID,
-		"password":   a.cfg.CrowdSecMachinePassword,
-		"scenarios":  []string{},
-	})
+	payload := map[string]any{"scenarios": []string{}}
+	if a.cfg.CrowdSecMachineID != "" && a.cfg.CrowdSecMachinePassword != "" {
+		payload["machine_id"] = a.cfg.CrowdSecMachineID
+		payload["password"] = a.cfg.CrowdSecMachinePassword
+	}
+	body, _ := json.Marshal(payload)
 	target := strings.TrimRight(a.cfg.CrowdSecLAPIURL, "/") + "/v1/watchers/login"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := a.cs().Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -475,8 +476,19 @@ func (a *App) csGetJWT(ctx context.Context) (string, error) {
 	return csJWT, nil
 }
 
+func (a *App) cs() *http.Client {
+	if a.csClient != nil {
+		return a.csClient
+	}
+	return http.DefaultClient
+}
+
+func (a *App) csHasCert() bool {
+	return a.cfg.CrowdSecClientCert != "" && a.cfg.CrowdSecClientKey != ""
+}
+
 func (a *App) csHasMachine() bool {
-	return a.cfg.CrowdSecMachineID != "" && a.cfg.CrowdSecMachinePassword != ""
+	return (a.cfg.CrowdSecMachineID != "" && a.cfg.CrowdSecMachinePassword != "") || a.csHasCert()
 }
 
 func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Reader, useJWT bool) (*http.Response, error) {
@@ -497,7 +509,7 @@ func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Read
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	return http.DefaultClient.Do(req)
+	return a.cs().Do(req)
 }
 
 func (a *App) csPageJSON(ctx context.Context, path string, useJWT bool) ([]json.RawMessage, error) {

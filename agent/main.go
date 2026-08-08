@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"log"
 	"net/http"
 	"os"
@@ -9,7 +10,7 @@ import (
 	"strings"
 )
 
-const Version = "1.10.0"
+const Version = "1.10.1"
 
 type Config struct {
 	APIKey                    string
@@ -32,6 +33,9 @@ type Config struct {
 	CrowdSecAPIKey            string
 	CrowdSecMachineID         string
 	CrowdSecMachinePassword   string
+	CrowdSecClientCert        string
+	CrowdSecClientKey         string
+	CrowdSecCACert            string
 	GitBackupEnabled          bool
 	GitBackupRepo             string
 	GitBackupBranch           string
@@ -48,7 +52,40 @@ type App struct {
 	cfg        *Config
 	rl         *perIPLimiter
 	httpClient *http.Client
+	csClient   *http.Client
 	keys       *keyStore
+}
+
+func buildCSClient(cfg *Config) *http.Client {
+	tlsCfg := &tls.Config{}
+	configured := false
+	if cfg.CrowdSecClientCert != "" && cfg.CrowdSecClientKey != "" {
+		pair, err := tls.LoadX509KeyPair(cfg.CrowdSecClientCert, cfg.CrowdSecClientKey)
+		if err != nil {
+			log.Printf("crowdsec client certificate unusable, mTLS disabled: %v", err)
+		} else {
+			tlsCfg.Certificates = []tls.Certificate{pair}
+			configured = true
+		}
+	}
+	if cfg.CrowdSecCACert != "" {
+		pem, err := os.ReadFile(cfg.CrowdSecCACert)
+		if err != nil {
+			log.Printf("crowdsec CA certificate unreadable: %v", err)
+		} else {
+			pool := x509.NewCertPool()
+			if pool.AppendCertsFromPEM(pem) {
+				tlsCfg.RootCAs = pool
+				configured = true
+			} else {
+				log.Printf("crowdsec CA certificate contains no usable PEM data")
+			}
+		}
+	}
+	if !configured {
+		return http.DefaultClient
+	}
+	return &http.Client{Transport: &http.Transport{TLSClientConfig: tlsCfg}}
 }
 
 func envOr(key, def string) string {
@@ -100,6 +137,9 @@ func loadConfig() *Config {
 		CrowdSecAPIKey:            os.Getenv("CROWDSEC_API_KEY"),
 		CrowdSecMachineID:         os.Getenv("CROWDSEC_MACHINE_ID"),
 		CrowdSecMachinePassword:   os.Getenv("CROWDSEC_MACHINE_PASSWORD"),
+		CrowdSecClientCert:        os.Getenv("CROWDSEC_CLIENT_CERT"),
+		CrowdSecClientKey:         os.Getenv("CROWDSEC_CLIENT_KEY"),
+		CrowdSecCACert:            os.Getenv("CROWDSEC_CA_CERT"),
 		GitBackupEnabled:          envBool("GIT_BACKUP_ENABLED", false),
 		GitBackupRepo:             os.Getenv("GIT_BACKUP_REPO"),
 		GitBackupBranch:           envOr("GIT_BACKUP_BRANCH", "main"),
@@ -126,6 +166,7 @@ func main() {
 		cfg:        cfg,
 		rl:         newPerIPLimiter(cfg.RateLimit),
 		httpClient: &http.Client{Transport: transport},
+		csClient:   buildCSClient(cfg),
 		keys:       newKeyStore(cfg.BackupDir),
 	}
 

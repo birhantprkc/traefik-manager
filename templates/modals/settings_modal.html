@@ -302,6 +302,14 @@
                                 <div id="crowdsecMachineSetHint" class="mt-1 text-xs hidden" style="color:var(--green)"><i class="ph-bold ph-check-circle"></i> Machine password configured</div>
                                 <div class="text-xs mt-1" style="color:var(--muted)">Leave blank to use the <code class="font-mono">CROWDSEC_MACHINE_ID</code> / <code class="font-mono">CROWDSEC_MACHINE_PASSWORD</code> env vars.</div>
                             </div>
+                            <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+                                <span class="settings-section-label">Client Certificate mTLS <span style="color:var(--muted);font-weight:400">(optional)</span></span>
+                                <div class="text-xs mb-2" style="color:var(--muted)">For a LAPI behind mutual TLS. Paths to PEM files mounted into this container. The certificate authenticates <strong>decisions</strong> instead of the API key and <strong>alerts</strong> instead of the machine login - or alongside them. The CA file verifies the LAPI's own certificate when it comes from a private PKI.</div>
+                                <input type="text" id="settingsCrowdSecClientCert" class="input-field mb-2" placeholder="client certificate, e.g. /certs/tm-client.crt" onblur="saveSettings()">
+                                <input type="text" id="settingsCrowdSecClientKey" class="input-field mb-2" placeholder="client key, e.g. /certs/tm-client.key" onblur="saveSettings()">
+                                <input type="text" id="settingsCrowdSecCaCert" class="input-field" placeholder="CA certificate, e.g. /certs/ca.crt" onblur="saveSettings()">
+                                <div class="text-xs mt-1" style="color:var(--muted)">Leave blank to use the <code class="font-mono">CROWDSEC_CLIENT_CERT</code> / <code class="font-mono">CROWDSEC_CLIENT_KEY</code> / <code class="font-mono">CROWDSEC_CA_CERT</code> env vars.</div>
+                            </div>
                             <div id="crowdsecSavedNotice" class="hidden text-xs px-3 py-2 rounded-md" style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);color:var(--green)">
                                 <i class="ph-bold ph-check-circle mr-1"></i>CrowdSec credentials saved
                             </div>
@@ -1145,6 +1153,13 @@
                                     <div>
                                         <label class="settings-section-label">Machine Password <span style="color:var(--muted)">(optional)</span></label>
                                         <input id="agCfgCsMachinePassword" type="password" class="input-field text-xs" placeholder="machine-password" oninput="agentCfgChanged()">
+                                    </div>
+                                    <div>
+                                        <label class="settings-section-label">Client Certificate mTLS <span style="color:var(--muted)">(optional)</span></label>
+                                        <div class="text-xs mb-1" style="color:var(--muted)">For a LAPI behind mutual TLS: cert, key and CA paths as mounted inside the agent container. Replaces the API key and machine login.</div>
+                                        <input id="agCfgCsClientCert" type="text" class="input-field text-xs mb-2" placeholder="client certificate, e.g. /certs/tma-client.crt" oninput="agentCfgChanged()">
+                                        <input id="agCfgCsClientKey" type="text" class="input-field text-xs mb-2" placeholder="client key, e.g. /certs/tma-client.key" oninput="agentCfgChanged()">
+                                        <input id="agCfgCsCaCert" type="text" class="input-field text-xs" placeholder="CA certificate, e.g. /certs/ca.crt" oninput="agentCfgChanged()">
                                     </div>
                                 </div>
 

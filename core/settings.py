@@ -101,6 +101,9 @@ def load_settings() -> dict:
         'crowdsec_api_key':     '',
         'crowdsec_machine_id':       '',
         'crowdsec_machine_password': '',
+        'crowdsec_client_cert':      '',
+        'crowdsec_client_key':       '',
+        'crowdsec_ca_cert':          '',
         'traefik_api_user':          os.environ.get('TRAEFIK_API_USER', ''),
         'traefik_api_password':      os.environ.get('TRAEFIK_API_PASSWORD', ''),
         'git_backup_enabled':        False,
@@ -243,6 +246,9 @@ def load_settings() -> dict:
             merged['crowdsec_machine_id'] = str(data['crowdsec_machine_id']).strip()
         if 'crowdsec_machine_password' in data:
             merged['crowdsec_machine_password'] = crypto.decrypt_secret(str(data['crowdsec_machine_password']))
+        for _ck in ('crowdsec_client_cert', 'crowdsec_client_key', 'crowdsec_ca_cert'):
+            if _ck in data:
+                merged[_ck] = str(data[_ck]).strip()
         if 'traefik_api_user' in data:
             merged['traefik_api_user'] = str(data['traefik_api_user']).strip()
         if 'traefik_api_password' in data:
@@ -296,6 +302,8 @@ def save_settings(domains, cert_resolver, traefik_api_url,
                   webhook_username=None, webhook_password=None,
                   crowdsec_lapi_url=None, crowdsec_api_key=None,
                   crowdsec_machine_id=None, crowdsec_machine_password=None,
+                  crowdsec_client_cert=None, crowdsec_client_key=None,
+                  crowdsec_ca_cert=None,
                   traefik_api_user=None, traefik_api_password=None,
                   git_backup_enabled=None, git_backup_repo=None,
                   git_backup_branch=None, git_backup_username=None,
@@ -375,6 +383,12 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         crowdsec_machine_id = _cur.get('crowdsec_machine_id', '')
     if crowdsec_machine_password is None:
         crowdsec_machine_password = _cur.get('crowdsec_machine_password', '')
+    if crowdsec_client_cert is None:
+        crowdsec_client_cert = _cur.get('crowdsec_client_cert', '')
+    if crowdsec_client_key is None:
+        crowdsec_client_key = _cur.get('crowdsec_client_key', '')
+    if crowdsec_ca_cert is None:
+        crowdsec_ca_cert = _cur.get('crowdsec_ca_cert', '')
     if traefik_api_user is None:
         traefik_api_user = _cur.get('traefik_api_user', '')
     if traefik_api_password is None:
@@ -447,6 +461,9 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'crowdsec_api_key':     crypto.encrypt_secret(crowdsec_api_key) if crowdsec_api_key else '',
         'crowdsec_machine_id':       crowdsec_machine_id,
         'crowdsec_machine_password': crypto.encrypt_secret(crowdsec_machine_password) if crowdsec_machine_password else '',
+        'crowdsec_client_cert':      str(crowdsec_client_cert).strip(),
+        'crowdsec_client_key':       str(crowdsec_client_key).strip(),
+        'crowdsec_ca_cert':          str(crowdsec_ca_cert).strip(),
         'traefik_api_user':          traefik_api_user,
         'traefik_api_password':      crypto.encrypt_secret(traefik_api_password) if traefik_api_password else '',
         'git_backup_enabled':        git_backup_enabled,

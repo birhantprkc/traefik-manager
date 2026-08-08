@@ -462,6 +462,12 @@ async function openSettingsModal(panel) {
         if (csMidEl) csMidEl.value = data.crowdsec_machine_id || '';
         const csMachineHint = document.getElementById('crowdsecMachineSetHint');
         if (csMachineHint) csMachineHint.classList.toggle('hidden', !data.crowdsec_machine_password_set);
+        const csCcEl = document.getElementById('settingsCrowdSecClientCert');
+        if (csCcEl) csCcEl.value = data.crowdsec_client_cert || '';
+        const csCkEl = document.getElementById('settingsCrowdSecClientKey');
+        if (csCkEl) csCkEl.value = data.crowdsec_client_key || '';
+        const csCaEl = document.getElementById('settingsCrowdSecCaCert');
+        if (csCaEl) csCaEl.value = data.crowdsec_ca_cert || '';
         const whEl = document.getElementById('webhookUrlInput');
         if (whEl) whEl.value = data.webhook_url || '';
         const whType = document.getElementById('webhookTypeSelect');
@@ -677,6 +683,9 @@ async function saveSettings() {
     const crowdsecApiKey      = document.getElementById('settingsCrowdSecKey')?.value || '';
     const crowdsecMachineId       = document.getElementById('settingsCrowdSecMachineId')?.value.trim() || '';
     const crowdsecMachinePassword = document.getElementById('settingsCrowdSecMachinePassword')?.value || '';
+    const crowdsecClientCert      = document.getElementById('settingsCrowdSecClientCert')?.value.trim() || '';
+    const crowdsecClientKey       = document.getElementById('settingsCrowdSecClientKey')?.value.trim() || '';
+    const crowdsecCaCert          = document.getElementById('settingsCrowdSecCaCert')?.value.trim() || '';
     const traefikApiUser      = document.getElementById('settingsApiUser')?.value.trim() || '';
     const traefikApiPassword  = document.getElementById('settingsApiPassword')?.value || '';
     if (!domains.length) return;
@@ -684,7 +693,7 @@ async function saveSettings() {
         const res  = await fetch('/api/settings', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
-            body: JSON.stringify({ domains, cert_resolver: resolver, traefik_api_url: apiUrl, acme_json_path: acmeJsonPath, access_log_path: accessLogPath, static_config_path: staticConfigPath, webhook_url: webhookUrl, webhook_type: webhookType, webhook_username: webhookUsername, webhook_password: webhookPassword, crowdsec_lapi_url: crowdsecLapiUrl, crowdsec_api_key: crowdsecApiKey, crowdsec_machine_id: crowdsecMachineId, crowdsec_machine_password: crowdsecMachinePassword, traefik_api_user: traefikApiUser, traefik_api_password: traefikApiPassword })
+            body: JSON.stringify({ domains, cert_resolver: resolver, traefik_api_url: apiUrl, acme_json_path: acmeJsonPath, access_log_path: accessLogPath, static_config_path: staticConfigPath, webhook_url: webhookUrl, webhook_type: webhookType, webhook_username: webhookUsername, webhook_password: webhookPassword, crowdsec_lapi_url: crowdsecLapiUrl, crowdsec_api_key: crowdsecApiKey, crowdsec_machine_id: crowdsecMachineId, crowdsec_machine_password: crowdsecMachinePassword, crowdsec_client_cert: crowdsecClientCert, crowdsec_client_key: crowdsecClientKey, crowdsec_ca_cert: crowdsecCaCert, traefik_api_user: traefikApiUser, traefik_api_password: traefikApiPassword })
         });
         const data = await res.json();
         if (data.success) {
@@ -730,6 +739,10 @@ async function resetCrowdSecConfig() {
     const csMpw = document.getElementById('settingsCrowdSecMachinePassword');
     if (csMpw) csMpw.value = '';
     document.getElementById('crowdsecMachineSetHint')?.classList.add('hidden');
+    ['settingsCrowdSecClientCert', 'settingsCrowdSecClientKey', 'settingsCrowdSecCaCert'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
     await saveSettings();
 }
 
@@ -1741,6 +1754,9 @@ async function openAgentSetup(id, titleOverride) {
             if (a.signal_file_path)   document.getElementById('agCfgSignalFile').value  = a.signal_file_path;
             if (a.crowdsec_lapi_url)  document.getElementById('agCfgCsUrl').value       = a.crowdsec_lapi_url;
             if (a.crowdsec_machine_id) document.getElementById('agCfgCsMachineId').value = a.crowdsec_machine_id;
+            if (a.crowdsec_client_cert) document.getElementById('agCfgCsClientCert').value = a.crowdsec_client_cert;
+            if (a.crowdsec_client_key)  document.getElementById('agCfgCsClientKey').value  = a.crowdsec_client_key;
+            if (a.crowdsec_ca_cert)    document.getElementById('agCfgCsCaCert').value     = a.crowdsec_ca_cert;
             if (a.restart_method)     selectRestartMethod(a.restart_method, null);
             const container = a.traefik_container || '';
             if (container) {
@@ -1803,6 +1819,9 @@ function resetAgentWizardCfgFields() {
     document.getElementById('agCfgCsKey').value       = '';
     document.getElementById('agCfgCsMachineId').value = '';
     document.getElementById('agCfgCsMachinePassword').value = '';
+    document.getElementById('agCfgCsClientCert').value = '';
+    document.getElementById('agCfgCsClientKey').value  = '';
+    document.getElementById('agCfgCsCaCert').value     = '';
     document.getElementById('agCfgInsecureTLS')?.classList.remove('on');
     selectRestartMethod('', document.querySelector('#restartMethodChips .agent-chip'));
 }
@@ -1948,6 +1967,9 @@ function buildAgentCfgPayload() {
         crowdsec_api_key:   document.getElementById('agCfgCsKey').value,
         crowdsec_machine_id:       document.getElementById('agCfgCsMachineId').value.trim(),
         crowdsec_machine_password: document.getElementById('agCfgCsMachinePassword').value,
+        crowdsec_client_cert:      document.getElementById('agCfgCsClientCert').value.trim(),
+        crowdsec_client_key:       document.getElementById('agCfgCsClientKey').value.trim(),
+        crowdsec_ca_cert:          document.getElementById('agCfgCsCaCert').value.trim(),
         git_backup_enabled: document.getElementById('agCfgGitEnabled').checked,
         git_backup_repo:    document.getElementById('agCfgGitRepo').value.trim(),
         git_backup_branch:  document.getElementById('agCfgGitBranch').value.trim() || 'main',
@@ -1977,6 +1999,9 @@ function agentCfgChanged() {
     const csKey     = document.getElementById('agCfgCsKey').value.trim();
     const csMid     = document.getElementById('agCfgCsMachineId').value.trim();
     const csMpw     = document.getElementById('agCfgCsMachinePassword').value.trim();
+    const csCc      = document.getElementById('agCfgCsClientCert').value.trim();
+    const csCk      = document.getElementById('agCfgCsClientKey').value.trim();
+    const csCa      = document.getElementById('agCfgCsCaCert').value.trim();
     const gitOn     = document.getElementById('agCfgGitEnabled').checked;
     const gitRepo   = document.getElementById('agCfgGitRepo').value.trim();
     const gitBranch = document.getElementById('agCfgGitBranch').value.trim() || 'main';
@@ -2006,6 +2031,9 @@ function agentCfgChanged() {
     if (csKey)       envLines.push(`      - CROWDSEC_API_KEY=${csKey}`);
     if (csMid)       envLines.push(`      - CROWDSEC_MACHINE_ID=${csMid}`);
     if (csMpw)       envLines.push(`      - CROWDSEC_MACHINE_PASSWORD=${csMpw}`);
+    if (csCc)        envLines.push(`      - CROWDSEC_CLIENT_CERT=${csCc}`);
+    if (csCk)        envLines.push(`      - CROWDSEC_CLIENT_KEY=${csCk}`);
+    if (csCa)        envLines.push(`      - CROWDSEC_CA_CERT=${csCa}`);
     if (gitOn) {
         envLines.push(`      - GIT_BACKUP_ENABLED=true`);
         if (gitRepo)   envLines.push(`      - GIT_BACKUP_REPO=${gitRepo}`);
@@ -2022,6 +2050,9 @@ function agentCfgChanged() {
     if (acmePath)    volLines.push(`      - ${acmePath}:${acmePath}:ro`);
     if (logPath)     volLines.push(`      - ${logPath}:${logPath}:ro`);
     if (pluginsDir)  volLines.push(`      - ${pluginsDir}:${pluginsDir}:ro`);
+    if (csCc)        volLines.push(`      - ${csCc}:${csCc}:ro`);
+    if (csCk)        volLines.push(`      - ${csCk}:${csCk}:ro`);
+    if (csCa)        volLines.push(`      - ${csCa}:${csCa}:ro`);
     if (restart === 'socket') volLines.push(`      - /var/run/docker.sock:/var/run/docker.sock:ro`);
     if (restart === 'poison-pill') volLines.push(`      - traefik-signals:/signals`);
 

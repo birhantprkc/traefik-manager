@@ -68,6 +68,9 @@ Variables marked ✅ **override** the corresponding `manager.yml` field on every
 | `CROWDSEC_API_KEY` | _(unset)_ | ✅ `crowdsec_api_key` | CrowdSec bouncer API key, reads decisions (stored encrypted) |
 | `CROWDSEC_MACHINE_ID` | _(unset)_ | ✅ `crowdsec_machine_id` | CrowdSec machine login, reads alerts and enables unban |
 | `CROWDSEC_MACHINE_PASSWORD` | _(unset)_ | ✅ `crowdsec_machine_password` | Password for the machine login (stored encrypted) |
+| `CROWDSEC_CLIENT_CERT` | _(unset)_ | ✅ `crowdsec_client_cert` | Path to a TLS client certificate for a LAPI behind mTLS, replaces the API key and machine login |
+| `CROWDSEC_CLIENT_KEY` | _(unset)_ | ✅ `crowdsec_client_key` | Path to the client certificate's private key |
+| `CROWDSEC_CA_CERT` | _(unset)_ | ✅ `crowdsec_ca_cert` | Path to the CA certificate that signed the LAPI's own certificate (private PKI) |
 
 ### Agents
 
@@ -651,6 +654,35 @@ Environment=CROWDSEC_MACHINE_PASSWORD=your-machine-password
 :::
 
 > If the password contains a `$`, escape it as `$$` in `docker-compose.yml`.
+
+---
+
+### `CROWDSEC_CLIENT_CERT` / `CROWDSEC_CLIENT_KEY` / `CROWDSEC_CA_CERT`
+
+**Default:** _(unset)_  
+**Overrides:** `crowdsec_client_cert` / `crowdsec_client_key` / `crowdsec_ca_cert` in `manager.yml`
+
+Mutual TLS for the LAPI connection. If your LAPI authenticates bouncers and machines with client certificates (`tls` auth, `bouncers_allowed_ou` / `agents_allowed_ou`), point these at the PEM files mounted into the container. The certificate then authenticates **decisions** in place of the API key and **alerts** in place of the machine login - one certificate covers both when its OU is allowed on both sides, and the LAPI auto-provisions the bouncer and machine on first contact. `CROWDSEC_CA_CERT` verifies the LAPI's own server certificate when it comes from a private PKI. The cert works alongside key or machine credentials too; any one of them makes the tab configured.
+
+:::tabs
+== Docker / Podman
+```yaml
+environment:
+  - CROWDSEC_LAPI_URL=https://crowdsec:8080
+  - CROWDSEC_CLIENT_CERT=/certs/tm-client.crt
+  - CROWDSEC_CLIENT_KEY=/certs/tm-client.key
+  - CROWDSEC_CA_CERT=/certs/ca.crt
+volumes:
+  - ./certs:/certs:ro
+```
+== Linux (systemd)
+```ini
+Environment=CROWDSEC_LAPI_URL=https://crowdsec:8080
+Environment=CROWDSEC_CLIENT_CERT=/etc/traefik-manager/certs/tm-client.crt
+Environment=CROWDSEC_CLIENT_KEY=/etc/traefik-manager/certs/tm-client.key
+Environment=CROWDSEC_CA_CERT=/etc/traefik-manager/certs/ca.crt
+```
+:::
 
 ---
 

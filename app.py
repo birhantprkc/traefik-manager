@@ -76,6 +76,8 @@ _cs_api_key                = _crowd._cs_api_key
 _cs_machine_id             = _crowd._cs_machine_id
 _cs_machine_password       = _crowd._cs_machine_password
 _cs_has_machine            = _crowd._cs_has_machine
+_cs_has_cert               = _crowd._cs_has_cert
+_cs_tls_kwargs             = _crowd._cs_tls_kwargs
 _cs_request                = _crowd._cs_request
 _cs_request_strict         = _crowd._cs_request_strict
 CrowdSecUnavailable        = _crowd.CrowdSecUnavailable
@@ -1149,9 +1151,9 @@ def api_cs_decisions():
     key  = _cs_api_key()
     if not lapi:
         return jsonify({'error': 'CrowdSec not configured'}), 503
-    if not key:
-        return jsonify({'error': 'No bouncer API key. CrowdSec only accepts a bouncer key on /v1/decisions, '
-                                 'the machine token is refused there'}), 503
+    if not key and not _cs_has_cert():
+        return jsonify({'error': 'No bouncer API key or client certificate. CrowdSec only accepts a bouncer key '
+                                 'or a TLS client certificate on /v1/decisions, the machine token is refused there'}), 503
     try:
         all_decisions = []
         cursor = 0
@@ -1196,14 +1198,15 @@ def api_cs_alerts():
         if _cs_has_machine():
             token = _cs_jwt(lapi)
             if not token:
-                return jsonify({'error': 'CrowdSec machine login failed - check CROWDSEC_MACHINE_ID / CROWDSEC_MACHINE_PASSWORD'}), 502
+                return jsonify({'error': 'CrowdSec machine login failed - check CROWDSEC_MACHINE_ID / CROWDSEC_MACHINE_PASSWORD '
+                                         'or the client certificate'}), 502
             headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
         else:
             headers = {'X-Api-Key': _cs_api_key(), 'Accept': 'application/json'}
         resp = requests.get(
             f"{lapi.rstrip('/')}/v1/alerts?limit=0&with_decisions=false",
             headers=headers,
-            timeout=5,
+            timeout=5, **_cs_tls_kwargs(),
         )
         if not resp.ok:
             try:
@@ -3157,6 +3160,9 @@ def api_save_settings():
         crowdsec_api_key     = str(data.get('crowdsec_api_key', ''))
         crowdsec_machine_id       = str(data.get('crowdsec_machine_id', '')).strip()
         crowdsec_machine_password = str(data.get('crowdsec_machine_password', ''))
+        crowdsec_client_cert      = str(data.get('crowdsec_client_cert', '')).strip()
+        crowdsec_client_key       = str(data.get('crowdsec_client_key', '')).strip()
+        crowdsec_ca_cert          = str(data.get('crowdsec_ca_cert', '')).strip()
         traefik_api_user          = str(data.get('traefik_api_user', '')).strip()
         traefik_api_password      = str(data.get('traefik_api_password', ''))
         git_backup_enabled        = bool(data['git_backup_enabled'])        if 'git_backup_enabled'        in data else None
@@ -3196,6 +3202,9 @@ def api_save_settings():
                       crowdsec_api_key=crowdsec_api_key,
                       crowdsec_machine_id=crowdsec_machine_id,
                       crowdsec_machine_password=crowdsec_machine_password,
+                      crowdsec_client_cert=crowdsec_client_cert,
+                      crowdsec_client_key=crowdsec_client_key,
+                      crowdsec_ca_cert=crowdsec_ca_cert,
                       traefik_api_user=traefik_api_user,
                       traefik_api_password=traefik_api_password,
                       git_backup_enabled=git_backup_enabled,
@@ -5319,6 +5328,9 @@ def api_agents_create():
         'crowdsec_api_key':      str(data.get('crowdsec_api_key', '')).strip(),
         'crowdsec_machine_id':       str(data.get('crowdsec_machine_id', '')).strip(),
         'crowdsec_machine_password': str(data.get('crowdsec_machine_password', '')).strip(),
+        'crowdsec_client_cert':      str(data.get('crowdsec_client_cert', '')).strip(),
+        'crowdsec_client_key':       str(data.get('crowdsec_client_key', '')).strip(),
+        'crowdsec_ca_cert':          str(data.get('crowdsec_ca_cert', '')).strip(),
         'git_backup_enabled':    bool(data.get('git_backup_enabled', False)),
         'git_backup_repo':       str(data.get('git_backup_repo', '')).strip(),
         'git_backup_branch':     str(data.get('git_backup_branch', 'main')).strip() or 'main',
@@ -5363,7 +5375,9 @@ def api_agents_update(agent_id):
                 'config_path', 'static_config_path',
                 'acme_json_path', 'access_log_path', 'plugins_dir', 'backup_dir', 'backup_keep_count',
                 'restart_method', 'traefik_container', 'docker_host', 'signal_file_path',
-                'crowdsec_lapi_url', 'crowdsec_machine_id', 'git_backup_enabled', 'git_backup_repo',
+                'crowdsec_lapi_url', 'crowdsec_machine_id',
+                'crowdsec_client_cert', 'crowdsec_client_key', 'crowdsec_ca_cert',
+                'git_backup_enabled', 'git_backup_repo',
                 'git_backup_branch', 'git_backup_username', 'git_backup_auto_push',
                 'git_backup_commit_message', 'tma_port', 'tma_rate_limit', 'domains',
                 'git_host_backup', 'git_host_branch',

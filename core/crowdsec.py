@@ -30,8 +30,37 @@ def _cs_machine_password() -> str:
     return s.get('crowdsec_machine_password', '').strip() or os.environ.get('CROWDSEC_MACHINE_PASSWORD', '').strip()
 
 
+def _cs_client_cert() -> str:
+    s = settings_mod.load_settings()
+    return s.get('crowdsec_client_cert', '').strip() or os.environ.get('CROWDSEC_CLIENT_CERT', '').strip()
+
+
+def _cs_client_key() -> str:
+    s = settings_mod.load_settings()
+    return s.get('crowdsec_client_key', '').strip() or os.environ.get('CROWDSEC_CLIENT_KEY', '').strip()
+
+
+def _cs_ca_cert() -> str:
+    s = settings_mod.load_settings()
+    return s.get('crowdsec_ca_cert', '').strip() or os.environ.get('CROWDSEC_CA_CERT', '').strip()
+
+
+def _cs_has_cert() -> bool:
+    return bool(_cs_client_cert() and _cs_client_key())
+
+
+def _cs_tls_kwargs() -> dict:
+    kw = {}
+    if _cs_has_cert():
+        kw['cert'] = (_cs_client_cert(), _cs_client_key())
+    ca = _cs_ca_cert()
+    if ca:
+        kw['verify'] = ca
+    return kw
+
+
 def _cs_has_machine() -> bool:
-    return bool(_cs_machine_id() and _cs_machine_password())
+    return bool(_cs_machine_id() and _cs_machine_password()) or _cs_has_cert()
 
 
 class CrowdSecUnavailable(Exception):
@@ -44,12 +73,15 @@ def _cs_request_strict(method: str, path: str, lapi: str = None, key: str = None
     if key is None:
         key = _cs_api_key()
     lapi = (lapi or '').rstrip('/')
-    if not lapi or not key:
-        raise CrowdSecUnavailable('CrowdSec LAPI URL or bouncer API key is not set')
+    if not lapi or not (key or _cs_has_cert()):
+        raise CrowdSecUnavailable('CrowdSec LAPI URL, bouncer API key or client certificate is not set')
+    headers = {'Accept': 'application/json'}
+    if key:
+        headers['X-Api-Key'] = key
     try:
         resp = requests.request(method, f"{lapi}{path}",
-                                headers={'X-Api-Key': key, 'Accept': 'application/json'},
-                                timeout=5, **kwargs)
+                                headers=headers,
+                                timeout=5, **_cs_tls_kwargs(), **kwargs)
         resp.raise_for_status()
     except requests.HTTPError as e:
         status = e.response.status_code if e.response is not None else '?'
@@ -74,15 +106,19 @@ def _cs_jwt(lapi: str = None) -> str:
     lapi = lapi.rstrip('/')
     mid  = _cs_machine_id()
     pw   = _cs_machine_password()
-    if not (lapi and mid and pw):
+    if not (lapi and ((mid and pw) or _cs_has_cert())):
         return ''
     now = datetime.now(timezone.utc)
     if _cs_jwt_cache['token'] and _cs_jwt_cache['expiry'] and now < _cs_jwt_cache['expiry']:
         return _cs_jwt_cache['token']
+    payload = {'scenarios': []}
+    if mid and pw:
+        payload['machine_id'] = mid
+        payload['password'] = pw
     try:
         resp = requests.post(f"{lapi}/v1/watchers/login",
-                             json={'machine_id': mid, 'password': pw, 'scenarios': []},
-                             timeout=5)
+                             json=payload,
+                             timeout=5, **_cs_tls_kwargs())
         resp.raise_for_status()
         body  = resp.json() or {}
         token = body.get('token', '')
@@ -108,7 +144,7 @@ def _cs_machine_request(method: str, path: str, **kwargs):
     try:
         resp = requests.request(method, f"{lapi}{path}",
                                 headers={'Authorization': f'Bearer {token}', 'Accept': 'application/json'},
-                                timeout=5, **kwargs)
+                                timeout=5, **_cs_tls_kwargs(), **kwargs)
         resp.raise_for_status()
         return resp.json() if resp.content else {}
     except Exception as e:
