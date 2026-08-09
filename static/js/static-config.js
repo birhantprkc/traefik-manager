@@ -1147,7 +1147,7 @@ function _scJump(section) {
 }
 
 function toggleStaticNote(key) {
-    const el = document.getElementById('scNote-' + key);
+    const el = document.getElementById('scNotice-' + key);
     if (!el) return;
     const open = !el.classList.contains('open');
     el.classList.toggle('open', open);
@@ -1155,12 +1155,21 @@ function toggleStaticNote(key) {
 }
 
 function _scApplyNoteState() {
-    document.querySelectorAll('.sc-note').forEach(el => {
-        const key = (el.id || '').replace('scNote-', '');
+    document.querySelectorAll('.sc-notice').forEach(el => {
+        const key = (el.id || '').replace('scNotice-', '');
         let open = false;
         try { open = localStorage.getItem('scNote_' + key) === '1'; } catch (e) {}
         el.classList.toggle('open', open);
     });
+}
+
+function _renderStaticPluginNotice() {
+    const el = document.getElementById('staticPluginNotice');
+    if (!el) return;
+    el.innerHTML = _scNotice('plugins', 'Installing plugins',
+        'These rows are what <code class="font-mono" style="background:var(--input-bg);padding:1px 4px;border-radius:3px">traefik.yml</code> declares. '
+        + 'The <button type="button" onclick="closeSettingsModal();switchTab(\'plugins\')" style="color:var(--blue);background:none;border:none;cursor:pointer;padding:0;font:inherit;text-decoration:underline">Plugins tab</button> '
+        + 'installs and removes them for you, and writes the middleware that uses them.');
 }
 
 function _scSetState(key, txt) {
@@ -1233,6 +1242,9 @@ function _renderStaticSections(parsed) {
     if (_tmModern()) {
         _renderStaticVerdict(_staticParsedData);
         _renderStaticFoldStates(_staticParsedData);
+    }
+    _renderStaticPluginNotice();
+    if (_tmModern()) {
         _scApplyNoteState();
     }
 }
@@ -1920,14 +1932,7 @@ function _buildStaticClassicHTML() {
     </div>
 
     <div id="staticPanel-plugins" style="display:none">
-        <div class="sc-note" id="scNote-plugins">
-            <button type="button" class="sc-note-head" onclick="toggleStaticNote('plugins')">
-                <i class="ph-bold ph-caret-right sc-note-caret"></i>
-                <i class="ph-bold ph-info sc-note-ic"></i>
-                <span class="sc-note-lab">Installing plugins</span>
-            </button>
-            <div class="sc-note-body">These rows are what <code>traefik.yml</code> declares. The <button type="button" onclick="closeSettingsModal();switchTab('plugins')" class="sc-note-link">Plugins tab</button> installs and removes them for you, and writes the middleware that uses them.</div>
-        </div>
+        <div id="staticPluginNotice"></div>
         <div id="staticPluginList"></div>
         <div id="staticForm-plugins" style="display:none;border-top:1px solid var(--border);background:var(--input-bg)" class="px-5 py-4 space-y-3">
             <p class="text-xs font-semibold uppercase tracking-wide" style="color:var(--muted)" id="sfPluginFormTitle">New Plugin</p>
@@ -2255,12 +2260,22 @@ function _buildStaticClassicHTML() {
     </div>`;
 }
 
+function _scNotice(key, title, body) {
+    return `<div class="sc-notice rounded-lg" id="scNotice-${key}" style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2)">
+        <button type="button" onclick="toggleStaticNote('${key}')" class="w-full px-4 py-2.5 flex items-center gap-2 text-left" style="background:none;border:none;cursor:pointer">
+            <i class="ph-bold ph-info text-sm shrink-0" style="color:var(--blue)"></i>
+            <span class="text-xs font-semibold flex-1" style="color:var(--text)">${title}</span>
+            <i class="ph-bold ph-caret-right sc-notice-caret text-xs" style="color:var(--muted)"></i>
+        </button>
+        <div class="sc-notice-body px-4 pb-3 text-xs" style="color:var(--muted)">${body}</div>
+    </div>`;
+}
+
 function _renderEpRuntimeWarning() {
     const el = document.getElementById('staticEpWarning');
     if (!el) return;
     const rt = _traefikRuntime;
     if (!rt) return;
-    const toggler = `onclick="const b=this.parentElement.querySelector('.ep-warn-body');b.classList.toggle('hidden');this.querySelector('i.caret').classList.toggle('ph-caret-down');this.querySelector('i.caret').classList.toggle('ph-caret-right')"`;
     let title = '', body = '';
     if (rt.runtime === 'docker') {
         title = 'New entrypoints also need a port mapping in your compose file';
@@ -2277,14 +2292,8 @@ function _renderEpRuntimeWarning() {
         body  = `<span class="font-medium" style="color:var(--text)">Docker / Podman / Unraid:</span> add the port under <code class="font-mono" style="background:var(--input-bg);padding:1px 4px;border-radius:3px">ports:</code> in your compose file and run <code class="font-mono" style="background:var(--input-bg);padding:1px 4px;border-radius:3px">docker compose up -d</code>
                  <span class="block mt-1"><span class="font-medium" style="color:var(--text)">Native Linux:</span> open the port in your firewall, e.g. <code class="font-mono" style="background:var(--input-bg);padding:1px 4px;border-radius:3px">sudo ufw allow PORT/tcp</code></span>`;
     }
-    el.innerHTML = `<div class="mx-4 mt-3 mb-1 rounded-lg" style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2)">
-        <button ${toggler} class="w-full px-4 py-2.5 flex items-center gap-2 text-left" style="background:none;border:none;cursor:pointer">
-            <i class="ph-bold ph-info text-sm shrink-0" style="color:var(--blue)"></i>
-            <span class="text-xs font-semibold flex-1" style="color:var(--text)">${title}</span>
-            <i class="ph-bold ph-caret-right caret text-xs" style="color:var(--muted)"></i>
-        </button>
-        <div class="ep-warn-body px-4 pb-3 text-xs hidden" style="color:var(--muted)">${body}</div>
-    </div>`;
+    el.innerHTML = _scNotice('entrypoints', title, body);
+    _scApplyNoteState();
 }
 
 async function _loadStaticFromDisk() {
@@ -2402,8 +2411,7 @@ function rerenderStaticBody() {
     filterStatic();
 }
 
-function filterStatic() {
-    const q = (document.getElementById('staticSearch')?.value || '').trim().toLowerCase();
+function _filterStaticClassic(q) {
     let shown = 0;
     document.querySelectorAll('#staticSettingsContent .sc-sec').forEach(sec => {
         const cards = sec.querySelectorAll('.tm-card');
@@ -2420,6 +2428,53 @@ function filterStatic() {
         sec.style.display = hits ? '' : 'none';
         shown += hits;
     });
+    return shown;
+}
+
+function _filterStaticModern(q) {
+    let shown = 0;
+    document.querySelectorAll('#staticSettingsContent .sc-sec').forEach(sec => {
+        const label = (sec.querySelector('.sc-sec-label')?.textContent || '').toLowerCase();
+        const rows  = sec.querySelectorAll('.sig-ep-row');
+        const labelHit = !!q && label.includes(q);
+        let hits = 0;
+        rows.forEach(row => {
+            const match = !q || labelHit || row.textContent.toLowerCase().includes(q);
+            row.style.display = match ? '' : 'none';
+            if (match) hits++;
+        });
+        const keep = !q || hits > 0 || labelHit;
+        sec.style.display = keep ? '' : 'none';
+        if (q && keep) shown += hits || 1;
+    });
+    document.querySelectorAll('#staticSettingsContent .sc-fold').forEach(fold => {
+        const key = fold.dataset.scSec || '';
+        const keep = !q || fold.textContent.toLowerCase().includes(q);
+        fold.style.display = keep ? '' : 'none';
+        if (q) {
+            if (keep) { fold.classList.add('open'); shown++; }
+        } else {
+            fold.classList.toggle('open', _scFoldOpen(key));
+        }
+    });
+    document.querySelectorAll('#staticSettingsContent .sc-grp').forEach(grp => {
+        let el = grp.nextElementSibling;
+        let any = false;
+        while (el && !el.classList.contains('sc-grp')) {
+            if ((el.classList.contains('sc-sec') || el.classList.contains('sc-fold'))
+                && el.style.display !== 'none') { any = true; break; }
+            el = el.nextElementSibling;
+        }
+        grp.style.display = any ? '' : 'none';
+    });
+    const verdict = document.getElementById('staticVerdict');
+    if (verdict) verdict.style.display = q ? 'none' : '';
+    return shown;
+}
+
+function filterStatic() {
+    const q = (document.getElementById('staticSearch')?.value || '').trim().toLowerCase();
+    const shown = _tmModern() ? _filterStaticModern(q) : _filterStaticClassic(q);
     const empty = document.getElementById('staticNoMatch');
     if (empty) empty.style.display = (q && shown === 0) ? '' : 'none';
 }

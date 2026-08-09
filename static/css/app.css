@@ -1513,18 +1513,11 @@ html.tm-modern .sc-sec[data-sc-sec="log"] > [id^="staticPanel-"] > div:first-chi
 .sc-root .sc-set-v { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .sc-root .sc-set-v .input-field { min-width: 150px; max-width: 260px; height: 30px; padding: 4px 9px; font-size: 11.5px; }
 .sc-root .sc-empty { padding: 14px 10px; font: 400 11.5px/1.5 'JetBrains Mono', monospace; color: var(--muted); }
-.sc-root .sc-note { margin: 0 0 8px; }
-.sc-root .sc-note-head { display: flex; align-items: center; gap: 7px; padding: 2px 0; background: none; border: none; cursor: pointer; text-align: left; color: var(--muted); }
-.sc-root .sc-note-head:hover { color: var(--text-secondary); }
-.sc-root .sc-note-caret { font-size: 10px; transition: transform .15s; flex-shrink: 0; }
-.sc-root .sc-note.open .sc-note-caret { transform: rotate(90deg); }
-.sc-root .sc-note-ic { font-size: 11px; flex-shrink: 0; color: var(--blue); }
-.sc-root .sc-note-lab { font: 400 11px/1.4 'JetBrains Mono', monospace; letter-spacing: -.01em; }
-.sc-root .sc-note-body { display: none; padding: 4px 0 2px 24px; font: 400 11.5px/1.6 'JetBrains Mono', monospace; color: var(--muted); max-width: 78ch; }
-.sc-root .sc-note.open .sc-note-body { display: block; }
-.sc-root .sc-note-body code { font-family: 'JetBrains Mono', monospace; color: var(--text-secondary); }
-.sc-root .sc-note-link { background: none; border: none; padding: 0; cursor: pointer; font: inherit; color: var(--blue); }
-.sc-root .sc-note-link:hover { text-decoration: underline; }
+.sc-notice { margin-bottom: 10px; }
+.sc-notice-body { display: none; line-height: 1.6; }
+.sc-notice.open .sc-notice-body { display: block; }
+.sc-notice-caret { transition: transform .15s; }
+.sc-notice.open .sc-notice-caret { transform: rotate(90deg); }
 @media (max-width: 560px) {
   .sc-root .sc-set { grid-template-columns: minmax(0, 1fr); row-gap: 8px; }
   .sc-root .sc-set-v { justify-content: flex-start; }
