@@ -47,6 +47,8 @@ function copy() {
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
   padding: 12px 16px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .install-cmd {
@@ -54,6 +56,8 @@ function copy() {
   font-size: 13px;
   color: var(--vp-c-text-1);
   white-space: nowrap;
+  overflow-x: auto;
+  min-width: 0;
 }
 
 .install-copy {

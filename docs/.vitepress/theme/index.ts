@@ -6,10 +6,6 @@ import mediumZoom from 'medium-zoom'
 import GitHubStars from './components/GitHubStars.vue'
 import MobileRelease from './components/MobileRelease.vue'
 import UnraidCAStatus from './components/UnraidCAStatus.vue'
-import ImageCarousel from './components/ImageCarousel.vue'
-import DesktopScreenshots from './components/DesktopScreenshots.vue'
-import ScreenshotGrid from './components/ScreenshotGrid.vue'
-import MobileScreenshots from './components/MobileScreenshots.vue'
 import ComposeUpgrader from './components/ComposeUpgrader.vue'
 import ShowcaseMockup from './components/ShowcaseMockup.vue'
 import InstallSection from './components/InstallSection.vue'
@@ -23,7 +19,7 @@ export default {
     const route = useRoute()
 
     const initZoom = () => {
-      mediumZoom('.ui-img-light, .ui-img-dark', {
+      mediumZoom('.screenshot', {
         background: 'rgba(0,0,0,0.85)',
       })
     }
@@ -41,10 +37,6 @@ export default {
     enhanceAppWithTabs(app)
     app.component('MobileRelease', MobileRelease)
     app.component('UnraidCAStatus', UnraidCAStatus)
-    app.component('ImageCarousel', ImageCarousel)
-    app.component('DesktopScreenshots', DesktopScreenshots)
-    app.component('ScreenshotGrid', ScreenshotGrid)
-    app.component('MobileScreenshots', MobileScreenshots)
     app.component('ComposeUpgrader', ComposeUpgrader)
     app.component('ShowcaseMockup', ShowcaseMockup)
     app.component('InstallSection', InstallSection)

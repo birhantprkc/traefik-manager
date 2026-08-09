@@ -127,3 +127,18 @@
   font-size: 11px;
   line-height: 18px;
 }
+
+@media (max-width: 768px) {
+  .gh-stars { display: none; }
+}
+
+html:not(.dark) .dark-only { display: none !important; }
+html.dark .light-only { display: none !important; }
+
+.screenshot {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--vp-c-divider);
+  margin: 16px 0 4px;
+  display: block;
+}
