@@ -15,19 +15,22 @@ import './style.css'
 
 export default {
   extends: DefaultTheme,
-  Layout() {
+  setup() {
     const route = useRoute()
+    let zoom: ReturnType<typeof mediumZoom> | null = null
 
     const initZoom = () => {
-      mediumZoom('.screenshot', {
+      if (zoom) zoom.detach()
+      zoom = mediumZoom('.screenshot', {
         margin: 32,
         background: 'rgba(0,0,0,0.85)',
       })
     }
 
-    onMounted(() => initZoom())
+    onMounted(() => nextTick(() => initZoom()))
     watch(() => route.path, () => nextTick(() => initZoom()))
-
+  },
+  Layout() {
     return h(DefaultTheme.Layout, null, {
       'nav-bar-content-after': () => [h(KoFiButton), h(GitHubStars)],
       'home-features-before': () => [h(InstallSection), h(ShowcaseMockup)],
