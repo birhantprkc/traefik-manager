@@ -53,12 +53,12 @@ async function capture(theme) {
     await js(`if (typeof _visibleTabsCache !== 'undefined' && !_visibleTabsCache.crowdsec) toggleTabVisibility('crowdsec')`); await sleep(700);
     await tab('crowdsec', 4000);
     await shot('crowdsec');
-    await tab('logs', 2500);
+    await tab('logs', 3000);
+    await shot('logs');
     await tab('plugins', 2000);
     await shot('plugins');
     await js(`openPluginForm()`); await sleep(1200); await shot('plugins-add');
     await js(`closePluginForm()`); await sleep(500);
-    await shot('logs');
 
     await tab('services', 600);
     await js(`openSettingsModal('ui')`); await sleep(1400); await shot('settings-interface');
@@ -79,6 +79,12 @@ async function capture(theme) {
     await tab('dashboard', 3000);
     const row = await page.$('.rm-route-link');
     if (row) { await row.hover(); await sleep(400); await shot('dashboard-hover'); }
+
+    await js(`setDashPodDensity('icons')`);
+    await sleep(3000);
+    await shot('dashboard-icons');
+    await js(`setDashPodDensity('list')`);
+    await sleep(1500);
 
     await page.close(); await ctx.close();
 }

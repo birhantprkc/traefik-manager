@@ -141,4 +141,8 @@ html.dark .light-only { display: none !important; }
   border: 1px solid var(--vp-c-divider);
   margin: 16px 0 4px;
   display: block;
+  cursor: zoom-in;
 }
+
+.medium-zoom-overlay { z-index: 200; }
+.medium-zoom-image--opened { z-index: 201; border-radius: 0; }

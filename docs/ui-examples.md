@@ -27,10 +27,10 @@ Every route as a launchable app, grouped into categories, with live health on ea
 <img class="screenshot dark-only" src="/images/dark-dashboard.png" alt="Dashboard">
 <img class="screenshot light-only" src="/images/light-dashboard.png" alt="Dashboard">
 
-The icon grid turns a category into an app launcher.
+Switch the categories to an icon grid under Settings -> Interface, and the dashboard becomes an app launcher.
 
-<img class="screenshot dark-only" src="/images/dark-dashboard-hover.png" alt="Dashboard app launcher">
-<img class="screenshot light-only" src="/images/light-dashboard-hover.png" alt="Dashboard app launcher">
+<img class="screenshot dark-only" src="/images/dark-dashboard-icons.png" alt="Dashboard icon grid">
+<img class="screenshot light-only" src="/images/light-dashboard-icons.png" alt="Dashboard icon grid">
 
 ## Routes
 

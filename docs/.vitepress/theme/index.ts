@@ -20,6 +20,7 @@ export default {
 
     const initZoom = () => {
       mediumZoom('.screenshot', {
+        margin: 32,
         background: 'rgba(0,0,0,0.85)',
       })
     }
