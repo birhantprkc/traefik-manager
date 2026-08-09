@@ -320,11 +320,7 @@ function _atkActive() { return Object.keys(_atkFacet).filter(k => _atkFacet[k]);
 function _atkClearFacets() { Object.keys(_atkFacet).forEach(k => { _atkFacet[k] = ''; }); }
 
 function _atkRevealFeed() {
-    const feed = document.querySelector('#csStats .atk-feed');
-    if (!feed) return;
-    const r = feed.getBoundingClientRect();
-    if (r.top >= 0 && r.top < window.innerHeight * 0.6) return;
-    feed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    revealBelowFold(document.querySelector('#csStats .atk-feed'));
 }
 
 function _atkOpenCsSettings() {
@@ -353,30 +349,42 @@ function _atkGo(spec) {
             const box = document.getElementById('csSearch');
             if (box) box.value = '';
         }
+        if (_atkViewAuto) { _atkView = 'alerts'; _atkViewAuto = false; }
         _atkPage = 1; _atkOpen = '';
         _csRender();
+        _atkRevealFeed();
         return;
     }
     if ('cfg' in p) { _atkOpenCsSettings(); return; }
     if ('reload' in p) { refreshCrowdSecTab(); return; }
     if ('unban' in p) { csUnban(Number(p.unban)); return; }
     if ('ban' in p) { openCsBanModal(p.ban); return; }
-    if ('page' in p) { _atkPage = Math.max(1, parseInt(p.page, 10) || 1); _atkOpen = ''; _csRender(); return; }
-    if ('open' in p) { _atkOpen = (_atkOpen === p.open) ? '' : p.open; _csRender(); return; }
+    if ('page' in p) { _atkPage = Math.max(1, parseInt(p.page, 10) || 1); _atkOpen = ''; _csRender(); _atkRevealFeed(); return; }
+    if ('open' in p) { _atkOpen = (_atkOpen === p.open) ? '' : p.open; _csRender(); _atkRevealFeed(); return; }
     if ('view' in p) {
         _atkView = p.view === 'decisions' ? 'decisions' : 'alerts';
+        _atkViewAuto = false;
         _atkPage = 1; _atkOpen = '';
         if (Object.keys(p).length === 1) { _csRender(); _atkRevealFeed(); return; }
     }
     const keys = Object.keys(p).filter(k => k in _atkFacet);
-    if (!keys.length) { _csRender(); return; }
+    if (!keys.length) { _csRender(); _atkRevealFeed(); return; }
     const same = !('view' in p) && keys.every(k => _atkFacet[k] === p[k]);
     keys.forEach(k => { _atkFacet[k] = same ? '' : p[k]; });
-    if (!('view' in p) && !same && keys.some(k => ATK_DEC_ONLY[k])) _atkView = 'decisions';
+    if (!('view' in p) && !same) {
+        if (keys.some(k => ATK_DEC_ONLY[k])) {
+            if (_atkView !== 'decisions') { _atkView = 'decisions'; _atkViewAuto = true; }
+        } else if (keys.some(k => ATK_ALERT_ONLY[k]) && _atkView !== 'alerts') {
+            _atkView = 'alerts'; _atkViewAuto = true;
+        }
+    }
+    if (same && _atkViewAuto && !_atkActive().length) { _atkView = 'alerts'; _atkViewAuto = false; }
     _atkPage = 1; _atkOpen = '';
     _csRender();
+    _atkRevealFeed();
 }
 
+let _atkViewAuto = false;
 let _atkBound = false;
 function _atkBind() {
     if (_atkBound) return;
@@ -1121,6 +1129,13 @@ function _atkKeyRow(d, sel) {
                 + '<i class="ph-bold ph-magnifying-glass"></i><b>' + _esc(_atkClip(_atkQuery, 24)) + '</b></span>';
         }
         html += '<button type="button" class="sig-key-item" data-atk="clear=all" title="Clear every filter and the search box"><i class="ph-bold ph-x"></i>clear</button>';
+    }
+    if (_atkView === 'decisions') {
+        html += '<span class="sig-key-lab">showing</span>'
+            + '<span class="sig-key-item sig-key-on lg-static" title="The feed below is listing active decisions rather than the alerts that caused them">'
+            + '<i class="ph-bold ph-shield-check"></i>bans in force</span>'
+            + '<button type="button" class="sig-key-item" data-atk="view=alerts" title="Go back to the attack evidence, the primary view">'
+            + '<i class="ph-bold ph-crosshair"></i>back to alerts</button>';
     }
     const scoped = facets.length || _atkQuery;
     const scopeTxt = scoped

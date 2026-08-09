@@ -161,7 +161,9 @@ def test_machine_request_carries_tls_kwargs(monkeypatch):
 def test_decisions_endpoint_gate_accepts_cert_only(monkeypatch, client):
     monkeypatch.setenv('CROWDSEC_LAPI_URL', 'https://lapi:8080')
     _set_cert(monkeypatch)
+    cs.cs_stream_reset()
     monkeypatch.setattr(tm, '_cs_request_strict', lambda *a, **k: [])
+    monkeypatch.setattr(cs, '_cs_request_strict', lambda *a, **k: {'new': [], 'deleted': []})
     resp = client.get('/api/crowdsec/decisions')
     assert resp.status_code == 200
     assert resp.get_json() == []

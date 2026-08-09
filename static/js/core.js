@@ -70,6 +70,14 @@ function buildSideNav() {
     }
 }
 
+function revealBelowFold(el) {
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.height === 0 && r.top === 0) return;
+    if (r.top >= 0 && r.top < window.innerHeight * 0.6) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function _detailDockActive() {
     return document.documentElement.classList.contains('tm-modern')
         && !document.documentElement.classList.contains('tm-settings-open')

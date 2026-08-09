@@ -270,6 +270,8 @@ A directory is read **one level deep**, not recursively. Point it at the folder 
 | `CROWDSEC_CLIENT_CERT` | - | Path to a TLS client certificate for a LAPI behind mTLS, replaces the API key and machine login |
 | `CROWDSEC_CLIENT_KEY` | - | Path to the client certificate's private key |
 | `CROWDSEC_CA_CERT` | - | Path to the CA certificate that signed the LAPI's own certificate (private PKI) |
+| `CROWDSEC_READ_TIMEOUT` | `20` | Seconds to wait for the LAPI to answer. Raise it on a busy or large LAPI |
+| `CROWDSEC_ALERT_LIMIT` | `500` | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
 
 **Two credential types - why both?**
 

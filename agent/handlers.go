@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -531,6 +533,21 @@ func (a *App) crowdsecDecisionsHandler(w http.ResponseWriter, r *http.Request) {
 	all := []json.RawMessage{}
 	cursor := int64(0)
 
+	if csStreamable {
+		rows, _, err := a.csDecisionsStream(r.Context(), r.URL.Query().Get("full") == "1")
+		if err == nil {
+			a.writeActiveDecisions(w, rows, now)
+			return
+		}
+		if strings.Contains(err.Error(), "LAPI 404") || strings.Contains(err.Error(), "LAPI 405") {
+			log.Printf("crowdsec: LAPI has no /v1/decisions/stream, falling back to the paged walk")
+			csStreamable = false
+		} else {
+			jsonError(w, "crowdsec unavailable: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+
 	for page := 0; page < csMaxPages; page++ {
 		path := fmt.Sprintf("/v1/decisions?limit=%d&id_gt=%d", csPageSize, cursor)
 		chunk, err := a.csPageJSON(r.Context(), path, false)
@@ -577,7 +594,8 @@ func (a *App) crowdsecAlertsHandler(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "CROWDSEC_LAPI_URL not configured", http.StatusNotFound)
 		return
 	}
-	chunk, err := a.csPageJSON(r.Context(), "/v1/alerts?limit=0&with_decisions=false", true)
+	chunk, err := a.csPageJSON(r.Context(),
+		fmt.Sprintf("/v1/alerts?limit=%d&with_decisions=false", a.cfg.CrowdSecAlertLimit), true)
 	if err != nil {
 		jsonError(w, "crowdsec unavailable: "+err.Error(), http.StatusBadGateway)
 		return
@@ -1657,4 +1675,112 @@ func (a *App) gitResetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("git repo directory reset by user")
 	jsonOK(w, map[string]any{"ok": true})
+}
+
+type csStreamCache struct {
+	mu    sync.Mutex
+	items map[int64]json.RawMessage
+	fp    string
+	ready bool
+	sync  time.Time
+}
+
+var csCache = &csStreamCache{items: map[int64]json.RawMessage{}}
+
+const csStreamResync = time.Hour
+
+func (a *App) csFingerprint() string {
+	sum := sha256.Sum256([]byte(a.cfg.CrowdSecLAPIURL + "|" + a.cfg.CrowdSecAPIKey + "|" + a.cfg.CrowdSecClientCert))
+	return hex.EncodeToString(sum[:8])
+}
+
+type csStreamPayload struct {
+	New     []json.RawMessage `json:"new"`
+	Deleted []json.RawMessage `json:"deleted"`
+}
+
+func decID(raw json.RawMessage) int64 {
+	var d struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return 0
+	}
+	return d.ID
+}
+
+func (a *App) csDecisionsStream(ctx context.Context, forceFull bool) ([]json.RawMessage, bool, error) {
+	fp := a.csFingerprint()
+	csCache.mu.Lock()
+	defer csCache.mu.Unlock()
+
+	full := forceFull || !csCache.ready || csCache.fp != fp ||
+		(!csCache.sync.IsZero() && time.Since(csCache.sync) > csStreamResync)
+	path := "/v1/decisions/stream"
+	if full {
+		path += "?startup=true"
+	}
+	resp, err := a.csRequest(ctx, http.MethodGet, path, nil, false)
+	if err != nil {
+		if csCache.ready && csCache.fp == fp {
+			return csCacheItems(), true, nil
+		}
+		return nil, false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		if csCache.ready && csCache.fp == fp && resp.StatusCode >= 500 {
+			return csCacheItems(), true, nil
+		}
+		return nil, false, fmt.Errorf("LAPI %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	var payload csStreamPayload
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, false, fmt.Errorf("LAPI 404: stream payload not understood: %w", err)
+	}
+	if full {
+		csCache.items = map[int64]json.RawMessage{}
+	}
+	for _, raw := range payload.New {
+		if id := decID(raw); id != 0 {
+			csCache.items[id] = raw
+		}
+	}
+	for _, raw := range payload.Deleted {
+		if id := decID(raw); id != 0 {
+			delete(csCache.items, id)
+		}
+	}
+	csCache.fp = fp
+	csCache.ready = true
+	csCache.sync = time.Now()
+	return csCacheItems(), false, nil
+}
+
+func csCacheItems() []json.RawMessage {
+	out := make([]json.RawMessage, 0, len(csCache.items))
+	for _, v := range csCache.items {
+		out = append(out, v)
+	}
+	return out
+}
+
+var csStreamable = true
+
+func (a *App) writeActiveDecisions(w http.ResponseWriter, rows []json.RawMessage, now time.Time) {
+	active := make([]json.RawMessage, 0, len(rows))
+	for _, raw := range rows {
+		var d struct {
+			Until string `json:"until"`
+		}
+		if json.Unmarshal(raw, &d) == nil && d.Until != "" {
+			if exp, err := time.Parse(time.RFC3339, strings.Replace(d.Until, "Z", "+00:00", 1)); err == nil && exp.Before(now) {
+				continue
+			}
+		}
+		active = append(active, raw)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(active)
 }

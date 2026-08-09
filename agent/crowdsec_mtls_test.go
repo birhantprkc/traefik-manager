@@ -98,8 +98,12 @@ func (p *testPKI) mtlsServer(t *testing.T, handler http.Handler) *httptest.Serve
 }
 
 func TestBuildCSClientDefaultWithoutConfig(t *testing.T) {
-	if buildCSClient(&Config{}) != http.DefaultClient {
-		t.Fatal("unconfigured cert paths must fall back to the default client")
+	c := buildCSClient(&Config{})
+	if c.Transport != nil {
+		t.Fatal("unconfigured cert paths must not build a TLS transport")
+	}
+	if c.Timeout == 0 {
+		t.Fatal("even the plain client needs a timeout so a stalled LAPI cannot hang the agent")
 	}
 }
 
@@ -109,7 +113,7 @@ func TestBuildCSClientFallbackOnUnreadablePaths(t *testing.T) {
 		CrowdSecClientKey:  "/nonexistent/c.key",
 		CrowdSecCACert:     "/nonexistent/ca.crt",
 	}
-	if buildCSClient(cfg) != http.DefaultClient {
+	if buildCSClient(cfg).Transport != nil {
 		t.Fatal("unreadable cert files must fall back instead of crashing the agent")
 	}
 }
@@ -121,8 +125,8 @@ func TestBuildCSClientLoadsCertAndCA(t *testing.T) {
 		CrowdSecClientKey:  p.clientKey,
 		CrowdSecCACert:     p.caFile,
 	})
-	if c == http.DefaultClient {
-		t.Fatal("valid cert config must build a dedicated client")
+	if c.Transport == nil {
+		t.Fatal("valid cert config must build a dedicated TLS client")
 	}
 	tcfg := c.Transport.(*http.Transport).TLSClientConfig
 	if len(tcfg.Certificates) != 1 {

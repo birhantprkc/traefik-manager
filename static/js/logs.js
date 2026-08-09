@@ -121,6 +121,7 @@ async function refreshLogs(silent) {
 function logGeo_click(cc) {
     _logCountryFilter = (_logCountryFilter === cc) ? '' : cc;
     renderLogs();
+    _lgRevealList();
 }
 function clearLogCountryFilter() { _logCountryFilter = ''; renderLogs(); }
 
@@ -364,6 +365,10 @@ function clearLogFilters() {
 }
 
 
+function _lgRevealList() {
+    revealBelowFold(document.getElementById('logsContent'));
+}
+
 function _lgGo(spec) {
     const p = {};
     String(spec || '').split(';').forEach(kv => {
@@ -382,6 +387,7 @@ function _lgGo(spec) {
             if (box) box.value = '';
         }
         renderLogs();
+        _lgRevealList();
         return;
     }
     if (p.cfg) { switchTab('static'); return; }
@@ -395,6 +401,7 @@ function _lgGo(spec) {
     const same = keys.every(k => _logFacet[k] === p[k]);
     keys.forEach(k => { _logFacet[k] = same ? '' : p[k]; });
     renderLogs();
+    _lgRevealList();
 }
 
 function _lgBind() {

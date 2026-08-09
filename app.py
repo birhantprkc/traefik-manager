@@ -78,6 +78,8 @@ _cs_machine_password       = _crowd._cs_machine_password
 _cs_has_machine            = _crowd._cs_has_machine
 _cs_has_cert               = _crowd._cs_has_cert
 _cs_tls_kwargs             = _crowd._cs_tls_kwargs
+cs_timeout                 = _crowd.cs_timeout
+cs_alert_limit             = _crowd.cs_alert_limit
 _cs_request                = _crowd._cs_request
 _cs_request_strict         = _crowd._cs_request_strict
 CrowdSecUnavailable        = _crowd.CrowdSecUnavailable
@@ -1084,21 +1086,41 @@ def api_cs_decisions():
     if not key and not _cs_has_cert():
         return jsonify({'error': 'No bouncer API key or client certificate. CrowdSec only accepts a bouncer key '
                                  'or a TLS client certificate on /v1/decisions, the machine token is refused there'}), 503
+    force_full = request.args.get('full') in ('1', 'true', 'yes')
     try:
-        all_decisions = []
-        cursor = 0
-        for _ in range(CS_MAX_PAGES):
-            chunk = _cs_request_strict('GET', f'/v1/decisions?limit={CS_PAGE_SIZE}&id_gt={cursor}',
-                                       lapi=lapi, key=key)
-            if not isinstance(chunk, list) or not chunk:
-                break
-            all_decisions.extend(chunk)
-            ids = [d.get('id') for d in chunk if isinstance(d.get('id'), int)]
-            if not ids:
-                break
-            cursor = max(ids)
-            if len(chunk) < CS_PAGE_SIZE:
-                break
+        all_decisions = None
+        if _crowd._cs_stream_cache.get('streamable', True):
+            try:
+                all_decisions, _mode = _crowd.cs_decisions_stream(force_full=force_full)
+            except CrowdSecUnavailable as e:
+                if 'HTTP 404' in str(e) or 'HTTP 405' in str(e):
+                    logger.info("CrowdSec LAPI has no /v1/decisions/stream, falling back to the paged walk")
+                    _crowd._cs_stream_cache['streamable'] = False
+                    all_decisions = None
+                else:
+                    raise
+        if all_decisions is None:
+            all_decisions = []
+            cursor = 0
+            for _page in range(CS_MAX_PAGES):
+                try:
+                    chunk = _cs_request_strict('GET', f'/v1/decisions?limit={CS_PAGE_SIZE}&id_gt={cursor}',
+                                               lapi=lapi, key=key)
+                except CrowdSecUnavailable:
+                    if all_decisions:
+                        logger.warning(f"CrowdSec decisions walk failed at page {_page + 1}, "
+                                       f"returning the {len(all_decisions)} rows already read")
+                        break
+                    raise
+                if not isinstance(chunk, list) or not chunk:
+                    break
+                all_decisions.extend(chunk)
+                ids = [d.get('id') for d in chunk if isinstance(d.get('id'), int)]
+                if not ids:
+                    break
+                cursor = max(ids)
+                if len(chunk) < CS_PAGE_SIZE:
+                    break
         now = datetime.now(timezone.utc)
         active = []
         for d in all_decisions:
@@ -1133,10 +1155,11 @@ def api_cs_alerts():
             headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
         else:
             headers = {'X-Api-Key': _cs_api_key(), 'Accept': 'application/json'}
+        _limit = cs_alert_limit()
         resp = requests.get(
-            f"{lapi.rstrip('/')}/v1/alerts?limit=0&with_decisions=false",
+            f"{lapi.rstrip('/')}/v1/alerts?limit={_limit}&with_decisions=false",
             headers=headers,
-            timeout=5, **_cs_tls_kwargs(),
+            timeout=cs_timeout(), **_cs_tls_kwargs(),
         )
         if not resp.ok:
             try:
@@ -1147,7 +1170,10 @@ def api_cs_alerts():
         alerts = resp.json() if resp.content else []
         if not isinstance(alerts, list):
             alerts = []
-        return jsonify(alerts)
+        out = jsonify(alerts)
+        out.headers['X-CS-Alert-Limit'] = str(_limit)
+        out.headers['X-CS-Alert-Capped'] = '1' if (_limit and len(alerts) >= _limit) else '0'
+        return out
     except Exception as e:
         logger.exception("CrowdSec alerts error")
         return jsonify({'error': str(e)}), 500

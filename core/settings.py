@@ -116,6 +116,8 @@ def load_settings() -> dict:
         'crowdsec_client_cert':      '',
         'crowdsec_client_key':       '',
         'crowdsec_ca_cert':          '',
+        'crowdsec_read_timeout':     '',
+        'crowdsec_alert_limit':      '',
         'traefik_api_user':          os.environ.get('TRAEFIK_API_USER', ''),
         'traefik_api_password':      os.environ.get('TRAEFIK_API_PASSWORD', ''),
         'git_backup_enabled':        False,
@@ -258,7 +260,8 @@ def load_settings() -> dict:
             merged['crowdsec_machine_id'] = str(data['crowdsec_machine_id']).strip()
         if 'crowdsec_machine_password' in data:
             merged['crowdsec_machine_password'] = crypto.decrypt_secret(str(data['crowdsec_machine_password']))
-        for _ck in ('crowdsec_client_cert', 'crowdsec_client_key', 'crowdsec_ca_cert'):
+        for _ck in ('crowdsec_client_cert', 'crowdsec_client_key', 'crowdsec_ca_cert',
+                    'crowdsec_read_timeout', 'crowdsec_alert_limit'):
             if _ck in data:
                 merged[_ck] = str(data[_ck]).strip()
         if 'traefik_api_user' in data:

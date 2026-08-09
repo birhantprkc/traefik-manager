@@ -164,8 +164,9 @@ def test_leaving_expose_by_default_on_does_not_write_the_key(client):
     assert 'exposedByDefault' not in (parsed['providers']['docker'] or {}), raw
 
 
-def _cs_lapi_stub(monkeypatch, capi_count, local_ip, local_origin='crowdsec'):
+def _cs_lapi_stub(monkeypatch, capi_count, local_ip, local_origin='crowdsec', stream=True):
     import app as tm
+    from core import crowdsec as cs
     pool = [{'id': i + 1, 'origin': 'CAPI', 'value': f'10.0.{i // 256}.{i % 256}',
              'type': 'ban', 'scenario': 'capi', 'until': '2099-01-01T00:00:00Z'}
             for i in range(capi_count)]
@@ -176,6 +177,10 @@ def _cs_lapi_stub(monkeypatch, capi_count, local_ip, local_origin='crowdsec'):
 
     def fake(method, path, **kw):
         calls.append(path)
+        if '/v1/decisions/stream' in path:
+            if not stream:
+                raise cs.CrowdSecUnavailable(f'LAPI answered HTTP 404 on {path}')
+            return {'new': list(pool), 'deleted': []}
         from urllib.parse import urlparse, parse_qs
         q = parse_qs(urlparse(path).query)
         limit = int(q.get('limit', ['100'])[0])
@@ -183,10 +188,14 @@ def _cs_lapi_stub(monkeypatch, capi_count, local_ip, local_origin='crowdsec'):
         rows = sorted((d for d in pool if d['id'] > id_gt), key=lambda d: d['id'])
         return rows[:limit]
 
+    cs.cs_stream_reset()
     monkeypatch.setattr(tm, '_cs_lapi_url', lambda: 'http://lapi:8080')
     monkeypatch.setattr(tm, '_cs_api_key', lambda: 'key')
+    monkeypatch.setattr(cs, '_cs_lapi_url', lambda: 'http://lapi:8080')
+    monkeypatch.setattr(cs, '_cs_api_key', lambda: 'key')
     monkeypatch.setattr(tm, '_cs_request', fake)
     monkeypatch.setattr(tm, '_cs_request_strict', fake)
+    monkeypatch.setattr(cs, '_cs_request_strict', fake)
     return calls
 
 
@@ -589,3 +598,36 @@ def test_tls_options_are_not_shown_for_agents(client, monkeypatch, app_module):
                         lambda a: {'dynamic.yml': {'tls': {'options': {'agentonly': {'minVersion': 'VersionTLS13'}}}}})
     agent2 = client.get('/api/tls-options?server=agent-abc').get_json()
     assert [o['name'] for o in agent2] == ['agentonly']
+
+
+def test_paged_fallback_still_returns_every_decision(client, monkeypatch):
+    ip = '203.0.113.9'
+    calls = _cs_lapi_stub(monkeypatch, capi_count=6000, local_ip=ip, stream=False)
+
+    res = client.get('/api/crowdsec/decisions')
+    assert res.status_code == 200, res.data
+    values = [d['value'] for d in res.get_json()]
+    assert ip in values, (
+        'On a LAPI with no /v1/decisions/stream the paged walk must still find every '
+        'decision, including one past the old cap. See issue #130.')
+    assert any('stream' in c for c in calls), 'the stream endpoint should be tried first'
+    assert any('id_gt=' in c for c in calls), 'it should fall back to the paged walk'
+
+
+def test_stream_is_preferred_and_pages_only_once(client, monkeypatch):
+    calls = _cs_lapi_stub(monkeypatch, capi_count=6000, local_ip='198.51.100.4')
+
+    res = client.get('/api/crowdsec/decisions')
+    assert res.status_code == 200
+    assert len(res.get_json()) == 6001
+    assert len(calls) == 1, f'the stream should need one call, got {calls[:5]}'
+    assert 'startup=true' in calls[0]
+
+
+def test_second_read_uses_a_delta_not_a_full_resync(client, monkeypatch):
+    calls = _cs_lapi_stub(monkeypatch, capi_count=10, local_ip='198.51.100.5')
+
+    client.get('/api/crowdsec/decisions')
+    client.get('/api/crowdsec/decisions')
+    assert 'startup=true' in calls[0]
+    assert 'startup=true' not in calls[1], 'the second read must be an incremental delta'

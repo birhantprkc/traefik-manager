@@ -71,6 +71,9 @@ Variables marked ✅ **override** the corresponding `manager.yml` field on every
 | `CROWDSEC_CLIENT_CERT` | _(unset)_ | ✅ `crowdsec_client_cert` | Path to a TLS client certificate for a LAPI behind mTLS, replaces the API key and machine login |
 | `CROWDSEC_CLIENT_KEY` | _(unset)_ | ✅ `crowdsec_client_key` | Path to the client certificate's private key |
 | `CROWDSEC_CA_CERT` | _(unset)_ | ✅ `crowdsec_ca_cert` | Path to the CA certificate that signed the LAPI's own certificate (private PKI) |
+| `CROWDSEC_READ_TIMEOUT` | `20` | ✅ `crowdsec_read_timeout` | Seconds to wait for the LAPI to answer. Raise it on a busy or large LAPI. Capped at 25 so it stays inside the worker budget |
+| `CROWDSEC_CONNECT_TIMEOUT` | `5` | - | Seconds to wait for the TCP/TLS connection itself |
+| `CROWDSEC_ALERT_LIMIT` | `500` | ✅ `crowdsec_alert_limit` | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
 
 ### Agents
 
@@ -767,3 +770,27 @@ Environment=PROXY_FIX_HOPS=2
 ::: warning
 Only count hops you actually control. Each trusted hop is one more `X-Forwarded-For` entry a client could forge, so setting this higher than your real proxy chain lets callers spoof their source IP past the login rate-limiter and audit log. Set it to `0` to ignore `X-Forwarded-For` entirely and use the direct connection IP.
 :::
+
+### `CROWDSEC_READ_TIMEOUT` / `CROWDSEC_CONNECT_TIMEOUT`
+
+How long to wait for the CrowdSec LAPI. The read timeout defaults to 20 seconds and is capped at 25, because the web worker itself is recycled at 30 - a higher value would be killed before it could return.
+
+Raise it if the CrowdSec tab reports the LAPI as unreachable on an instance that is simply busy:
+
+```yaml
+environment:
+  - CROWDSEC_READ_TIMEOUT=25
+```
+
+### `CROWDSEC_ALERT_LIMIT`
+
+How many of the most recent alerts the CrowdSec tab reads, newest first. The default of 500 keeps the tab responsive on a LAPI holding a large community blocklist.
+
+Set it to `0` to read every alert the LAPI still retains. On a large instance that request can take longer than the read timeout allows, which is what the limit exists to prevent.
+
+```yaml
+environment:
+  - CROWDSEC_ALERT_LIMIT=1000
+```
+
+Decisions are not limited. They are read through the LAPI's own streaming endpoint, which sends the full set once and then only what changed, so a refresh stays cheap no matter how many decisions the LAPI holds.
