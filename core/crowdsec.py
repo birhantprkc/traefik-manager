@@ -1,4 +1,3 @@
-"""CrowdSec LAPI client: decisions, alerts and machine login."""
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -64,7 +63,7 @@ def _cs_has_machine() -> bool:
 
 
 class CrowdSecUnavailable(Exception):
-    """The LAPI could not be reached or refused the read. Never the same as an empty result."""
+    pass
 
 
 def _cs_request_strict(method: str, path: str, lapi: str = None, key: str = None, **kwargs):

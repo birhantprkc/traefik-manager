@@ -1,7 +1,3 @@
-"""CrowdSec LAPI mTLS auth (#131): a client certificate replaces the bouncer
-API key on decisions and the machine login on alerts. Cert-only setups count
-as configured, the cert/CA are threaded into every LAPI request, and the
-login payload omits credentials that are not set."""
 import pytest
 
 from tests.conftest import tm

@@ -397,7 +397,7 @@ function switchSettingsPanel(id, btn) {
     document.getElementById('mpanel-' + id).classList.add('active');
     if (id === 'about') _loadAboutAgentInfo();
     if (window.innerWidth < 640) {
-        const titles = {connection:'Connection',routes:'Route Monitoring',system:'System Monitoring',auth:'Authentication',backups:'Backups',ui:'Interface',notifications:'Notifications',about:'About','agent-keys':'API Keys'};
+        const titles = {connection:'Connection',routes:'Route Monitoring',system:'System Monitoring',auth:'Authentication',backups:'Backups',ui:'Interface',notifications:'Notifications',about:'About','agent-keys':'API Keys',static:'Static Config'};
         document.getElementById('settingsModalTitle').textContent = titles[id] || 'Settings';
         document.getElementById('settingsGearIcon').style.display = 'none';
         document.getElementById('settingsMobileRoot').style.display = 'none';
@@ -1035,7 +1035,6 @@ function renderReleaseNotes(md) {
     while (i < lines.length) {
         const line = lines[i].trimEnd();
 
-        // Table - collect all consecutive table rows
         if (isTableRow(line)) {
             if (inList) { html += '</ul>'; inList = false; }
             const block = [];
@@ -1055,21 +1054,18 @@ function renderReleaseNotes(md) {
             continue;
         }
 
-        // Blockquote
         if (/^> /.test(line)) {
             if (inList) { html += '</ul>'; inList = false; }
             html += `<div style="margin:6px 0;padding:5px 10px;border-left:3px solid var(--blue);background:rgba(58,130,246,0.06);border-radius:0 4px 4px 0;font-size:11px;color:var(--muted)">${inline(line.replace(/^> /, ''))}</div>`;
             i++; continue;
         }
 
-        // Horizontal rule
         if (/^---+$/.test(line.trim())) {
             if (inList) { html += '</ul>'; inList = false; }
             html += '<hr style="border:none;border-top:1px solid var(--border);margin:10px 0">';
             i++; continue;
         }
 
-        // Headings
         if (/^#{1,4} /.test(line)) {
             if (inList) { html += '</ul>'; inList = false; }
             const lvl   = line.match(/^(#{1,4}) /)[1].length;
@@ -1081,20 +1077,17 @@ function renderReleaseNotes(md) {
             i++; continue;
         }
 
-        // List item
         if (/^[-*] /.test(line)) {
             if (!inList) { html += '<ul style="margin:4px 0 6px;padding-left:16px;list-style:disc">'; inList = true; }
             html += `<li style="margin:2px 0;color:var(--text)">${inline(line.replace(/^[-*] /, ''))}</li>`;
             i++; continue;
         }
 
-        // Blank line
         if (line.trim() === '') {
             if (inList) { html += '</ul>'; inList = false; }
             i++; continue;
         }
 
-        // Paragraph
         if (inList) { html += '</ul>'; inList = false; }
         html += `<p style="margin:3px 0;color:var(--muted)">${inline(line)}</p>`;
         i++;
@@ -1248,7 +1241,6 @@ async function otpToggleFlow() {
         } catch(e) { showToast('Request failed', 'error'); }
         return;
     }
-    // Start setup flow
     try {
         const res  = await fetch('/api/auth/otp/setup', { method: 'POST', headers: _csrfHeaders() });
         const data = await res.json();

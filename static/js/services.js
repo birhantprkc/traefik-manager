@@ -160,14 +160,12 @@ function renderServicesTable() {
         const stColor = st === 'success' ? 'var(--green)' : st === 'error' ? 'var(--red)' : 'var(--yellow)';
         const stLabel = st === 'success' ? 'Success'      : st === 'error' ? 'Error'      : 'Warning';
 
-        // Server health from serverStatus map (Traefik API)
         const serverStatus  = s.serverStatus || {};
         const serverEntries = Object.entries(serverStatus);
         const activeCount   = serverEntries.filter(([,v]) => (v||'').toLowerCase() === 'up').length;
         const serverSummary = serverEntries.length > 0 ? `${activeCount}/${serverEntries.length} active` : null;
         const srvColor      = serverEntries.length > 0 && activeCount === serverEntries.length ? 'var(--green)' : 'var(--orange)';
 
-        // Used-by router chips
         const usedBy = s.usedBy || [];
         const usedByHtml = usedBy.length > 0 ? `
             <div class="svc-card-usedby">

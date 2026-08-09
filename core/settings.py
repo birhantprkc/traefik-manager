@@ -1,8 +1,3 @@
-"""manager.yml load/save.
-
-Depends on core.agents_store only for the one-time migration of agent entries
-out of manager.yml into agents.yml.
-"""
 import os
 import threading
 
@@ -21,7 +16,11 @@ UI_PREF_VIEWS = ('routeViewMode', 'mwViewMode', 'svcViewMode')
 UI_PREF_SCOPES = ('statBarScope',)
 UI_PREF_LAYOUTS = ('layoutMode',)
 UI_PREF_DENSITY = ('dashPodDensity',)
-UI_PREF_KEYS = UI_PREF_BOOLS + UI_PREF_VIEWS + UI_PREF_SCOPES + UI_PREF_DENSITY + UI_PREF_LAYOUTS
+UI_PREF_PLACEMENTS = ('staticPlacement',)
+UI_PREF_SECTION_LISTS = ('staticOpenSections',)
+STATIC_SECTION_KEYS = ('entrypoints', 'resolvers', 'providers', 'api', 'log', 'observability', 'system', 'plugins')
+UI_PREF_KEYS = (UI_PREF_BOOLS + UI_PREF_VIEWS + UI_PREF_SCOPES + UI_PREF_DENSITY
+                + UI_PREF_LAYOUTS + UI_PREF_PLACEMENTS + UI_PREF_SECTION_LISTS)
 
 
 def sanitize_visible_tabs(tabs) -> dict:
@@ -57,6 +56,19 @@ def sanitize_ui_prefs(prefs) -> dict:
             v = str(prefs[k]).strip().lower()
             if v in ('list', 'icons'):
                 out[k] = v
+    for k in UI_PREF_PLACEMENTS:
+        if k in prefs:
+            v = str(prefs[k]).strip().lower()
+            if v in ('off', 'settings', 'tab'):
+                out[k] = v
+    for k in UI_PREF_SECTION_LISTS:
+        if k in prefs and isinstance(prefs[k], list):
+            seen = []
+            for item in prefs[k]:
+                s = str(item).strip()
+                if s in STATIC_SECTION_KEYS and s not in seen:
+                    seen.append(s)
+            out[k] = seen
     return out
 
 
@@ -495,12 +507,6 @@ def _get_acme_json_path() -> str:
 
 
 def get_acme_json_paths() -> list:
-    """Every acme storage file to read, in order.
-
-    The setting takes a comma-separated list, and any entry that is a directory
-    contributes its .json files. Traefik writes one storage file per resolver,
-    so a setup with several resolvers has several files.
-    """
     raw = _get_acme_json_path()
     out = []
     for part in (p.strip() for p in raw.split(',')):

@@ -744,12 +744,75 @@ function _scRail(section, name) {
         '</span>';
 }
 
+function _scRowRail(section, name, glyphs) {
+    const g = (glyphs || []).map(([ic, cls, tip]) =>
+        `<span class="sig-flag ${cls}" title="${_esc(tip)}"><i class="ph-bold ${ic}"></i></span>`).join('');
+    const nd = JSON.stringify(name);
+    return '<span class="sc-rail"><span class="sc-rail-glyphs">' + g + '</span>'
+        + '<span class="sc-rail-btns">'
+        + `<button type="button" class="sc-btn" title="Edit" onclick='event.stopPropagation();openStaticEditForm("${section}",${_esc(nd)})'><i class="ph-bold ph-pencil-simple"></i></button>`
+        + `<button type="button" class="sc-btn sc-btn-del" title="Delete" onclick='event.stopPropagation();removeStaticItem("${section}",${_esc(nd)})'><i class="ph-bold ph-trash"></i></button>`
+        + '</span></span>';
+}
+
+function _scRow(o) {
+    const health = o.warn ? ' data-health="warn"' : (o.idle ? ' data-health="idle"' : '');
+    const sub = o.warn
+        ? `<span class="sig-ep-sub d-warn"><i class="ph-bold ph-warning" style="font-size:10px"></i> ${_esc(o.warn)}</span>`
+        : (o.sub ? `<span class="sig-ep-sub">${_esc(o.sub)}</span>` : '');
+    const n = (o.n === undefined || o.n === null || o.n === '') ? ''
+        : (o.n === 0 ? '<span style="color:var(--muted);font-weight:400">-</span>' : _sdNum(o.n));
+    return `<div class="sig-ep-row"${health} role="button" tabindex="0"`
+        + ` onclick='openStaticEditForm("${o.section}",${_esc(JSON.stringify(o.name))})'>`
+        + `<span class="sig-ep-id"><span class="sig-ep-name">${_esc(o.name)}</span>`
+        + `<span class="sig-idle-txt" style="color:${o.tagColor || 'var(--muted)'}">${_esc(o.tag || '')}</span></span>`
+        + `<span class="sig-ep-addr">${_esc(o.addr || '')}</span>`
+        + '<span class="sig-ep-strip"></span>'
+        + `<span class="sig-ep-n">${n}</span>`
+        + `<span class="sig-ep-flags">${_scRowRail(o.section, o.name, o.glyphs)}</span>`
+        + sub + '</div>';
+}
+
+function _scRows(rows) {
+    return '<div class="sc-panel">' + rows.join('') + '</div>';
+}
+
 function _scGrid(cards) {
     return `<div class="tm-card-grid">${cards}</div>`;
 }
 
 function _scEmpty(text) {
     return `<div class="px-5 py-8 text-center text-sm" style="color:var(--muted)">${_esc(text)}</div>`;
+}
+
+function _scEpRow(name, ep) {
+    const addr  = ep.address || '';
+    const redir = ep.http?.redirections?.entryPoint?.to || '';
+    const uhs   = ep.http?.underscoreHeadersStrategy || '';
+    const tips  = Array.isArray(ep.forwardedHeaders?.trustedIPs) ? ep.forwardedHeaders.trustedIPs.length : 0;
+    const insecureFwd = !!ep.forwardedHeaders?.insecure;
+    const insecurePp  = !!ep.proxyProtocol?.insecure;
+    const isUdp = /\/udp$/i.test(addr);
+    const isTcp = /\/tcp$/i.test(addr);
+    const port  = addr.replace(/\/(tcp|udp)$/i, '').replace(/^.*:/, '');
+    const proto = isUdp ? ['UDP', '#e2c041'] : isTcp ? ['TCP', 'var(--teal)']
+                : port === '443' ? ['HTTPS', 'var(--green)'] : ['HTTP', 'var(--blue)'];
+    const glyphs = [];
+    if (ep.http3) glyphs.push(['ph-lightning', 'd-mw', 'HTTP/3 enabled']);
+    if (redir) glyphs.push(['ph-arrow-u-up-right', 'd-off', 'redirects to ' + redir]);
+    if (tips) glyphs.push(['ph-shield', 'd-blue', 'forwardedHeaders.trustedIPs: ' + tips + ' range(s)']);
+    if (uhs) glyphs.push(['ph-shield-check', 'd-on', 'underscoreHeadersStrategy: ' + uhs]);
+    let warn = '';
+    if (insecureFwd) warn = 'forwardedHeaders.insecure is on, any client can set X-Forwarded-For';
+    else if (insecurePp) warn = 'proxyProtocol.insecure is on, the PROXY header is trusted from any source';
+    const facts = [];
+    if (redir) facts.push('redirects to ' + redir);
+    if (tips) facts.push(tips + ' trusted range' + (tips > 1 ? 's' : ''));
+    if (uhs) facts.push('underscore headers ' + uhs);
+    return _scRow({
+        section: 'entrypoints', name: name, tag: proto[0], tagColor: proto[1],
+        addr: addr, n: _scCount('eps', name), glyphs: glyphs, warn: warn, sub: facts.join(' · '),
+    });
 }
 
 function _tmEpCard(name, ep) {
@@ -785,6 +848,28 @@ function _tmEpCard(name, ep) {
     </div>`;
 }
 
+function _scResolverRow(name, res) {
+    const acme   = (res || {}).acme || {};
+    const isDns  = !!acme.dnsChallenge;
+    const isHttp = !!acme.httpChallenge;
+    const tag    = isDns ? 'DNS' : isHttp ? 'HTTP' : 'TLS';
+    const color  = isDns ? 'var(--teal)' : isHttp ? 'var(--green)' : 'var(--blue)';
+    const glyphs = [];
+    if (acme.email) glyphs.push(['ph-envelope-simple', 'd-off', acme.email]);
+    if (isDns && acme.dnsChallenge.provider) glyphs.push(['ph-cloud', 'd-blue', acme.dnsChallenge.provider]);
+    if (acme.caServer) glyphs.push(['ph-buildings', 'd-off', acme.caServer]);
+    const facts = [];
+    if (acme.email) facts.push(acme.email);
+    if (isDns && acme.dnsChallenge.provider) facts.push(acme.dnsChallenge.provider);
+    if (acme.keyType) facts.push(acme.keyType);
+    const warn = !acme.email ? 'no email set, Let\'s Encrypt requires one to issue certificates' : '';
+    return _scRow({
+        section: 'resolvers', name: name, tag: tag, tagColor: color,
+        addr: acme.storage ? acme.storage.split('/').pop() : '', n: _scCount('resolvers', name),
+        glyphs: glyphs, warn: warn, sub: facts.join(' · '),
+    });
+}
+
 function _tmResolverCard(name, res) {
     const acme  = (res || {}).acme || {};
     const isDns = !!acme.dnsChallenge, isHttp = !!acme.httpChallenge;
@@ -801,6 +886,20 @@ function _tmResolverCard(name, res) {
         </div>
         <div class="tm-foot"><span class="tm-meta">${acme.email ? _esc(acme.email) : 'no account email'}</span>${_scFile(acme.storage || 'acme.json')}</div>
     </div>`;
+}
+
+function _scPluginRow(name, p) {
+    const pl = p || {};
+    const local = !!pl._local;
+    return _scRow({
+        section: 'plugins', name: name, tag: local ? 'local' : 'plugin',
+        tagColor: local ? 'var(--teal)' : 'var(--purple)',
+        addr: local ? '' : (pl.version || ''), n: _scCount('plugins', name),
+        glyphs: local
+            ? [['ph-folder-open', 'd-off', 'local plugin, loaded from disk']]
+            : [['ph-package', 'd-mw', pl.moduleName || name]],
+        sub: local ? 'local plugin' : (pl.moduleName || ''),
+    });
 }
 
 function _tmPluginCard(name, p) {
@@ -831,7 +930,7 @@ function _renderStaticEntrypoints(eps) {
         return;
     }
     if (_tmModern()) {
-        el.innerHTML = _scGrid(keys.map(name => _tmEpCard(name, eps[name] || {})).join(''));
+        el.innerHTML = _scRows(keys.map(name => _scEpRow(name, eps[name] || {})));
         return;
     }
     const rows = keys.map((name, i) => {
@@ -875,7 +974,7 @@ function _renderStaticResolvers(resolvers) {
         return;
     }
     if (_tmModern()) {
-        el.innerHTML = _scGrid(keys.map(name => _tmResolverCard(name, resolvers[name])).join(''));
+        el.innerHTML = _scRows(keys.map(name => _scResolverRow(name, resolvers[name])));
         return;
     }
     const rows = keys.map((name, i) => {
@@ -919,7 +1018,7 @@ function _renderStaticPlugins(plugins, localPlugins) {
         return;
     }
     if (_tmModern()) {
-        el.innerHTML = _scGrid(keys.map(name => _tmPluginCard(name, all[name])).join(''));
+        el.innerHTML = _scRows(keys.map(name => _scPluginRow(name, all[name])));
         return;
     }
     const rows = keys.map((name, i) => {
@@ -942,6 +1041,185 @@ function _renderStaticPlugins(plugins, localPlugins) {
     el.innerHTML = `<div style="margin:12px 16px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;">${rows}</div>`;
 }
 
+let _scCounts = null;
+
+async function _scLoadCounts() {
+    try {
+        const [routers, certs, mws] = await Promise.all([
+            agentFetch('/api/traefik/routers').then(r => r.json()).catch(() => null),
+            agentFetch('/api/traefik/certs').then(r => r.json()).catch(() => null),
+            agentFetch('/api/traefik/middlewares').then(r => r.json()).catch(() => null),
+        ]);
+        if (!routers || routers.error) return null;
+        const eps = {}, provs = {}, resolvers = {}, plugins = {};
+        const all = [].concat(routers.http || [], routers.tcp || [], routers.udp || []);
+        all.forEach(r => {
+            (typeof _sdUsing === 'function' ? _sdUsing(r) : (r.entryPoints || [])).forEach(e => {
+                eps[e] = (eps[e] || 0) + 1;
+            });
+            const p = String(r.provider || String(r.name || '').split('@')[1] || '').trim();
+            if (p) provs[p] = (provs[p] || 0) + 1;
+        });
+        if (certs && Array.isArray(certs.certs)) {
+            certs.certs.forEach(c => {
+                const rn = c.resolver || '';
+                if (rn) resolvers[rn] = (resolvers[rn] || 0) + 1;
+            });
+        }
+        if (mws) {
+            [].concat(mws.http || [], mws.tcp || []).forEach(m => {
+                const t = m && m.type ? String(m.type) : '';
+                if (t) plugins[t] = (plugins[t] || 0) + 1;
+            });
+        }
+        return { eps, provs, resolvers, plugins, certsOk: !!(certs && Array.isArray(certs.certs)) };
+    } catch (e) { return null; }
+}
+
+function _scCount(kind, key) {
+    if (!_scCounts) return null;
+    const map = _scCounts[kind] || {};
+    return map[key] === undefined ? 0 : map[key];
+}
+
+function _scHas(v) { return v !== undefined && v !== null; }
+
+function _scFindings(d) {
+    const out = [];
+    const eps = d.entryPoints || d.entrypoints || {};
+    Object.keys(eps).forEach(name => {
+        const ep = eps[name] || {};
+        if (ep.forwardedHeaders && ep.forwardedHeaders.insecure) {
+            out.push(['ph-shield-warning', name + ' trusts forwarded headers from anyone', 'entrypoints']);
+        }
+        if (ep.proxyProtocol && ep.proxyProtocol.insecure) {
+            out.push(['ph-shield-warning', name + ' trusts PROXY protocol from anyone', 'entrypoints']);
+        }
+    });
+    const api = d.api;
+    if (_scHas(api) && api && api.insecure) {
+        out.push(['ph-lock-open', 'API is exposed without authentication', 'api']);
+    }
+    if (!_scHas(d.accessLog)) {
+        out.push(['ph-scroll', 'no access log, the Logs tab has nothing to read', 'log']);
+    }
+    Object.keys(d.certificatesResolvers || {}).forEach(name => {
+        const acme = (d.certificatesResolvers[name] || {}).acme || {};
+        if (!acme.email) out.push(['ph-certificate', name + ' has no ACME email', 'resolvers']);
+    });
+    return out;
+}
+
+function _renderStaticVerdict(d) {
+    const el = document.getElementById('staticVerdict');
+    if (!el) return;
+    const found = _scFindings(d);
+    const shown = found.slice(0, 4);
+    const more  = found.length - shown.length;
+    const path  = window._staticConfigPath || '';
+    const meta  = path
+        ? `<span class="sig-verdict-meta"><b>${_esc(path.split('/').pop())}</b> ${_esc(path)}</span>`
+        : '';
+    if (!found.length) {
+        el.innerHTML = '<div class="sig-verdict">'
+            + '<i class="ph-fill ph-check-circle sig-verdict-ic"></i>'
+            + '<span class="sig-verdict-txt">Nothing to flag</span>'
+            + '<span class="sig-verdict-items"><span class="sig-ok">every section reads as configured</span></span>'
+            + meta + '</div>';
+        return;
+    }
+    const items = shown.map(([ic, txt, sec]) =>
+        `<button type="button" class="sig-flag d-warn" onclick="_scJump('${sec}')" title="Go to ${_esc(sec)}">`
+        + `<i class="ph-bold ${ic}"></i><span class="sig-fl">${_esc(txt)}</span></button>`).join('');
+    el.innerHTML = '<div class="sig-verdict" data-health="warn">'
+        + '<i class="ph-fill ph-warning-circle sig-verdict-ic"></i>'
+        + `<span class="sig-verdict-txt">${found.length} to look at</span>`
+        + `<span class="sig-verdict-items">${items}`
+        + (more > 0 ? `<span class="sig-ok">+${more} more</span>` : '')
+        + '</span>' + meta + '</div>';
+}
+
+function _scJump(section) {
+    const fold = document.getElementById('scFold-' + section);
+    if (fold && !fold.classList.contains('open')) toggleStaticFold(section);
+    const target = fold || document.querySelector(`.sc-sec[data-sc-sec="${section}"]`);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleStaticNote(key) {
+    const el = document.getElementById('scNote-' + key);
+    if (!el) return;
+    const open = !el.classList.contains('open');
+    el.classList.toggle('open', open);
+    try { localStorage.setItem('scNote_' + key, open ? '1' : '0'); } catch (e) {}
+}
+
+function _scApplyNoteState() {
+    document.querySelectorAll('.sc-note').forEach(el => {
+        const key = (el.id || '').replace('scNote-', '');
+        let open = false;
+        try { open = localStorage.getItem('scNote_' + key) === '1'; } catch (e) {}
+        el.classList.toggle('open', open);
+    });
+}
+
+function _scSetState(key, txt) {
+    const el = document.getElementById('scState-' + key);
+    if (el) el.innerHTML = txt;
+}
+
+function _scWarnTxt(t) { return `<span class="d-warn">${_esc(t)}</span>`; }
+
+function _renderStaticFoldStates(d) {
+    const api = d.api;
+    const apiOn = _scHas(api);
+    _scSetState('api', [
+        apiOn ? 'enabled' : _scWarnTxt('disabled'),
+        apiOn && (api || {}).dashboard !== false ? 'dashboard on' : 'dashboard off',
+        (api || {}).insecure ? _scWarnTxt('insecure on') : 'insecure off',
+        (api || {}).debug ? 'debug on' : 'debug off',
+    ].join(' &middot; '));
+
+    const log = d.log || {};
+    _scSetState('log', [
+        log.level || 'ERROR',
+        log.format || 'text',
+        log.filePath || 'stdout',
+        _scHas(d.accessLog) ? 'access log on' : _scWarnTxt('access log off'),
+    ].join(' &middot; '));
+
+    const prom = (d.metrics || {}).prometheus;
+    _scSetState('observability', [
+        _scHas(d.ping) ? 'ping on' : 'ping off',
+        _scHas(prom) ? 'metrics on' : 'metrics off',
+        _scHas(d.tracing) ? 'tracing on' : 'tracing off',
+    ].join(' &middot; '));
+
+    const g = d['global'] || {};
+    const core = d.core || {};
+    _scSetState('system', [
+        g.checkNewVersion === false ? 'version check off' : 'version check on',
+        g.sendAnonymousUsage ? 'usage stats on' : 'usage stats off',
+        'rule syntax ' + (core.defaultRuleSyntax === 'v2' ? 'v2' : 'v3'),
+    ].join(' &middot; '));
+
+    const plugins = Object.keys((d.experimental || {}).plugins || {})
+        .concat(Object.keys((d.experimental || {}).localPlugins || {}));
+    _scSetState('plugins', plugins.length ? _esc(plugins.join(' &middot; ')) : 'none installed');
+
+    const prov = d.providers || {};
+    const provBits = [];
+    if (_scHas(prov.docker)) provBits.push('docker on'); else provBits.push('docker off');
+    if (_scHas(prov.file)) {
+        provBits.push('file ' + ((prov.file || {}).directory || (prov.file || {}).filename || 'on'));
+    } else {
+        provBits.push('file off');
+    }
+    const others = Object.keys(prov).filter(k => k !== 'docker' && k !== 'file' && k !== 'providersThrottleDuration');
+    if (others.length) provBits.push(others.join(', '));
+    _scSetState('providers', _esc(provBits.join(' · ')));
+}
+
 function _renderStaticSections(parsed) {
     _staticParsedData = parsed || {};
     _renderStaticEntrypoints(_staticParsedData.entryPoints || _staticParsedData.entrypoints || {});
@@ -952,6 +1230,11 @@ function _renderStaticSections(parsed) {
     _renderStaticObservability(_staticParsedData.metrics, _staticParsedData.tracing, _staticParsedData.ping);
     _renderStaticSystem(_staticParsedData['global'], _staticParsedData.core, _staticParsedData.serversTransport);
     _renderStaticProviders(_staticParsedData.providers);
+    if (_tmModern()) {
+        _renderStaticVerdict(_staticParsedData);
+        _renderStaticFoldStates(_staticParsedData);
+        _scApplyNoteState();
+    }
 }
 
 function onPromToggle() {
@@ -1083,8 +1366,73 @@ function _renderStaticLog(logData, accessLogData) {
     if (row) row.style.display = hasAL ? '' : 'none';
 }
 
+function _scToggleProvider(key) {
+    const card = document.getElementById('scProvCard-' + key);
+    if (!card) return;
+    const open = card.dataset.scOpen === '1';
+    document.querySelectorAll('#staticProviderCards > [id^="scProvCard-"]').forEach(c => {
+        c.dataset.scOpen = '0';
+        c.style.display = 'none';
+    });
+    if (!open) { card.dataset.scOpen = '1'; card.style.display = ''; }
+}
+
+function _scProviderRow(key, label, on, addr, count, glyphs, warn) {
+    const health = warn ? ' data-health="warn"' : (on ? '' : ' data-health="idle"');
+    const sub = warn
+        ? `<span class="sig-ep-sub d-warn"><i class="ph-bold ph-warning" style="font-size:10px"></i> ${_esc(warn)}</span>`
+        : '';
+    const g = (glyphs || []).map(([ic, cls, tip]) =>
+        `<span class="sig-flag ${cls}" title="${_esc(tip)}"><i class="ph-bold ${ic}"></i></span>`).join('');
+    const n = count === null || count === undefined ? ''
+        : (count === 0 ? '<span style="color:var(--muted);font-weight:400">-</span>' : _sdNum(count));
+    return `<div class="sig-ep-row"${health} role="button" tabindex="0" onclick="_scToggleProvider('${key}')">`
+        + `<span class="sig-ep-id"><span class="sig-ep-name">${_esc(label)}</span>`
+        + `<span class="sig-idle-txt" style="color:${on ? 'var(--green)' : 'var(--muted)'}">${on ? 'enabled' : 'disabled'}</span></span>`
+        + `<span class="sig-ep-addr">${_esc(addr || '')}</span>`
+        + '<span class="sig-ep-strip"></span>'
+        + `<span class="sig-ep-n">${n}</span>`
+        + `<span class="sig-ep-flags"><span class="sc-rail"><span class="sc-rail-glyphs">${g}</span>`
+        + '<span class="sc-rail-btns"><button type="button" class="sc-btn" title="Edit"><i class="ph-bold ph-pencil-simple"></i></button></span>'
+        + '</span></span>' + sub + '</div>';
+}
+
+function _scRenderProviderRows(prov) {
+    const el = document.getElementById('staticProviderRows');
+    if (!el) return;
+    const configured = Object.keys(prov).filter(k => k !== 'providersThrottleDuration' && _scHas(prov[k]));
+    const cnt = document.getElementById('staticProviderCount');
+    if (cnt) cnt.textContent = configured.length;
+    const rows = [];
+    const hasDocker = _scHas(prov.docker);
+    const d = prov.docker || {};
+    rows.push(_scProviderRow('docker', 'docker', hasDocker,
+        hasDocker ? (d.endpoint || 'unix:///var/run/docker.sock') : 'not configured',
+        hasDocker ? _scCount('provs', 'docker') : null,
+        hasDocker && d.watch !== false ? [['ph-eye', 'd-on', 'watch on']] : [],
+        hasDocker && d.exposedByDefault !== false ? 'exposedByDefault is on, every container is routable unless it opts out' : ''));
+    const hasFile = _scHas(prov.file);
+    const f = prov.file || {};
+    rows.push(_scProviderRow('file', 'file', hasFile,
+        hasFile ? (f.directory || f.filename || 'no path set') : 'not configured',
+        hasFile ? _scCount('provs', 'file') : null,
+        hasFile && f.watch !== false ? [['ph-eye', 'd-on', 'watch on']] : [],
+        hasFile && !f.directory && !f.filename ? 'neither directory nor filename is set' : ''));
+    Object.keys(prov).filter(k => k !== 'docker' && k !== 'file' && k !== 'providersThrottleDuration')
+        .forEach(k => {
+            rows.push(_scProviderRow(k, k, true, 'configured in traefik.yml', _scCount('provs', k), [], ''));
+        });
+    el.innerHTML = _scRows(rows);
+}
+
 function _renderStaticProviders(providersData) {
     const prov = providersData || {};
+    if (_tmModern()) {
+        _scRenderProviderRows(prov);
+        document.querySelectorAll('#staticProviderCards > [id^="scProvCard-"]').forEach(c => {
+            if (c.dataset.scOpen !== '1') c.style.display = 'none';
+        });
+    }
     const hasDocker = prov.docker !== undefined && prov.docker !== null;
     _setStaticToggle('dockerEnabled', hasDocker);
     const dockerFields = document.getElementById('dockerProviderFields');
@@ -1262,7 +1610,9 @@ async function saveStaticSingleSection(section) {
 }
 
 function _buildStaticTabHTML() {
-    return _tmModern() ? _buildStaticOnePage() : _buildStaticClassicHTML();
+    return _tmModern()
+        ? '<div class="sig-root sc-root">' + _buildStaticOnePage() + '</div>'
+        : _buildStaticClassicHTML();
 }
 
 function _scSectionHead(key, label, icon, color, countId, addLabel) {
@@ -1276,27 +1626,78 @@ function _scSectionHead(key, label, icon, color, countId, addLabel) {
 const SC_SECTIONS = [
     ['entrypoints',   'Entrypoints',           'ph-door-open',   'var(--blue)',   'staticEpCount',       'Entrypoint'],
     ['resolvers',     'Certificate resolvers', 'ph-certificate', 'var(--green)',  'staticResolverCount', 'Resolver'],
-    ['providers',     'Providers',             'ph-cloud',       'var(--teal)',   null,                  'Provider'],
+    ['providers',     'Providers',             'ph-cloud',       'var(--teal)',   'staticProviderCount', 'Provider'],
     ['api',           'API and dashboard',     'ph-gauge',       'var(--orange)', null,                  null],
     ['log',           'Logging',               'ph-scroll',      '#ca8a04',       null,                  null],
     ['observability', 'Observability',         'ph-heartbeat',   'var(--green)',  null,                  null],
     ['system',        'System',                'ph-gear-six',    'var(--muted)',  null,                  null],
+    ['plugins',       'Plugins',               'ph-plug',        'var(--purple)', 'staticPluginCount',   'Plugin'],
 ];
+
+const SC_GROUPS = [
+    ['Traffic in',   ['entrypoints', 'providers']],
+    ['Certificates', ['resolvers']],
+    ['Operations',   ['api', 'log', 'observability', 'system', 'plugins']],
+];
+
+const SC_LIST_SECTIONS = ['entrypoints', 'resolvers', 'providers', 'plugins'];
+
+function _scIsList(key) { return SC_LIST_SECTIONS.indexOf(key) !== -1; }
+
+function _scFoldOpen(key) {
+    if (_scIsList(key)) return true;
+    const open = tmPref('staticOpenSections');
+    if (Array.isArray(open)) return open.indexOf(key) !== -1;
+    return false;
+}
+
+function toggleStaticFold(key) {
+    const el = document.getElementById('scFold-' + key);
+    if (!el) return;
+    const nowOpen = !el.classList.contains('open');
+    el.classList.toggle('open', nowOpen);
+    const cur = tmPref('staticOpenSections');
+    const list = Array.isArray(cur) ? cur.slice() : [];
+    const at = list.indexOf(key);
+    if (nowOpen && at === -1) list.push(key);
+    if (!nowOpen && at !== -1) list.splice(at, 1);
+    tmSetPref('staticOpenSections', list);
+}
+
+function _scFoldHead(key, label, icon, color, countId) {
+    const count = countId ? `<span class="d-n sc-count" id="${countId}">0</span>` : '';
+    return `<button type="button" class="sc-fold-head" onclick="toggleStaticFold('${key}')">`
+        + `<i class="ph-bold ph-caret-right sc-fold-caret"></i>`
+        + `<i class="ph-bold ${icon} sc-sec-icon" style="color:${color}"></i>`
+        + `<span class="sc-sec-label">${label}</span>${count}`
+        + `<span class="sc-sec-rule"></span>`
+        + `<span class="sc-fold-state" id="scState-${key}"></span></button>`;
+}
 
 function _buildStaticOnePage() {
     const classic = document.createElement('div');
     classic.innerHTML = _buildStaticClassicHTML();
-    return SC_SECTIONS.map(([key, label, icon, color, countId, addLabel]) => {
+    const byKey = {};
+    SC_SECTIONS.forEach(([key, label, icon, color, countId, addLabel]) => {
         const panel = classic.querySelector('#staticPanel-' + key);
-        if (!panel) return '';
+        if (!panel) return;
         panel.style.display = '';
         const warn = panel.querySelector('#staticEpWarning');
         const form = panel.querySelector('#staticForm-' + key);
         if (warn && form) form.insertBefore(warn, form.firstChild);
-        return `<section class="sc-sec" data-sc-sec="${key}">`
-             + _scSectionHead(key, label, icon, color, countId, addLabel)
-             + panel.outerHTML + '</section>';
-    }).join('');
+        byKey[key] = _scIsList(key)
+            ? `<section class="sc-sec" data-sc-sec="${key}">`
+                + _scSectionHead(key, label, icon, color, countId, addLabel)
+                + panel.outerHTML + '</section>'
+            : `<div class="sc-fold${_scFoldOpen(key) ? ' open' : ''}" id="scFold-${key}" data-sc-sec="${key}">`
+                + _scFoldHead(key, label, icon, color, countId)
+                + '<div class="sc-fold-body">' + panel.outerHTML + '</div></div>';
+    });
+    return '<div id="staticVerdict"></div>'
+        + SC_GROUPS.map(([label, keys]) => {
+            const body = keys.map(k => byKey[k] || '').join('');
+            return body ? `<div class="sc-grp">${label}</div>${body}` : '';
+        }).join('');
 }
 
 function _buildStaticClassicHTML() {
@@ -1307,17 +1708,17 @@ function _buildStaticClassicHTML() {
             <button onclick="switchStaticSection('entrypoints')" id="ssnBtn-entrypoints" class="auth-sub-tab active">
                 <i class="ph-bold ph-plugs" style="color:var(--blue)"></i>
                 Entrypoints
-                <span id="staticEpCount" style="display:inline-flex;align-items:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(36,161,222,0.15);color:var(--blue)">0</span>
+                <span id="staticEpCount" style="display:inline-flex;align-items:center;min-width:14px;height:16px;padding:0 2px;font-size:10.5px;font-weight:700;color:var(--blue)">0</span>
             </button>
             <button onclick="switchStaticSection('resolvers')" id="ssnBtn-resolvers" class="auth-sub-tab">
                 <i class="ph-bold ph-seal-check" style="color:var(--green)"></i>
                 Cert Resolvers
-                <span id="staticResolverCount" style="display:inline-flex;align-items:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(34,197,94,0.15);color:var(--green)">0</span>
+                <span id="staticResolverCount" style="display:inline-flex;align-items:center;min-width:14px;height:16px;padding:0 2px;font-size:10.5px;font-weight:700;color:var(--green)">0</span>
             </button>
             <button onclick="switchStaticSection('plugins')" id="ssnBtn-plugins" class="auth-sub-tab">
                 <i class="ph-bold ph-puzzle-piece" style="color:var(--purple)"></i>
                 Plugins
-                <span id="staticPluginCount" style="display:inline-flex;align-items:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(168,85,247,0.15);color:var(--purple)">0</span>
+                <span id="staticPluginCount" style="display:inline-flex;align-items:center;min-width:14px;height:16px;padding:0 2px;font-size:10.5px;font-weight:700;color:var(--purple)">0</span>
             </button>
             <button onclick="switchStaticSection('api')" id="ssnBtn-api" class="auth-sub-tab">
                 <i class="ph-bold ph-gauge" style="color:var(--orange)"></i>
@@ -1519,9 +1920,13 @@ function _buildStaticClassicHTML() {
     </div>
 
     <div id="staticPanel-plugins" style="display:none">
-        <div class="mx-5 mt-4 mb-2 rounded-lg p-3 text-xs flex items-center gap-2" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);color:var(--text)">
-            <i class="ph-bold ph-info text-sm shrink-0" style="color:var(--blue)"></i>
-            <span>Use the <button onclick="closeSettingsModal();switchTab('plugins')" class="font-semibold" style="color:var(--blue);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">Plugins tab</button> for an interactive way to install and manage plugins.</span>
+        <div class="sc-note" id="scNote-plugins">
+            <button type="button" class="sc-note-head" onclick="toggleStaticNote('plugins')">
+                <i class="ph-bold ph-caret-right sc-note-caret"></i>
+                <i class="ph-bold ph-info sc-note-ic"></i>
+                <span class="sc-note-lab">Installing plugins</span>
+            </button>
+            <div class="sc-note-body">These rows are what <code>traefik.yml</code> declares. The <button type="button" onclick="closeSettingsModal();switchTab('plugins')" class="sc-note-link">Plugins tab</button> installs and removes them for you, and writes the middleware that uses them.</div>
         </div>
         <div id="staticPluginList"></div>
         <div id="staticForm-plugins" style="display:none;border-top:1px solid var(--border);background:var(--input-bg)" class="px-5 py-4 space-y-3">
@@ -1771,9 +2176,10 @@ function _buildStaticClassicHTML() {
     </div>
 
     <div id="staticPanel-providers" style="display:none">
+        <div id="staticProviderRows"></div>
         <div id="staticOtherProvidersList" class="pt-3"></div>
-        <div class="px-4 pb-4 space-y-3">
-            <div class="rounded-lg p-3" style="border:1px solid var(--border)">
+        <div class="px-4 pb-4 space-y-3" id="staticProviderCards">
+            <div class="rounded-lg p-3" id="scProvCard-docker" style="border:1px solid var(--border)">
                 <div class="tab-toggle-row" onclick="onDockerProviderToggle()">
                     <span class="flex items-center gap-2 text-sm font-medium"><i class="ph-bold ph-cube" style="color:var(--blue)"></i> Docker</span>
                     <div class="toggle-switch" id="staticT-dockerEnabled"><div class="toggle-knob"></div></div>
@@ -1793,7 +2199,7 @@ function _buildStaticClassicHTML() {
                     </div>
                 </div>
             </div>
-            <div class="rounded-lg p-3" style="border:1px solid var(--border)">
+            <div class="rounded-lg p-3" id="scProvCard-file" style="border:1px solid var(--border)">
                 <div class="tab-toggle-row" onclick="onFileProviderToggle()">
                     <span class="flex items-center gap-2 text-sm font-medium"><i class="ph-bold ph-file-code" style="color:var(--green)"></i> File</span>
                     <div class="toggle-switch" id="staticT-fileEnabled"><div class="toggle-knob"></div></div>
@@ -1940,6 +2346,8 @@ async function _loadStaticFromDisk() {
         if (!_staticSaved) _hideStaticRestartBanner();
         const hdrAddBtn = document.getElementById('staticHdrAddBtn');
         if (hdrAddBtn) hdrAddBtn.style.display = '';
+        window._staticConfigPath = data.path || '';
+        _scCounts = _tmModern() ? await _scLoadCounts() : null;
         wrapper.innerHTML = _buildStaticTabHTML();
         initStaticDirtyTracking();
         _renderStaticSections(data.parsed || {});

@@ -209,13 +209,6 @@ _encrypt_otp_secret  = crypto.encrypt_secret
 _decrypt_otp_secret  = crypto.decrypt_secret
 
 
-
-
-
-
-
-
-
 def load_templates() -> list:
     if not os.path.exists(TEMPLATES_PATH):
         return []
@@ -264,9 +257,6 @@ from flask_limiter.util import get_remote_address
 limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="memory://")
 
 
-
-
-
 BACKUP_DIR         = env.BACKUP_DIR
 SETTINGS_PATH      = env.SETTINGS_PATH
 _CONFIG_DIR        = env.CONFIG_DIR
@@ -278,21 +268,11 @@ AGENTS_PATH        = env.AGENTS_PATH
 TEMPLATES_PATH     = env.TEMPLATES_PATH
 
 
-
-
-
-
-
-
 ACTIVE_CONFIG_DIR = env.ACTIVE_CONFIG_DIR
 _ALLOWED_API_SCHEMES = env.ALLOWED_API_SCHEMES
 
 
-
 def _ssrf_ok(url: str) -> bool:
-    """False if the URL host resolves to a link-local (cloud metadata 169.254.x),
-    multicast, reserved, or unspecified address. Private and loopback are allowed -
-    a self-hosted tool legitimately reaches internal services (Traefik, ntfy, OIDC)."""
     try:
         from urllib.parse import urlparse
         import socket, ipaddress
@@ -308,23 +288,8 @@ def _ssrf_ok(url: str) -> bool:
         return False
 
 
-
 def _register_config_path(path: str):
-    """Add a newly created config file to the active set (see core.env)."""
     env.register_config_path(path)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _geoip_maybe_autoupdate():
@@ -350,12 +315,6 @@ def _get_signal_file_path() -> str:
     return os.environ.get('SIGNAL_FILE_PATH', '/signals/restart.sig')
 
 
-
-
-
-
-
-
 def _best_entrypoint() -> str:
     eps = traefik_api_get_all('/api/entrypoints') or []
     for ep in eps:
@@ -367,12 +326,6 @@ def _best_entrypoint() -> str:
     return 'websecure'
 
 
-
-
-
-
-
-
 def _detect_setup_self_route() -> tuple[str, str]:
     settings = load_settings()
     saved = settings.get('self_route', {})
@@ -382,9 +335,6 @@ def _detect_setup_self_route() -> tuple[str, str]:
     if domain:
         return domain, 'http://traefik-manager:5000'
     return _detect_self_route_from_own_labels()
-
-
-
 
 
 def _hash_password(plaintext: str) -> str:
@@ -479,8 +429,6 @@ def _inject_theme():
         return {'default_theme': 'dark'}
 
 
-
-
 @app.errorhandler(_CsrfError)
 def _handle_csrf_error(e):
     return jsonify({'ok': False, 'message': 'Session expired - please refresh the page.'}), 403
@@ -496,7 +444,6 @@ def inject_asset_version():
     return {'asset_version': APP_VERSION}
 
 
-
 def _hash_api_key(key: str) -> str:
     import hashlib
     return 'sha256:' + hashlib.sha256(key.encode()).hexdigest()
@@ -506,11 +453,6 @@ def _safe_next(next_url: str) -> str:
     if nu.startswith('/') and not nu.startswith('//') and not nu.startswith('/\\'):
         return nu
     return url_for('index')
-
-
-
-
-
 
 
 def _has_password_set() -> bool:
@@ -1070,9 +1012,6 @@ if not os.environ.get('REQUESTS_CA_BUNDLE'):
         os.environ['REQUESTS_CA_BUNDLE'] = _SYSTEM_CA_BUNDLE
 
 
-
-
-
 @app.route('/api/traefik/overview')
 @login_required
 def api_overview():
@@ -1129,15 +1068,6 @@ def api_entrypoints():
 @login_required
 def api_version():
     return jsonify(traefik_api_get('/api/version') or {})
-
-
-
-
-
-
-
-
-
 
 
 CS_PAGE_SIZE = 1000
@@ -1347,7 +1277,6 @@ def _apr1_hash(password: str, salt: str) -> str:
     enc += to64((a[4]<<16)|(a[10]<<8)|a[5], 4)
     enc += to64(a[11], 2)
     return f'$apr1${salt}${enc}'
-
 
 
 @app.route('/api/traefik/ping')
@@ -1893,24 +1822,36 @@ def api_static_section_update():
         elif section == 'providers' and action == 'set':
             providers = config.setdefault('providers', {})
             if payload.get('docker'):
-                docker_cfg = {}
+                _existing = providers.get('docker')
+                docker_cfg = _existing if isinstance(_existing, dict) else {}
                 endpoint = str(payload.get('dockerEndpoint', '')).strip()
                 if endpoint and endpoint != 'unix:///var/run/docker.sock':
                     docker_cfg['endpoint'] = endpoint
+                else:
+                    docker_cfg.pop('endpoint', None)
                 if not payload.get('dockerExposedByDefault', True):
                     docker_cfg['exposedByDefault'] = False
+                else:
+                    docker_cfg.pop('exposedByDefault', None)
                 if not payload.get('dockerWatch', True):
                     docker_cfg['watch'] = False
+                else:
+                    docker_cfg.pop('watch', None)
                 providers['docker'] = docker_cfg
             else:
                 providers.pop('docker', None)
             if payload.get('file'):
-                file_cfg = {}
+                _existing = providers.get('file')
+                file_cfg = _existing if isinstance(_existing, dict) else {}
                 directory = str(payload.get('fileDirectory', '')).strip()
                 if directory:
                     file_cfg['directory'] = directory
+                else:
+                    file_cfg.pop('directory', None)
                 if not payload.get('fileWatch', True):
                     file_cfg['watch'] = False
+                else:
+                    file_cfg.pop('watch', None)
                 providers['file'] = file_cfg
             else:
                 providers.pop('file', None)
@@ -2078,9 +2019,6 @@ def api_static_section_update():
         return jsonify({'error': str(e)}), 500
 
 
-# Cloudflare edge ranges for forwardedHeaders.trustedIPs, captured 2026-07-23 from
-# https://www.cloudflare.com/ips/ (https://www.cloudflare.com/ips-v4 + /ips-v6).
-# Refresh on release: replace both lists from that source and bump _CLOUDFLARE_IPS_CAPTURED.
 _CLOUDFLARE_IPS_CAPTURED = '2026-07-23'
 _CLOUDFLARE_IPS_V4 = [
     '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
@@ -2093,8 +2031,6 @@ _CLOUDFLARE_IPS_V6 = [
     '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
 ]
 _PRIVATE_IP_RANGES = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7']
-
-
 
 
 _DURATION_RE = re.compile(r'^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$')
@@ -2111,8 +2047,6 @@ def _is_valid_cidr(cidr: str) -> bool:
         return True
     except ValueError:
         return False
-
-
 
 
 def _parse_cidr_input(raw) -> list:
@@ -2206,7 +2140,6 @@ def api_static_trusted_ips_preview():
     except Exception as e:
         logger.exception("Trusted IPs preview failed")
         return jsonify({'error': str(e)}), 500
-
 
 
 @app.route('/api/tools/digestauth', methods=['POST'])
@@ -2496,8 +2429,6 @@ def api_plugins_install():
     return jsonify(result)
 
 
-
-
 @app.route('/api/traefik/certs')
 @login_required
 def api_certs():
@@ -2574,10 +2505,6 @@ def api_logs():
         return jsonify({'error': str(e), 'lines': []})
 
 
-
-
-
-
 def list_backups():
     ensure_backup_dir()
     static_path = _get_static_config_path()
@@ -2615,23 +2542,6 @@ def _validated_backup_path(filename: str) -> str:
         logger.warning(f"Path traversal attempt blocked: {filename!r}")
         abort(400)
     return path
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _git_req_agent():
@@ -3033,10 +2943,7 @@ def api_restore(filename):
         path = _validated_backup_path(filename)
         if not os.path.exists(path):
             return jsonify({'error': 'Backup not found'}), 404
-        # Infer the target config file from the backup filename (basename.yml.ts.bak)
-        # Strip the timestamp suffix to get the original basename
-        bname = filename  # e.g. dynamic.yml.20260325_120000.bak
-        # Find matching config path by basename prefix
+        bname = filename
         target_path = env.CONFIG_PATH
         for p in env.CONFIG_PATHS:
             if bname.startswith(os.path.basename(p) + '.'):
@@ -3315,13 +3222,6 @@ def api_save_tabs():
 @csrf_protect
 @login_required
 def api_ui_prefs():
-    """Display preferences, stored server-side so they follow the user.
-
-    These are cosmetic - which nav buttons and stat cards are shown, and whether
-    each tab renders as cards or a list. Unknown keys are dropped rather than
-    stored, so this endpoint cannot be used to write arbitrary data into
-    manager.yml.
-    """
     existing = load_settings()
     if request.method == 'GET':
         return jsonify({'ok': True, 'ui_prefs': existing.get('ui_prefs', {})})
@@ -3368,8 +3268,6 @@ def api_save_theme():
         return jsonify({'success': False, 'error': 'Save failed'}), 500
 
 
-
-
 @app.route('/api/settings/geoip', methods=['POST'])
 @csrf_protect
 @login_required
@@ -3393,7 +3291,6 @@ def api_save_geoip():
     except Exception:
         logger.exception("GeoIP settings save error")
         return jsonify({'success': False, 'error': 'Save failed'}), 500
-
 
 
 _CGNAT_NETWORK = ipaddress.ip_network('100.64.0.0/10')
@@ -3467,7 +3364,6 @@ def api_save_backup_retention():
         return jsonify({'error': str(e)}), 500
 
 
-
 @app.route('/api/settings/self-route', methods=['GET'])
 @login_required
 def api_get_self_route():
@@ -3510,24 +3406,12 @@ def api_save_self_route():
     return jsonify({'ok': True})
 
 
-
-
 def _file_template_map(path):
     if path and os.path.exists(path):
         with open(path, 'r') as f:
             _, mapping = _sanitize_go_templates(f.read())
         return mapping
     return {}
-
-
-
-
-
-
-
-
-
-
 
 
 def _parse_backends_json(raw):
@@ -3610,18 +3494,6 @@ def _streaming_forwarding_timeouts() -> dict:
     return {'dialTimeout': '30s', 'responseHeaderTimeout': '0s', 'idleConnTimeout': '90s'}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def _headers_toggles_from_form(form) -> dict:
     perms = {}
     for feat in HEADERS_PRESET_FEATURES:
@@ -3634,27 +3506,6 @@ def _headers_toggles_from_form(form) -> dict:
         'frameDeny': form.get('hp_frameDeny') == 'true',
         'referrer': (form.get('hp_referrer') or '').strip(),
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _service_shared(config: dict, svc_name: str, exclude_router: str) -> bool:
@@ -5062,7 +4913,6 @@ def api_test_oidc():
         return jsonify({'ok': False, 'error': str(e)})
 
 
-
 def _redact_agent(a: dict) -> dict:
     out = dict(a)
     out['api_key'] = '***' if out.get('api_key') else ''
@@ -5070,9 +4920,6 @@ def _redact_agent(a: dict) -> dict:
     out['crowdsec_machine_password'] = '***' if out.get('crowdsec_machine_password') else ''
     out['git_backup_token'] = '***' if out.get('git_backup_token') else ''
     return out
-
-
-
 
 
 @app.route('/api/mw/templates', methods=['GET'])

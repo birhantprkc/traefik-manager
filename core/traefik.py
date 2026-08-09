@@ -1,4 +1,3 @@
-"""Read-only client for the Traefik API."""
 import os
 
 import requests

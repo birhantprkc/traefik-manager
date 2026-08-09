@@ -169,7 +169,7 @@ function placeStatCards() {
         _statsHomeMarker.style.display = 'none';
         ov.parentElement.insertBefore(_statsHomeMarker, ov);
     }
-    const active = document.querySelector('.tab-content.active');
+    const active = document.querySelector('main .tab-content.active');
     const tab = active ? active.id.replace(/^tab-/, '') : '';
     if (!_statTabSet().has(tab)) { _statsHomeMarker.insertAdjacentElement('afterend', ov); return; }
     const bar = active.querySelector('.filter-bar');
@@ -583,9 +583,6 @@ async function loadGeoStatus(force) {
 const GEO_LOOKUP_BATCH = 5000;
 const _geoNames = {};
 
-// Aggregate mode: one pass over every IP returning country counts for the map plus a
-// compact ip -> country code map for the country filter. Roughly a quarter the bytes
-// of per-IP results, and exact rather than a sample.
 async function geoAggregate(ips) {
     if (!_geoEnabled || !_geoAvailable) return {};
     const uniq = [...new Set(ips.filter(Boolean))];

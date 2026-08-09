@@ -90,6 +90,9 @@
                 <button class="modal-sidebar-btn" id="msb-templates" onclick="switchSettingsPanel('templates', this); loadTemplatesList()">
                     <i class="ph-bold ph-puzzle-piece"></i> Templates
                 </button>
+                <button class="modal-sidebar-btn" id="msb-static" onclick="switchSettingsPanel('static', this)" style="display:none">
+                    <i class="ph-bold ph-file-code"></i> Static Config
+                </button>
                 <button class="modal-sidebar-btn" id="msb-about" onclick="switchSettingsPanel('about', this)">
                     <i class="ph-bold ph-info"></i> About
                 </button>
@@ -895,7 +898,11 @@
                                     <div class="text-xs font-medium" style="color:var(--text)">Static Config</div>
                                     <div class="text-xs" style="color:var(--muted)">Edit entrypoints, certificate resolvers, plugins and providers in traefik.yml</div>
                                 </div>
-                                <div class="toggle-switch" id="toggle-static" onclick="toggleTabVisibility('static')"><div class="toggle-knob"></div></div>
+                                <div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)">
+                                    <button type="button" id="scPlace-off" onclick="setStaticPlacement('off')" class="proto-btn text-xs px-3 py-1.5" title="Do not show it anywhere">Off</button>
+                                    <button type="button" id="scPlace-settings" onclick="setStaticPlacement('settings')" class="proto-btn text-xs px-3 py-1.5" title="Show it inside this Settings window">Settings</button>
+                                    <button type="button" id="scPlace-tab" onclick="setStaticPlacement('tab')" class="proto-btn text-xs px-3 py-1.5" title="Show it as its own tab in the side navigation">Tab</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1285,6 +1292,10 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div class="modal-panel" id="mpanel-static">
+                    <div id="staticSettingsMount"></div>
                 </div>
 
                 <div class="modal-panel" id="mpanel-about">

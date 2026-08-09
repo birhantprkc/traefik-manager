@@ -133,7 +133,6 @@ def test_comments_survive_a_save(client):
     assert "existing" in read_config()["http"]["routers"]
 
 
-
 def test_tcp_save_without_a_backend_is_rejected(client):
     r = post_form(client, "/save", serviceName="badtcp", subdomain="badtcp",
                   protocol="tcp", targetIp="10.0.0.9", targetPort="5432")
@@ -173,7 +172,6 @@ def test_backends_json_alone_is_enough(client):
     assert lb["servers"][0]["address"] == "10.0.0.7:6379"
 
 
-
 def test_tcp_does_not_double_append_the_domain(client):
     r = post_form(client, "/save", serviceName="fqdn", subdomain="db.other.tld",
                   protocol="tcp", targetIp=["", "10.0.0.9", ""],
@@ -201,7 +199,6 @@ def test_http_and_tcp_treat_subdomains_the_same(client):
     assert "svc.other.tld" in cfg["http"]["routers"]["hsame"]["rule"]
     assert "svc.other.tld" in cfg["tcp"]["routers"]["tsame"]["rule"]
     assert "other.tld.example.com" not in str(cfg)
-
 
 
 def _mobile_save(client, proto, ip, port, **extra):
@@ -309,7 +306,6 @@ def test_tcp_udp_save_refuses_a_missing_port(client, proto, ip):
     assert r.status_code == 400
     assert b'port is required' in r.data
     assert 'sv-service' not in read_config().get(proto, {}).get('services', {})
-
 
 
 def _make_owner(client, name='app1', ip='10.0.0.50', port='80'):
@@ -431,7 +427,6 @@ def test_switching_own_route_to_ref_cleans_up_orphan(client):
 
 
 def test_negative_router_priority_is_kept(client):
-    """Traefik allows negative priorities; a wildcard catchall needs one (#128)."""
     r = _save_http(client, name="catchall", backendsJsonHttp=json.dumps({
         "servers": [{"scheme": "http", "host": "10.0.0.1", "port": "8080"}],
         "priority": -100,
@@ -463,7 +458,6 @@ def _seed_disabled(app_module, route_id):
 
 
 def test_delete_a_disabled_route_stored_under_a_prefixed_id(client, app_module):
-    """Disabling stores the full id, and multi-config ids carry a configFile:: prefix."""
     route_id = "dynamic.yml::gone"
     _seed_disabled(app_module, route_id)
 
@@ -473,7 +467,6 @@ def test_delete_a_disabled_route_stored_under_a_prefixed_id(client, app_module):
 
 
 def test_delete_a_disabled_route_stored_under_a_bare_id(client, app_module):
-    """Single-file installs store the bare name; that path must keep working."""
     _seed_disabled(app_module, "gone")
 
     r = post_form(client, "/delete/gone")

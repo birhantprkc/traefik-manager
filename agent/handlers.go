@@ -25,8 +25,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ---- helpers ----------------------------------------------------------------
-
 func jsonOK(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
@@ -50,13 +48,9 @@ func (a *App) applyTraefikAuth(req *http.Request) {
 	}
 }
 
-// ---- health -----------------------------------------------------------------
-
 func (a *App) healthHandler(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"ok": true, "version": Version})
 }
-
-// ---- traefik proxy ----------------------------------------------------------
 
 func (a *App) traefikProxy(w http.ResponseWriter, r *http.Request, traefikPath string) {
 	target := strings.TrimRight(a.cfg.TraefikAPIURL, "/") + traefikPath
@@ -186,8 +180,6 @@ func (a *App) middlewaresHandler(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]json.RawMessage{"http": httpM, "tcp": tcpM})
 }
 
-// ---- config files -----------------------------------------------------------
-
 type fileEntry struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
@@ -277,8 +269,6 @@ func atomicWrite(path string, data []byte) error {
 	}
 	return nil
 }
-
-// ---- static config ----------------------------------------------------------
 
 func (a *App) staticReadHandler(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.StaticConfigPath == "" {
@@ -429,8 +419,6 @@ func (a *App) dockerRestart(ctx context.Context) error {
 	return nil
 }
 
-// ---- crowdsec proxy ---------------------------------------------------------
-
 var (
 	csJWT       string
 	csJWTExpiry time.Time
@@ -534,9 +522,6 @@ const (
 	csMaxPages = 200
 )
 
-// LAPI supports id_gt cursor pagination on /v1/decisions (undocumented, but present
-// since v1.6.0). Unknown params are silently ignored on this endpoint, which is why
-// the old page= sweep returned the same rows ten times.
 func (a *App) crowdsecDecisionsHandler(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.CrowdSecLAPIURL == "" {
 		jsonError(w, "CROWDSEC_LAPI_URL not configured", http.StatusNotFound)
@@ -692,8 +677,6 @@ func (a *App) crowdsecProxy(w http.ResponseWriter, r *http.Request, method, csPa
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
 }
-
-// ---- local backups ----------------------------------------------------------
 
 func (a *App) backupDir() string {
 	return filepath.Join(a.cfg.BackupDir, "backups")
@@ -876,8 +859,6 @@ func (a *App) backupDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]any{"ok": true})
 }
-
-// ---- git backup -------------------------------------------------------------
 
 func (a *App) gitRepoDir() string {
 	return filepath.Join(a.cfg.BackupDir, "git-repo")
@@ -1262,9 +1243,6 @@ func (a *App) gitRestoreHandler(w http.ResponseWriter, r *http.Request, sha stri
 	jsonOK(w, map[string]any{"ok": true})
 }
 
-// acmeJSONPaths expands ACME_JSON_PATH into the storage files to read.
-// It accepts a comma-separated list, and any entry that is a directory
-// contributes its .json files. Traefik writes one storage file per resolver.
 func acmeJSONPaths(raw string) []string {
 	var out []string
 	seen := map[string]bool{}

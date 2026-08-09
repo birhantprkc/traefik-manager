@@ -88,8 +88,38 @@ def test_sanitiser_accepts_every_documented_key():
     payload.update({k: 'dashboard' for k in settings_mod.UI_PREF_SCOPES})
     payload.update({k: 'modern' for k in settings_mod.UI_PREF_LAYOUTS})
     payload.update({k: 'icons' for k in settings_mod.UI_PREF_DENSITY})
+    payload.update({k: 'tab' for k in settings_mod.UI_PREF_PLACEMENTS})
+    payload.update({k: ['entrypoints'] for k in settings_mod.UI_PREF_SECTION_LISTS})
     cleaned = settings_mod.sanitize_ui_prefs(payload)
     assert set(cleaned) == set(settings_mod.UI_PREF_KEYS)
+
+
+def test_static_placement_validates(client):
+    for good in ('off', 'settings', 'tab'):
+        r = client.post('/api/settings/ui', json={'ui_prefs': {'staticPlacement': good}},
+                        headers={'X-CSRF-Token': 'testtoken', 'X-Requested-With': 'fetch'})
+        assert r.status_code == 200
+        assert r.get_json()['ui_prefs']['staticPlacement'] == good
+    r = client.post('/api/settings/ui', json={'ui_prefs': {'staticPlacement': 'bogus'}},
+                    headers={'X-CSRF-Token': 'testtoken', 'X-Requested-With': 'fetch'})
+    assert r.status_code == 200
+    assert r.get_json()['ui_prefs'].get('staticPlacement') == 'tab'
+
+
+def test_static_open_sections_rejects_unknown_keys(client):
+    r = client.post('/api/settings/ui',
+                    json={'ui_prefs': {'staticOpenSections': ['log', 'bogus', 'log', 'api']}},
+                    headers={'X-CSRF-Token': 'testtoken', 'X-Requested-With': 'fetch'})
+    assert r.status_code == 200
+    assert r.get_json()['ui_prefs']['staticOpenSections'] == ['log', 'api']
+
+
+def test_static_open_sections_ignores_non_lists(client):
+    r = client.post('/api/settings/ui', json={'ui_prefs': {'staticOpenSections': 'log'}},
+                    headers={'X-CSRF-Token': 'testtoken', 'X-Requested-With': 'fetch'})
+    assert r.status_code == 200
+    assert 'staticOpenSections' not in r.get_json()['ui_prefs'] or \
+        r.get_json()['ui_prefs']['staticOpenSections'] != 'log'
 
 
 def test_stat_bar_scope_round_trips_and_validates(client):

@@ -505,6 +505,67 @@ async function refreshStaticTabAvailability() {
         if (btn.classList.contains('active')) switchTab('services');
         if (typeof buildSideNav === 'function') buildSideNav();
     }
+    _staticAvailable = available;
+    applyStaticPlacement(getStaticPlacement());
+}
+
+let _staticAvailable = false;
+
+function getStaticPlacement() {
+    const v = tmPref('staticPlacement');
+    if (v === 'off' || v === 'settings' || v === 'tab') return v;
+    const tabs = _activeAgent ? (_activeAgent.visible_tabs || {}) : _localTabsCache;
+    return (tabs || {}).static ? 'tab' : 'off';
+}
+
+function applyStaticPlacement(mode) {
+    const el = document.getElementById('tab-static');
+    const sidebarBtn = document.getElementById('msb-static');
+    const mount = document.getElementById('staticSettingsMount');
+    const home = document.querySelector('main');
+    if (sidebarBtn) sidebarBtn.style.display = (mode === 'settings' && _staticAvailable) ? '' : 'none';
+    document.documentElement.classList.toggle('tm-static-in-settings', mode === 'settings');
+    ['off', 'settings', 'tab'].forEach(m => {
+        document.getElementById('scPlace-' + m)?.classList.toggle('active-http', m === mode);
+    });
+    if (el) {
+        if (mode === 'settings' && mount && el.parentElement !== mount) {
+            el.classList.remove('tab-content');
+            el.classList.remove('active');
+            el.dataset.scMounted = '1';
+            mount.appendChild(el);
+        } else if (mode !== 'settings' && el.dataset.scMounted === '1') {
+            delete el.dataset.scMounted;
+            el.classList.add('tab-content');
+            if (home) home.appendChild(el);
+        }
+    }
+    if (typeof applyTabVisibility === 'function') {
+        const tabs = _activeAgent ? (_activeAgent.visible_tabs || {}) : (_localTabsCache || {});
+        tabs.static = mode === 'tab';
+        applyTabVisibility(tabs);
+    }
+    if (typeof buildSideNav === 'function') buildSideNav();
+    if (mode === 'settings' && _staticAvailable && typeof refreshStaticTab === 'function') {
+        if (typeof _staticLoadedFor !== 'undefined') _staticLoadedFor = null;
+        refreshStaticTab();
+    }
+}
+
+function setStaticPlacement(mode) {
+    tmSetPref('staticPlacement', mode);
+    const tabs = _activeAgent ? (_activeAgent.visible_tabs || {}) : (_localTabsCache || {});
+    tabs.static = mode === 'tab';
+    if (!_activeAgent) {
+        _localTabsCache = tabs;
+        localStorage.setItem('tm_tabs_local', JSON.stringify(tabs));
+        fetch('/api/settings/tabs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
+            body: JSON.stringify({ visible_tabs: tabs }),
+        }).catch(() => {});
+    }
+    applyStaticPlacement(mode);
 }
 
 function _renderServerSwitcherList(runHealthChecks) {

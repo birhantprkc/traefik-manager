@@ -68,13 +68,6 @@ ALLOWED_FILE_PREFIXES = allowed_file_prefixes()
 
 
 def register_config_path(path: str):
-    """Add a newly created config file to the active set.
-
-    CONFIG_PATHS, CONFIG_PATH and MULTI_CONFIG are rebound here at runtime, so
-    every consumer must read them as `env.CONFIG_PATHS` rather than importing
-    the names directly - a `from core.env import CONFIG_PATHS` binds a snapshot
-    and would silently stop seeing files created after startup.
-    """
     global CONFIG_PATHS, CONFIG_PATH, MULTI_CONFIG, ALLOWED_FILE_PREFIXES
     if path and path not in CONFIG_PATHS:
         CONFIG_PATHS = sorted(CONFIG_PATHS + [path])

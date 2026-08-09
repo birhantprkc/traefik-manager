@@ -175,7 +175,15 @@ sudo systemctl restart traefik-manager
 
 ## Verify
 
-Open Traefik Manager - the **Static Config** tab toggle should appear under **Settings → Interface**; enable it to show the tab. If the toggle does not appear, check that `STATIC_CONFIG_PATH` is set and the file exists at that path inside the container:
+Open Traefik Manager - a **Static Config** row appears under **Settings → Interface** with three choices:
+
+| Choice | Where it appears |
+|---|---|
+| **Off** | Nowhere. |
+| **Settings** | Inside the Settings window, as a **Static Config** panel in the sidebar. |
+| **Tab** | As its own tab in the side navigation. |
+
+If the row does not appear, check that `STATIC_CONFIG_PATH` is set and the file exists at that path inside the container:
 
 ```bash
 docker exec traefik-manager ls -la /app/traefik.yml
