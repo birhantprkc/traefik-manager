@@ -405,6 +405,8 @@ html.tm-compact-stats .sig-root .lg-note { margin-top: 6px; font-size: 10px; }
 .sig-root .atk-switch:hover, .sig-root .atk-switch:hover > b { color: var(--blue); }
 .sig-root .atk-switch:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 3px; }
 
+.sig-root .atk-feed { scroll-margin-top: 12px; }
+html.tm-modern .sig-root .atk-feed { scroll-margin-top: calc(var(--tm-nav-h, 54px) + 64px); }
 .sig-root .atk-feed .sig-ep-head { flex-wrap: wrap; }
 .sig-root .atk-feed .sig-ep-addr { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .sig-root .atk-feed .sig-ep-flags { min-width: 0; }

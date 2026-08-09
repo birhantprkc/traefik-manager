@@ -319,6 +319,14 @@ function _atkSpec(obj) {
 function _atkActive() { return Object.keys(_atkFacet).filter(k => _atkFacet[k]); }
 function _atkClearFacets() { Object.keys(_atkFacet).forEach(k => { _atkFacet[k] = ''; }); }
 
+function _atkRevealFeed() {
+    const feed = document.querySelector('#csStats .atk-feed');
+    if (!feed) return;
+    const r = feed.getBoundingClientRect();
+    if (r.top >= 0 && r.top < window.innerHeight * 0.6) return;
+    feed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function _atkOpenCsSettings() {
     if (typeof openSettingsModal !== 'function') return;
     openSettingsModal('system');
@@ -358,7 +366,7 @@ function _atkGo(spec) {
     if ('view' in p) {
         _atkView = p.view === 'decisions' ? 'decisions' : 'alerts';
         _atkPage = 1; _atkOpen = '';
-        if (Object.keys(p).length === 1) { _csRender(); return; }
+        if (Object.keys(p).length === 1) { _csRender(); _atkRevealFeed(); return; }
     }
     const keys = Object.keys(p).filter(k => k in _atkFacet);
     if (!keys.length) { _csRender(); return; }
