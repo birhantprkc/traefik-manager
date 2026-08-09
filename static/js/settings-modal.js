@@ -415,6 +415,7 @@ function settingsMobileBack() {
 }
 
 async function openSettingsModal(panel) {
+    document.documentElement.classList.add('tm-settings-open');
     document.getElementById('settingsSavedNotice').classList.add('hidden');
     document.getElementById('apiTestResult').textContent = '';
 
@@ -522,6 +523,7 @@ async function openSettingsModal(panel) {
 }
 
 function closeSettingsModal() {
+    document.documentElement.classList.remove('tm-settings-open');
     document.getElementById('settingsModal').style.display = 'none';
     document.body.style.overflow = '';
 }

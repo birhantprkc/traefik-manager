@@ -1300,10 +1300,10 @@ html.tm-modern #tabBar { display: none; }
     html.tm-modern .max-w-7xl { max-width: none; }
     html.tm-modern main { margin-left: var(--side-nav-w, 232px); margin-right: 0; width: auto; align-self: stretch; transition: margin-left 0.15s ease, margin-right 0.3s cubic-bezier(0.4,0,0.2,1); }
     @media (min-width: 1440px) {
-        html.tm-modern:not(.tm-static-in-settings) .detail-panel { top: var(--tm-nav-h, 54px); max-width: 680px; }
-        html.tm-modern:not(.tm-static-in-settings) .detail-panel.open { box-shadow: none; }
-        html.tm-modern:not(.tm-static-in-settings) .detail-backdrop { display: none !important; }
-        html.tm-modern:not(.tm-static-in-settings).tm-detail-open main { margin-right: 680px; }
+        html.tm-modern:not(.tm-settings-open) .detail-panel { top: var(--tm-nav-h, 54px); max-width: 680px; }
+        html.tm-modern:not(.tm-settings-open) .detail-panel.open { box-shadow: none; }
+        html.tm-modern:not(.tm-settings-open) .detail-backdrop { display: none !important; }
+        html.tm-modern:not(.tm-settings-open).tm-detail-open main { margin-right: 680px; }
     }
     html.tm-modern { --side-nav-w: 232px; }
     html.tm-modern.tm-nav-collapsed { --side-nav-w: 60px; }

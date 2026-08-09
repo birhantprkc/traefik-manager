@@ -72,6 +72,7 @@ function buildSideNav() {
 
 function _detailDockActive() {
     return document.documentElement.classList.contains('tm-modern')
+        && !document.documentElement.classList.contains('tm-settings-open')
         && window.matchMedia('(min-width: 1440px)').matches;
 }
 
