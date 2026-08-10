@@ -2080,8 +2080,31 @@ function agentCfgChanged() {
     if (!backupDir) namedVols.push(`  tma_backups:`);
     if (restart === 'poison-pill') namedVols.push(`  traefik-signals:`);
 
+    const proxyHost = restart === 'proxy'
+        ? (/^tcp:\/\/([A-Za-z][A-Za-z0-9._-]*):(\d+)/.exec(dockerHost || '') || [])
+        : [];
+    const proxyName = proxyHost[1] && proxyHost[1] !== 'localhost' ? proxyHost[1] : '';
+    const proxyPort = proxyHost[2] || '2375';
+    const proxyNet  = proxyName ? `${proxyName}-net` : '';
+
     let compose = `services:\n  traefik-manager-agent:\n    image: ghcr.io/chr0nzz/traefik-manager-agent:latest\n    restart: unless-stopped\n    ports:\n      - "${agentPort}:${agentPort}"\n    environment:\n${envLines.join('\n')}\n    volumes:\n${volLines.join('\n')}`;
+    if (proxyName) compose += `\n    networks:\n      - ${proxyNet}`;
+
+    if (proxyName) {
+        compose += `\n\n  ${proxyName}:\n    image: tecnativa/docker-socket-proxy\n    restart: unless-stopped\n    environment:\n      CONTAINERS: 1\n      POST: 1\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n    networks:\n      - ${proxyNet}`;
+        if (proxyPort !== '2375') compose += `\n    expose:\n      - "${proxyPort}"`;
+    }
+
     if (namedVols.length) compose += `\n\nvolumes:\n${namedVols.join('\n')}`;
+    if (proxyName) compose += `\n\nnetworks:\n  ${proxyNet}:\n    internal: true`;
+    if (restart === 'poison-pill') {
+        compose += `\n\n# The poison pill also needs a healthcheck on your Traefik service:\n`
+            + `#   healthcheck:\n`
+            + `#     test: ["CMD-SHELL", "[ ! -f ${signalFile || '/signals/restart.sig'} ] || (rm ${signalFile || '/signals/restart.sig'} && kill -TERM 1)"]\n`
+            + `#     interval: 5s\n`
+            + `#   volumes:\n`
+            + `#     - traefik-signals:/signals`;
+    }
 
     const runParts = [`docker run -d \\`, `  --name traefik-manager-agent \\`, `  -p ${agentPort}:${agentPort} \\`];
     envLines.forEach(e => runParts.push(`  -e ${e.replace(/^\s+- /, '')} \\`));

@@ -1122,6 +1122,11 @@
                                 </div>
 
                                 <div id="agentCfgPane-git" class="auth-sub-panel space-y-3" style="display:none;flex-direction:column;">
+                                    <div class="rounded-lg px-3 py-2.5 text-xs" style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);color:var(--muted)">
+                                        <span class="font-semibold" style="color:var(--text)"><i class="ph-bold ph-info" style="color:var(--blue)"></i> You probably do not need this.</span>
+                                        <span class="block mt-1">The Host can back this agent up to its own repository instead, on a separate branch, using the Host's credentials. Nothing is configured on the agent and no token is stored on it. Select this server in the switcher, then turn on <strong>Use Host Repository</strong> under <strong>Backups &rarr; Git</strong>.</span>
+                                        <span class="block mt-1">Only fill in the fields below if this agent should push on its own, to a different repository. Give it a branch no other server uses, or they overwrite each other.</span>
+                                    </div>
                                     <label class="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" id="agCfgGitEnabled" onchange="agentCfgChanged()">
                                         <span class="text-xs font-medium" style="color:var(--text)">Enable Git Backup</span>
