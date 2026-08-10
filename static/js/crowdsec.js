@@ -499,6 +499,14 @@ function _csSetConfigured(on) {
     if (notCfg) notCfg.style.setProperty('display', on ? 'none' : 'flex', 'important');
     if (bar) bar.style.display = on ? '' : 'none';
     if (el && !on) el.innerHTML = '';
+    if (on) return;
+    const onAgent = !!_activeAgent;
+    const hostBlock  = document.getElementById('csNotCfgHost');
+    const agentBlock = document.getElementById('csNotCfgAgent');
+    const agentName  = document.getElementById('csNotCfgAgentName');
+    if (hostBlock)  hostBlock.style.display  = onAgent ? 'none' : '';
+    if (agentBlock) agentBlock.style.display = onAgent ? '' : 'none';
+    if (agentName && onAgent) agentName.textContent = _activeAgent.name || 'this agent';
 }
 
 function _csSkeleton() {

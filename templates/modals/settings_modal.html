@@ -1153,9 +1153,17 @@
                                 </div>
 
                                 <div id="agentCfgPane-crowdsec" class="auth-sub-panel space-y-3" style="display:none;flex-direction:column;">
+                                    <div class="rounded-lg px-4 py-2.5 flex items-start gap-2" style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2)">
+                                        <i class="ph-bold ph-info text-sm shrink-0 mt-0.5" style="color:var(--blue)"></i>
+                                        <div class="text-xs" style="color:var(--muted)">
+                                            <span class="font-semibold" style="color:var(--text)">These build the compose snippet, they are not sent to the agent.</span>
+                                            The agent reads CrowdSec from its own container environment, so changing anything here has no effect until you copy the compose below and recreate the agent container. With mTLS, the cert paths must be mounted inside the agent container too.
+                                        </div>
+                                    </div>
                                     <div>
                                         <label class="settings-section-label">LAPI URL <span style="color:var(--muted)">(optional)</span></label>
                                         <input id="agCfgCsUrl" type="text" class="input-field text-xs" placeholder="http://crowdsec:8080" oninput="agentCfgChanged()">
+                                        <p class="text-xs mt-1" style="color:var(--muted)">Resolved from inside the agent container. Sets <code class="font-mono">CROWDSEC_LAPI_URL</code>.</p>
                                     </div>
                                     <div>
                                         <label class="settings-section-label">API Key <span style="color:var(--muted)">(optional)</span></label>
