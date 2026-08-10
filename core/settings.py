@@ -78,6 +78,7 @@ def load_settings() -> dict:
         'cert_resolver':        os.environ.get('CERT_RESOLVER', 'cloudflare'),
         'traefik_api_url':      os.environ.get('TRAEFIK_API_URL', 'http://traefik:8080'),
         'auth_enabled':         True,
+        'auth_external_ack':    False,
         'password_hash':        '',
         'visible_tabs':         {t: False for t in OPTIONAL_TABS},
         'must_change_password': False,
@@ -161,6 +162,8 @@ def load_settings() -> dict:
             merged['traefik_api_url'] = config.safe_api_url(str(data['traefik_api_url'])) or defaults['traefik_api_url']
         if 'auth_enabled' in data:
             merged['auth_enabled'] = bool(data['auth_enabled'])
+        if 'auth_external_ack' in data:
+            merged['auth_external_ack'] = bool(data['auth_external_ack'])
         if 'password_hash' in data:
             merged['password_hash'] = str(data['password_hash']).strip()
         if 'visible_tabs' in data and isinstance(data['visible_tabs'], dict):
@@ -299,7 +302,7 @@ def load_settings() -> dict:
         return defaults
 
 def save_settings(domains, cert_resolver, traefik_api_url,
-                  auth_enabled=True, password_hash='', visible_tabs=None,
+                  auth_enabled=True, auth_external_ack=None, password_hash='', visible_tabs=None,
                   must_change_password=None, setup_complete=None,
                   otp_secret=None, otp_enabled=None,
                   api_keys=None,
@@ -330,6 +333,8 @@ def save_settings(domains, cert_resolver, traefik_api_url,
     if visible_tabs is None:
         visible_tabs = {t: False for t in OPTIONAL_TABS}
     _cur = load_settings()
+    if auth_external_ack is None:
+        auth_external_ack = _cur.get('auth_external_ack', False)
     if must_change_password is None:
         must_change_password = _cur.get('must_change_password', False)
     if setup_complete is None:
@@ -441,6 +446,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'cert_resolver':        cert_resolver,
         'traefik_api_url':      traefik_api_url,
         'auth_enabled':         auth_enabled,
+        'auth_external_ack':    auth_external_ack,
         'password_hash':        password_hash,
         'visible_tabs':         visible_tabs,
         'must_change_password': must_change_password,

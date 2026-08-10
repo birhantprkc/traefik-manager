@@ -512,8 +512,7 @@ async function openSettingsModal(panel) {
             }
             if (changePwForm) changePwForm.style.display = isOn ? '' : 'none';
         }
-        const noAuthWarn = document.getElementById('noAuthWarning');
-        if (noAuthWarn) noAuthWarn.style.display = data.no_auth ? '' : 'none';
+        _paintAuthState(data.no_auth, data.auth_external_ack);
     } catch(e) {
         console.error('Could not load settings', e);
     }
@@ -564,6 +563,33 @@ async function changePassword() {
     }
 }
 
+function _paintAuthState(noAuth, ack) {
+    const warn = document.getElementById('noAuthWarning');
+    const note = document.getElementById('authDelegatedNote');
+    if (warn) warn.style.display = (noAuth && !ack) ? '' : 'none';
+    if (note) note.style.display = (noAuth && ack) ? '' : 'none';
+}
+
+async function setAuthExternalAck(on) {
+    if (on && !await _confirm(
+        'Only do this if something in front of Traefik Manager already requires a login, such as Authelia, Authentik or a forward-auth middleware. '
+        + 'Traefik Manager will stop warning you, but it still does not check who you are, so anything that reaches it directly gets full access.',
+        'Authentication is handled elsewhere', 'I understand')) return;
+    try {
+        const res = await fetch('/api/auth/external-ack', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
+            body: JSON.stringify({ auth_external_ack: !!on }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) { showToast(data.error || 'Failed to update.', 'error'); return; }
+        _paintAuthState(true, !!on);
+        const banner = document.getElementById('noAuthBanner');
+        if (banner) banner.style.display = on ? 'none' : '';
+        showToast(on ? 'Warning hidden. Traefik Manager still does not authenticate anyone.' : 'Warning restored.', 'success');
+    } catch (e) { showToast('Request failed.', 'error'); }
+}
+
 async function toggleAuth() {
     const stateLabel  = document.getElementById('authStateLabel');
     const toggleLabel = document.getElementById('authToggleLabel');
@@ -586,7 +612,7 @@ async function toggleAuth() {
             stateLabel.style.color = newState ? 'var(--green)' : 'var(--muted)';
             toggleLabel.textContent = newState ? 'Disable' : 'Enable';
             if (changePwForm) changePwForm.style.display = newState ? '' : 'none';
-            const naw = document.getElementById('noAuthWarning'); if (naw) naw.style.display = 'none';
+            _paintAuthState(false, false);
             showToast(`Authentication ${newState ? 'enabled' : 'disabled'}.`, 'success');
         } else {
             showToast(data.error || 'Failed to update auth.', 'error');

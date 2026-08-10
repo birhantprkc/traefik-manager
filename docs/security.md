@@ -38,9 +38,15 @@ Traefik Manager has two independent web-UI auth mechanisms - **built-in password
 | Enabled | Off | Password login (optionally with 2FA). |
 | Enabled | Enabled | Login page offers both. |
 | **Disabled** | **Enabled** | **OIDC is the sole login** - the password form is hidden and users are sent to your identity provider. |
-| Disabled | Off | **No authentication - the UI is publicly accessible.** A red warning is shown in the app and Settings, and logged at startup. Avoid this outside a fully trusted, isolated network. |
+| Disabled | Off | **No authentication - the UI is publicly accessible.** A red warning is shown in the app and Settings, and logged at startup. Avoid this outside a fully trusted, isolated network, or [acknowledge it](#authentication-handled-by-a-reverse-proxy) if a reverse proxy already requires a login. |
 
 Disabling built-in authentication only turns off the password form - it does **not** disable OIDC. **API keys keep working in every mode**, so the mobile app and automation are unaffected when OIDC is your only interactive login.
+
+### Authentication handled by a reverse proxy
+
+If something in front of Traefik Manager already requires a login - Authelia, Authentik, GateKeeper, or any forward-auth middleware - then running with both mechanisms off is a deliberate choice, and the red warning is noise. Under **Settings -> Authentication**, the warning offers **Acknowledge and hide this warning**. It is stored in `manager.yml` as `auth_external_ack`, so it applies to every browser and survives restarts, and the startup log drops from a `SECURITY:` warning to an informational line.
+
+This changes what you are told, never what is enforced. Traefik Manager still authenticates nobody, so anything that reaches it directly - another container on the same Docker network, a LAN client hitting the port, a route that bypasses your middleware - has full administrative access. The acknowledgement cannot be set while a password or OIDC is active, and Settings keeps showing a neutral note stating that authentication is delegated, with an **Undo** link.
 
 > **Recovery / lockout safety:** disabling built-in authentication preserves your password hash in `manager.yml`. If your OIDC provider becomes unreachable and you are locked out, set `auth_enabled: true` in `manager.yml` and restart the container - the password form returns and you can log in with your existing password. You can also generate a fresh password with `flask reset-password` (see the [Reset Password](reset-password.md) guide).
 
@@ -99,7 +105,7 @@ API key requests are exempt from CSRF checks only when a **valid** key is provid
 
 ## External auth providers
 
-Traefik Manager's built-in auth can be disabled when using an external provider such as Authentik, Authelia, or Keycloak via Traefik's `forwardAuth` middleware.
+Traefik Manager's built-in auth can be disabled when using an external provider such as Authentik, Authelia, or Keycloak via Traefik's `forwardAuth` middleware. Once it is, [acknowledge the no-authentication warning](#authentication-handled-by-a-reverse-proxy) under Settings so it stops being reported as a misconfiguration.
 
 ::: warning Mobile app compatibility
 `forwardAuth` intercepts all requests including mobile app API calls. To use the mobile app alongside an external auth provider, split the Traefik route so `/api/*` bypasses `forwardAuth` and relies on Traefik Manager's built-in API key auth. See the [mobile app docs](mobile.md#external-auth-providers) for the full example.

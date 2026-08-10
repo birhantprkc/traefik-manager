@@ -415,7 +415,10 @@ logger.info(f"Auth Enabled:   {_auth_enabled()}")
 if _s.get('oidc_enabled'):
     logger.info(f"OIDC:           enabled ({_s.get('oidc_issuer', '')})")
 if not _auth_enabled() and not _s.get('oidc_enabled'):
-    logger.warning("SECURITY: no authentication is active - the web UI is publicly accessible. Enable a password or OIDC.")
+    if _s.get('auth_external_ack'):
+        logger.info("Auth:           delegated to an external provider (acknowledged in Settings)")
+    else:
+        logger.warning("SECURITY: no authentication is active - the web UI is publicly accessible. Enable a password or OIDC.")
 if _s.get('oidc_enabled') and not _s.get('oidc_allowed_emails', '').strip() and not _s.get('oidc_allowed_groups', '').strip() and not _s.get('oidc_allow_any_authenticated'):
     logger.warning("SECURITY: OIDC is enabled with no allowed emails/groups - logins are denied until you set an allowlist or enable 'Allow any authenticated account'.")
 logger.info("===========================================")
@@ -825,6 +828,30 @@ def api_auth_toggle():
     logger.info(f"auth_enabled set to {enabled} by {request.remote_addr}")
     reauth = _auth_required() and not session.get('authenticated')
     return jsonify({'success': True, 'auth_enabled': enabled, 'reauth_required': reauth})
+
+
+@app.route('/api/auth/external-ack', methods=['POST'])
+@csrf_protect
+@login_required
+def api_auth_external_ack():
+    data = request.get_json(silent=True) or {}
+    ack  = bool(data.get('auth_external_ack'))
+    if ack and _auth_required():
+        return jsonify({'error': 'Built-in authentication or OIDC is active, so there is nothing to acknowledge'}), 400
+    settings = load_settings()
+    save_settings(
+        domains=settings['domains'],
+        cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'],
+        auth_enabled=settings['auth_enabled'],
+        auth_external_ack=ack,
+        password_hash=settings['password_hash'],
+        visible_tabs=settings['visible_tabs'],
+    )
+    logger.warning(f"auth_external_ack set to {ack} by {request.remote_addr} - "
+                   f"the operator asserts this instance is protected by an external provider"
+                   if ack else f"auth_external_ack cleared by {request.remote_addr}")
+    return jsonify({'success': True, 'auth_external_ack': ack})
 
 
 @app.route('/login/otp', methods=['GET', 'POST'])
@@ -3058,6 +3085,7 @@ def api_get_settings():
     s['auth_enabled']             = _auth_enabled()
     s['oidc_active']            = _oidc_active()
     s['no_auth']                = not _auth_required()
+    s['auth_external_ack']      = bool(s.get('auth_external_ack'))
     s['has_password']           = _has_password_set()
     s['auth_env_forced']        = os.environ.get('AUTH_ENABLED', '').strip().lower() in ('false', '0', 'no')
     s['oidc_client_secret_set'] = bool(load_settings().get('oidc_client_secret', ''))
@@ -4023,7 +4051,8 @@ def index():
     apps, middlewares = _build_all_apps(include_external=False)
     apps = [a for a in apps if not (a.get('service_name') or '').endswith('@internal')]
     auth_on    = _auth_required()
-    no_auth    = not _auth_required()
+    _ack       = bool(load_settings().get('auth_external_ack'))
+    no_auth    = not _auth_required() and not _ack
     login_time = session.get('login_time', '')
     config_paths_list = [{'label': os.path.basename(p), 'path': p} for p in env.CONFIG_PATHS]
     cert_resolvers    = [r.strip() for r in settings['cert_resolver'].split(',') if r.strip()]
