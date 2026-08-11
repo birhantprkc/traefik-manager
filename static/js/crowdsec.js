@@ -1595,6 +1595,7 @@ async function submitCsBan() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to add decision');
         document.getElementById('csBanIp').value = '';
+        closeCsBanModal();
         showToast(`Decision added: ${_csBanType} ${ip} for ${duration}`, 'success');
         setTimeout(refreshCrowdSecTab, 800);
     } catch(e) {

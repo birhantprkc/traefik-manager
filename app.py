@@ -439,6 +439,13 @@ def _handle_csrf_error(e):
     return jsonify({'ok': False, 'message': 'Session expired - please refresh the page.'}), 403
 
 
+@app.errorhandler(401)
+def _handle_unauthorized(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'ok': False, 'error': 'Not authenticated', 'auth_required': True}), 401
+    return redirect(url_for('login', next=request.path))
+
+
 @app.context_processor
 def inject_csrf():
     return {'csrf_token': _get_csrf_token()}

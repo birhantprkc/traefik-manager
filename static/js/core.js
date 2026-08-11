@@ -307,6 +307,29 @@ function toggleLiveDd(id) {
     if (!isOpen) { menu.classList.add('open'); btn.classList.add('open'); }
 }
 
+let _tmAuthLost = false;
+
+function _tmHandleAuthLoss() {
+    if (_tmAuthLost) return;
+    _tmAuthLost = true;
+    const here = window.location.pathname + window.location.search;
+    window.location.href = '/login?next=' + encodeURIComponent(here);
+}
+
+(function () {
+    const orig = window.fetch;
+    window.fetch = function (input, init) {
+        return orig.call(this, input, init).then(res => {
+            if (res.status !== 401) return res;
+            let url = '';
+            try { url = new URL(typeof input === 'string' ? input : input.url, window.location.origin).pathname; }
+            catch (e) { url = String(input || ''); }
+            if (url.startsWith('/api/') && !window.location.pathname.startsWith('/login')) _tmHandleAuthLoss();
+            return res;
+        });
+    };
+})();
+
 let _shortcutsPanelOpen = false;
 
 function toggleShortcutsPanel() {

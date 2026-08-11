@@ -49,6 +49,10 @@ If built-in auth is enabled, an API key is required.
 OIDC login applies to the web browser only. The mobile app always authenticates via API key. If you log in to the web UI via OIDC, generate an API key under **Settings → Authentication → App / Mobile API Keys**, then enter it in the mobile app - the process is the same as for password-based users.
 :::
 
+::: info Internal CAs and plain HTTP
+Since v1.7.1 the Android app trusts CA certificates installed on the device, so instances secured by an internal/private CA work: install your root CA on the phone under **Settings → Security → Encryption & credentials → Install a certificate → CA certificate**, then connect with your `https://` URL. Plain `http://` URLs (LAN-only setups) are also supported.
+:::
+
 ---
 
 ## Navigation
