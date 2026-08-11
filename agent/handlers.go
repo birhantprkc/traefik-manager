@@ -760,6 +760,11 @@ func (a *App) backupsListHandler(w http.ResponseWriter, r *http.Request) {
 		Name string `json:"name"`
 		Size int64  `json:"size"`
 		Date string `json:"date"`
+		Kind string `json:"kind"`
+	}
+	staticBase := ""
+	if a.cfg.StaticConfigPath != "" {
+		staticBase = filepath.Base(a.cfg.StaticConfigPath)
 	}
 	var list []backup
 	for _, e := range entries {
@@ -774,9 +779,13 @@ func (a *App) backupsListHandler(w http.ResponseWriter, r *http.Request) {
 			size = info.Size()
 			date = info.ModTime().UTC().Format(time.RFC3339)
 		}
-		list = append(list, backup{Name: n, Size: size, Date: date})
+		kind := "routes"
+		if staticBase != "" && bakBaseName(n) == staticBase {
+			kind = "static"
+		}
+		list = append(list, backup{Name: n, Size: size, Date: date, Kind: kind})
 	}
-	jsonOK(w, map[string]any{"backups": list})
+	jsonOK(w, map[string]any{"backups": list, "static_configured": a.cfg.StaticConfigPath != ""})
 }
 
 func (a *App) backupCreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -849,13 +858,20 @@ func (a *App) restoreHandler(w http.ResponseWriter, r *http.Request) {
 			origName = candidate
 		}
 	}
-	cfgPath := a.cfg.ConfigPath
-	info, _ := os.Stat(cfgPath)
 	var dest string
-	if info != nil && info.IsDir() {
-		dest = filepath.Join(cfgPath, origName)
+	if a.cfg.StaticConfigPath != "" && origName == filepath.Base(a.cfg.StaticConfigPath) {
+		dest = a.cfg.StaticConfigPath
 	} else {
-		dest = cfgPath
+		cfgPath := a.cfg.ConfigPath
+		info, _ := os.Stat(cfgPath)
+		if info != nil && info.IsDir() {
+			dest = filepath.Join(cfgPath, origName)
+		} else {
+			dest = cfgPath
+		}
+	}
+	if err := a.createFileBak(dest, origName); err != nil {
+		log.Printf("pre-restore backup failed: %v", err)
 	}
 	if err := atomicWrite(dest, data); err != nil {
 		jsonError(w, "restore failed: "+err.Error(), http.StatusInternalServerError)
@@ -1783,4 +1799,13 @@ func (a *App) writeActiveDecisions(w http.ResponseWriter, rows []json.RawMessage
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(active)
+}
+
+
+func bakBaseName(n string) string {
+	base := strings.TrimSuffix(n, ".bak")
+	if idx := strings.LastIndex(base, "."); idx >= 0 && len(base)-idx == 16 {
+		return base[:idx]
+	}
+	return base
 }

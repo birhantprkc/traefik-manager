@@ -5,7 +5,12 @@ function _backupFetch(path, opts) {
 
 async function createAndLoadStaticBackup() {
     if (typeof _activeAgent !== 'undefined' && _activeAgent) {
-        showToast('Static config backup is included in the dynamic config backup for remote agents', 'info');
+        try {
+            const res  = await _backupFetch('/api/backups', { method: 'POST' });
+            const data = await res.json();
+            if (data.ok) { showToast('Backup created on ' + _activeAgent.name, 'success'); loadBackups(); }
+            else showToast(data.error || 'Backup failed', 'error');
+        } catch(e) { showToast('Backup failed', 'error'); }
         return;
     }
     const btn = document.querySelector('[onclick="createAndLoadStaticBackup()"]');
@@ -27,16 +32,12 @@ async function createAndLoadStaticBackup() {
 
 function switchBackupTab(id, btn) {
     const isAgent = typeof _activeAgent !== 'undefined' && !!_activeAgent;
-    const staticTabBtn = document.getElementById('backup-tab-static');
-    if (staticTabBtn) staticTabBtn.style.display = isAgent ? 'none' : '';
     const chip = document.getElementById('backupRemoteChip');
     if (chip) { chip.textContent = isAgent ? _activeAgent.name : ''; chip.style.display = isAgent ? '' : 'none'; }
-    if (isAgent && id === 'static') id = 'routes';
     document.querySelectorAll('#mpanel-backups .auth-sub-tab').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('#mpanel-backups .auth-sub-panel').forEach(p => p.style.display = 'none');
-    if (btn && id !== 'static') btn.classList.add('active');
-    const activeTabBtn = document.getElementById('backup-tab-' + id);
-    if (activeTabBtn && isAgent && id !== 'static') activeTabBtn.classList.add('active');
+    const activeTabBtn = btn || document.getElementById('backup-tab-' + id);
+    if (activeTabBtn) activeTabBtn.classList.add('active');
     const panel = document.getElementById('backup-sub-' + id);
     if (panel) panel.style.display = 'flex';
     if (id === 'git') loadGitTab();
@@ -843,9 +844,13 @@ function _renderBackupList(containerId, backups) {
                 <div class="sc-set-d">${b.modified} · ${formatBytes(b.size)}</div>
             </div>
             <div class="sc-set-v">
-                <button onclick="restoreBackup('${b.name}')" class="btn-secondary text-xs py-1 px-2.5">
+                ${b.restoreBlocked
+                    ? `<button class="btn-secondary text-xs py-1 px-2.5" disabled style="opacity:.5;cursor:not-allowed" title="This agent is running an older version that restores static backups to the wrong path. Update the agent, then restore.">
+                        <i class="ph-bold ph-arrow-counter-clockwise text-xs"></i> Restore
+                    </button>`
+                    : `<button onclick="restoreBackup('${b.name}')" class="btn-secondary text-xs py-1 px-2.5">
                     <i class="ph-bold ph-arrow-counter-clockwise text-xs"></i> Restore
-                </button>
+                </button>`}
                 <button onclick="deleteBackup('${b.name}')" class="btn-icon" title="Delete" style="color:var(--red)">
                     <i class="ph-bold ph-trash text-sm"></i>
                 </button>
@@ -857,7 +862,6 @@ function _renderBackupList(containerId, backups) {
 async function loadBackups() {
     const isAgent    = typeof _activeAgent !== 'undefined' && !!_activeAgent;
     const staticTab  = document.getElementById('backup-tab-static');
-    if (staticTab)  staticTab.style.display = isAgent ? 'none' : '';
     const chip = document.getElementById('backupRemoteChip');
     if (chip) { chip.textContent = isAgent ? _activeAgent.name : ''; chip.style.display = isAgent ? '' : 'none'; }
     const retRow     = document.getElementById('backupRetentionRow');
@@ -888,11 +892,19 @@ async function loadBackups() {
             return;
         }
         const rawArr  = Array.isArray(raw) ? raw : (raw.backups || []);
-        const backups = rawArr.map(b => ({ ...b, modified: b.modified || b.date || '' }));
-        const routes  = isAgent ? backups : backups.filter(b => b.kind !== 'static');
+        const oldAgent = isAgent && rawArr.length > 0 && !rawArr.some(b => b.kind);
+        const kindOf  = b => b.kind || (/^traefik\.ya?ml\.\d{8}_\d{6}\.bak$/.test(b.name) ? 'static' : 'routes');
+        const backups = rawArr.map(b => ({ ...b, kind: kindOf(b), modified: b.modified || b.date || '',
+            restoreBlocked: isAgent && oldAgent && kindOf(b) === 'static' }));
+        const routes  = backups.filter(b => b.kind !== 'static');
         const statics = backups.filter(b => b.kind === 'static');
+        const hasStaticSide = !isAgent || !!raw.static_configured || statics.length > 0;
+        if (staticTab) staticTab.style.display = hasStaticSide ? '' : 'none';
         _renderBackupList('sm-backups-list', routes);
-        if (!isAgent) _renderBackupList('sm-static-backups-list', statics);
+        _renderBackupList('sm-static-backups-list', statics);
+        if (isAgent && !hasStaticSide && document.getElementById('backup-sub-static')?.style.display !== 'none') {
+            switchBackupTab('routes', document.getElementById('backup-tab-routes'));
+        }
     } catch (e) {
         if (routesList) routesList.innerHTML = `<p class="text-sm px-1" style="color:var(--red)">Failed to load backups</p>`;
         if (staticList) staticList.innerHTML = `<p class="text-sm px-1" style="color:var(--red)">Failed to load backups</p>`;
