@@ -331,7 +331,7 @@ html.tm-modern .svc-list-row .toggle-switch { transform: scale(.88); transform-o
     .sig-root .lg-feed .sig-ep-row { grid-template-columns: minmax(0, 1fr) 42px; grid-template-areas: "id n" "addr flags" "kind kind"; }
 }
 .tab-content > .filter-bar { position: sticky; top: 0; z-index: 30; background: var(--bg); margin-bottom: 12px; padding-bottom: 10px; }
-html.tm-modern .tab-content > .filter-bar { top: var(--tm-nav-h, 54px); }
+html.tm-modern .tab-content > .filter-bar { top: var(--tm-nav-h, 54px); padding-top: 10px; margin-top: -10px; }
 @media (max-width: 640px) {
     .tab-content > .filter-bar,
     html.tm-modern .tab-content > .filter-bar { position: static; z-index: auto; }
