@@ -1499,6 +1499,7 @@ async function loadAgentsList() {
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full flex-shrink-0" id="agent-dot-${a.id}" style="background:var(--muted)"></span>
                         <span class="agent-name-label sc-set-n truncate">${_esc(a.name)}</span>
+                        <button onclick="inlineEditAgent('${a.id}','name','${_esc(a.name)}')" class="btn-icon agent-rename-btn flex-shrink-0" title="Rename" style="opacity:0.5;padding:0 2px;"><i class="ph-bold ph-pencil-simple" style="font-size:10px;"></i></button>
                     </div>
                     <div class="flex items-center gap-1">
                         <span class="agent-url-label sc-set-d truncate">${_esc(a.url)}</span>
@@ -1507,7 +1508,6 @@ async function loadAgentsList() {
                 </div>
                 <div class="sc-set-v">
                     <button onclick="openAgentKeys('${a.id}','${_esc(a.name)}')" class="btn-icon" title="API Keys"><i class="ph-bold ph-key text-xs"></i></button>
-                    <button onclick="inlineEditAgent('${a.id}','name','${_esc(a.name)}')" class="btn-icon agent-rename-btn" title="Rename"><i class="ph-bold ph-pencil-simple text-xs"></i></button>
                     <button onclick="openAgentSetup('${a.id}')" class="btn-icon" title="Edit Settings"><i class="ph-bold ph-gear text-xs"></i></button>
                     <button onclick="deleteAgent('${a.id}','${_esc(a.name)}')" class="btn-icon" title="Remove" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button>
                 </div>

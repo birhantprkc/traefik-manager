@@ -317,14 +317,19 @@ function toggleShortcutsPanel() {
     panel.classList.toggle('open', _shortcutsPanelOpen);
     if (btn) btn.style.color = _shortcutsPanelOpen ? 'var(--blue)' : '';
     if (_shortcutsPanelOpen) {
-        const r = btn.getBoundingClientRect();
         const panelW = Math.min(320, window.innerWidth - 16);
-        let left = r.right - panelW;
-        if (left < 8) left = 8;
+        const r = btn && btn.offsetParent ? btn.getBoundingClientRect() : null;
         panel.style.position = 'fixed';
-        panel.style.top  = (r.bottom + 8) + 'px';
-        panel.style.left = left + 'px';
         panel.style.width = panelW + 'px';
+        if (r && r.width) {
+            let left = r.right - panelW;
+            if (left < 8) left = 8;
+            panel.style.top  = (r.bottom + 8) + 'px';
+            panel.style.left = left + 'px';
+        } else {
+            panel.style.top  = Math.max(24, Math.round(window.innerHeight * 0.14)) + 'px';
+            panel.style.left = Math.round((window.innerWidth - panelW) / 2) + 'px';
+        }
     }
 }
 
