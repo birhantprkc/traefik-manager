@@ -33,13 +33,15 @@ Add routes, manage middlewares, monitor services, and view TLS certificates - al
 
 ## Highlights
 
+- **New design** - full-width layout with a collapsible side navigation, redesigned cards, and slide-in editors throughout
 - **Routes** - add, edit, clone, and enable/disable HTTP, TCP, and UDP routes from the browser
 - **Load balancing** - multiple backends per route, sticky sessions, health checks, and router priority
 - **Middlewares** - 24 guided wizards plus a raw YAML editor, for HTTP and TCP
 - **Multi-server** - manage unlimited remote Traefik instances through a lightweight Go agent
 - **Static config editor** - edit the full `traefik.yml` from the UI and apply it with a one-click Traefik restart
 - **Backups** - timestamped local backups plus git push with history, diffs, and one-click restore
-- **Monitoring** - live services, certificates, access logs, CrowdSec, and CVE advisory warnings
+- **Monitoring** - live services, certificates, CVE advisory warnings, plus access logs and CrowdSec rebuilt as
+  click-through analytics rather than raw lists
 - **Mobile app** - Android companion app on Google Play
 
 ## Quick Start
@@ -106,6 +108,7 @@ Open **http://your-server:5000** - the setup wizard will guide you through the r
 
 - **24 guided wizards**: Basic/Digest Auth, Forward Auth (with Authentik, Authelia, and Gatekeeper presets), OIDC Auth, Rate Limit, In-Flight Requests, IP Allowlist, Secure Headers, CORS, Redirects, Strip/Add/Replace Prefix, Retry, Circuit Breaker, Buffering, Compress, Chain, Encoded Characters, and more
 - **Raw YAML editor** for anything the wizards don't cover
+- **Custom templates** - save your own reusable YAML from the middlewares toolbar; it appears in the template picker alongside the built-ins and is shared across every server
 - **Client IP source selector** in the IP Allowlist wizard - match the real client instead of your proxy, via trusted hop depth (`ipStrategy.depth`) or excluded proxy IPs (`ipStrategy.excludedIPs`)
 - **TCP middlewares** alongside HTTP
 - **Provider middlewares** (Docker, Kubernetes, etc.) shown read-only in the provider tabs
@@ -120,6 +123,8 @@ Open **http://your-server:5000** - the setup wizard will guide you through the r
   - **Route Map** - entry points, routes, middlewares, and services in a visual topology
   - **TLS Options** - create and manage named `tls.options` profiles, assignable per route
   - **CrowdSec** - decisions and alerts from a LAPI; ban, captcha, bypass, or unban IPs with one click
+- **Logs as analytics** - the access log becomes seven click-through cards (status codes, response time, methods, domains, paths, clients, services) with a "where it fails" panel naming the worst status-and-path pairs; every count is a filter, and an optional auto-refresh polls without losing your filters or scroll position
+- **CrowdSec around the attack** - attacking sources, networks by ASN, scenarios, targeted paths, tooling by user agent, and bans in force; colour marks only what is *not* already handled, so a host being probed but absorbed cleanly reads calm. Authenticates with a bouncer key, machine login, or a client certificate for mTLS setups
 - **IP geolocation** *(optional, off by default)* - country flags and a shaded, clickable **world map** of where your traffic and bans come from, on the Logs and CrowdSec tabs; lookups run on the server against a local [DB-IP](https://db-ip.com) database (no IPs leave your machine), or point `GEOIP_DB_PATH` at your own MaxMind `.mmdb`
 - Optional tabs that read a mounted file:
   - **Certs** *(mount `acme.json`)* - TLS certificates with expiry tracking; accepts several storage files or a directory, one per cert resolver
@@ -130,12 +135,14 @@ Open **http://your-server:5000** - the setup wizard will guide you through the r
 - **Configurable file paths** - set the `acme.json`, access log, and static config paths from **Settings → File Paths** without a container restart; UI settings override env vars
 - **Light, dark, or system theme** - the nav-bar toggle sets the default for the whole instance, including the login page
 - Card/list view toggle on Routes, Middlewares, and Services
+- **Type DELETE to confirm** - deleting a route, a middleware, or a bulk selection asks for the word in full, and says what is lost before it goes
 
 ### Static Config Editor *(optional - mount `traefik.yml` read-write)*
 
 - Edit every part of `traefik.yml` from the UI - **Entrypoints, Cert Resolvers, Plugins, API, Logging, and Providers** sections, plus a raw **Monaco** YAML editor for the full file
 - Changes are staged and backed up; apply them with a **one-click Traefik restart** - via socket proxy (recommended), poison pill (no socket needed), or direct socket
 - Full-screen reconnect overlay polls until Traefik is back up
+- **Show it where you want** - off, inside the Settings window, or as its own tab, grouped into Traffic in, Certificates and Operations with a verdict line naming anything that needs attention
 
 ### Backups
 

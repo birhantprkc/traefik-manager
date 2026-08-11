@@ -87,9 +87,6 @@
                 <button class="modal-sidebar-btn" id="msb-agent-keys" style="display:none" onclick="switchSettingsPanel('agent-keys', this); loadActiveAgentKeys()">
                     <i class="ph-bold ph-key"></i> API Keys
                 </button>
-                <button class="modal-sidebar-btn" id="msb-templates" onclick="switchSettingsPanel('templates', this); loadTemplatesList()">
-                    <i class="ph-bold ph-puzzle-piece"></i> Templates
-                </button>
                 <button class="modal-sidebar-btn" id="msb-static" onclick="switchSettingsPanel('static', this)" style="display:none">
                     <i class="ph-bold ph-file-code"></i> Static Config
                 </button>
@@ -1285,35 +1282,6 @@
                             </div>
                         </div>
                         <div id="activeAgentKeysList"></div>
-                    </div>
-                </div>
-
-                <div class="modal-panel" id="mpanel-templates" style="gap:0;padding:0;overflow:hidden;">
-                    <div class="flex items-center justify-between px-4 py-3" style="border-bottom:1px solid var(--border);flex-shrink:0;">
-                        <div class="font-semibold text-sm" style="color:var(--text)">Middleware Templates</div>
-                        <button onclick="openTemplateEditor(null)" class="btn-secondary text-xs py-1 px-2.5">
-                            <i class="ph-bold ph-plus text-xs"></i> Add Template
-                        </button>
-                    </div>
-                    <div id="templateListView" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;"></div>
-                    <div id="templateEditorView" style="display:none;flex-direction:column;flex:1;overflow-y:auto;">
-                        <div class="flex items-center justify-between px-4 py-3" style="border-bottom:1px solid var(--border);flex-shrink:0;">
-                            <div class="font-semibold text-sm" id="templateEditorTitle" style="color:var(--text)">Add Template</div>
-                        </div>
-                        <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
-                            <div>
-                                <label class="text-xs font-medium mb-1 block" style="color:var(--muted)">Name</label>
-                                <input id="tplName" type="text" class="input-field text-sm" placeholder="e.g. Secure Headers">
-                            </div>
-                            <div>
-                                <label class="text-xs font-medium mb-1 block" style="color:var(--muted)">YAML</label>
-                                <textarea id="tplYaml" class="input-field text-xs font-mono" rows="12" placeholder="headers:&#10;  sslRedirect: true&#10;  forceSTSHeader: true&#10;  stsSeconds: 315360000" style="resize:vertical;"></textarea>
-                            </div>
-                            <div class="flex gap-2">
-                                <button onclick="saveTemplate()" class="btn-primary text-xs py-1.5 px-4">Save</button>
-                                <button onclick="closeTemplateEditor()" class="btn-secondary text-xs py-1.5 px-4">Cancel</button>
-                            </div>
-                        </div>
                     </div>
                 </div>
 

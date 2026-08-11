@@ -2123,8 +2123,26 @@ function updateServerSwitcher(agents) {
 
 let _editingTemplateId = null;
 
+function openTemplatesPanel() {
+    const panel = document.getElementById('mwTplPanel');
+    const back  = document.getElementById('mwTplBackdrop');
+    if (!panel) return;
+    closeTemplateEditor(true);
+    loadTemplatesList();
+    panel.classList.add('open');
+    if (back) back.classList.add('open');
+    if (!setDetailDockOpen(true)) document.body.style.overflow = 'hidden';
+}
+
+function closeTemplatesPanel() {
+    setDetailDockOpen(false);
+    document.getElementById('mwTplPanel')?.classList.remove('open');
+    document.getElementById('mwTplBackdrop')?.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
 async function loadTemplatesList() {
-    const listEl = document.getElementById('templateListView');
+    const listEl = document.getElementById('templateListItems');
     if (!listEl) return;
     try {
         const res  = await fetch('/api/mw/templates');
@@ -2132,7 +2150,7 @@ async function loadTemplatesList() {
         const templates = data.templates || [];
         if (templates.length === 0) {
             listEl.innerHTML = `<div class="text-center py-10" style="color:var(--muted)">
-                <i class="ph-light ph-puzzle-piece text-3xl block mb-2 opacity-40"></i>
+                <i class="ph-light ph-cards text-3xl block mb-2 opacity-40"></i>
                 <p class="text-xs">No custom templates yet. Click <strong>Add Template</strong> to create one.</p>
             </div>`;
             return;
@@ -2140,7 +2158,7 @@ async function loadTemplatesList() {
         listEl.innerHTML = templates.map(t => `
             <div class="flex items-center justify-between px-3 py-2.5 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)">
                 <div class="flex items-center gap-2 min-w-0">
-                    <i class="ph-bold ph-puzzle-piece text-sm flex-shrink-0" style="color:var(--blue)"></i>
+                    <i class="ph-bold ph-cards text-sm flex-shrink-0" style="color:var(--blue)"></i>
                     <span class="text-sm font-medium truncate" style="color:var(--text)">${_esc(t.name)}</span>
                 </div>
                 <div class="flex gap-1 flex-shrink-0">
@@ -2156,8 +2174,9 @@ async function loadTemplatesList() {
 async function openTemplateEditor(id) {
     _editingTemplateId = id;
     document.getElementById('templateListView').style.display = 'none';
-    document.getElementById('templateEditorView').style.display = 'flex';
-    document.getElementById('templateEditorTitle').textContent = id ? 'Edit Template' : 'Add Template';
+    document.getElementById('templateEditorView').style.display = '';
+    document.getElementById('mwTplFoot').style.display = '';
+    document.getElementById('mwTplPanelTitle').textContent = id ? 'Edit Template' : 'Add Template';
     document.getElementById('tplName').value = '';
     document.getElementById('tplYaml').value = '';
     if (id) {
@@ -2173,11 +2192,17 @@ async function openTemplateEditor(id) {
     }
 }
 
-function closeTemplateEditor() {
+function closeTemplateEditor(skipReload) {
     _editingTemplateId = null;
-    document.getElementById('templateEditorView').style.display = 'none';
-    document.getElementById('templateListView').style.display = 'flex';
-    loadTemplatesList();
+    const ed = document.getElementById('templateEditorView');
+    const li = document.getElementById('templateListView');
+    const ft = document.getElementById('mwTplFoot');
+    const ti = document.getElementById('mwTplPanelTitle');
+    if (ed) ed.style.display = 'none';
+    if (li) li.style.display = '';
+    if (ft) ft.style.display = 'none';
+    if (ti) ti.textContent = 'Middleware Templates';
+    if (skipReload !== true) loadTemplatesList();
 }
 
 async function saveTemplate() {
@@ -2209,7 +2234,10 @@ async function saveTemplate() {
 }
 
 async function deleteTemplate(id) {
-    if (!confirm('Delete this template?')) return;
+    const ok = (typeof _confirm === 'function')
+        ? await _confirm('Delete this template? Middlewares already created from it are not affected.', 'Delete template', 'Delete')
+        : confirm('Delete this template?');
+    if (!ok) return;
     try {
         const res  = await fetch('/api/mw/templates/' + id, { method: 'DELETE', headers: _csrfHeaders() });
         const data = await res.json();

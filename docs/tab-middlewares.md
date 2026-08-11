@@ -45,6 +45,14 @@ The Forward Auth wizards (including Authentik, Authelia, and Gatekeeper) expose 
 
 The **IP Allow List** wizard includes a **Client IP source** (`ipStrategy`) selector. When Traefik is exposed directly, leave it on **Direct connection**. When a reverse proxy (Cloudflare, another Traefik, nginx) sits in front, the allow-list would otherwise match the proxy's IP on every request - pick **trusted hop depth** to set `ipStrategy.depth` (the number of proxies in front), or **exclude proxy IPs** to set `ipStrategy.excludedIPs` when the proxy's own addresses vary. Depth and excluded IPs are mutually exclusive, matching Traefik's own constraint.
 
+### Custom templates
+
+The built-in list covers the common cases. For YAML you reuse across servers, save it as a custom template: click the puzzle-piece icon in the middlewares toolbar to open the **Middleware Templates** panel, then **Add Template**. Give it a name and the middleware body, without the name line above it.
+
+Saved templates appear in the **Template** dropdown of the middleware form under a **Custom** group, below the built-ins. Selecting one loads its YAML into the editor, which you can then edit before saving - the template is a starting point, not a link, so changing a template later does not alter middlewares already created from it.
+
+Templates are stored in `templates.yml` and are shared across every server. They are not per-agent, so one saved on the Host is available when an agent is selected too.
+
 ### Middleware ordering in routes
 
 When attaching middlewares to a route, order matters - Traefik processes them left to right. The middleware chip selector in the route form shows selected middlewares first (numbered by position) with a divider before unselected ones, so you can see the processing order at a glance.
