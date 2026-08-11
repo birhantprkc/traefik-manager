@@ -47,7 +47,7 @@ The **IP Allow List** wizard includes a **Client IP source** (`ipStrategy`) sele
 
 ### Custom templates
 
-The built-in list covers the common cases. For YAML you reuse across servers, save it as a custom template: click the puzzle-piece icon in the middlewares toolbar to open the **Middleware Templates** panel, then **Add Template**. Give it a name and the middleware body, without the name line above it.
+The built-in list covers the common cases. For YAML you reuse across servers, save it as a custom template: click the templates icon in the middlewares toolbar to open the **Middleware Templates** panel, then **Add Template**. Give it a name and the middleware body, without the name line above it.
 
 Saved templates appear in the **Template** dropdown of the middleware form under a **Custom** group, below the built-ins. Selecting one loads its YAML into the editor, which you can then edit before saving - the template is a starting point, not a link, so changing a template later does not alter middlewares already created from it.
 
@@ -56,6 +56,8 @@ Templates are stored in `templates.yml` and are shared across every server. They
 ### Middleware ordering in routes
 
 When attaching middlewares to a route, order matters - Traefik processes them left to right. The middleware chip selector in the route form shows selected middlewares first (numbered by position) with a divider before unselected ones, so you can see the processing order at a glance.
+
+Once an instance has a dozen or more middlewares the selector gains a filter box. Typing narrows the unselected pool and reports how many are hidden; already-selected middlewares always stay visible, so the form never hides what is actually attached to the route.
 
 ## Editing a middleware
 

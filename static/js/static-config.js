@@ -2479,9 +2479,17 @@ function filterStatic() {
     if (empty) empty.style.display = (q && shown === 0) ? '' : 'none';
 }
 
-function openStaticTab() {
+function _applyStaticWarnState() {
     const warn = document.getElementById('staticDangerWarn');
-    if (warn) warn.style.display = localStorage.getItem('staticWarnHidden') === '1' ? 'none' : '';
+    if (!warn) return;
+    let hidden = false;
+    try { hidden = localStorage.getItem('staticWarnHidden') === '1'; } catch (e) {}
+    warn.style.display = hidden ? 'none' : '';
+}
+
+function openStaticTab() {
+    _applyStaticWarnState();
+    const warn = document.getElementById('staticDangerWarn');
     const server = _activeAgent ? _activeAgent.id : 'host';
     if (_staticLoadedFor !== server) {
         _staticLoadedFor = server;

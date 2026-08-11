@@ -185,13 +185,19 @@ Read-only tabs that pull live data from the Traefik API. No extra mounts needed 
 
 ## Configuration
 
-| Page                                 | Description                                                                                   |
-| --------------------------------------| -----------------------------------------------------------------------------------------------|
-| [manager.yml](manager-yml.md)        | Full settings file reference - all keys, types, and defaults                                  |
-| [Environment Variables](env-vars.md) | All supported environment variables with override behaviour                                   |
-| [OIDC / SSO Login](oidc.md)          | Supports OpenID Connect (OIDC) as an additional login method alongside the built-in password. |
-| [Notification Webhooks](webhooks.md) | Forward events to Discord, Slack, ntfy or any JSON endpoint |
-| [Git Repository Backup](git-backup.md) | Auto-push, commit history, diff viewer and one-click restore |
+Settings open from the gear in the top bar. Each pane lists its settings as aligned rows carrying the setting name, what it does and its control, in the same visual language as the rest of the app.
+
+The search box above the panes filters by setting name and description, and it searches every pane at once: matches in panes you are not looking at show as a count beside that pane in the sidebar, so you can find a setting without knowing where it lives. Clearing the box restores everything.
+
+A verdict line appears above the search when something needs attention, so a warning like no authentication being active is visible from any pane rather than only from the one that owns it.
+
+| Page                                   | Description                                                                                   |
+| ----------------------------------------| -----------------------------------------------------------------------------------------------|
+| [manager.yml](manager-yml.md)          | Full settings file reference - all keys, types, and defaults                                  |
+| [Environment Variables](env-vars.md)   | All supported environment variables with override behaviour                                   |
+| [OIDC / SSO Login](oidc.md)            | Supports OpenID Connect (OIDC) as an additional login method alongside the built-in password. |
+| [Notification Webhooks](webhooks.md)   | Forward events to Discord, Slack, ntfy or any JSON endpoint                                   |
+| [Git Repository Backup](git-backup.md) | Auto-push, commit history, diff viewer and one-click restore                                  |
 
 ---
 

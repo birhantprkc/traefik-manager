@@ -644,6 +644,8 @@ function switchServer(agentId) {
     refreshCurrentTab();
     loadOverviewStats();
     if (typeof updateTmVersionBadge === 'function') updateTmVersionBadge();
+    const sm = document.getElementById('settingsModal');
+    if (sm && sm.style.display !== 'none' && typeof _loadAboutAgentInfo === 'function') _loadAboutAgentInfo();
 }
 
 

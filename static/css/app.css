@@ -1521,10 +1521,45 @@ html.tm-modern .sc-sec[data-sc-sec="log"] > [id^="staticPanel-"] > div:first-chi
 .sc-notice.open .sc-notice-body { display: block; }
 .sc-notice-caret { transition: transform .15s; }
 .sc-notice.open .sc-notice-caret { transform: rotate(90deg); }
-@media (max-width: 560px) {
+html.tm-modern .modal-panel.sc-root { gap: 0; padding: 18px 20px 24px; container-type: inline-size; container-name: sigep; }
+html.tm-modern .modal-panel.sc-root .sc-grp:first-child { margin-top: 0; }
+#settingsModal .hidden { display: none !important; }
+html.tm-modern #settingsModal .sc-root .sc-set { align-items: start; padding-top: 10px; padding-bottom: 10px; }
+html.tm-modern #settingsModal .sc-root .sc-set-d { white-space: normal; overflow: visible; max-width: 52ch; }
+html.tm-modern #settingsModal .sc-root .sc-set-v { padding-top: 1px; }
+html.tm-modern .modal-panel.sc-root .settings-section-label { font: 600 10.5px/1 'JetBrains Mono', monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: block; margin: 26px 0 10px; }
+html.tm-modern .modal-panel.sc-root > div:first-child .settings-section-label { margin-top: 0; }
+html.tm-modern .modal-panel.sc-root .tab-toggle-row { border: 1px solid var(--border); border-radius: 8px; background: var(--card); padding: 9px 12px; transition: border-color .12s, background .12s; }
+html.tm-modern .modal-panel.sc-root .tab-toggle-row:hover { border-color: color-mix(in srgb, var(--blue) 40%, var(--border)); background: color-mix(in srgb, var(--blue) 4%, transparent); }
+html.tm-modern .modal-panel.sc-root .tab-toggle-row > span { font: 500 12px/1.35 'JetBrains Mono', monospace; letter-spacing: -.01em; }
+html.tm-modern .auth-sub-panel.sc-root { container-type: inline-size; container-name: sigep; }
+html.tm-modern .auth-sub-panel.sc-root .sc-set { align-items: start; padding-top: 10px; padding-bottom: 10px; }
+html.tm-modern .auth-sub-panel.sc-root .sc-set-d { white-space: normal; overflow: visible; max-width: 52ch; }
+html.tm-modern .auth-sub-panel.sc-root .settings-section-label { font: 600 10.5px/1 'JetBrains Mono', monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: block; margin: 26px 0 10px; }
+html.tm-modern .auth-sub-panel.sc-root > div:first-child .settings-section-label { margin-top: 0; }
+html.tm-modern .auth-sub-panel.sc-root .tab-toggle-row { border: 1px solid var(--border); border-radius: 8px; background: var(--card); padding: 9px 12px; transition: border-color .12s, background .12s; }
+html.tm-modern .auth-sub-panel.sc-root .tab-toggle-row:hover { border-color: color-mix(in srgb, var(--blue) 40%, var(--border)); background: color-mix(in srgb, var(--blue) 4%, transparent); }
+html.tm-modern .auth-sub-panel.sc-root .tab-toggle-row > span { font: 500 12px/1.35 'JetBrains Mono', monospace; letter-spacing: -.01em; }
+html.tm-modern .modal-panel.sc-root > div > label,
+html.tm-modern .modal-panel.sc-root .sc-fld > label,
+html.tm-modern .auth-sub-panel.sc-root > div > label,
+html.tm-modern .modal-sidebar-btn .settings-hit { margin-left: auto; font-size: 10px; font-variant-numeric: tabular-nums; color: var(--blue); }
+html.tm-modern .modal-sidebar-btn { display: flex; align-items: center; gap: 8px; }
+html.tm-modern .auth-sub-panel.sc-root .sc-fld > label {
+  font: 600 10.5px/1 'JetBrains Mono', monospace; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 5px;
+}
+@container sigep (max-width: 560px) {
   .sc-root .sc-set { grid-template-columns: minmax(0, 1fr); row-gap: 8px; }
   .sc-root .sc-set-v { justify-content: flex-start; }
   .sc-root .sc-set-v .input-field { max-width: none; width: 100%; }
+  .sc-root .sc-set-d { white-space: normal; overflow: visible; }
+}
+@container sc (max-width: 560px) {
+  .sc-root .sc-set { grid-template-columns: minmax(0, 1fr); row-gap: 8px; }
+  .sc-root .sc-set-v { justify-content: flex-start; }
+  .sc-root .sc-set-v .input-field { max-width: none; width: 100%; }
+  .sc-root .sc-set-d { white-space: normal; overflow: visible; }
 }
 @media (hover: none) {
   .sc-root .sc-rail-glyphs { display: none; }
@@ -1545,3 +1580,61 @@ html.tm-modern .nav-brand-wrap > img { align-self: center; }
 .detail-panel-form > div:nth-child(2) { flex: 1; overflow-y: auto; }
 .detail-panel-foot { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--card); position: sticky; bottom: 0; }
 @keyframes cs-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.mw-chip { padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font: 400 12px 'JetBrains Mono', monospace; cursor: pointer; transition: border-color .12s, background .12s, color .12s; }
+.mw-chip:hover { border-color: var(--purple); color: var(--purple); }
+.mw-chip.on { border-color: var(--purple); background: color-mix(in srgb, var(--purple) 15%, transparent); color: var(--purple); }
+
+.sc-root .sc-fld { padding: 11px 12px; border-bottom: 1px solid var(--border); }
+.sc-root .sc-fld:last-child { border-bottom: none; }
+.sc-root .sc-fld > .sc-set-n { margin-bottom: 2px; }
+.sc-root .sc-fld > .sc-set-d { white-space: normal; overflow: visible; margin-bottom: 8px; max-width: 68ch; }
+.sc-root .sc-fld .input-field { width: 100%; }
+.sc-root .sc-fld > .flex { margin-top: 6px; }
+html.tm-modern .modal-panel.sc-root > .sc-fld,
+html.tm-modern .auth-sub-panel.sc-root > .sc-fld { border: 1px solid var(--border); border-radius: 10px; background: var(--card); margin-bottom: 10px; }
+
+html.tm-modern .modal-panel.sc-root .sc-fld > .sc-set-d,
+html.tm-modern .auth-sub-panel.sc-root .sc-fld > .sc-set-d { max-width: none; }
+html.tm-modern .modal-panel.sc-root .sc-set-d,
+html.tm-modern .auth-sub-panel.sc-root .sc-set-d { max-width: 76ch; }
+html.tm-modern .modal-panel.sc-root label,
+html.tm-modern .auth-sub-panel.sc-root label {
+  font: 600 10.5px/1 'JetBrains Mono', monospace; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 5px; font-weight: 600;
+}
+html.tm-modern .modal-panel.sc-root .tab-toggle-row,
+html.tm-modern .auth-sub-panel.sc-root .tab-toggle-row { text-transform: none; letter-spacing: normal; }
+
+html.tm-modern .modal-panel.sc-root .text-xs.font-semibold:not(.sc-set-v *):not(.sc-set-l *),
+html.tm-modern .auth-sub-panel.sc-root .text-xs.font-semibold:not(.sc-set-v *):not(.sc-set-l *) {
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+html.tm-modern .modal-panel.sc-root .text-xs.font-semibold a,
+html.tm-modern .auth-sub-panel.sc-root .text-xs.font-semibold a,
+html.tm-modern .modal-panel.sc-root .sig-verdict .sig-verdict-txt,
+html.tm-modern .auth-sub-panel.sc-root .sig-verdict .sig-verdict-txt { text-transform: none; letter-spacing: normal; }
+html.tm-modern .modal-panel.sc-root .auth-sub-tab,
+html.tm-modern .auth-sub-panel.sc-root .auth-sub-tab { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: -.01em; }
+
+.sc-filtered-out { display: none !important; }
+
+html.tm-modern .sc-root .sc-set-stack { display: block; }
+html.tm-modern .sc-root .sc-set-stack > .flex { gap: 12px; }
+html.tm-modern .sc-root .sc-set-stack .sc-set-l { min-width: 0; flex: 1; }
+html.tm-modern .sc-root .sc-set-stack .sc-set-v { flex-shrink: 0; }
+html.tm-modern .sc-root .sc-set-stack #layoutSunsetNote { margin-top: 10px; }
+html.tm-modern .sc-root .sc-panel + .text-xs:not(.hidden) { display: block; margin: 8px 2px 0; font: 400 10.5px/1.55 'JetBrains Mono', monospace; color: var(--muted); max-width: 76ch; }
+
+html.tm-static-in-settings 
+html.tm-static-in-settings #mpanel-static #staticFilterBar { padding: 0 0 10px; }
+
+.sc-root .wiz-step { font: 600 11px 'JetBrains Mono', monospace; padding: 2px 8px; border-radius: 6px; background: var(--input-bg); border: 1px solid var(--border); color: var(--muted); }
+.sc-root .wiz-step.on { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 30%, transparent); background: color-mix(in srgb, var(--blue) 14%, transparent); }
+.sc-root .wiz-step.done { color: var(--green); border-color: color-mix(in srgb, var(--green) 30%, transparent); background: color-mix(in srgb, var(--green) 12%, transparent); }
+
+html.tm-modern #settingsModal .sc-root .sc-fld > .sc-set-d { max-width: none; }
+
+
+#mpanel-static #staticSearchWrap { display: none !important; }

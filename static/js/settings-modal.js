@@ -164,15 +164,15 @@ async function loadGitCommits() {
             return;
         }
         list.innerHTML = commits.map(c => `
-            <div class="flex items-center justify-between py-2.5 px-3 mb-2 rounded-lg" style="background:var(--bg);border:1px solid var(--border)">
-                <div style="min-width:0;flex:1;">
+            <div class="sc-set">
+                <div class="sc-set-l">
                     <div class="flex items-center gap-1.5">
                         <span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background:var(--input-bg);color:var(--muted);flex-shrink:0;">${c.sha_short}</span>
-                        <span class="text-xs truncate" style="color:var(--text)">${_esc(c.message)}</span>
+                        <span class="sc-set-n truncate">${_esc(c.message)}</span>
                     </div>
-                    <div class="text-xs mt-0.5" style="color:var(--muted)">${c.timestamp}</div>
+                    <div class="sc-set-d">${c.timestamp}</div>
                 </div>
-                <div class="flex gap-1 ml-2 flex-shrink-0">
+                <div class="sc-set-v">
                     <button onclick="gitViewDiff('${c.sha}')" class="btn-secondary text-xs py-1 px-2" title="View diff">
                         <i class="ph-bold ph-code text-xs"></i>
                     </button>
@@ -374,7 +374,7 @@ async function _loadAboutAgentInfo() {
     document.getElementById('agentVersionCurrent').textContent = '-';
     document.getElementById('agentVersionHint').classList.add('hidden');
     row.classList.remove('hidden');
-    row.style.display = 'flex';
+    row.style.removeProperty('display');
     try {
         const d = await fetch('/api/agents/' + _activeAgent.id + '/health').then(r => r.json());
         const cur = (d.version || '').replace(/^v/, '');
@@ -390,6 +390,16 @@ async function _loadAboutAgentInfo() {
 }
 
 function switchSettingsPanel(id, btn) {
+    setTimeout(() => {
+        if (typeof filterSettings === 'function') filterSettings();
+        if (id === 'static') {
+            if (typeof applyStaticPlacement === 'function' && typeof getStaticPlacement === 'function') {
+                applyStaticPlacement(getStaticPlacement());
+            }
+            if (typeof openStaticTab === 'function') openStaticTab();
+            if (typeof _applyStaticWarnState === 'function') _applyStaticWarnState();
+        }
+    }, 0);
     document.querySelectorAll('.modal-sidebar-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.modal-panel').forEach(p => p.classList.remove('active'));
     const activeBtn = btn || document.getElementById('msb-' + id);
@@ -568,6 +578,24 @@ function _paintAuthState(noAuth, ack) {
     const note = document.getElementById('authDelegatedNote');
     if (warn) warn.style.display = (noAuth && !ack) ? '' : 'none';
     if (note) note.style.display = (noAuth && ack) ? '' : 'none';
+    _paintSettingsVerdict(noAuth && !ack);
+}
+
+function _paintSettingsVerdict(noAuth) {
+    const el = document.getElementById('settingsVerdict');
+    if (!el) return;
+    const items = [];
+    if (noAuth) {
+        items.push('<button type="button" class="sig-flag d-bad" onclick="switchSettingsPanel(\'auth\')"'
+            + ' title="No password and no OIDC - anything that reaches this instance has full access">'
+            + '<i class="ph-bold ph-lock-open"></i><span class="sig-fl">no authentication</span></button>');
+    }
+    if (!items.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = '';
+    el.dataset.health = 'down';
+    el.innerHTML = '<i class="ph-fill ph-warning-octagon sig-verdict-ic"></i>'
+        + '<span class="sig-verdict-txt">' + items.length + (items.length === 1 ? ' thing' : ' things') + ' to look at</span>'
+        + '<span class="sig-verdict-items">' + items.join('') + '</span>';
 }
 
 async function setAuthExternalAck(on) {
@@ -809,16 +837,16 @@ function _renderBackupList(containerId, backups) {
         return;
     }
     list.innerHTML = backups.map(b => `
-        <div class="flex items-center justify-between py-2.5 rounded-lg px-3 mb-2" style="background:var(--bg);border:1px solid var(--border)">
-            <div>
-                <div class="font-mono text-xs" style="color:var(--text)">${b.name}</div>
-                <div class="text-xs mt-0.5" style="color:var(--muted)">${b.modified} · ${formatBytes(b.size)}</div>
+        <div class="sc-set">
+            <div class="sc-set-l">
+                <div class="sc-set-n">${b.name}</div>
+                <div class="sc-set-d">${b.modified} · ${formatBytes(b.size)}</div>
             </div>
-            <div class="flex gap-1">
+            <div class="sc-set-v">
                 <button onclick="restoreBackup('${b.name}')" class="btn-secondary text-xs py-1 px-2.5">
                     <i class="ph-bold ph-arrow-counter-clockwise text-xs"></i> Restore
                 </button>
-                <button onclick="deleteBackup('${b.name}')" class="btn-danger p-1.5">
+                <button onclick="deleteBackup('${b.name}')" class="btn-icon" title="Delete" style="color:var(--red)">
                     <i class="ph-bold ph-trash text-sm"></i>
                 </button>
             </div>
@@ -843,7 +871,6 @@ async function loadBackups() {
             const sres = await fetch('/api/settings');
             const sdat = await sres.json();
             _setVal('backupKeepCount', (sdat.backup_keep_count ?? 0));
-            _setVal('backupKeepCountStatic', (sdat.backup_keep_count ?? 0));
         } catch (e) {}
     }
     const routesList  = document.getElementById('sm-backups-list');
@@ -875,12 +902,11 @@ async function loadBackups() {
 async function saveBackupKeepCount(sourceId) {
     const input = document.getElementById(sourceId || 'backupKeepCount');
     if (!input) return;
-    const btnId = sourceId === 'backupKeepCountStatic' ? 'backupKeepBtnStatic' : 'backupKeepBtn';
+    const btnId = 'backupKeepBtn';
     const btn   = document.getElementById(btnId);
     let n = parseInt(input.value, 10);
     if (isNaN(n) || n < 0) n = 0;
     _setVal('backupKeepCount', n);
-    _setVal('backupKeepCountStatic', n);
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ph-light ph-spinner-gap animate-spin text-xs"></i> Saving…'; }
     try {
         const res = await fetch('/api/settings/backup-retention', {
@@ -1456,18 +1482,18 @@ async function loadAgentsList() {
             return;
         }
         body.innerHTML = agents.map(a => `
-            <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-2" data-agent-id="${a.id}" style="background:var(--bg);border:1px solid var(--border);">
-                <div style="flex:1;min-width:0;">
+            <div class="sc-set" data-agent-id="${a.id}">
+                <div class="sc-set-l">
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full flex-shrink-0" id="agent-dot-${a.id}" style="background:var(--muted)"></span>
-                        <span class="agent-name-label text-xs font-medium truncate" style="color:var(--text)">${_esc(a.name)}</span>
+                        <span class="agent-name-label sc-set-n truncate">${_esc(a.name)}</span>
                     </div>
-                    <div class="flex items-center gap-1 mt-0.5">
-                        <span class="agent-url-label text-xs truncate font-mono" style="color:var(--muted)">${_esc(a.url)}</span>
+                    <div class="flex items-center gap-1">
+                        <span class="agent-url-label sc-set-d truncate">${_esc(a.url)}</span>
                         <button onclick="inlineEditAgent('${a.id}','url','${_esc(a.url)}')" class="btn-icon agent-url-btn flex-shrink-0" title="Edit URL" style="opacity:0.5;padding:0 2px;"><i class="ph-bold ph-pencil-simple" style="font-size:10px;"></i></button>
                     </div>
                 </div>
-                <div class="flex items-center gap-1 flex-shrink-0">
+                <div class="sc-set-v">
                     <button onclick="openAgentKeys('${a.id}','${_esc(a.name)}')" class="btn-icon" title="API Keys"><i class="ph-bold ph-key text-xs"></i></button>
                     <button onclick="inlineEditAgent('${a.id}','name','${_esc(a.name)}')" class="btn-icon agent-rename-btn" title="Rename"><i class="ph-bold ph-pencil-simple text-xs"></i></button>
                     <button onclick="openAgentSetup('${a.id}')" class="btn-icon" title="Edit Settings"><i class="ph-bold ph-gear text-xs"></i></button>
@@ -1511,13 +1537,12 @@ async function loadAgentKeys() {
             return;
         }
         list.innerHTML = keys.map(k => `
-            <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg" style="background:var(--bg);border:1px solid var(--border);">
-                <i class="ph-bold ph-key text-xs flex-shrink-0" style="color:var(--muted)"></i>
-                <div style="flex:1;min-width:0;">
-                    <div class="text-xs font-medium" style="color:var(--text)">${_esc(k.name)}</div>
-                    <div class="text-xs" style="color:var(--muted)">Created ${new Date(k.created_at).toLocaleDateString()}${k.last_used_at ? ' &middot; Last used ' + new Date(k.last_used_at).toLocaleDateString() : ''}</div>
+            <div class="sc-set">
+                <div class="sc-set-l">
+                    <div class="sc-set-n">${_esc(k.name)}</div>
+                    <div class="sc-set-d">Created ${new Date(k.created_at).toLocaleDateString()}${k.last_used_at ? ' &middot; Last used ' + new Date(k.last_used_at).toLocaleDateString() : ''}</div>
                 </div>
-                <button onclick="deleteAgentKey('${_keysAgentId}','${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button>
+                <div class="sc-set-v"><button onclick="deleteAgentKey('${_keysAgentId}','${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button></div>
             </div>`).join('');
     } catch(e) {
         list.innerHTML = '<div class="text-xs" style="color:var(--red)">Failed to load keys</div>';
@@ -1597,13 +1622,12 @@ async function loadActiveAgentKeys() {
             return;
         }
         list.innerHTML = keys.map(k => `
-            <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg" style="background:var(--bg);border:1px solid var(--border);">
-                <i class="ph-bold ph-key text-xs flex-shrink-0" style="color:var(--muted)"></i>
-                <div style="flex:1;min-width:0;">
-                    <div class="text-xs font-medium" style="color:var(--text)">${_esc(k.name)}</div>
-                    <div class="text-xs" style="color:var(--muted)">Created ${new Date(k.created_at).toLocaleDateString()}${k.last_used_at ? ' &middot; Last used ' + new Date(k.last_used_at).toLocaleDateString() : ''}</div>
+            <div class="sc-set">
+                <div class="sc-set-l">
+                    <div class="sc-set-n">${_esc(k.name)}</div>
+                    <div class="sc-set-d">Created ${new Date(k.created_at).toLocaleDateString()}${k.last_used_at ? ' &middot; Last used ' + new Date(k.last_used_at).toLocaleDateString() : ''}</div>
                 </div>
-                <button onclick="deleteActiveAgentKey('${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button>
+                <div class="sc-set-v"><button onclick="deleteActiveAgentKey('${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button></div>
             </div>`).join('');
     } catch(e) {
         list.innerHTML = '<div class="text-xs" style="color:var(--red)">Failed to load keys</div>';
@@ -1852,8 +1876,8 @@ function showAgentWizStep(n) {
         if (el) el.style.display = i === n ? '' : 'none';
         const pill = document.getElementById('wiz-step-pill-' + i);
         if (pill) {
-            pill.style.background = i === n ? 'var(--blue)' : (i < n ? 'var(--green)' : 'var(--border)');
-            pill.style.color      = i <= n ? '#fff' : 'var(--muted)';
+            pill.classList.toggle('on', i === n);
+            pill.classList.toggle('done', i < n);
         }
     });
     _agentWizStep = n;
@@ -2249,4 +2273,104 @@ async function deleteTemplate(id) {
             showToast(data.error || 'Delete failed', 'error');
         }
     } catch(e) { showToast('Request failed', 'error'); }
+}
+
+const SETTINGS_SEARCH_FIELDS = '.sc-set-n, .sc-set-d, .settings-section-label, .tab-toggle-row > span, label';
+
+function _setUnitText(el) {
+    let out = '';
+    el.querySelectorAll(SETTINGS_SEARCH_FIELDS).forEach(f => { out += ' ' + f.textContent; });
+    if (!out.trim()) out = el.textContent;
+    return out.toLowerCase();
+}
+
+function _settingsUnits(pane) {
+    const units = [];
+    pane.querySelectorAll('.sc-set, .tab-toggle-row, .sc-fld').forEach(el => units.push(el));
+    if (units.length) return units;
+    pane.querySelectorAll(':scope > div, :scope > .auth-sub-panel > div').forEach(el => {
+        if (el.querySelector('input, select, textarea, .toggle-switch, button')) units.push(el);
+    });
+    return units;
+}
+
+function _scopeBlocks(pane) {
+    const sub = pane.querySelectorAll(':scope > div > .auth-sub-panel');
+    if (sub.length) {
+        const out = [];
+        sub.forEach(sp => sp.querySelectorAll(':scope > div').forEach(d => out.push(d)));
+        return out;
+    }
+    return [...pane.querySelectorAll(':scope > div')];
+}
+
+function _scHide(el, off) {
+    el.classList.toggle('sc-filtered-out', !!off);
+}
+
+function _filterOnePane(pane, q) {
+    const units = _settingsUnits(pane);
+    let hits = 0;
+    units.forEach(el => {
+        const match = !q || _setUnitText(el).indexOf(q) !== -1;
+        _scHide(el, !match);
+        if (match) hits++;
+    });
+    _scopeBlocks(pane).forEach(block => {
+        const own = block.querySelectorAll('.sc-set, .tab-toggle-row, .sc-fld');
+        if (!own.length) {
+            if (units.indexOf(block) === -1) _scHide(block, !!q);
+            return;
+        }
+        const alive = [...own].some(c => !c.classList.contains('sc-filtered-out'));
+        _scHide(block, !!q && !alive);
+    });
+    pane.querySelectorAll('.sc-panel').forEach(g => {
+        const kids = [...g.children].filter(c => !c.classList.contains('sc-filtered-out'));
+        _scHide(g, !!q && kids.length === 0);
+    });
+    return hits;
+}
+
+function filterSettings() {
+    const box = document.getElementById('settingsSearch');
+    const q = (box ? box.value : '').trim().toLowerCase();
+    const wrap = document.getElementById('settingsClearWrap');
+    if (wrap) wrap.style.display = q ? '' : 'none';
+
+    let activeHits = 0;
+    const scBox = document.getElementById('staticSearch');
+    if (scBox && typeof filterStatic === 'function') {
+        scBox.value = q;
+        filterStatic();
+    }
+    document.querySelectorAll('#settingsPanelWrapper .modal-panel').forEach(pane => {
+        if (pane.id === 'mpanel-static' || pane.id === 'mpanel-about') return;
+        const hits = _filterOnePane(pane, q);
+        const btn = document.getElementById('msb-' + pane.id.replace('mpanel-', ''));
+        if (btn) {
+            let tag = btn.querySelector('.settings-hit');
+            if (q && hits) {
+                if (!tag) {
+                    tag = document.createElement('span');
+                    tag.className = 'settings-hit d-n';
+                    btn.appendChild(tag);
+                }
+                tag.textContent = hits;
+            } else if (tag) {
+                tag.remove();
+            }
+        }
+        if (pane.classList.contains('active')) activeHits = hits;
+    });
+
+    const empty = document.getElementById('settingsNoMatch');
+    if (empty) empty.style.display = (q && activeHits === 0) ? '' : 'none';
+}
+
+function clearSettingsSearch() {
+    const box = document.getElementById('settingsSearch');
+    if (box) box.value = '';
+    filterSettings();
+    if (box) box.focus();
 }

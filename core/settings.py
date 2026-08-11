@@ -17,8 +17,14 @@ UI_PREF_SCOPES = ('statBarScope',)
 UI_PREF_LAYOUTS = ('layoutMode',)
 UI_PREF_DENSITY = ('dashPodDensity',)
 UI_PREF_PLACEMENTS = ('staticPlacement',)
-UI_PREF_SECTION_LISTS = ('staticOpenSections',)
 STATIC_SECTION_KEYS = ('entrypoints', 'resolvers', 'providers', 'api', 'log', 'observability', 'system', 'plugins')
+SETTINGS_SECTION_KEYS = ('connection', 'routes', 'system', 'auth', 'backups', 'ui',
+                         'notifications', 'agents', 'agent-keys', 'about')
+UI_PREF_SECTION_ALLOW = {
+    'staticOpenSections': STATIC_SECTION_KEYS,
+    'settingsOpenSections': SETTINGS_SECTION_KEYS,
+}
+UI_PREF_SECTION_LISTS = tuple(UI_PREF_SECTION_ALLOW)
 UI_PREF_KEYS = (UI_PREF_BOOLS + UI_PREF_VIEWS + UI_PREF_SCOPES + UI_PREF_DENSITY
                 + UI_PREF_LAYOUTS + UI_PREF_PLACEMENTS + UI_PREF_SECTION_LISTS)
 
@@ -61,12 +67,12 @@ def sanitize_ui_prefs(prefs) -> dict:
             v = str(prefs[k]).strip().lower()
             if v in ('off', 'settings', 'tab'):
                 out[k] = v
-    for k in UI_PREF_SECTION_LISTS:
+    for k, allowed in UI_PREF_SECTION_ALLOW.items():
         if k in prefs and isinstance(prefs[k], list):
             seen = []
             for item in prefs[k]:
                 s = str(item).strip()
-                if s in STATIC_SECTION_KEYS and s not in seen:
+                if s in allowed and s not in seen:
                     seen.append(s)
             out[k] = seen
     return out

@@ -85,7 +85,7 @@ export default defineConfig({
       },
       {
         text: 'Management',
-        collapsed: true,
+        collapsed: false,
         items: [
           { text: 'Routes', link: '/tab-routes' },
           { text: 'Middlewares', link: '/tab-middlewares' },
@@ -94,7 +94,7 @@ export default defineConfig({
       },
       {
         text: 'Visualizations',
-        collapsed: true,
+        collapsed: false,
         items: [
           { text: 'Dashboard', link: '/tab-dashboard' },
           { text: 'Route Map', link: '/tab-routemap' },
@@ -102,7 +102,7 @@ export default defineConfig({
       },
       {
         text: 'Monitoring',
-        collapsed: true,
+        collapsed: false,
         items: [
           { text: 'Certificates', link: '/tab-certs' },
           { text: 'Plugins', link: '/tab-plugins' },
@@ -113,7 +113,7 @@ export default defineConfig({
       },
       {
         text: 'Providers',
-        collapsed: true,
+        collapsed: false,
         items: [
           { text: 'Docker', link: '/tab-docker' },
           { text: 'Kubernetes', link: '/tab-kubernetes' },

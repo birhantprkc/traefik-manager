@@ -154,3 +154,21 @@ def test_dash_pod_density_round_trips_and_validates(client):
     client.post('/api/settings/ui', json={'ui_prefs': {'dashPodDensity': 'grid'}},
                 headers={'X-CSRF-Token': 'testtoken', 'X-Requested-With': 'fetch'})
     assert client.get('/api/settings/ui').get_json()['ui_prefs']['dashPodDensity'] == 'icons'
+
+
+def test_section_lists_use_their_own_allowlist():
+    payload = {
+        'staticOpenSections': ['api', 'entrypoints', 'auth', 'backups'],
+        'settingsOpenSections': ['auth', 'backups', 'entrypoints', 'bogus'],
+    }
+    cleaned = settings_mod.sanitize_ui_prefs(payload)
+    assert cleaned['staticOpenSections'] == ['api', 'entrypoints']
+    assert cleaned['settingsOpenSections'] == ['auth', 'backups']
+
+
+def test_settings_sections_survive_the_endpoint(client):
+    r = client.post('/api/settings/ui',
+                    json={'ui_prefs': {'settingsOpenSections': ['auth', 'ui', 'auth', 'nope']}},
+                    headers={'X-CSRF-Token': 'testtoken', 'X-Requested-With': 'fetch'})
+    assert r.status_code == 200
+    assert r.get_json()['ui_prefs']['settingsOpenSections'] == ['auth', 'ui']
