@@ -296,7 +296,8 @@ async function gitResetRepo() {
 }
 
 async function gitRestoreCommit(sha, shaShort) {
-    if (!await _confirm(`Restore config from commit ${shaShort}? Local backups will be created first.`, 'Git Restore', 'Restore')) return;
+    if (!await _confirm(`Restore every config file from commit ${shaShort}? Local backups are created first.`,
+                        'Git Restore', 'Restore', 'RESTORE')) return;
     try {
         const res  = await _gitFetch(`/api/backup/git/restore/${sha}`, { method: 'POST', headers: _csrfHeaders() });
         const data = await res.json();
@@ -954,7 +955,8 @@ async function createAndLoadBackups() {
 }
 
 async function restoreBackup(name) {
-    if (!await _confirm(`Restore backup "${name}"? Your current config will be backed up first.`, 'Restore Backup', 'Restore')) return;
+    if (!await _confirm(`Restore "${name}"? This replaces the config file it came from. Your current config is backed up first.`,
+                        'Restore Backup', 'Restore', 'RESTORE')) return;
     try {
         const res  = await _backupFetch(`/api/restore/${encodeURIComponent(name)}`, { method: 'POST', headers: _csrfHeaders() });
         const data = await res.json();
