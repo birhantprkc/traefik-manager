@@ -3004,11 +3004,17 @@ def api_restore(filename):
         if not os.path.exists(path):
             return jsonify({'error': 'Backup not found'}), 404
         bname = filename
-        target_path = env.CONFIG_PATH
+        target_path = None
         for p in env.CONFIG_PATHS:
             if bname.startswith(os.path.basename(p) + '.'):
                 target_path = p
                 break
+        if target_path is None:
+            static_path = _get_static_config_path()
+            if static_path and bname.startswith(os.path.basename(static_path) + '.'):
+                target_path = static_path
+        if target_path is None:
+            return jsonify({'error': f'No config file matches {filename!r}'}), 400
         create_backup(target_path)
         shutil.copy2(path, target_path)
         logger.info(f"Restored: {filename} → {target_path}")
