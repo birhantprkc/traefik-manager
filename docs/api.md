@@ -787,6 +787,10 @@ Delete a single notification by timestamp.
 
 Clear all notifications.
 
+::: tip Changed in v1.10.1
+`add`, `delete` and `clear` enforced CSRF unconditionally, so an API key request was rejected with `403` even though API keys are meant to skip CSRF. All three now honour the key. On v1.10.0 and earlier, they are session-only.
+:::
+
 ---
 
 ### `POST /api/notifications/add`

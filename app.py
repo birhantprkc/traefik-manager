@@ -2847,9 +2847,9 @@ def api_notifications_clear():
     return jsonify({'ok': True})
 
 @app.route('/api/notifications/add', methods=['POST'])
+@csrf_protect
 @login_required
 def api_notifications_add():
-    _check_csrf()
     data = request.get_json(silent=True) or {}
     type_ = data.get('type', 'info')
     msg   = (data.get('message') or '').strip()
