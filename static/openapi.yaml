@@ -52,6 +52,21 @@ components:
       name: session
       description: Browser session cookie set after logging in via the web UI.
 
+  responses:
+    Unauthorized:
+      description: |
+        Not authenticated, or the session expired. Every `/api/` endpoint answers
+        with this instead of redirecting to the login page. Treat it as
+        "log in again", never as an empty result.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok: { type: boolean, example: false }
+              error: { type: string, example: Not authenticated }
+              auth_required: { type: boolean, example: true }
+
   schemas:
     OkResponse:
       type: object
@@ -92,7 +107,7 @@ components:
           type: object
           description: "loadBalancer.healthCheck, or an empty object when no health check is configured. HTTP only."
           example: { path: "/health", interval: "10s", timeout: "3s" }
-        priority: { type: integer, nullable: true, description: "Router priority, or null when unset. HTTP and TCP only." }
+        priority: { type: [integer, "null"], description: "Router priority, or null when unset. HTTP and TCP only." }
         middlewares: { type: array, items: { type: string } }
         tls: { type: boolean }
         certResolver: { type: string, description: "ACME resolver name, or empty if using external certs." }
@@ -1164,7 +1179,7 @@ paths:
                   enabled: { type: boolean }
                   available: { type: boolean }
                   db_path: { type: string }
-                  db_date: { type: string, nullable: true, description: Database file date (YYYY-MM-DD) }
+                  db_date: { type: [string, "null"], description: Database file date (YYYY-MM-DD) }
 
   /api/geoip/lookup:
     post:
@@ -1444,8 +1459,8 @@ paths:
                 properties:
                   enabled: { type: boolean }
                   configured: { type: boolean }
-                  last_sha: { type: string, nullable: true }
-                  last_push: { type: string, nullable: true }
+                  last_sha: { type: [string, "null"] }
+                  last_push: { type: [string, "null"] }
                   branch: { type: string, description: Only present for agents }
 
   /api/backup/git/push:
@@ -2408,3 +2423,365 @@ paths:
                 properties:
                   ok: { type: boolean }
                   version: { type: string, example: "3.2.0" }
+
+  /api/health:
+    get:
+      tags: [Utility]
+      summary: Liveness probe
+      description: The only `/api/` endpoint that needs no authentication. Suitable as a container healthcheck.
+      security: []
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OkResponse' }
+
+  /api/traefik/runtime:
+    get:
+      tags: [Utility]
+      summary: How Traefik Manager expects to reach Traefik
+      description: Used by the Static Config tab to tailor its guidance after adding an entrypoint.
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "200":
+          description: Runtime information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  method: { type: string, example: proxy }
+                  runtime: { type: string, enum: [docker, native, unknown] }
+                  container: { type: [string, "null"], example: traefik }
+
+  /api/tools/htpasswd:
+    post:
+      tags: [Utility]
+      summary: Generate an APR1 hash for basicauth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: username or password missing }
+        "200":
+          description: Generated hash
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  hash: { type: string, example: "admin:$apr1$..." }
+
+  /api/tools/digestauth:
+    post:
+      tags: [Utility]
+      summary: Generate an MD5 hash for digestauth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, realm, password]
+              properties:
+                username: { type: string }
+                realm: { type: string, example: traefik }
+                password: { type: string, format: password }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: "username, realm or password missing" }
+        "200":
+          description: Generated hash
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  hash: { type: string }
+
+  /api/settings/webhook-test:
+    post:
+      tags: [Notifications]
+      summary: Send a test webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string }
+                webhook_type: { type: string, example: discord }
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: "Invalid URL, or the target is blocked by the SSRF guard" }
+        "200": { description: Delivery result }
+
+  /api/auth/external-ack:
+    post:
+      tags: [Authentication]
+      summary: Acknowledge that an external provider protects this instance
+      description: |
+        Hides the "no authentication" banner when a forward-auth provider already
+        requires a login. Changes only what the UI reports, never what is enforced.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auth_external_ack: { type: boolean }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: "A password or OIDC is active, so there is nothing to acknowledge" }
+        "200": { description: Saved }
+
+  /api/notifications/add:
+    post:
+      tags: [Notifications]
+      summary: Add a notification and fire the configured webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                type: { type: string, enum: [info, success, warning, error] }
+                message: { type: string }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: message required }
+        "200": { description: Added }
+
+  /api/notifications/log:
+    post:
+      tags: [Notifications]
+      summary: Record a UI toast without firing a webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                type: { type: string, enum: [info, success, warning, error] }
+                message: { type: string, maxLength: 300 }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: Empty message }
+        "200":
+          description: Recorded. stored is false when the type is filtered out by settings.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  stored: { type: boolean }
+
+  /api/notifications/update:
+    post:
+      tags: [Notifications]
+      summary: Record an update-available notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: { type: string, example: "1.10.1" }
+                product: { type: string, enum: [manager, traefik] }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "200": { description: Recorded }
+
+  /api/static/backup/create:
+    post:
+      tags: [Backups]
+      summary: Back up traefik.yml on demand
+      description: '`POST /api/backup/static/create` is an alias for this endpoint.'
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: "STATIC_CONFIG_PATH not set, or the file is missing" }
+        "200":
+          description: Backup created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  name: { type: string }
+
+  /api/plugins/install:
+    post:
+      tags: [Static Config]
+      summary: Install a Traefik plugin from pasted YAML
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [static_yaml]
+              properties:
+                static_yaml: { type: string, description: Must contain an experimental.plugins block }
+                middleware_yaml: { type: string, description: Optionally create the middleware that uses it }
+                config_file: { type: string, description: Which dynamic config file the middleware goes to }
+                server: { type: string, description: "Agent id, to install on an agent" }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: "Invalid YAML, or no plugins block found" }
+        "404": { description: Agent not found }
+        "200": { description: Installed }
+
+  /api/routes/{route_id}/raw:
+    get:
+      tags: [Routes & Middlewares]
+      summary: The YAML for one route and its service
+      description: Go template expressions are preserved rather than expanded.
+      parameters:
+        - { name: route_id, in: path, required: true, schema: { type: string }, description: "Router name, or file.yml::router on a multi-file install" }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { description: No config file contains that router }
+        "200":
+          description: Route YAML
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  raw: { type: string }
+                  configFile: { type: string }
+                  proto: { type: string, enum: [http, tcp, udp] }
+    post:
+      tags: [Routes & Middlewares]
+      summary: Replace one route's YAML
+      description: A backup is taken first. Go templates in the content are preserved.
+      parameters:
+        - { name: route_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: Empty content or invalid YAML }
+        "404": { description: Route not found }
+        "200": { description: Saved }
+
+  /api/mw/templates:
+    get:
+      tags: [Routes & Middlewares]
+      summary: List middleware templates
+      description: Templates are stored on the Host and are not per-server.
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        yaml: { type: string }
+    post:
+      tags: [Routes & Middlewares]
+      summary: Create a middleware template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100 }
+                yaml: { type: string }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: name is required }
+        "200": { description: "Created, including the generated id" }
+
+  /api/mw/templates/{template_id}:
+    put:
+      tags: [Routes & Middlewares]
+      summary: Update a middleware template
+      description: name and yaml are both optional; only what you send is changed.
+      parameters:
+        - { name: template_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                yaml: { type: string }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { description: Template not found }
+        "200": { description: Updated }
+    delete:
+      tags: [Routes & Middlewares]
+      summary: Delete a middleware template
+      description: Succeeds even if the id does not exist.
+      parameters:
+        - { name: template_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "200": { description: Deleted }
+
+  /api/ping:
+    get:
+      tags: [Utility]
+      summary: Ping a route's domain and return latency
+      parameters:
+        - { name: url, in: query, required: true, schema: { type: string } }
+        - { name: fallback, in: query, schema: { type: string }, description: Tried if the first attempt fails }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400": { description: "Invalid URL, or the target is blocked by the SSRF guard" }
+        "200":
+          description: Result. A URL pointing at Traefik Manager itself short-circuits with self=true.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  latency_ms: { type: [integer, "null"] }
+                  status_code: { type: integer }
+                  self: { type: boolean }

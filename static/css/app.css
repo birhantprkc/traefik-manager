@@ -1337,8 +1337,12 @@ html.tm-modern .tm-head { display: flex; align-items: flex-start; gap: 10px; }
 html.tm-modern .tm-ic { position: relative; width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
 html.tm-modern .tm-ic-tile { background: var(--input-bg); }
 html.tm-modern .tm-ic > i { font-size: 14px; color: var(--muted); }
+html.tm-modern .tm-ic[data-mono]::before { content: attr(data-mono); font: 700 10.5px/1 'JetBrains Mono', monospace; letter-spacing: -.02em; color: var(--muted); opacity: .7; }
 html.tm-modern .tm-ic img { width: 28px; height: 28px; border-radius: 6px; object-fit: contain; }
+html.tm-modern .tm-ic[data-mono] img { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); border-radius: 5px; background: var(--input-bg); }
 html.tm-modern .tm-ic .status-dot { position: absolute; right: -2px; bottom: -2px; box-shadow: 0 0 0 2px var(--card); }
+html.tm-modern .route-card .status-dot,
+html.tm-modern .svc-list-row .status-dot { border-radius: 1.5px; }
 html.tm-modern .tm-ic-bare { width: 8px; height: 16px; margin-top: 3px; display: flex; align-items: center; flex-shrink: 0; }
 html.tm-modern .tm-head-txt { flex: 1; min-width: 0; }
 html.tm-modern .tm-title { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; letter-spacing: -.01em; color: var(--text); }

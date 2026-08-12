@@ -31,6 +31,7 @@ Requests are rate-limited per IP using `TMA_RATE_LIMIT` (default: 300 requests/m
 | GET | `/api/traefik/version` | Traefik version |
 | GET | `/api/traefik/logs` | Last N access log lines (requires `ACCESS_LOG_PATH`) - `?lines=100` |
 | GET | `/api/traefik/certs` | Certificates from acme.json (requires `ACME_JSON_PATH`) |
+| GET | `/api/traefik/plugins` | Installed plugins declared in the agent's static config (requires `STATIC_CONFIG_PATH`) |
 | GET | `/api/configs` | Read dynamic config file(s) |
 | POST | `/api/configs` | Write a dynamic config file (creates a `.bak` before writing) |
 | GET | `/api/static` | Read static config (requires `STATIC_CONFIG_PATH`) |

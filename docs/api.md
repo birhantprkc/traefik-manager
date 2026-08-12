@@ -18,6 +18,22 @@ X-Api-Key: your-api-key
 
 **Session cookie** - log in via the web UI. The browser session cookie is used automatically.
 
+### When authentication fails
+
+Every `/api/` endpoint answers an unauthenticated or expired request with **`401`** and a JSON body. It never redirects.
+
+```json
+{ "ok": false, "error": "Not authenticated", "auth_required": true }
+```
+
+This matters if you write a client: treat `401` on any `/api/` path as "log in again", not as an empty result. Sessions also expire on inactivity (`INACTIVITY_TIMEOUT_MINUTES`), so a long-lived script using session auth will start receiving `401` even though it authenticated successfully earlier. API keys do not expire.
+
+Page routes (everything outside `/api/`) still redirect to `/login` as a browser expects.
+
+::: tip Changed in v1.10.1
+Before v1.10.1, `/api/` paths also redirected to `/login`, which returned the login page's HTML with status `200`. Clients could not distinguish "logged out" from "no data". If you parsed those responses, switch to checking for `401`.
+:::
+
 ---
 
 ## Response format
@@ -28,6 +44,17 @@ All endpoints return JSON.
 |---|---|
 | Success | `{ "ok": true }` or `{ "success": true }` |
 | Error | `{ "ok": false, "message": "..." }` or `{ "error": "..." }` |
+
+Common status codes:
+
+| Code | Meaning |
+|---|---|
+| `400` | Invalid or missing parameters |
+| `401` | Not authenticated, or the session expired |
+| `403` | CSRF token missing or invalid |
+| `404` | Object not found |
+| `429` | Rate limit exceeded |
+| `502` | An upstream (Traefik, an agent, CrowdSec, a remote repo) could not be reached |
 
 State-changing endpoints (POST / DELETE) require an `X-CSRF-Token` header when using session auth. API key requests skip this.
 
@@ -170,6 +197,30 @@ Enable or disable a route without deleting it. Config is preserved in `manager.y
 ```json
 { "enable": true }
 ```
+
+---
+
+### `GET /api/routes/{route_id}/raw`
+
+The YAML for one route and its service, as stored. `route_id` is either the router name or `file.yml::router` on a multi-file install. Go template expressions are preserved rather than being expanded.
+
+```json
+{ "raw": "http:\n  routers:\n    my-app:\n      ...", "configFile": "dynamic.yml", "proto": "http" }
+```
+
+`404` if no config file contains that router.
+
+---
+
+### `POST /api/routes/{route_id}/raw`
+
+Replace that route's YAML. A backup is taken first, and Go templates in your content are preserved.
+
+```json
+{ "content": "http:\n  routers:\n    my-app:\n      rule: Host(`app.example.com`)" }
+```
+
+Returns `400` for empty content or invalid YAML, `404` if the route cannot be located.
 
 ---
 
@@ -472,6 +523,30 @@ Anything else is dropped rather than stored - this endpoint writes into `manager
 
 ---
 
+### `POST /api/settings/theme`
+
+Set the default theme for new browsers. One of `dark`, `light`, `system`.
+
+```json
+{ "default_theme": "system" }
+```
+
+`400` for any other value.
+
+---
+
+### `POST /api/settings/geoip`
+
+Enable GeoIP and set the database path. Omitted keys keep their current value.
+
+```json
+{ "geoip_enabled": true, "geoip_db_path": "/app/config/geoip/dbip-city-lite.mmdb" }
+```
+
+Returns `{ "success": true, "status": { } }` carrying the same payload as `GET /api/geoip/status`.
+
+---
+
 ## TLS Options
 
 ### `GET /api/tls-options`
@@ -515,7 +590,7 @@ Create or update a TLS options profile. Sends JSON body.
 
 ---
 
-### `DELETE /api/tls-options/<name>`
+### `DELETE /api/tls-options/{name}`
 
 Delete a TLS options profile by name.
 
@@ -555,6 +630,98 @@ Delete a backup file.
 
 ---
 
+### `POST /api/static/backup/create`
+
+Create a backup of `traefik.yml` on demand. `POST /api/backup/static/create` is an alias for the same handler.
+
+```json
+{ "success": true, "name": "traefik.yml.20260812_051500.bak" }
+```
+
+Returns `400` if `STATIC_CONFIG_PATH` is not set or the file is missing.
+
+---
+
+### `POST /api/settings/backup-retention`
+
+Set how many backups to keep per file. `0` keeps all of them.
+
+```json
+{ "backup_keep_count": 20 }
+```
+
+---
+
+## Git backup
+
+Every endpoint here accepts an optional `?server=<agent-id>` to act on an agent's repository instead of the Host's.
+
+### `GET /api/backup/git/status`
+
+```json
+{ "enabled": true, "configured": true, "last_sha": "a1b2c3d4", "last_push": "2026-08-12 05:15:00 +0000" }
+```
+
+Agent requests also return `branch`.
+
+---
+
+### `POST /api/backup/git/push`
+
+Commit and push the current config. An optional `message` overrides the configured commit template for this push only.
+
+```json
+{ "message": "before the entrypoint change" }
+```
+
+---
+
+### `POST /api/backup/git/test`
+
+Test repository credentials without pushing, via `git ls-remote`. Falls back to the saved settings when the body is empty, so it can verify an existing configuration.
+
+```json
+{ "repo_url": "https://github.com/you/configs", "username": "you", "token": "ghp_..." }
+```
+
+Returns `{ "ok": true }`, or `400` with the git error. Tokens are redacted from the message.
+
+---
+
+### `GET /api/backup/git/commits`
+
+The 50 most recent commits. Returns `[]` rather than an error when git backup is not configured.
+
+```json
+[{ "sha": "a1b2...", "sha_short": "a1b2c3d4", "timestamp": "2026-08-12 05:15:00 +0000", "message": "Update dynamic config" }]
+```
+
+---
+
+### `GET /api/backup/git/commit/{sha}/diff`
+
+The diffstat plus the old and new content of every file in that commit, which is what the UI's diff viewer renders.
+
+```json
+{ "stat": " dynamic/app.yml | 4 ++--", "files": [{ "filename": "dynamic/app.yml", "status": "M", "old": "...", "new": "..." }] }
+```
+
+`400` if `sha` is not a hex SHA of 7 to 40 characters.
+
+---
+
+### `POST /api/backup/git/restore/{sha}`
+
+Restore the config from a commit. A local backup is taken first. On an agent, the files are pushed back through the agent.
+
+---
+
+### `DELETE /api/backup/git/repo`
+
+Delete the local clone. The next push re-initialises it. Use this when the repository or credentials change and the clone is stale.
+
+---
+
 ## Notifications
 
 ### `GET /api/notifications`
@@ -580,6 +747,38 @@ Delete a single notification by timestamp.
 ### `POST /api/notifications/clear`
 
 Clear all notifications.
+
+---
+
+### `POST /api/notifications/add`
+
+Add a notification. Unlike `/log`, this also fires the configured webhook.
+
+```json
+{ "type": "info", "message": "Deployment finished" }
+```
+
+---
+
+### `POST /api/notifications/log`
+
+Record a UI toast in the notification history without firing a webhook. `type` is one of `info`, `success`, `warning`, `error` and falls back to `info`. The message is truncated to 300 characters.
+
+```json
+{ "ok": true, "stored": true }
+```
+
+`stored` is `false` when the type is filtered out by the notification settings.
+
+---
+
+### `POST /api/notifications/update`
+
+Record an "update available" notification. `product` is `manager` for Traefik Manager, anything else means Traefik.
+
+```json
+{ "version": "1.10.1", "product": "manager" }
+```
 
 ---
 
@@ -699,6 +898,22 @@ Test connectivity to an OIDC provider's discovery endpoint.
 ```json
 { "provider_url": "https://accounts.google.com" }
 ```
+
+---
+
+### `POST /api/auth/external-ack`
+
+Acknowledge that an external provider (a Traefik forward-auth middleware, for example) already protects this instance, which hides the "no authentication" banner.
+
+```json
+{ "auth_external_ack": true }
+```
+
+```json
+{ "success": true, "auth_external_ack": true }
+```
+
+Returns `400` if a password or OIDC is active, since there is then nothing to acknowledge. This changes only what the UI reports - it never changes what is enforced. Setting and clearing it are both logged.
 
 ---
 
@@ -870,6 +1085,140 @@ Ping a route's domain from the TM server and return latency. Used by the route h
 ```
 
 On failure: `{ "ok": false, "error": "Timeout", "latency_ms": null }`
+
+A URL pointing at Traefik Manager's own hostname, or at the configured self-route domain, short-circuits to `{ "ok": true, "latency_ms": 0, "status_code": 200, "self": true }` without a request. Targets that fail the SSRF guard return `400`. An optional `fallback` URL is tried if the first attempt fails.
+
+---
+
+### `GET /api/health`
+
+Liveness probe. The only `/api/` endpoint that needs no authentication, so it can be used as a container healthcheck.
+
+```json
+{ "ok": true }
+```
+
+---
+
+### `GET /api/traefik/runtime`
+
+How Traefik Manager expects to reach Traefik in order to restart it. The Static Config tab uses this to tailor its "new entrypoints need a port mapping" guidance.
+
+```json
+{ "method": "proxy", "runtime": "docker", "container": "traefik" }
+```
+
+`runtime` is `docker`, `native` or `unknown`. With `RESTART_METHOD=poison-pill` it probes the Docker API and reports `native` when the container cannot be seen.
+
+---
+
+### `POST /api/tools/htpasswd`
+
+Generate an APR1 hash for a basicauth middleware.
+
+```json
+{ "username": "admin", "password": "secret" }
+```
+
+```json
+{ "ok": true, "hash": "admin:$apr1$..." }
+```
+
+---
+
+### `POST /api/tools/digestauth`
+
+Generate an MD5 hash for a digestauth middleware. `realm` is required as well.
+
+```json
+{ "username": "admin", "realm": "traefik", "password": "secret" }
+```
+
+```json
+{ "ok": true, "hash": "admin:traefik:5f4dcc3b..." }
+```
+
+---
+
+### `GET /api/geoip/status`
+
+Whether GeoIP is enabled, whether a database is readable, and its vintage.
+
+---
+
+### `POST /api/geoip/lookup`
+
+Resolve a batch of IPs. Set `aggregate` to get per-country counts instead of per-IP detail, which is what the Logs and CrowdSec maps use.
+
+```json
+{ "ips": ["1.2.3.4", "5.6.7.8"], "aggregate": false }
+```
+
+Per-IP: `{ "enabled": true, "available": true, "results": { "1.2.3.4": { "country": "...", "country_code": "..." } } }`
+
+Aggregated: `{ "enabled": true, "available": true, "counts": { "US": { "count": 2, "country": "United States" } }, "codes": { "1.2.3.4": "US" } }`
+
+Duplicate and unresolvable addresses are skipped. When GeoIP is off, returns `{ "enabled": false, "available": false, "results": {} }` rather than an error.
+
+---
+
+### `POST /api/geoip/update`
+
+Download the current DB-IP city-lite database. Rate-limited to 6/hour.
+
+```json
+{ "success": true, "db_month": "2026-08", "status": { } }
+```
+
+Returns `502` if the download fails.
+
+---
+
+### `POST /api/plugins/install`
+
+Install a Traefik plugin by pasting the YAML from its plugin page. `static_yaml` must contain an `experimental.plugins` (or top-level `plugins`) block. `middleware_yaml` optionally creates the middleware that uses it, and `config_file` chooses which dynamic config file it is written to. Pass `server` to install on an agent.
+
+```json
+{ "static_yaml": "experimental:\n  plugins:\n    ...", "middleware_yaml": "...", "config_file": "dynamic.yml", "server": "" }
+```
+
+Returns `400` when the YAML is invalid or no plugins block is found, and `404` for an unknown agent.
+
+---
+
+## Middleware templates
+
+Templates are reusable middleware snippets shown in the middlewares toolbar. They are stored on the Host and are not per-server.
+
+### `GET /api/mw/templates`
+
+```json
+{ "templates": [{ "id": "uuid", "name": "Secure headers", "yaml": "headers:\n  ..." }] }
+```
+
+---
+
+### `POST /api/mw/templates`
+
+Create a template. `name` is required and truncated to 100 characters.
+
+```json
+{ "name": "Secure headers", "yaml": "headers:\n  sslRedirect: true" }
+```
+
+Returns the created object, including its generated `id`.
+
+---
+
+### `PUT /api/mw/templates/{template_id}`
+
+Update a template. `name` and `yaml` are both optional; only what you send is changed. `404` if the id is unknown.
+
+---
+
+### `DELETE /api/mw/templates/{template_id}`
+
+Delete a template. Succeeds even if the id does not exist.
 
 ---
 

@@ -70,6 +70,11 @@ function buildSideNav() {
     }
 }
 
+function _tmMono(name) {
+    const m = String(name || '').replace(/[^A-Za-z0-9]/g, '');
+    return (m.slice(0, 2) || '?').toUpperCase();
+}
+
 function revealBelowFold(el) {
     if (!el) return;
     const r = el.getBoundingClientRect();

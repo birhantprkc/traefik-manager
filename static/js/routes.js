@@ -767,7 +767,7 @@ function _tmRouteCard(app, i, opts) {
 
     const iconUrl = (typeof _routeIconUrl === 'function' && window._showRouteIcons) ? _routeIconUrl(app) : '';
     const head = iconUrl
-        ? `<span class="tm-ic"><img src="${iconUrl}" data-slug="${_esc(_routeIconSlug(app))}" onerror="window.rmIconFallback(this)" alt="" class="route-app-icon"><span class="status-dot status-checking" title="Checking..."></span></span>`
+        ? `<span class="tm-ic tm-ic-tile" data-mono="${_esc(_tmMono(app.name))}"><img src="${iconUrl}" data-slug="${_esc(_routeIconSlug(app))}" onerror="window.rmIconFallback(this)" alt="" class="route-app-icon"><span class="status-dot status-checking" title="Checking..."></span></span>`
         : `<span class="tm-ic-bare"><span class="status-dot status-checking" title="Checking..."></span></span>`;
 
     let valRows;

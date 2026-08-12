@@ -330,8 +330,7 @@ function _dskSlug(s) {
 }
 
 function _dskMono(name) {
-    const m = String(name || '').replace(/[^A-Za-z0-9]/g, '');
-    return (m.slice(0, 2) || '?').toUpperCase();
+    return _tmMono(name);
 }
 
 function _dskPlain(html) {
