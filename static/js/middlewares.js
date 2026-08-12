@@ -188,6 +188,7 @@ function buildYamlFromWizard() {
     let yaml = '';
     const key = _wizKeyMap[tpl] || tpl;
 
+    const _q = (v) => JSON.stringify(String(v ?? ''));
     const _lines = (id) => (document.getElementById(id)?.value || '').trim().split('\n').map(l => l.trim()).filter(Boolean);
     const _val   = (id, def='') => (document.getElementById(id)?.value || def).trim();
     const _chk   = (id, def=false) => document.getElementById(id)?.checked ?? def;
@@ -195,20 +196,20 @@ function buildYamlFromWizard() {
     if (key === 'basicAuth') {
         const users = _lines('wizBaUsers');
         const realm = _val('wizBaRealm');
-        yaml = 'basicAuth:\n  users:\n' + users.map(l => '    - "' + l + '"').join('\n');
-        if (realm) yaml += '\n  realm: "' + realm + '"';
+        yaml = 'basicAuth:\n  users:\n' + users.map(l => '    - ' + _q(l) + '').join('\n');
+        if (realm) yaml += '\n  realm: ' + _q(realm) + '';
 
     } else if (key === 'digestAuth') {
         const users = _lines('wizDaUsers');
-        yaml = 'digestAuth:\n  users:\n' + users.map(l => '    - "' + l + '"').join('\n');
+        yaml = 'digestAuth:\n  users:\n' + users.map(l => '    - ' + _q(l) + '').join('\n');
 
     } else if (key === 'forwardAuth') {
         const addr  = _val('wizFaAddress');
         const trust = _chk('wizFaTrust', true);
         const hdrs  = _lines('wizFaHeaders');
         const maxBody = _val('wizFaMaxBody');
-        yaml = 'forwardAuth:\n  address: "' + addr + '"\n  trustForwardHeader: ' + trust;
-        if (hdrs.length) yaml += '\n  authResponseHeaders:\n' + hdrs.map(h => '    - "' + h + '"').join('\n');
+        yaml = 'forwardAuth:\n  address: ' + _q(addr) + '\n  trustForwardHeader: ' + trust;
+        if (hdrs.length) yaml += '\n  authResponseHeaders:\n' + hdrs.map(h => '    - ' + _q(h) + '').join('\n');
         if (maxBody && /^\d+$/.test(maxBody)) yaml += '\n  maxResponseBodySize: ' + maxBody;
 
     } else if (key === 'forwardAuthGatekeeper') {
@@ -220,8 +221,8 @@ function buildYamlFromWizard() {
         const hdrs   = _lines('wizGkHeaders');
         const allHdrs = auth ? ['Authorization', ...hdrs.filter(h => h !== 'Authorization')] : hdrs;
         const gkMaxBody = _val('wizGkMaxBody');
-        yaml = 'forwardAuth:\n  address: "' + addr + '"\n  trustForwardHeader: ' + trust;
-        if (allHdrs.length) yaml += '\n  authResponseHeaders:\n' + allHdrs.map(h => '    - "' + h + '"').join('\n');
+        yaml = 'forwardAuth:\n  address: ' + _q(addr) + '\n  trustForwardHeader: ' + trust;
+        if (allHdrs.length) yaml += '\n  authResponseHeaders:\n' + allHdrs.map(h => '    - ' + _q(h) + '').join('\n');
         if (gkMaxBody && /^\d+$/.test(gkMaxBody)) yaml += '\n  maxResponseBodySize: ' + gkMaxBody;
 
     } else if (key === 'oidcAuth') {
@@ -238,29 +239,29 @@ function buildYamlFromWizard() {
             return idx > -1 ? { Name: l.slice(0, idx).trim(), Value: '{' + '{`' + '{' + '{ .claims.' + l.slice(idx+1).trim() + ' }' + '}`' + '}' + '}' } : null;
         }).filter(Boolean);
         yaml = 'plugin:\n  traefik-oidc-auth:';
-        if (secret) yaml += '\n    Secret: "' + secret + '"';
+        if (secret) yaml += '\n    Secret: ' + _q(secret) + '';
         yaml += '\n    Provider:';
-        if (providerUrl) yaml += '\n      Url: "' + providerUrl + '"';
-        if (clientId)    yaml += '\n      ClientId: "' + clientId + '"';
-        if (clientSecret) yaml += '\n      ClientSecret: "' + clientSecret + '"';
+        if (providerUrl) yaml += '\n      Url: ' + _q(providerUrl) + '';
+        if (clientId)    yaml += '\n      ClientId: ' + _q(clientId) + '';
+        if (clientSecret) yaml += '\n      ClientSecret: ' + _q(clientSecret) + '';
         if (scopes.length) yaml += '\n    Scopes:\n' + scopes.map(s => '      - ' + s).join('\n');
         yaml += '\n    SessionCookie:\n      MaxAge: ' + maxAge;
-        if (headers.length) yaml += '\n    Headers:\n' + headers.map(h => '      - Name: "' + h.Name + '"\n        Value: "' + h.Value + '"').join('\n');
-        if (bypassLines.length) yaml += '\n    BypassAuthenticationRule:\n' + bypassLines.map(r => '      - "' + r + '"').join('\n');
+        if (headers.length) yaml += '\n    Headers:\n' + headers.map(h => '      - Name: ' + _q(h.Name) + '\n        Value: ' + _q(h.Value) + '').join('\n');
+        if (bypassLines.length) yaml += '\n    BypassAuthenticationRule:\n' + bypassLines.map(r => '      - ' + _q(r) + '').join('\n');
 
     } else if (key === 'rateLimit') {
         yaml = 'rateLimit:\n  average: ' + _val('wizRlAvg','100') + '\n  burst: ' + _val('wizRlBurst','50') + '\n  period: ' + _val('wizRlPeriod','1s');
 
     } else if (key === 'ipAllowList') {
         const cidrs = _lines('wizIpCidrs');
-        yaml = 'ipAllowList:\n  sourceRange:\n' + cidrs.map(c => '    - "' + c + '"').join('\n');
+        yaml = 'ipAllowList:\n  sourceRange:\n' + cidrs.map(c => '    - ' + _q(c) + '').join('\n');
         const strat = _val('wizIpStrategy', 'direct');
         if (strat === 'depth') {
             const depth = _val('wizIpDepth', '1');
             yaml += '\n  ipStrategy:\n    depth: ' + (/^\d+$/.test(depth) && +depth > 0 ? depth : '1');
         } else if (strat === 'excluded') {
             const excluded = _lines('wizIpExcluded');
-            if (excluded.length) yaml += '\n  ipStrategy:\n    excludedIPs:\n' + excluded.map(c => '      - "' + c + '"').join('\n');
+            if (excluded.length) yaml += '\n  ipStrategy:\n    excludedIPs:\n' + excluded.map(c => '      - ' + _q(c) + '').join('\n');
         }
 
     } else if (key === 'secureHeaders') {
@@ -287,8 +288,8 @@ function buildYamlFromWizard() {
         const vary    = _chk('wizCorsVary', true);
         const lines = ['headers:'];
         if (methods.length) lines.push('  accessControlAllowMethods:\n' + methods.map(m => '    - ' + m).join('\n'));
-        if (hdrs.length)    lines.push('  accessControlAllowHeaders:\n' + hdrs.map(h => '    - "' + h + '"').join('\n'));
-        if (origins.length) lines.push('  accessControlAllowOriginList:\n' + origins.map(o => '    - "' + o + '"').join('\n'));
+        if (hdrs.length)    lines.push('  accessControlAllowHeaders:\n' + hdrs.map(h => '    - ' + _q(h) + '').join('\n'));
+        if (origins.length) lines.push('  accessControlAllowOriginList:\n' + origins.map(o => '    - ' + _q(o) + '').join('\n'));
         lines.push('  accessControlMaxAge: ' + maxAge);
         if (vary) lines.push('  addVaryHeader: true');
         yaml = lines.join('\n');
@@ -311,17 +312,17 @@ function buildYamlFromWizard() {
         yaml = 'redirectScheme:\n  scheme: ' + _val('wizRsScheme','https') + '\n  permanent: ' + _chk('wizRsPermanent',true);
 
     } else if (key === 'redirectRegex') {
-        yaml = 'redirectRegex:\n  regex: "' + _val('wizRrRegex') + '"\n  replacement: "' + _val('wizRrReplacement') + '"\n  permanent: ' + _chk('wizRrPermanent',true);
+        yaml = 'redirectRegex:\n  regex: ' + _q(_val('wizRrRegex')) + '\n  replacement: ' + _q(_val('wizRrReplacement')) + '\n  permanent: ' + _chk('wizRrPermanent',true);
 
     } else if (key === 'stripPrefix') {
         const prefixes = _lines('wizSpPrefixes');
-        yaml = 'stripPrefix:\n  prefixes:\n' + prefixes.map(p => '    - "' + p + '"').join('\n');
+        yaml = 'stripPrefix:\n  prefixes:\n' + prefixes.map(p => '    - ' + _q(p) + '').join('\n');
 
     } else if (key === 'addPrefix') {
-        yaml = 'addPrefix:\n  prefix: "' + _val('wizApPrefix') + '"';
+        yaml = 'addPrefix:\n  prefix: ' + _q(_val('wizApPrefix')) + '';
 
     } else if (key === 'replacePath') {
-        yaml = 'replacePath:\n  path: "' + _val('wizRpPath') + '"';
+        yaml = 'replacePath:\n  path: ' + _q(_val('wizRpPath')) + '';
 
     } else if (key === 'compress') {
         yaml = 'compress:\n  minResponseBodyBytes: ' + _val('wizCmpMin','1200');
@@ -330,12 +331,12 @@ function buildYamlFromWizard() {
         yaml = 'retry:\n  attempts: ' + _val('wizRtAttempts','4') + '\n  initialInterval: ' + _val('wizRtInterval','100ms');
 
     } else if (key === 'circuitBreaker') {
-        yaml = 'circuitBreaker:\n  expression: "' + _val('wizCbExpr') + '"';
+        yaml = 'circuitBreaker:\n  expression: ' + _q(_val('wizCbExpr')) + '';
 
     } else if (key === 'buffering') {
         const retryExpr = _val('wizBufRetry');
         yaml = 'buffering:\n  maxRequestBodyBytes: ' + _val('wizBufReq','10485760') + '\n  maxResponseBodyBytes: ' + _val('wizBufRes','10485760');
-        if (retryExpr) yaml += '\n  retryExpression: "' + retryExpr + '"';
+        if (retryExpr) yaml += '\n  retryExpression: ' + _q(retryExpr) + '';
 
     } else if (key === 'chain') {
         const mws = _lines('wizChMiddlewares');
@@ -419,7 +420,7 @@ async function saveMwAjax(event) {
 }
 
 async function deleteMw(name, configFile) {
-    if (!await _confirm('Delete middleware "' + name + '"? Any route still referencing it will stop working.', 'Delete Middleware', 'Delete', 'DELETE')) return;
+    if (!await _confirm('Delete middleware ' + _q(name) + '? Any route still referencing it will stop working.', 'Delete Middleware', 'Delete', 'DELETE')) return;
     const data = new FormData();
     data.append('csrf_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
     if (configFile) data.append('configFile', configFile);
@@ -556,32 +557,6 @@ async function handleMwEdit(btn) {
     _loadCustomMwTemplates();
 }
 
-const mwTemplates = {
-    basicAuth: `basicAuth:\n  users:\n    - "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"`,
-    digestAuth: `digestAuth:\n  users:\n    - "admin:traefik:a2688e031edb4be6fe3079ef99a6274e"`,
-    forwardAuth: `forwardAuth:\n  address: "http://auth-service:4181"\n  trustForwardHeader: true\n  authResponseHeaders:\n    - "X-Auth-User"\n    - "X-Auth-Token"`,
-    forwardAuthAuthentik: `forwardAuth:\n  address: "http://authentik-server:9000/outpost.goauthentik.io/auth/traefik"\n  trustForwardHeader: true\n  authResponseHeaders:\n    - X-authentik-username\n    - X-authentik-groups\n    - X-authentik-email\n    - X-authentik-name\n    - X-authentik-uid`,
-    forwardAuthAuthelia: `forwardAuth:\n  address: "http://authelia:9091/api/authz/forward-auth"\n  trustForwardHeader: true\n  authResponseHeaders:\n    - Remote-User\n    - Remote-Groups\n    - Remote-Name\n    - Remote-Email`,
-    forwardAuthGatekeeper: `forwardAuth:\n  address: "https://auth.example.com/auth/verify"\n  trustForwardHeader: false\n  authResponseHeaders:\n    - "X-Auth-User"\n    - "X-Auth-Email"\n    - "X-Auth-Groups"`,
-    oidcAuth: `plugin:\n  traefik-oidc-auth:\n    Secret: "change-me-32-char-secret"\n    Provider:\n      Url: "https://login.microsoftonline.com/{tenant}/v2.0"\n      ClientId: "client-id"\n      ClientSecret: "client-secret"\n    Scopes:\n      - openid\n      - profile\n      - email\n    SessionCookie:\n      MaxAge: 86400\n    Headers:\n      - Name: "X-Forwarded-User"\n        Value: "{{ '{{' }}\`{{ '{{' }} .claims.preferred_username {{ '}}' }}\`{{ '}}' }}"\n      - Name: "X-Forwarded-Email"\n        Value: "{{ '{{' }}\`{{ '{{' }} .claims.email {{ '}}' }}\`{{ '}}' }}"`,
-    ipAllowList: `ipAllowList:\n  sourceRange:\n    - "127.0.0.1/32"\n    - "192.168.1.0/24"`,
-    ipAllowListPrivate: `ipAllowList:\n  sourceRange:\n    - "10.0.0.0/8"\n    - "172.16.0.0/12"\n    - "192.168.0.0/16"\n    - "127.0.0.1/32"`,
-    rateLimit: `rateLimit:\n  average: 100\n  burst: 50\n  period: 1s`,
-    secureHeaders: `headers:\n  sslRedirect: true\n  forceSTSHeader: true\n  stsSeconds: 315360000\n  stsIncludeSubdomains: true\n  stsPreload: true\n  contentTypeNosniff: true\n  browserXssFilter: true\n  referrerPolicy: "same-origin"\n  frameDeny: true`,
-    corsHeaders: `headers:\n  accessControlAllowMethods:\n    - GET\n    - OPTIONS\n    - PUT\n    - POST\n    - DELETE\n  accessControlAllowHeaders:\n    - "*"\n  accessControlAllowOriginList:\n    - "https://example.com"\n  accessControlMaxAge: 100\n  addVaryHeader: true`,
-    redirectScheme: `redirectScheme:\n  scheme: https\n  permanent: true`,
-    redirectRegex: `redirectRegex:\n  regex: "^http://(.*)"\n  replacement: "https://$${1}"\n  permanent: true`,
-    stripPrefix: `stripPrefix:\n  prefixes:\n    - "/api"\n    - "/v1"`,
-    addPrefix: `addPrefix:\n  prefix: "/api"`,
-    replacePath: `replacePath:\n  path: "/foo"`,
-    compress: `compress:\n  minResponseBodyBytes: 1200`,
-    retry: `retry:\n  attempts: 4\n  initialInterval: 100ms`,
-    circuitBreaker: `circuitBreaker:\n  expression: "NetworkErrorRatio() > 0.5"`,
-    buffering: `buffering:\n  maxRequestBodyBytes: 10485760\n  maxResponseBodyBytes: 10485760\n  retryExpression: "IsNetworkError() && Attempts() < 2"`,
-    chain: `chain:\n  middlewares:\n    - redirect-https\n    - secure-headers\n    - rate-limit`,
-    inFlightReq: `inFlightReq:\n  amount: 10`,
-};
-
 async function _loadCustomMwTemplates() {
     const grp = document.getElementById('mwCustomOptgroup');
     if (!grp) return;
@@ -612,11 +587,6 @@ function applyMwTemplate(select) {
     } else if (_wizardTemplates.has(tpl)) {
         _showMwWizard(tpl);
         setMwMode('wizard');
-    } else if (mwTemplates[tpl]) {
-        setMwMode('yaml');
-        const val = mwTemplates[tpl];
-        if (_mwMonacoEditor) _mwMonacoEditor.setValue(val);
-        else document.getElementById('middlewareContent').value = val;
     }
 }
 
