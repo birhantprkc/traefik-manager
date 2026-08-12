@@ -2823,9 +2823,9 @@ def api_notifications_log():
 
 
 @app.route('/api/notifications/delete', methods=['POST'])
+@csrf_protect
 @login_required
 def api_notifications_delete():
-    _check_csrf()
     ts = (request.get_json(silent=True) or {}).get('ts', '')
     if not ts:
         return jsonify({'ok': False, 'message': 'Missing ts'}), 400
@@ -2838,9 +2838,9 @@ def api_notifications_delete():
     return jsonify({'ok': True})
 
 @app.route('/api/notifications/clear', methods=['POST'])
+@csrf_protect
 @login_required
 def api_notifications_clear():
-    _check_csrf()
     with _notif_lock:
         _notifications.clear()
     threading.Thread(target=_save_notifications_bg, daemon=True).start()
