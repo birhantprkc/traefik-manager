@@ -393,6 +393,27 @@ Get saved dashboard configuration - custom groups and per-route icon, name, link
 
 Pass `?server=<agent-id>` to read an agent's configuration. Without it you get the Host's. Each server keeps its own groups and overrides.
 
+```json
+{
+  "custom_groups": [{ "name": "Media" }],
+  "route_overrides": {
+    "dynamic.yml::jellyfin": {
+      "display_name": "Jellyfin",
+      "icon_type": "slug",
+      "icon_slug": "jellyfin",
+      "icon_url": "",
+      "group": "Media",
+      "url": "https://jellyfin.example.com",
+      "hidden": false,
+      "link_disabled": false
+    }
+  },
+  "tm_route_name": "traefik-manager"
+}
+```
+
+Keys of `route_overrides` are route ids (`<config-file>::<router-name>`, or just the router name on a single-file install). `tm_route_name` is read-only and names the router that points at Traefik Manager itself, so a client can give it TM's own icon.
+
 ---
 
 ### `POST /api/dashboard/config`
@@ -417,7 +438,25 @@ Pass `?server=<agent-id>`, or a `server` key in the body, to write an agent's co
 
 ### `GET /api/dashboard/icon/{slug}`
 
-Serve a cached app icon by slug (e.g. `plex`, `grafana`). Fetches from the selfh.st CDN on cache miss. Responses include `Cache-Control: max-age=86400`.
+Serve a cached app icon by slug (e.g. `plex`, `grafana`). Fetches from the [selfh.st](https://selfh.st/icons/) CDN on cache miss and stores the PNG on disk. Responses include `Cache-Control: max-age=86400`.
+
+Misses are cached too: a slug with no icon returns `404` immediately on later requests instead of hitting the CDN again. Prefer this endpoint over the CDN directly - a client that goes to the CDN itself makes one request per route on every render and loses the negative cache.
+
+The slug is lowercased and stripped to `a-z0-9-`; anything else returns `404`.
+
+#### Resolving a route's icon
+
+The dashboard resolves icons client-side. To match it:
+
+1. `icon_type: "url"` - use `icon_url` as-is.
+2. `icon_type: "slug"` - use `icon_slug`.
+3. Route name equals `tm_route_name` - use Traefik Manager's own icon.
+4. Otherwise (`icon_type: "auto"`, or no override) - derive the slug from the route name:
+   - strip a trailing `:port`
+   - strip one trailing `-service`, `-svc`, `-router`, `-app`, `-container` or `-pod`, with an optional `s`, separated by `-` or `_`
+   - lowercase, then remove every character that is not `a-z`, `0-9` or `-`
+
+So `Jellyfin-Service` and `jellyfin` both resolve to `jellyfin`. Fall back to a monogram of the route's first letters when the request returns `404`.
 
 ---
 

@@ -84,6 +84,70 @@ components:
         ok: { type: boolean, example: false }
         message: { type: string, example: "Something went wrong" }
 
+    RouteOverride:
+      type: object
+      description: |
+        Per-route dashboard overrides. Every field is optional; an absent field means
+        "use the derived default". Keys of `route_overrides` are route ids
+        (`<config-file>::<router-name>`, or the router name on a single-file install).
+      properties:
+        display_name:
+          type: string
+          description: Replaces the route name on the card.
+          example: Jellyfin
+        icon_type:
+          type: string
+          enum: [auto, slug, url]
+          default: auto
+          description: |
+            How to resolve the icon. `auto` derives a slug from the route name,
+            `slug` uses `icon_slug`, `url` uses `icon_url`.
+        icon_slug:
+          type: string
+          description: selfh.st icon slug, used when `icon_type` is `slug`.
+          example: jellyfin
+        icon_url:
+          type: string
+          description: Absolute image URL, used when `icon_type` is `url`.
+        group:
+          type: string
+          description: Category the card is filed under. Matches a custom group name or a built-in one.
+          example: Media
+        url:
+          type: string
+          description: |
+            Overrides the URL the card opens. Must start with `http://` or `https://` -
+            any other value is dropped on save.
+          example: https://jellyfin.example.com
+        hidden:
+          type: boolean
+          default: false
+          description: Hide the card from both dashboard views. The route keeps running.
+        link_disabled:
+          type: boolean
+          default: false
+          description: Render the card but make it non-clickable.
+
+    DashboardConfig:
+      type: object
+      properties:
+        custom_groups:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string, example: Media }
+        route_overrides:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/RouteOverride" }
+        tm_route_name:
+          type: string
+          readOnly: true
+          description: |
+            Router that points at Traefik Manager itself, so a client can give it
+            TM's own icon instead of deriving one. Read-only - ignored on save.
+          example: traefik-manager
+
     Route:
       type: object
       properties:
@@ -877,35 +941,41 @@ paths:
     get:
       tags: [Dashboard]
       summary: Get dashboard config
-      description: Get the saved Dashboard configuration - custom groups and per-route icon/name overrides.
+      description: |
+        Custom groups and per-route overrides for the dashboard.
+
+        Each server keeps its own groups and overrides, so pass `server` to read an
+        agent's configuration. Without it you get the Host's.
+      parameters:
+        - name: server
+          in: query
+          required: false
+          schema: { type: string }
+          description: Agent id. Omit for the Host.
       responses:
         "200":
           description: Dashboard config
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  custom_groups:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        name: { type: string }
-                  route_overrides:
-                    type: object
-                    additionalProperties:
-                      type: object
-                      properties:
-                        display_name: { type: string }
-                        icon_type: { type: string, enum: [auto, slug, url] }
-                        icon_slug: { type: string }
-                        icon_url: { type: string }
-                        group: { type: string }
+              schema: { $ref: "#/components/schemas/DashboardConfig" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
     post:
       tags: [Dashboard]
       summary: Save dashboard config
-      description: Save the Dashboard configuration. Replaces the full config in `dashboard.yml`.
+      description: |
+        Replaces that server's section of `dashboard.yml`, leaving every other server
+        untouched. Send the full `custom_groups` and `route_overrides` for the server -
+        anything omitted is removed.
+
+        The target server can be given either as the `server` query parameter or as a
+        `server` key in the body.
+      parameters:
+        - name: server
+          in: query
+          required: false
+          schema: { type: string }
+          description: Agent id. Omit for the Host.
       requestBody:
         required: true
         content:
@@ -913,22 +983,52 @@ paths:
             schema:
               type: object
               properties:
-                custom_groups: { type: array, items: { type: object } }
-                route_overrides: { type: object }
+                server:
+                  type: string
+                  description: Agent id, as an alternative to the query parameter.
+                custom_groups:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name: { type: string }
+                route_overrides:
+                  type: object
+                  additionalProperties: { $ref: "#/components/schemas/RouteOverride" }
       responses:
         "200":
           description: Success
           content:
             application/json:
               schema: { $ref: "#/components/schemas/OkResponse" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /api/dashboard/icon/{slug}:
     get:
       tags: [Dashboard]
       summary: Get app icon
       description: |
-        Serve a cached app icon by slug. On cache miss, fetches from the selfh.st CDN and caches locally.
-        Responses are served with `Cache-Control: max-age=86400`.
+        Serve a cached app icon by slug. On cache miss, fetches from the selfh.st CDN
+        and stores the PNG on disk. Responses are served with `Cache-Control: max-age=86400`.
+
+        Misses are cached too: a slug with no icon returns `404` immediately on later
+        requests rather than hitting the CDN again. Prefer this endpoint over the CDN
+        directly - a client that fetches from the CDN itself makes one request per route
+        on every render and loses the negative cache.
+
+        **Resolving a route's icon.** Icons are resolved client-side, in this order:
+
+        1. `icon_type: url` - use `icon_url` as-is.
+        2. `icon_type: slug` - use `icon_slug`.
+        3. Route name equals `tm_route_name` - use Traefik Manager's own icon.
+        4. Otherwise (`auto`, or no override) - derive the slug from the route name:
+           strip a trailing `:port`; strip one trailing `-service`, `-svc`, `-router`,
+           `-app`, `-container` or `-pod` (optional plural, `-` or `_` separated);
+           lowercase; drop every character outside `a-z0-9-`.
+
+        So `Jellyfin-Service` and `jellyfin` both resolve to `jellyfin`. Fall back to a
+        monogram when the request returns `404`.
       parameters:
         - name: slug
           in: path
@@ -941,8 +1041,12 @@ paths:
           content:
             image/png:
               schema: { type: string, format: binary }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: Icon not found on CDN
+          description: |
+            No icon for this slug, or the slug was empty after sanitising.
+            Negatively cached, so repeat requests do not reach the CDN.
 
   # ─── Settings ─────────────────────────────────────────────────────────────
 
