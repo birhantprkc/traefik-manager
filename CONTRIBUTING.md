@@ -90,6 +90,8 @@ touch config/dynamic.yml
 | `RESTART_METHOD` | How TM restarts Traefik (`proxy`, `poison-pill`, `socket`) | `proxy` |
 | `STATIC_CONFIG_PATH` | Path to `traefik.yml` to enable the Static Config Editor | - |
 
+These are the ones you need to run it locally. The full list is in the [Environment Variables](https://traefik-manager.xyzlab.dev/env-vars.html) reference.
+
 ### Run
 
 ```bash
@@ -136,7 +138,7 @@ docker-compose.yml
 agent/                        # TMA - the Go agent for remote servers
 templates/
     index.html                # Main SPA shell
-    sections/                 # Navbar, stats bar, mobile menu
+    sections/                 # Navbar and stats bar
     tabs/                     # One file per tab (routes, middlewares, dashboard, etc.)
     modals/                   # Route, middleware, settings and other modals
 static/
@@ -152,13 +154,13 @@ docs/                         # VitePress documentation site
     workflows/
         docker.yml            # Builds and pushes Docker images on tag/branch push
         tests.yml             # pytest + coverage + ruff, and the Go agent build/vet/test
-        docs.yml              # Deploys VitePress docs
         pr-base-check.yml     # Fails a PR opened against main instead of dev
         release-binaries.yml  # Builds agent binaries on a published release
+wrangler.toml                 # Cloudflare Pages builds and deploys the docs site
 ```
 
 > [!NOTE]
-> **`app.py` still holds the route handlers.** Shared logic lives in `core/`, and the JavaScript is fully split into `static/js/`, but the ~114 Flask routes are still in `app.py`. Moving them into blueprints needs an app-factory restructure and has not been done. See the [Development guide](https://traefik-manager.xyzlab.dev/development.html) for the `core/` module graph and its conventions.
+> **`app.py` still holds the route handlers.** Shared logic lives in `core/`, and the JavaScript is fully split into `static/js/`, but the Flask routes are still in `app.py`. Moving them into blueprints needs an app-factory restructure and has not been done. See the [Development guide](https://traefik-manager.xyzlab.dev/development.html) for the `core/` module graph and its conventions.
 
 ---
 

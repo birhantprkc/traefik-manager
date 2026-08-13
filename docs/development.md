@@ -70,7 +70,7 @@ pip install -r requirements.txt
 TRAEFIK_API_URL=http://your-traefik:8080 CONFIG_PATH=config/dynamic.yml python3 app.py
 ```
 
-The UI is at `http://localhost:5000`. See [CONTRIBUTING.md](https://github.com/chr0nzz/traefik-manager/blob/main/CONTRIBUTING.md) for the full environment variable list and the Docker build.
+The UI is at `http://localhost:5000`. See [Environment Variables](env-vars.md) for the full list, and [CONTRIBUTING.md](https://github.com/chr0nzz/traefik-manager/blob/main/CONTRIBUTING.md) for the Docker build.
 
 ## Tests
 
