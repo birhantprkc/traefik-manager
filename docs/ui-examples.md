@@ -1,6 +1,6 @@
 ---
 title: UI Examples
-description: The Traefik Manager dashboard, routes, middlewares, services, logs, CrowdSec and settings, in light and dark.
+description: The Traefik Manager dashboard, routes, middlewares, services, logs, CrowdSec, settings and setup wizard, in light and dark.
 ---
 
 # UI Examples
@@ -157,6 +157,34 @@ Interface, authentication with API keys and OIDC, backups, system and route moni
 
 <img class="screenshot dark-only" src="/images/dark-settings-about.png" alt="About">
 <img class="screenshot light-only" src="/images/light-settings-about.png" alt="About">
+
+## Setup Wizard
+
+First run walks through everything in one pass: the Traefik connection, a route for the manager itself, which monitoring tabs to show, CrowdSec, git backup, notifications and the admin password.
+
+<img class="screenshot dark-only" src="/images/dark-setup-welcome.png" alt="Setup wizard welcome">
+<img class="screenshot light-only" src="/images/light-setup-welcome.png" alt="Setup wizard welcome">
+
+<img class="screenshot dark-only" src="/images/dark-setup-connection.png" alt="Setup wizard Traefik connection">
+<img class="screenshot light-only" src="/images/light-setup-connection.png" alt="Setup wizard Traefik connection">
+
+<img class="screenshot dark-only" src="/images/dark-setup-self-route.png" alt="Setup wizard self route">
+<img class="screenshot light-only" src="/images/light-setup-self-route.png" alt="Setup wizard self route">
+
+<img class="screenshot dark-only" src="/images/dark-setup-monitoring.png" alt="Setup wizard monitoring tabs">
+<img class="screenshot light-only" src="/images/light-setup-monitoring.png" alt="Setup wizard monitoring tabs">
+
+<img class="screenshot dark-only" src="/images/dark-setup-crowdsec.png" alt="Setup wizard CrowdSec">
+<img class="screenshot light-only" src="/images/light-setup-crowdsec.png" alt="Setup wizard CrowdSec">
+
+<img class="screenshot dark-only" src="/images/dark-setup-git-backup.png" alt="Setup wizard git backup">
+<img class="screenshot light-only" src="/images/light-setup-git-backup.png" alt="Setup wizard git backup">
+
+<img class="screenshot dark-only" src="/images/dark-setup-notifications.png" alt="Setup wizard notifications">
+<img class="screenshot light-only" src="/images/light-setup-notifications.png" alt="Setup wizard notifications">
+
+<img class="screenshot dark-only" src="/images/dark-setup-password.png" alt="Setup wizard admin password">
+<img class="screenshot light-only" src="/images/light-setup-password.png" alt="Setup wizard admin password">
 
 ## Android
 
