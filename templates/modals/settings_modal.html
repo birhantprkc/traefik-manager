@@ -174,20 +174,17 @@
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-connection">
                     <div class="sc-lede">
-                        <div class="sc-lede-t">Connection</div>
-                        <div class="sc-lede-d">How Traefik Manager reaches your Traefik instance, and the defaults it offers when you build a route. The API URL is the only value here it cannot work without. Domains and certificate resolvers only seed the route form; they do not change your Traefik configuration.</div>
+                        <div class="sc-lede-t">Connection<span class="tm-info-btn" data-tip="How Traefik Manager reaches your Traefik instance, and the defaults it offers when you build a route. The API URL is the only value here it cannot work without. Domains and certificate resolvers only seed the route form; they do not change your Traefik configuration."><i class="ph-bold ph-info"></i></span></div>
                     </div>
                     <div style="margin-bottom:12px;">
                         <div class="sc-sec-head"><i class="ph-bold ph-signpost sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Routing defaults</span><span class="sc-sec-rule"></span></div>
                         <div class="sc-panel">
                             <div class="sc-fld">
-                                <div class="sc-set-n">Domains</div>
-                                <div class="sc-set-d">Convenience list used to build <code class="font-mono">Host()</code> rules in the route form - it does not affect your Traefik configuration, TLS, or routing. Domains found in existing routes are added to the route form automatically, so this list is optional seeding.</div>
+                                <div class="sc-set-n">Domains<span class="tm-info-btn" data-tip="Convenience list used to build Host() rules in the route form - it does not affect your Traefik configuration, TLS, or routing. Domains found in existing routes are added to the route form automatically, so this list is optional seeding."><i class="ph-bold ph-info"></i></span></div>
                                 <input type="text" id="settingsDomains" class="input-field" placeholder="example.com, example.net" onblur="saveSettings()">
                             </div>
                             <div class="sc-fld">
-                                <div class="sc-set-n">Certificate resolver</div>
-                                <div class="sc-set-d">One or more cert resolver names, comma-separated (e.g. <code class="font-mono">letsencrypt, cloudflare</code>). The first is the default - each route can override it individually. If you manage certificates externally and don't use ACME, type <code class="font-mono">none</code>.</div>
+                                <div class="sc-set-n">Certificate resolver<span class="tm-info-btn" data-tip="One or more cert resolver names, comma-separated (e.g. letsencrypt, cloudflare). The first is the default - each route can override it individually. If you manage certificates externally and don't use ACME, type none."><i class="ph-bold ph-info"></i></span></div>
                                 <input type="text" id="settingsCertResolver" class="input-field" placeholder="cloudflare" onblur="saveSettings()">
                             </div>
                         </div>
@@ -263,12 +260,10 @@
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-routes">
                     <div class="sc-lede">
-                        <div class="sc-lede-t">Route Monitoring</div>
-                        <div class="sc-lede-d">Traefik discovers routes from providers other than your dynamic config file - Docker labels, a Kubernetes CRD, a KV store. Turn on a provider to get a read-only tab listing what it contributes. Traefik Manager can show those routes but cannot edit them, because they are defined where the provider lives.</div>
+                        <div class="sc-lede-t">Route Monitoring<span class="tm-info-btn" data-tip="Traefik discovers routes from providers other than your dynamic config file - Docker labels, a Kubernetes CRD, a KV store. Turn on a provider to get a read-only tab listing what it contributes. Traefik Manager can show those routes but cannot edit them, because they are defined where the provider lives."><i class="ph-bold ph-info"></i></span></div>
                     </div>
                     <div>
-                        <div class="sc-sec-head"><i class="ph-bold ph-cloud sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Provider tabs</span><span class="sc-sec-rule"></span></div>
-                        <div class="text-xs mb-3" style="color:var(--muted)">Provider tabs pulled live from the Traefik API - no file mounts needed.</div>
+                        <div class="sc-sec-head"><i class="ph-bold ph-cloud sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Provider tabs</span><span class="tm-info-btn" data-tip="Provider tabs pulled live from the Traefik API - no file mounts needed."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span></div>
                         <div class="grid grid-cols-2 gap-2">
                             <label class="tab-toggle-row" onclick="toggleTabVisibility('docker')">
                                 <span class="flex items-center gap-2 text-sm"><i class="ph-bold ph-cube" style="color:var(--muted)"></i> Docker</span>
@@ -324,8 +319,7 @@
 
                                 <div class="modal-panel has-subnav" id="mpanel-system" style="gap:0;padding:0;">
                     <div class="sc-lede sc-lede-inset">
-                        <div class="sc-lede-t">System Monitoring</div>
-                        <div class="sc-lede-d">Views that read a file rather than the Traefik API: certificate expiry from your ACME store, the plugin list from your static config, and the access log. Each needs its file mounted into this container, and each view tells you the exact volume line if it is missing. CrowdSec is here too, since it reads its own local API.</div>
+                        <div class="sc-lede-t">System Monitoring<span class="tm-info-btn" data-tip="Views that read a file rather than the Traefik API: certificate expiry from your ACME store, the plugin list from your static config, and the access log. Each needs its file mounted into this container, and each view tells you the exact volume line if it is missing. CrowdSec is here too, since it reads its own local API."><i class="ph-bold ph-info"></i></span></div>
                     </div>
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;">
 
@@ -343,7 +337,7 @@
 
                         <div id="system-sub-tabs" class="auth-sub-panel sig-root sc-root" style="display:flex;">
                             <div>
-                                <div class="sc-sec-head"><i class="ph-bold ph-monitor sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">System Monitoring</span><span class="sc-sec-rule"></span></div>
+                                <div class="sc-sec-head"><i class="ph-bold ph-monitor sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">System Monitoring</span><span class="tm-info-btn" data-tip="These tabs require a file mount in your compose file - each tab shows the exact volume line to add if not yet mounted."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span></div>
                                 <div class="grid grid-cols-2 gap-2">
                                     <label class="tab-toggle-row" onclick="toggleTabVisibility('certs')">
                                         <span class="flex items-center gap-2 text-sm"><i class="ph-bold ph-shield-check" style="color:var(--muted)"></i> Certs</span>
@@ -358,17 +352,15 @@
                                         <div class="toggle-switch" id="toggle-logs"><div class="toggle-knob"></div></div>
                                     </label>
                                 </div>
-                                <div class="text-xs mt-1.5" style="color:var(--muted)">These tabs require a file mount in your compose file - each tab shows the exact volume line to add if not yet mounted.</div>
                             </div>
                             <div>
-                                <div class="sc-sec-head"><i class="ph-bold ph-shield-slash sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Intrusion Detection</span><span class="sc-sec-rule"></span></div>
+                                <div class="sc-sec-head"><i class="ph-bold ph-shield-slash sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Intrusion Detection</span><span class="tm-info-btn" data-tip="Requires API credentials, not a file mount. Configure the LAPI URL and key in the CrowdSec tab."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span></div>
                                 <div class="grid grid-cols-2 gap-2">
                                     <label class="tab-toggle-row" onclick="toggleTabVisibility('crowdsec')">
                                         <span class="flex items-center gap-2 text-sm"><i class="ph-bold ph-shield-slash" style="color:var(--muted)"></i> CrowdSec</span>
                                         <div class="toggle-switch" id="toggle-crowdsec"><div class="toggle-knob"></div></div>
                                     </label>
                                 </div>
-                                <div class="text-xs mt-1.5" style="color:var(--muted)">Requires API credentials, not a file mount. Configure the LAPI URL and key in the CrowdSec tab.</div>
                             </div>
                         </div>
 
@@ -419,7 +411,7 @@
                                 </div>
                             </div>
                             <div>
-                                <div class="sc-sec-head"><i class="ph-bold ph-identification-card sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Machine Credentials</span><span class="sc-sec-rule"></span></div>
+                                <div class="sc-sec-head"><i class="ph-bold ph-identification-card sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Machine Credentials</span><span class="tm-info-btn" data-tip="Leave blank to use the CROWDSEC_MACHINE_ID / CROWDSEC_MACHINE_PASSWORD env vars."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span></div>
                                 <div class="sc-panel">
                                     <div class="sc-fld">
                                         <div class="sc-set-n">Machine ID</div>
@@ -433,10 +425,9 @@
                                         <div id="crowdsecMachineSetHint" class="mt-1 text-xs hidden" style="color:var(--green)"><i class="ph-bold ph-check-circle"></i> Machine password configured</div>
                                     </div>
                                 </div>
-                                <div class="text-xs">Leave blank to use the <code class="font-mono">CROWDSEC_MACHINE_ID</code> / <code class="font-mono">CROWDSEC_MACHINE_PASSWORD</code> env vars.</div>
                             </div>
                             <div>
-                                <div class="sc-sec-head"><i class="ph-bold ph-certificate sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Client Certificate mTLS</span><span class="sc-sec-rule"></span></div>
+                                <div class="sc-sec-head"><i class="ph-bold ph-certificate sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Client Certificate mTLS</span><span class="tm-info-btn" data-tip="Leave blank to use the CROWDSEC_CLIENT_CERT / CROWDSEC_CLIENT_KEY / CROWDSEC_CA_CERT env vars."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span></div>
                                 <div class="sc-panel">
                                     <div class="sc-fld">
                                         <div class="sc-set-n">Client Certificate</div>
@@ -454,7 +445,6 @@
                                         <input type="text" id="settingsCrowdSecCaCert" class="input-field" placeholder="CA certificate, e.g. /certs/ca.crt" onblur="saveSettings()">
                                     </div>
                                 </div>
-                                <div class="text-xs">Leave blank to use the <code class="font-mono">CROWDSEC_CLIENT_CERT</code> / <code class="font-mono">CROWDSEC_CLIENT_KEY</code> / <code class="font-mono">CROWDSEC_CA_CERT</code> env vars.</div>
                             </div>
                             <div id="crowdsecSavedNotice" class="hidden text-xs px-3 py-2 rounded-md" style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);color:var(--green)">
                                 <i class="ph-bold ph-check-circle mr-1"></i>CrowdSec credentials saved
@@ -480,8 +470,7 @@
 
                                 <div class="modal-panel has-subnav" id="mpanel-auth" style="gap:0;padding:0;">
                     <div class="sc-lede sc-lede-inset">
-                        <div class="sc-lede-t">Authentication</div>
-                        <div class="sc-lede-d">Who gets in, and how. The built-in password, two-factor, API keys for the mobile app and scripts, and OIDC single sign-on. If a forward-auth provider already sits in front of Traefik Manager you can leave the built-in login off and acknowledge the banner.</div>
+                        <div class="sc-lede-t">Authentication<span class="tm-info-btn" data-tip="Who gets in, and how. The built-in password, two-factor, API keys for the mobile app and scripts, and OIDC single sign-on. If a forward-auth provider already sits in front of Traefik Manager you can leave the built-in login off and acknowledge the banner."><i class="ph-bold ph-info"></i></span></div>
                     </div>
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;">
 
@@ -603,7 +592,7 @@
                         <div id="auth-sub-apikeys" class="auth-sub-panel sig-root sc-root" style="display:none;">
                             <div>
                                 <div class="sc-sec-head">
-                                    <i class="ph-bold ph-key sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">API Keys</span><span class="sc-sec-rule"></span>
+                                    <i class="ph-bold ph-key sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">API Keys</span><span class="tm-info-btn" data-tip="Per-device keys used by the mobile app via X-Api-Key header. Up to 10 keys."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span>
                                     <div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)">
                                         <button onclick="showAddApiKeyForm()" id="btnAddApiKey" class="proto-btn text-xs px-3 py-1.5"><i class="ph-bold ph-plus"></i> Add Key</button>
                                     </div>
@@ -624,7 +613,6 @@
                                 <div id="apikeyList" class="sc-panel">
                                     <div class="sc-empty">No active keys</div>
                                 </div>
-                                <div class="text-xs" style="color:var(--muted)">Per-device keys used by the mobile app via <code>X-Api-Key</code> header. Up to 10 keys.</div>
                                 <div id="apikeyDisplay" class="hidden" style="margin-top:8px;">
                                     <div class="sc-panel">
                                         <div class="sc-set" data-health="warn">
@@ -741,8 +729,7 @@
 
                                 <div class="modal-panel has-subnav" id="mpanel-backups" style="gap:0;padding:0;">
                     <div class="sc-lede sc-lede-inset">
-                        <div class="sc-lede-t">Backups</div>
-                        <div class="sc-lede-d">Every save writes a timestamped copy of the config first, kept locally. Git backup adds an off-box copy with history, diffs and restore from any commit. Restoring overwrites your live config, so it takes a typed confirmation.</div>
+                        <div class="sc-lede-t">Backups<span class="tm-info-btn" data-tip="Every save writes a timestamped copy of the config first, kept locally. Git backup adds an off-box copy with history, diffs and restore from any commit. Restoring overwrites your live config, so it takes a typed confirmation."><i class="ph-bold ph-info"></i></span></div>
                     </div>
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;">
                         <div class="sub-tab-strip" style="display:flex;gap:2px;padding:12px 20px 0;border-bottom:1px solid var(--border);flex-shrink:0;align-items:flex-end;">
@@ -796,7 +783,7 @@
                                 <div class="sc-sec-head">
                                     <i class="ph-bold ph-sliders-horizontal sc-sec-icon" style="color:var(--green)"></i>
                                     <span class="sc-sec-label">Static config backups</span>
-                                    <span class="sc-sec-rule"></span>
+                                    <span class="tm-info-btn" data-tip="Retention is one setting for both kinds of backup. Change it under Dynamic Config."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span>
                                     <div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)">
                                         <button onclick="createAndLoadStaticBackup()" class="proto-btn text-xs px-3 py-1.5"><i class="ph-bold ph-plus"></i> Create Backup</button>
                                     </div>
@@ -809,7 +796,6 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="text-xs" style="color:var(--muted)"><i class="ph-bold ph-info" style="color:var(--blue)"></i> Retention is one setting for both kinds of backup. Change it under <strong>Dynamic Config</strong>.</div>
                             </div>
                             <div id="sm-static-backups-list" style="flex:1;overflow-y:auto;min-height:0;margin-top:10px;">
                                 <div class="sc-empty">Loading...</div>
@@ -955,8 +941,7 @@
 
                 <div class="modal-panel active sig-root sc-root" id="mpanel-ui">
                     <div class="sc-lede">
-                        <div class="sc-lede-t">Interface</div>
-                        <div class="sc-lede-d">How Traefik Manager looks and which tabs it shows. Theme and layout, what appears on the dashboard and in the navigation bar, and IP geolocation for the Logs and CrowdSec tabs. All of it is per-browser except the default theme and the tab list.</div>
+                        <div class="sc-lede-t">Interface<span class="tm-info-btn" data-tip="How Traefik Manager looks and which tabs it shows. Theme and layout, what appears on the dashboard and in the navigation bar, and IP geolocation for the Logs and CrowdSec tabs. All of it is per-browser except the default theme and the tab list."><i class="ph-bold ph-info"></i></span></div>
                     </div>
                     <div style="margin-bottom:12px;">
                         <div class="sc-sec-head"><i class="ph-bold ph-paint-brush sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Appearance</span><span class="sc-sec-rule"></span></div>
@@ -994,13 +979,12 @@
                             </div>
                         </div>
                     </div>
-                    <div style="margin-bottom:12px;">
-                        <div class="sc-sec-head"><i class="ph-bold ph-globe-hemisphere-west sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Geolocation</span><span class="sc-sec-rule"></span></div>
+                    <div style="margin-bottom:12px;" id="geoipSection">
+                        <div class="sc-sec-head"><i class="ph-bold ph-globe-hemisphere-west sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Geolocation</span><span class="tm-info-btn" data-tip="Set GEOIP_DB_PATH to use your own MaxMind or DB-IP .mmdb file instead of the bundled database, which refreshes monthly."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span><a href="https://db-ip.com" target="_blank" rel="noopener" class="sc-sec-attrib">IP Geolocation by DB-IP (CC-BY 4.0)</a></div>
                         <div class="sc-panel">
                                                         <div class="sc-set">
                                 <div class="sc-set-l">
-                                    <div class="sc-set-n">IP geolocation</div>
-                                    <div class="sc-set-d">Show country flags and a world map in the Logs and CrowdSec tabs. Lookups run on the server against a local database - no IPs leave your server.</div>
+                                    <div class="sc-set-n">IP geolocation<span class="tm-info-btn" data-tip="Show country flags and a world map in the Logs and CrowdSec tabs. Lookups run on the server against a local database - no IPs leave your server."><i class="ph-bold ph-info"></i></span></div>
                                 </div>
                                 <div class="sc-set-v"><div class="toggle-switch" id="toggle-geoip" onclick="toggleGeoip()"><div class="toggle-knob"></div></div></div>
                             </div>
@@ -1012,7 +996,6 @@
                                 <div class="sc-set-v"><button onclick="updateGeoipDb(this)" id="geoipUpdateBtn" class="btn-secondary text-xs py-1 px-2.5"><i class="ph-bold ph-download-simple text-xs"></i> Download</button></div>
                             </div>
                         </div>
-                        <div class="text-xs mt-1.5" style="color:var(--muted)">Free <a href="https://db-ip.com" target="_blank" rel="noopener" style="color:var(--blue)">IP Geolocation by DB-IP</a> (CC-BY 4.0), refreshed monthly. Set <code class="font-mono">GEOIP_DB_PATH</code> to use your own MaxMind/DB-IP <code class="font-mono">.mmdb</code> instead.</div>
                     </div>
                     <div style="margin-bottom:12px;">
                         <div class="sc-sec-head"><i class="ph-bold ph-squares-four sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Dashboard</span><span class="sc-sec-rule"></span></div>
@@ -1162,11 +1145,10 @@
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-notifications">
                     <div class="sc-lede">
-                        <div class="sc-lede-t">Notifications</div>
-                        <div class="sc-lede-d">Send a message when a route is saved or deleted, a backup runs, or a restore completes. Discord, Slack, Gotify, ntfy, or a generic JSON payload you shape downstream.</div>
+                        <div class="sc-lede-t">Notifications<span class="tm-info-btn" data-tip="Send a message when a route is saved or deleted, a backup runs, or a restore completes. Discord, Slack, Gotify, ntfy, or a generic JSON payload you shape downstream."><i class="ph-bold ph-info"></i></span></div>
                     </div>
                     <div style="margin-bottom:12px;">
-                        <div class="sc-sec-head"><i class="ph-bold ph-webhooks-logo sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Webhook</span><span class="sc-sec-rule"></span></div>
+                        <div class="sc-sec-head"><i class="ph-bold ph-webhooks-logo sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Webhook</span><span class="tm-info-btn" data-tip="Sends a notification on every event: route saved, deleted, backup restored, and more."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span></div>
                         <div class="sc-panel">
                             <div class="sc-fld">
                                 <div class="sc-set-n">Type</div>
@@ -1196,14 +1178,12 @@
                                 <input type="password" id="webhookPassword" class="input-field text-sm" placeholder="Leave empty if not required" onblur="saveSettings()" autocomplete="off">
                             </div>
                         </div>
-                        <div class="text-xs">Sends a notification on every event: route saved, deleted, backup restored, and more.</div>
                     </div>
                 </div>
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-agents">
                     <div class="sc-lede">
-                        <div class="sc-lede-t">Agents</div>
-                        <div class="sc-lede-d">Traefik Manager manages one Traefik instance. To manage more, run a lightweight agent next to each and register it here, then switch between them from the server switcher. Adding an agent generates the compose snippet and mints its API key.</div>
+                        <div class="sc-lede-t">Agents<span class="tm-info-btn" data-tip="Traefik Manager manages one Traefik instance. To manage more, run a lightweight agent next to each and register it here, then switch between them from the server switcher. Adding an agent generates the compose snippet and mints its API key."><i class="ph-bold ph-info"></i></span></div>
                     </div>
                     <div id="agentListView" style="display:flex;flex-direction:column;">
                         <div class="sc-sec-head"><i class="ph-bold ph-robot sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Remote Agents</span><span class="sc-sec-rule"></span><div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)"><button onclick="startAddAgent()" class="proto-btn text-xs px-3 py-1.5" title="Add agent"><i class="ph-bold ph-plus"></i></button></div></div>
@@ -1508,8 +1488,7 @@
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-agent-keys">
                     <div class="sc-lede">
-                        <div class="sc-lede-t">API Keys</div>
-                        <div class="sc-lede-d">Keys that let external clients talk to this agent - the mobile app, a script, another tool. Each key is shown once when created and stored as a hash, so a lost key is replaced rather than recovered.</div>
+                        <div class="sc-lede-t">API Keys<span class="tm-info-btn" data-tip="Keys that let external clients talk to this agent - the mobile app, a script, another tool. Each key is shown once when created and stored as a hash, so a lost key is replaced rather than recovered."><i class="ph-bold ph-info"></i></span></div>
                     </div>
                     <div>
                         <div class="sc-sec-head"><i class="ph-bold ph-key sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">API Keys</span><span class="d-n" id="agentKeysSubtitle"></span><span class="sc-sec-rule"></span><div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)"><button onclick="showActiveAgentAddKeyForm()" class="proto-btn text-xs px-3 py-1.5" title="Add key"><i class="ph-bold ph-plus"></i></button></div></div>
@@ -1535,8 +1514,7 @@
 
                 <div class="modal-panel" id="mpanel-static">
                     <div class="sc-lede">
-                        <div class="sc-lede-t">Static Config</div>
-                        <div class="sc-lede-d">Your <code class="font-mono">traefik.yml</code>: entry points, certificate resolvers, providers and plugins. This is the file Traefik reads at boot, so changes here need a Traefik restart, unlike the dynamic config that Traefik Manager writes live.</div>
+                        <div class="sc-lede-t">Static Config<span class="tm-info-btn" data-tip="Your traefik.yml: entry points, certificate resolvers, providers and plugins. This is the file Traefik reads at boot, so changes here need a Traefik restart, unlike the dynamic config that Traefik Manager writes live."><i class="ph-bold ph-info"></i></span></div>
                     </div>
                     <div id="staticSettingsMount"></div>
                 </div>

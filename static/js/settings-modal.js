@@ -731,6 +731,7 @@ async function loadGeoipSettings() {
         _geoipEnabledState = !!r.enabled;
         const tog = document.getElementById('toggle-geoip');
         if (tog) tog.classList.toggle('on', _geoipEnabledState);
+        if (typeof applyGeoipRelevance === 'function') applyGeoipRelevance();
         const st = document.getElementById('geoipDbStatus');
         if (st) st.textContent = r.available ? `Ready${r.db_date ? ' - ' + r.db_date : ''}` : 'Not downloaded';
         const btn = document.getElementById('geoipUpdateBtn');

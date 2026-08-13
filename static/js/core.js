@@ -165,6 +165,18 @@ function applyTabVisibility(map) {
         switchTab('services');
     }
     buildSideNav();
+    applyGeoipRelevance();
+}
+
+// GeoIP only feeds the Logs and CrowdSec tabs, so the setting is pointless with
+// both off. It stays visible while enabled, otherwise turning it back off would
+// mean re-enabling a tab first.
+function applyGeoipRelevance() {
+    const sec = document.getElementById('geoipSection');
+    if (!sec) return;
+    const used = !!(_visibleTabsCache.logs || _visibleTabsCache.crowdsec);
+    const on   = document.getElementById('toggle-geoip')?.classList.contains('on');
+    sec.style.display = (used || on) ? '' : 'none';
 }
 
 let _statsHomeMarker = null;
