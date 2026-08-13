@@ -1,6 +1,6 @@
 # Mobile App
 
-**traefik-manager-mobile** is a React Native companion app for managing Traefik Manager from your phone.
+**traefik-manager-mobile** is a native Android companion app for managing Traefik Manager from your phone. Version 2.0 is a ground-up rewrite in Kotlin and Jetpack Compose.
 
 ::: info Using external auth (Authentik, Authelia, etc.)?
 See [connecting without an API key](#connecting-without-an-api-key) and [external auth providers](#external-auth-providers) below.
@@ -186,22 +186,35 @@ When an agent is active, the agent name appears as a subtitle below each tab tit
 
 To rename an agent, tap the pencil icon on its row - the name becomes an editable field. Tap the checkmark or submit to save.
 
-### Widget (Android)
+### Widgets
 
-A home screen widget shows the health of every server - the Host and each registered agent - as its own row, with a status dot, service counts, and a green/yellow/red status bar. Add it from your launcher's widget picker after installing the app.
+Home screen widgets show the same cards the app does, built from the same data. Add one from your launcher's widget picker; the setup screen opens as soon as you place it.
 
-The layout adapts to the widget's size:
+Pick up to four cards per widget:
 
-| Size | Shows |
+| Card | Shows |
 |---|---|
-| 2x1 | One aggregate bar and total counts across all servers |
-| 2x2 | A server list with per-server counts |
-| 4x2 and wider | Full rows with a per-server status bar and count chips |
-| Taller sizes | Up to six server rows, then `+N more` |
+| All servers | Every server with routers, services, warnings and bans, plus a combined services strip |
+| HTTP routers | How many are live, with the provider breakdown |
+| TCP / UDP routers | Stream routers and how they split |
+| Services | Backends up against backends configured |
+| Middlewares | In use against defined but unused |
+| Attacking sources | Who is probing, who is banned, and the repeat/one-shot split |
+| Scenarios | Which buckets are firing, ranked |
+| Targeted paths | What they are reaching for, ranked |
+| Bans in force | Decisions holding now, by origin |
 
-An unreachable server shows a muted row instead of taking the whole widget down. If the last refresh failed entirely, the widget keeps the last known counts and labels them `offline` with the age of the data. Tapping a server row opens the app on the Servers screen; the title opens the app; the arrow refreshes immediately. The widget follows the phone's system dark/light theme and refreshes every 15 minutes.
+Three sizes are offered in the picker, and each renders as many of your chosen cards as it has room for:
 
-The widget connects using the same API key saved when you first connected the app, and reads agent status through the hub, so it works from anywhere the hub is reachable. Multi-server rows need server v1.5.0 or newer; older servers show the connected server only. If the widget stops updating or shows offline, disconnect and reconnect the server in **Settings → Server** - this refreshes the stored credentials.
+| Size | Cards |
+|---|---|
+| 2x2 | One |
+| 4x2 | Two side by side |
+| 4x4 | Four in a grid |
+
+Each widget also picks its own server and its own refresh interval - 15, 30 or 60 minutes, defaulting to 30. One background job serves every widget, running at the shortest interval any of them asked for, so a single fast widget does not drag the rest onto its cadence. The refresh control on the widget updates that widget immediately.
+
+Cards carry the desk's own detail: the signal strip aggregates when there are more objects than squares and prints what one square stands for, trouble tints the whole card border amber or red, and an unreachable server is reported as such rather than as a zero. A failed refresh keeps the last known numbers and marks them `stale`. Tapping a card opens the app on the page that card belongs to, on the server it was watching.
 
 ### Edit Mode
 
@@ -296,12 +309,17 @@ When using this split-route pattern, keep Traefik Manager's built-in auth **enab
 
 | | |
 |---|---|
-| Traefik Manager (server) | **v1.8.0 or higher** for mobile v1.6.0; v1.5.0+ for mobile v1.5.0; v0.12.0+ for mobile v0.11.0+; v0.11.0+ for mobile v0.10.0 |
-| Android | 7.0+ (API 24+) |
-| iOS | 16+ (build from source required) |
+| Traefik Manager (server) | **v1.10.1 or higher** for mobile v2.x. For mobile v1.x: v1.8.0+ for v1.6.0, v1.5.0+ for v1.5.0, v0.12.0+ for v0.11.0+ |
+| Android | 13+ (API 33) for v2.x; 7.0+ (API 24+) for v1.x |
 
 ---
 
 ## Tech Stack
 
-Built with [Expo](https://expo.dev) SDK 54 / React Native 0.81, Expo Router, TanStack Query, Zustand, and React Native Paper (Material Design 3).
+Version 2.x is native Android: Kotlin 2.4, Jetpack Compose with Material 3 Expressive, Hilt, Retrofit 3 with kotlinx.serialization, DataStore for storage, and Glance with WorkManager for the widgets. Release builds are minified and resource-shrunk with R8.
+
+Version 1.x was built with Expo SDK 54 / React Native 0.81, and is still available on the `v1` branch.
+
+::: tip Upgrading from 1.x
+The rewrite ships under the same application id and is signed with the same certificate, so it installs straight over 1.x from either channel and keeps your server, API key and placed widgets. iOS is not supported in 2.x.
+:::
