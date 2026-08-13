@@ -69,6 +69,7 @@ import TiltIn from './TiltIn.vue'
 
 .sm-monitor {
   position: relative;
+  margin-left: 9%;
   width: 75%;
   z-index: 1;
 }
@@ -115,7 +116,7 @@ import TiltIn from './TiltIn.vue'
 
 .sm-tablet {
   position: absolute;
-  left: 38%;
+  left: 47%;
   bottom: -44px;
   width: 33%;
   background: #16191d;
@@ -145,7 +146,7 @@ import TiltIn from './TiltIn.vue'
 
 .sm-phone {
   position: absolute;
-  left: 65%;
+  left: 74%;
   bottom: -66px;
   width: 16.5%;
   background: #16191d;
