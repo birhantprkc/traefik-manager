@@ -17,18 +17,20 @@ import { withBase } from 'vitepress'
           <img :src="withBase('/images/dark-routes-cards.png')" alt="Traefik Manager routes tab" class="browser-img shot-dark" />
         </div>
 
-        <div class="tablet">
-          <div class="tablet-screen">
-            <img :src="withBase('/images/light-tablet-overview.png')" alt="Traefik Manager on a tablet" class="tablet-img shot-light" />
-            <img :src="withBase('/images/dark-tablet-overview.png')" alt="Traefik Manager on a tablet" class="tablet-img shot-dark" />
+        <div class="devices">
+          <div class="tablet">
+            <div class="tablet-screen">
+              <img :src="withBase('/images/light-tablet-overview.png')" alt="Traefik Manager on a tablet" class="tablet-img shot-light" />
+              <img :src="withBase('/images/dark-tablet-overview.png')" alt="Traefik Manager on a tablet" class="tablet-img shot-dark" />
+            </div>
           </div>
-        </div>
 
-        <div class="phone">
-          <div class="phone-screen">
-            <img :src="withBase('/images/light-mobile-overview.png')" alt="Traefik Manager mobile app" class="phone-img shot-light" />
-            <img :src="withBase('/images/dark-mobile-overview.png')" alt="Traefik Manager mobile app" class="phone-img shot-dark" />
-            <div class="phone-punch" />
+          <div class="phone">
+            <div class="phone-screen">
+              <img :src="withBase('/images/light-mobile-overview.png')" alt="Traefik Manager mobile app" class="phone-img shot-light" />
+              <img :src="withBase('/images/dark-mobile-overview.png')" alt="Traefik Manager mobile app" class="phone-img shot-dark" />
+              <div class="phone-punch" />
+            </div>
           </div>
         </div>
       </div>
@@ -38,7 +40,7 @@ import { withBase } from 'vitepress'
 
 <style scoped>
 .showcase-wrap {
-  padding: 32px 24px 120px;
+  padding: 32px 24px 150px;
   width: 100%;
 }
 
@@ -116,22 +118,26 @@ import { withBase } from 'vitepress'
   display: block;
 }
 
-.tablet {
+.devices {
   position: absolute;
-  bottom: -58px;
-  left: -30px;
-  width: 232px;
-  border-radius: 14px;
+  right: -16px;
+  bottom: -72px;
+  z-index: 10;
+  display: block;
+}
+
+.tablet {
+  width: 238px;
+  border-radius: 16px;
   background: #1c1f23;
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.26);
-  padding: 6px;
-  z-index: 9;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.3);
+  padding: 7px;
 }
 
 .tablet-screen {
   width: 100%;
   aspect-ratio: 1660 / 1721;
-  border-radius: 9px;
+  border-radius: 10px;
   overflow: hidden;
   position: relative;
 }
@@ -146,20 +152,19 @@ import { withBase } from 'vitepress'
 
 .phone {
   position: absolute;
-  bottom: -78px;
-  right: -26px;
-  width: 152px;
-  border-radius: 28px;
+  right: -30px;
+  bottom: -34px;
+  width: 106px;
+  border-radius: 24px;
   background: #1c1f23;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.26);
+  box-shadow: -8px 14px 40px rgba(0, 0, 0, 0.38);
   padding: 4px;
-  z-index: 10;
 }
 
 .phone-screen {
   width: 100%;
   aspect-ratio: 864 / 1891;
-  border-radius: 24px;
+  border-radius: 20px;
   overflow: hidden;
   position: relative;
 }
@@ -174,28 +179,30 @@ import { withBase } from 'vitepress'
 
 .phone-punch {
   position: absolute;
-  top: 9px;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #0b0d10;
   z-index: 2;
 }
 
-
 @media (max-width: 640px) {
   .browser-img {
     object-position: top center;
+  }
+  .devices {
+    right: -8px;
+    bottom: -46px;
   }
   .tablet {
     display: none;
   }
   .phone {
-    width: 80px;
-    right: -8px;
-    bottom: -38px;
+    position: static;
+    width: 86px;
     border-radius: 16px;
     padding: 2px;
   }
@@ -208,4 +215,5 @@ import { withBase } from 'vitepress'
     top: 5px;
   }
 }
+
 </style>
