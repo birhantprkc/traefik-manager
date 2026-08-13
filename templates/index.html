@@ -222,6 +222,23 @@
 
 <div class="side-nav-backdrop" id="sideNavBackdrop" onclick="closeSideNavDrawer()"></div>
 <aside id="sideNav">
+    <div class="side-nav-app" id="sideNavApp">
+        <div class="side-nav-brand-row">
+            <img src="/static/icons/icon.png" alt="logo">
+            <span>Traefik <span style="color:var(--blue)">Manager</span></span>
+        </div>
+        <div id="drawerServerWrap" style="display:none">
+            <button class="drawer-srv-head" id="drawerServerBtn" onclick="toggleDrawerServerList()">
+                <span class="drawer-srv-dot" id="drawerServerDot" style="background:var(--green)"></span>
+                <span class="drawer-srv-t">
+                    <span class="drawer-srv-n" id="drawerServerName">Host</span>
+                    <span class="drawer-srv-s" id="drawerServerSub">This Traefik Manager</span>
+                </span>
+                <i class="ph-bold ph-caret-down" id="drawerServerCaret"></i>
+            </button>
+            <div class="drawer-srv-list" id="drawerServerList" style="display:none"></div>
+        </div>
+    </div>
     <nav id="sideNavItems"></nav>
     <div class="side-nav-foot">
         <button onclick="toggleSideNavCollapse()" id="sideNavCollapseBtn" title="Collapse navigation">
@@ -589,10 +606,67 @@ function _renderServerSwitcherList(runHealthChecks) {
     if (runHealthChecks) {
         agents.forEach(a => fetch('/api/agents/' + a.id + '/health').then(r => r.json()).then(d => {
             _agentHealthCache[a.id] = d.ok ? 'var(--green)' : 'var(--red)';
+            _agentHealthInfo[a.id] = d;
             const dot = document.getElementById('ss-dot-' + a.id);
             if (dot) dot.style.background = _agentHealthCache[a.id];
-        }).catch(() => { _agentHealthCache[a.id] = 'var(--red)'; }));
+            _renderDrawerServerList();
+        }).catch(() => { _agentHealthCache[a.id] = 'var(--red)'; _renderDrawerServerList(); }));
     }
+    _renderDrawerServerList();
+}
+
+const _agentHealthInfo = {};
+
+function _agentSubLine(a) {
+    const d = _agentHealthInfo[a.id];
+    if (!d) return '';
+    if (!d.ok) return 'offline';
+    const v  = d.version ? 'v' + d.version : '';
+    const ms = (typeof d.latency_ms === 'number' && d.latency_ms >= 0) ? d.latency_ms + 'ms' : '';
+    return [v, ms].filter(Boolean).join(' · ');
+}
+
+function _renderDrawerServerList() {
+    const wrap = document.getElementById('drawerServerWrap');
+    const list = document.getElementById('drawerServerList');
+    if (!wrap || !list) return;
+    wrap.style.display = _agentList.length ? '' : 'none';
+    if (!_agentList.length) return;
+    const name = document.getElementById('drawerServerName');
+    const sub  = document.getElementById('drawerServerSub');
+    const dot  = document.getElementById('drawerServerDot');
+    if (name) name.textContent = _activeAgent ? _activeAgent.name : 'Host';
+    if (sub)  sub.textContent  = _activeAgent ? (_agentSubLine(_activeAgent) || 'Agent') : 'This Traefik Manager';
+    if (dot)  dot.style.background = _activeAgent ? (_agentHealthCache[_activeAgent.id] || 'var(--muted)') : 'var(--green)';
+    const item = (id, icon, title, subText, active, dotColor) =>
+        `<button class="drawer-srv-item${active ? ' active' : ''}" onclick="_drawerPickServer(${id ? `'${id}'` : 'null'})">
+            <i class="ph-bold ${icon}"></i>
+            <span class="drawer-srv-t">
+                <span class="drawer-srv-n">${title}</span>
+                ${subText ? `<span class="drawer-srv-s">${subText}</span>` : ''}
+            </span>
+            ${active ? '<i class="ph-bold ph-check drawer-srv-check"></i>' : `<span class="drawer-srv-dot" style="background:${dotColor}"></span>`}
+        </button>`;
+    list.innerHTML =
+        item(null, 'ph-house', 'Host', 'This Traefik Manager', !_activeAgent, 'var(--green)') +
+        _agentList.map(a => item(a.id, 'ph-hard-drives', _esc(a.name), _esc(_agentSubLine(a)), _activeAgent && _activeAgent.id === a.id, _agentHealthCache[a.id] || 'var(--muted)')).join('');
+}
+
+function _drawerPickServer(id) {
+    const list  = document.getElementById('drawerServerList');
+    const caret = document.getElementById('drawerServerCaret');
+    if (list) list.style.display = 'none';
+    if (caret) caret.classList.remove('open');
+    switchServer(id);
+}
+
+function toggleDrawerServerList() {
+    const list  = document.getElementById('drawerServerList');
+    const caret = document.getElementById('drawerServerCaret');
+    if (!list) return;
+    const opening = list.style.display === 'none';
+    list.style.display = opening ? '' : 'none';
+    if (caret) caret.classList.toggle('open', opening);
 }
 
 function _updateServerSwitcherList(agents) {
