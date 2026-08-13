@@ -1172,10 +1172,32 @@ function renderReleaseNotes(md) {
             continue;
         }
 
-        if (/^> /.test(line)) {
+        if (/^>\s?/.test(line)) {
             if (inList) { html += '</ul>'; inList = false; }
-            html += `<div style="margin:6px 0;padding:5px 10px;border-left:3px solid var(--blue);background:rgba(58,130,246,0.06);border-radius:0 4px 4px 0;font-size:11px;color:var(--muted)">${inline(line.replace(/^> /, ''))}</div>`;
-            i++; continue;
+            const quote = [];
+            while (i < lines.length && /^>\s?/.test(lines[i].trimEnd())) {
+                quote.push(lines[i].trimEnd().replace(/^>\s?/, ''));
+                i++;
+            }
+            const ALERTS = {
+                NOTE:      ['var(--blue)',   'ph-info'],
+                TIP:       ['var(--green)',  'ph-lightbulb'],
+                IMPORTANT: ['var(--purple)', 'ph-seal-warning'],
+                WARNING:   ['var(--orange)', 'ph-warning'],
+                CAUTION:   ['var(--red)',    'ph-prohibit'],
+            };
+            const tag  = quote.length ? quote[0].trim().match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]$/i) : null;
+            const key  = tag ? tag[1].toUpperCase() : null;
+            const col  = key ? ALERTS[key][0] : 'var(--blue)';
+            const body = (key ? quote.slice(1) : quote).filter(l => l.trim()).map(inline).join('<br>');
+            const head = key
+                ? `<div style="font-weight:700;color:${col};display:flex;align-items:center;gap:5px;margin-bottom:3px">`
+                    + `<i class="ph-bold ${ALERTS[key][1]}"></i>${key.charAt(0)}${key.slice(1).toLowerCase()}</div>`
+                : '';
+            html += `<div style="margin:8px 0;padding:7px 10px;border-left:3px solid ${col};`
+                + `background:color-mix(in srgb, ${col} 8%, transparent);border-radius:0 4px 4px 0;`
+                + `font-size:11px;color:var(--muted)">${head}${body}</div>`;
+            continue;
         }
 
         if (/^---+$/.test(line.trim())) {
