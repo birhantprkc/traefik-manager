@@ -108,6 +108,7 @@ def load_settings() -> dict:
         'oidc_allowed_groups':  '',
         'oidc_groups_claim':    'groups',
         'oidc_allow_any_authenticated': False,
+        'oidc_auto_login':      False,
         'default_theme':        'dark',
         'ui_prefs':             {},
         'geoip_enabled':        False,
@@ -244,6 +245,8 @@ def load_settings() -> dict:
             merged['oidc_allow_any_authenticated'] = bool(data['oidc_allow_any_authenticated'])
         if 'oidc_groups_claim' in data:
             merged['oidc_groups_claim'] = str(data['oidc_groups_claim']).strip()
+        if 'oidc_auto_login' in data:
+            merged['oidc_auto_login'] = bool(data['oidc_auto_login'])
         if 'default_theme' in data:
             _dt = str(data['default_theme']).strip().lower()
             merged['default_theme'] = _dt if _dt in ('dark', 'light', 'system') else 'dark'
@@ -322,6 +325,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
                   oidc_client_secret=None, oidc_display_name=None,
                   oidc_allowed_emails=None, oidc_allowed_groups=None,
                   oidc_allow_any_authenticated=None,
+                  oidc_auto_login=None,
                   oidc_groups_claim=None, webhook_url=None, webhook_type=None,
                   webhook_username=None, webhook_password=None,
                   crowdsec_lapi_url=None, crowdsec_api_key=None,
@@ -393,6 +397,8 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         oidc_allow_any_authenticated = _cur.get('oidc_allow_any_authenticated', False)
     if oidc_groups_claim is None:
         oidc_groups_claim = _cur.get('oidc_groups_claim', 'groups')
+    if oidc_auto_login is None:
+        oidc_auto_login = _cur.get('oidc_auto_login', False)
     if webhook_url is None:
         webhook_url = _cur.get('webhook_url', '')
     if webhook_type is None:
@@ -475,6 +481,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'oidc_allowed_emails':  oidc_allowed_emails,
         'oidc_allowed_groups':  oidc_allowed_groups,
         'oidc_allow_any_authenticated': bool(oidc_allow_any_authenticated),
+        'oidc_auto_login':      bool(oidc_auto_login),
         'default_theme':        default_theme,
         'ui_prefs':             ui_prefs,
         'geoip_enabled':        bool(geoip_enabled),

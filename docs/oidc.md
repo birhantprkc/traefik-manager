@@ -41,8 +41,21 @@ Go to **Settings → Authentication → OIDC / SSO Login** and fill in:
 | Allowed Groups | Comma-separated group names required. Empty = no group restriction |
 | Groups Claim Key | Claim name that contains groups (default: `groups`) |
 | Allow any authenticated account | Off by default. When **both** allow-lists are empty, logins are denied unless you enable this. Turn it on only if you intend to admit every account your provider authenticates |
+| Automatic sign-in | Off by default. The login page silently tries OIDC first and signs you in with zero clicks when your provider already has a session |
 
 Click **Test** next to the Provider URL to verify the discovery document is reachable, then click **Save OIDC Config** and toggle **Enable**.
+
+---
+
+## Automatic sign-in
+
+With **Automatic sign-in** enabled, opening the login page redirects straight to your provider with `prompt=none` - the OIDC-standard silent flow. If the provider already has a session for you, it bounces back immediately with a code and you land on the dashboard without clicking anything. If it does not (`login_required`), you land back on the normal login page with the password form and the OIDC button, and no further silent attempts are made until your next browser session.
+
+Notes:
+
+- **The login page stays reachable.** Open `/login?auto=0` to always get the form, even with a live provider session - useful for signing in with the local password instead.
+- **Logging out does not log you back in.** After logout the silent attempt is suppressed, so you see the login page as usual.
+- Silent sign-in is a top-level redirect, not a hidden iframe or XHR, so it is unaffected by third-party cookie blocking.
 
 ---
 

@@ -596,6 +596,12 @@ def login():
             logger.warning(f"Failed login attempt from {request.remote_addr}")
 
     next_url = request.args.get('next', '')
+    if (request.method == 'GET'
+            and settings.get('oidc_enabled')
+            and settings.get('oidc_auto_login')
+            and request.args.get('auto') != '0'
+            and not session.get('oidc_auto_tried')):
+        return redirect(url_for('oidc_login', silent='1'))
     return render_template('login.html', error=error, next=next_url,
                            csrf_token=_get_csrf_token(),
                            temp_password_hint=temp_password_hint,
@@ -791,6 +797,7 @@ def setup_test_git():
 @csrf_protect
 def logout():
     session.clear()
+    session['oidc_auto_tried'] = True
     logger.info(f"User logged out from {request.remote_addr}")
     return redirect(url_for('login'))
 
@@ -4861,6 +4868,9 @@ def delete_middleware(mw_name):
 @limiter.limit("10 per minute")
 def oidc_login():
     s = load_settings()
+    silent = request.args.get('silent') == '1'
+    if silent:
+        session['oidc_auto_tried'] = True
     if not s.get('oidc_enabled'):
         return redirect(url_for('login'))
     provider_url = s.get('oidc_provider_url', '').rstrip('/')
@@ -4884,14 +4894,17 @@ def oidc_login():
     groups_claim = s.get('oidc_groups_claim', '').strip()
     if s.get('oidc_allowed_groups', '').strip() and groups_claim and groups_claim not in scopes:
         scopes.append(groups_claim)
-    params = urlencode({
+    auth_params = {
         'response_type': 'code',
         'client_id':     s.get('oidc_client_id', ''),
         'redirect_uri':  redirect_uri,
         'scope':         ' '.join(scopes),
         'state':         state,
         'nonce':         nonce,
-    })
+    }
+    if silent:
+        auth_params['prompt'] = 'none'
+    params = urlencode(auth_params)
     return redirect(f"{cfg['authorization_endpoint']}?{params}")
 
 
@@ -4903,6 +4916,10 @@ def oidc_callback():
     state = request.args.get('state', '')
     if not state or not secrets.compare_digest(state, session.get('oidc_state', '')):
         flash("Invalid OIDC state. Please try again.", "error")
+        return redirect(url_for('login'))
+    err = request.args.get('error', '')
+    if err in ('login_required', 'interaction_required', 'consent_required', 'account_selection_required'):
+        logger.info(f"OIDC silent login not possible ({err}) - showing the login page")
         return redirect(url_for('login'))
     code = request.args.get('code', '')
     if not code:
@@ -5007,6 +5024,7 @@ def api_get_oidc():
         'oidc_allowed_groups':  s.get('oidc_allowed_groups', ''),
         'oidc_allow_any_authenticated': bool(s.get('oidc_allow_any_authenticated', False)),
         'oidc_groups_claim':    s.get('oidc_groups_claim', 'groups'),
+        'oidc_auto_login':      bool(s.get('oidc_auto_login', False)),
     })
 
 
@@ -5036,6 +5054,7 @@ def api_save_oidc():
             oidc_allowed_groups=str(data.get('oidc_allowed_groups', '')).strip(),
             oidc_allow_any_authenticated=bool(data.get('oidc_allow_any_authenticated', False)),
             oidc_groups_claim=str(data.get('oidc_groups_claim', 'groups')).strip() or 'groups',
+            oidc_auto_login=bool(data.get('oidc_auto_login', False)),
         )
         reauth = _auth_required() and not session.get('authenticated')
         return jsonify({'ok': True, 'reauth_required': reauth})

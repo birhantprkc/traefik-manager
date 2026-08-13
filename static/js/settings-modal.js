@@ -1458,6 +1458,7 @@ async function loadOidcStatus() {
         set(['oidcAllowedGroups', data.oidc_allowed_groups]);
         set(['oidcGroupsClaim', data.oidc_groups_claim]);
         const _anyEl = document.getElementById('oidcAllowAny'); if (_anyEl) _anyEl.checked = !!data.oidc_allow_any_authenticated;
+        const _autoEl = document.getElementById('oidcAutoLogin'); if (_autoEl) _autoEl.checked = !!data.oidc_auto_login;
         document.getElementById('oidcClientSecret') && (document.getElementById('oidcClientSecret').value = '');
         const secretLabel = document.getElementById('oidcSecretSetLabel');
         if (secretLabel) secretLabel.classList.toggle('hidden', !data.oidc_client_secret_set);
@@ -1476,11 +1477,12 @@ async function oidcToggleEnabled() {
     const ag    = document.getElementById('oidcAllowedGroups')?.value.trim() || '';
     const gc    = document.getElementById('oidcGroupsClaim')?.value.trim() || 'groups';
     const any   = document.getElementById('oidcAllowAny')?.checked || false;
+    const auto  = document.getElementById('oidcAutoLogin')?.checked || false;
     try {
         const res = await fetch('/api/auth/oidc', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
-            body: JSON.stringify({ oidc_enabled: !isOn, oidc_provider_url: url, oidc_client_id: id, oidc_client_secret: sec, oidc_display_name: disp, oidc_allowed_emails: ae, oidc_allowed_groups: ag, oidc_groups_claim: gc, oidc_allow_any_authenticated: any })
+            body: JSON.stringify({ oidc_enabled: !isOn, oidc_provider_url: url, oidc_client_id: id, oidc_client_secret: sec, oidc_display_name: disp, oidc_allowed_emails: ae, oidc_allowed_groups: ag, oidc_groups_claim: gc, oidc_allow_any_authenticated: any, oidc_auto_login: auto })
         });
         const data = await res.json();
         if (data.ok) {
@@ -1506,13 +1508,14 @@ async function saveOidcConfig() {
     const ag   = document.getElementById('oidcAllowedGroups')?.value.trim() || '';
     const gc   = document.getElementById('oidcGroupsClaim')?.value.trim() || 'groups';
     const any  = document.getElementById('oidcAllowAny')?.checked || false;
+    const auto = document.getElementById('oidcAutoLogin')?.checked || false;
     const label = document.getElementById('oidcStatusLabel');
     const isOn  = label && label.textContent.trim() === 'Enabled';
     try {
         const res = await fetch('/api/auth/oidc', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
-            body: JSON.stringify({ oidc_enabled: isOn, oidc_provider_url: url, oidc_client_id: id, oidc_client_secret: sec, oidc_display_name: disp, oidc_allowed_emails: ae, oidc_allowed_groups: ag, oidc_groups_claim: gc, oidc_allow_any_authenticated: any })
+            body: JSON.stringify({ oidc_enabled: isOn, oidc_provider_url: url, oidc_client_id: id, oidc_client_secret: sec, oidc_display_name: disp, oidc_allowed_emails: ae, oidc_allowed_groups: ag, oidc_groups_claim: gc, oidc_allow_any_authenticated: any, oidc_auto_login: auto })
         });
         const data = await res.json();
         if (data.ok) {

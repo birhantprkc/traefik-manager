@@ -663,6 +663,14 @@
                                         <div class="sc-set-d">Shown on the login button: "Sign in with ..."</div>
                                         <input type="text" id="oidcDisplayName" class="input-field text-xs" placeholder="OIDC">
                                     </div>
+                                    <div class="sc-set">
+                                        <div class="sc-set-l">
+                                            <div class="sc-set-n"><label for="oidcAutoLogin" class="cursor-pointer" style="display:inline">Automatic sign-in</label><span class="tm-info-btn" data-tip="The login page silently tries OIDC first (prompt=none) and signs you in with zero clicks when your provider already has a session. Falls back to the normal login page otherwise; /login?auto=0 always shows it."><i class="ph-bold ph-info"></i></span></div>
+                                        </div>
+                                        <div class="sc-set-v">
+                                            <input type="checkbox" id="oidcAutoLogin" class="rounded" style="accent-color:var(--blue)">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
