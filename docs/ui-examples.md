@@ -6,9 +6,16 @@ description: The Traefik Manager dashboard, routes, middlewares, services, logs,
 # UI Examples
 
 <style>
-.shot-device { max-width: 360px; margin-left: auto; margin-right: auto; }
-.shot-device-wide { max-width: 760px; margin-left: auto; margin-right: auto; }
-</style>
+.shot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+.shot-grid .screenshot { margin: 0; }
+@media (max-width: 640px) {
+  .shot-grid { grid-template-columns: repeat(2, 1fr); }
+}</style>
 
 **The screenshots below follow whichever theme you are reading this page in** - switch it with the toggle in the header to see the other one. Click any image to open it full screen.
 
@@ -151,18 +158,108 @@ Interface, authentication with API keys and OIDC, backups, system and route moni
 <img class="screenshot dark-only" src="/images/dark-settings-about.png" alt="About">
 <img class="screenshot light-only" src="/images/light-settings-about.png" alt="About">
 
-## Android and tablet
+## Android
 
-The companion app, connected to the same instance. Both tours cycle through every screen - overview, routes, middlewares, services, logs, CrowdSec, certificates, plugins, backups and settings.
+The companion app, connected to the same instance. Every screen, in the theme you are reading this page in.
 
-### Phone
+<div class="shot-grid">
+  <img class="screenshot dark-only" src="/images/dark-mobile-overview.png" alt="Overview">
+  <img class="screenshot light-only" src="/images/light-mobile-overview.png" alt="Overview">
+  <img class="screenshot dark-only" src="/images/dark-mobile-routes.png" alt="Routes">
+  <img class="screenshot light-only" src="/images/light-mobile-routes.png" alt="Routes">
+  <img class="screenshot dark-only" src="/images/dark-mobile-route-detail.png" alt="Route detail">
+  <img class="screenshot light-only" src="/images/light-mobile-route-detail.png" alt="Route detail">
+  <img class="screenshot dark-only" src="/images/dark-mobile-route-add.png" alt="Add a route">
+  <img class="screenshot light-only" src="/images/light-mobile-route-add.png" alt="Add a route">
+  <img class="screenshot dark-only" src="/images/dark-mobile-route-edit.png" alt="Edit a route">
+  <img class="screenshot light-only" src="/images/light-mobile-route-edit.png" alt="Edit a route">
+  <img class="screenshot dark-only" src="/images/dark-mobile-middleware.png" alt="Middlewares">
+  <img class="screenshot light-only" src="/images/light-mobile-middleware.png" alt="Middlewares">
+  <img class="screenshot dark-only" src="/images/dark-mobile-middleware-detail.png" alt="Middleware detail">
+  <img class="screenshot light-only" src="/images/light-mobile-middleware-detail.png" alt="Middleware detail">
+  <img class="screenshot dark-only" src="/images/dark-mobile-middleware-add.png" alt="Add a middleware">
+  <img class="screenshot light-only" src="/images/light-mobile-middleware-add.png" alt="Add a middleware">
+  <img class="screenshot dark-only" src="/images/dark-mobile-middleware-edit.png" alt="Edit a middleware">
+  <img class="screenshot light-only" src="/images/light-mobile-middleware-edit.png" alt="Edit a middleware">
+  <img class="screenshot dark-only" src="/images/dark-mobile-services.png" alt="Services">
+  <img class="screenshot light-only" src="/images/light-mobile-services.png" alt="Services">
+  <img class="screenshot dark-only" src="/images/dark-mobile-service-detail.png" alt="Service detail">
+  <img class="screenshot light-only" src="/images/light-mobile-service-detail.png" alt="Service detail">
+  <img class="screenshot dark-only" src="/images/dark-mobile-logs.png" alt="Access logs">
+  <img class="screenshot light-only" src="/images/light-mobile-logs.png" alt="Access logs">
+  <img class="screenshot dark-only" src="/images/dark-mobile-log-detail.png" alt="Log entry detail">
+  <img class="screenshot light-only" src="/images/light-mobile-log-detail.png" alt="Log entry detail">
+  <img class="screenshot dark-only" src="/images/dark-mobile-crowdsec.png" alt="CrowdSec">
+  <img class="screenshot light-only" src="/images/light-mobile-crowdsec.png" alt="CrowdSec">
+  <img class="screenshot dark-only" src="/images/dark-mobile-crowdsec-add-decision.png" alt="Add a decision">
+  <img class="screenshot light-only" src="/images/light-mobile-crowdsec-add-decision.png" alt="Add a decision">
+  <img class="screenshot dark-only" src="/images/dark-mobile-certificates.png" alt="Certificates">
+  <img class="screenshot light-only" src="/images/light-mobile-certificates.png" alt="Certificates">
+  <img class="screenshot dark-only" src="/images/dark-mobile-plugins.png" alt="Plugins">
+  <img class="screenshot light-only" src="/images/light-mobile-plugins.png" alt="Plugins">
+  <img class="screenshot dark-only" src="/images/dark-mobile-plugin-detail.png" alt="Plugin detail">
+  <img class="screenshot light-only" src="/images/light-mobile-plugin-detail.png" alt="Plugin detail">
+  <img class="screenshot dark-only" src="/images/dark-mobile-backups-dynamic.png" alt="Dynamic config backups">
+  <img class="screenshot light-only" src="/images/light-mobile-backups-dynamic.png" alt="Dynamic config backups">
+  <img class="screenshot dark-only" src="/images/dark-mobile-backups-static.png" alt="Static config backups">
+  <img class="screenshot light-only" src="/images/light-mobile-backups-static.png" alt="Static config backups">
+  <img class="screenshot dark-only" src="/images/dark-mobile-backups-git.png" alt="Git backups">
+  <img class="screenshot light-only" src="/images/light-mobile-backups-git.png" alt="Git backups">
+  <img class="screenshot dark-only" src="/images/dark-mobile-drawer.png" alt="Navigation drawer">
+  <img class="screenshot light-only" src="/images/light-mobile-drawer.png" alt="Navigation drawer">
+  <img class="screenshot dark-only" src="/images/dark-mobile-settings.png" alt="Settings">
+  <img class="screenshot light-only" src="/images/light-mobile-settings.png" alt="Settings">
+</div>
 
-<img class="screenshot shot-device dark-only" src="/images/mobile-dark.gif" alt="Traefik Manager on a phone">
-<img class="screenshot shot-device light-only" src="/images/mobile-light.gif" alt="Traefik Manager on a phone">
-
-### Tablet
+## Tablet
 
 The tablet layout swaps the bottom tab bar for a side rail and lays the cards out in two columns.
 
-<img class="screenshot shot-device-wide dark-only" src="/images/tablet-dark.gif" alt="Traefik Manager on a tablet">
-<img class="screenshot shot-device-wide light-only" src="/images/tablet-light.gif" alt="Traefik Manager on a tablet">
+<div class="shot-grid">
+  <img class="screenshot dark-only" src="/images/dark-tablet-overview.png" alt="Overview">
+  <img class="screenshot light-only" src="/images/light-tablet-overview.png" alt="Overview">
+  <img class="screenshot dark-only" src="/images/dark-tablet-routes.png" alt="Routes">
+  <img class="screenshot light-only" src="/images/light-tablet-routes.png" alt="Routes">
+  <img class="screenshot dark-only" src="/images/dark-tablet-route-detail.png" alt="Route detail">
+  <img class="screenshot light-only" src="/images/light-tablet-route-detail.png" alt="Route detail">
+  <img class="screenshot dark-only" src="/images/dark-tablet-route-add.png" alt="Add a route">
+  <img class="screenshot light-only" src="/images/light-tablet-route-add.png" alt="Add a route">
+  <img class="screenshot dark-only" src="/images/dark-tablet-route-edit.png" alt="Edit a route">
+  <img class="screenshot light-only" src="/images/light-tablet-route-edit.png" alt="Edit a route">
+  <img class="screenshot dark-only" src="/images/dark-tablet-middleware.png" alt="Middlewares">
+  <img class="screenshot light-only" src="/images/light-tablet-middleware.png" alt="Middlewares">
+  <img class="screenshot dark-only" src="/images/dark-tablet-middleware-detail.png" alt="Middleware detail">
+  <img class="screenshot light-only" src="/images/light-tablet-middleware-detail.png" alt="Middleware detail">
+  <img class="screenshot dark-only" src="/images/dark-tablet-middleware-add.png" alt="Add a middleware">
+  <img class="screenshot light-only" src="/images/light-tablet-middleware-add.png" alt="Add a middleware">
+  <img class="screenshot dark-only" src="/images/dark-tablet-middleware-edit.png" alt="Edit a middleware">
+  <img class="screenshot light-only" src="/images/light-tablet-middleware-edit.png" alt="Edit a middleware">
+  <img class="screenshot dark-only" src="/images/dark-tablet-services.png" alt="Services">
+  <img class="screenshot light-only" src="/images/light-tablet-services.png" alt="Services">
+  <img class="screenshot dark-only" src="/images/dark-tablet-service-detail.png" alt="Service detail">
+  <img class="screenshot light-only" src="/images/light-tablet-service-detail.png" alt="Service detail">
+  <img class="screenshot dark-only" src="/images/dark-tablet-logs.png" alt="Access logs">
+  <img class="screenshot light-only" src="/images/light-tablet-logs.png" alt="Access logs">
+  <img class="screenshot dark-only" src="/images/dark-tablet-log-detail.png" alt="Log entry detail">
+  <img class="screenshot light-only" src="/images/light-tablet-log-detail.png" alt="Log entry detail">
+  <img class="screenshot dark-only" src="/images/dark-tablet-crowdsec.png" alt="CrowdSec">
+  <img class="screenshot light-only" src="/images/light-tablet-crowdsec.png" alt="CrowdSec">
+  <img class="screenshot dark-only" src="/images/dark-tablet-crowdsec-add-decision.png" alt="Add a decision">
+  <img class="screenshot light-only" src="/images/light-tablet-crowdsec-add-decision.png" alt="Add a decision">
+  <img class="screenshot dark-only" src="/images/dark-tablet-certificates.png" alt="Certificates">
+  <img class="screenshot light-only" src="/images/light-tablet-certificates.png" alt="Certificates">
+  <img class="screenshot dark-only" src="/images/dark-tablet-plugins.png" alt="Plugins">
+  <img class="screenshot light-only" src="/images/light-tablet-plugins.png" alt="Plugins">
+  <img class="screenshot dark-only" src="/images/dark-tablet-plugin-detail.png" alt="Plugin detail">
+  <img class="screenshot light-only" src="/images/light-tablet-plugin-detail.png" alt="Plugin detail">
+  <img class="screenshot dark-only" src="/images/dark-tablet-backups-dynamic.png" alt="Dynamic config backups">
+  <img class="screenshot light-only" src="/images/light-tablet-backups-dynamic.png" alt="Dynamic config backups">
+  <img class="screenshot dark-only" src="/images/dark-tablet-backups-static.png" alt="Static config backups">
+  <img class="screenshot light-only" src="/images/light-tablet-backups-static.png" alt="Static config backups">
+  <img class="screenshot dark-only" src="/images/dark-tablet-backups-git.png" alt="Git backups">
+  <img class="screenshot light-only" src="/images/light-tablet-backups-git.png" alt="Git backups">
+  <img class="screenshot dark-only" src="/images/dark-tablet-drawer.png" alt="Navigation drawer">
+  <img class="screenshot light-only" src="/images/light-tablet-drawer.png" alt="Navigation drawer">
+  <img class="screenshot dark-only" src="/images/dark-tablet-settings.png" alt="Settings">
+  <img class="screenshot light-only" src="/images/light-tablet-settings.png" alt="Settings">
+</div>
