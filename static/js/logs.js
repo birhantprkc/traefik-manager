@@ -1327,12 +1327,12 @@ function renderLogs() {
         : (fetched ? 'No line in this window could be read as a log entry.' : 'No log lines in the fetched window.');
     const body = visible.length
         ? '<div class="sig-ep-rows lg-feed-rows">' + cards + '</div>'
-        : '<div class="atk-empty"><i class="ph-fill ph-terminal"></i>'
+        : '<div class="atk-empty"><i class="ph-fill ph-receipt"></i>'
             + '<div class="atk-empty-t">Nothing to show</div><p class="lg-note">' + _esc(emptyTxt) + '</p></div>';
 
     container.innerHTML = geoPanel + '<div class="sig-root"><section class="sig-ep lg-feed">'
         + '<div class="sig-ep-head">'
-        + '<i class="ph-fill ph-terminal sig-ep-headic"></i>'
+        + '<i class="ph-fill ph-receipt sig-ep-headic"></i>'
         + '<span class="sc-sec-label">Access log</span>'
         + '<span class="d-n">' + _sdNum(visible.length) + '</span>'
         + '<span class="sc-sec-rule"></span>'

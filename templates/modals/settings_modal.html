@@ -17,40 +17,81 @@
         <div class="modal-inner">
 
             <div id="settingsMobileRoot" style="display:none;flex-direction:column;flex:1;overflow-y:auto;">
-                <button class="settings-mobile-row" onclick="switchSettingsPanel('ui')">
-                    <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-sliders" style="color:var(--muted)"></i>Interface</span>
+                <div class="settings-mobile-section">Traffic</div>
+                <button class="settings-mobile-row" id="msb-connection-mobile" onclick="switchSettingsPanel('connection')">
+                    <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-broadcast" style="color:var(--muted)"></i>Connection</span>
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
                 </button>
-                <button class="settings-mobile-row" id="msb-auth-mobile" onclick="switchSettingsPanel('auth')">
-                    <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-lock-key" style="color:var(--muted)"></i>Authentication</span>
+                <button class="settings-mobile-row" id="msb-routes-mobile" onclick="switchSettingsPanel('routes')">
+                    <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-arrows-split" style="color:var(--muted)"></i>Route Monitoring</span>
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
                 </button>
-                <button class="settings-mobile-row" id="msb-backups-mobile" onclick="switchSettingsPanel('backups'); loadBackups()">
-                    <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-clock-counter-clockwise" style="color:var(--muted)"></i>Backups</span>
-                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
-                </button>
+                <div class="settings-mobile-section">Observability</div>
                 <button class="settings-mobile-row" id="msb-system-mobile" onclick="switchSettingsPanel('system')">
                     <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-monitor" style="color:var(--muted)"></i>System Monitoring</span>
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
                 </button>
-                <button class="settings-mobile-row" id="msb-routes-mobile" onclick="switchSettingsPanel('routes')">
-                    <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-path" style="color:var(--muted)"></i>Route Monitoring</span>
+                <button class="settings-mobile-row is-child" onclick="openSettingsChild('system', 'tabs')">
+                    <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-monitor" style="color:var(--muted)"></i>Tab Visibility</span>
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
                 </button>
-                <button class="settings-mobile-row" id="msb-connection-mobile" onclick="switchSettingsPanel('connection')">
-                    <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-plugs-connected" style="color:var(--muted)"></i>Connection</span>
+                <button class="settings-mobile-row is-child" onclick="openSettingsChild('system', 'paths')">
+                    <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-folder-open" style="color:var(--muted)"></i>File Paths</span>
+                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                </button>
+                <button class="settings-mobile-row is-child" onclick="openSettingsChild('system', 'crowdsec')">
+                    <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-shield" style="color:var(--muted)"></i>CrowdSec</span>
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
                 </button>
                 <button class="settings-mobile-row" id="msb-notifications-mobile" onclick="switchSettingsPanel('notifications')">
                     <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-bell" style="color:var(--muted)"></i>Notifications</span>
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
                 </button>
+                <div class="settings-mobile-section">Infrastructure</div>
+                <button class="settings-mobile-row" id="msb-backups-mobile" onclick="switchSettingsPanel('backups'); loadBackups()">
+                    <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-archive-box" style="color:var(--muted)"></i>Backups</span>
+                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                </button>
+                <button class="settings-mobile-row is-child" onclick="openSettingsChild('backups', 'routes')">
+                    <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-arrows-split" style="color:var(--muted)"></i>Dynamic Config</span>
+                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                </button>
+                <button class="settings-mobile-row is-child" onclick="openSettingsChild('backups', 'static')">
+                    <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-file-code" style="color:var(--muted)"></i>Static Config</span>
+                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                </button>
+                <button class="settings-mobile-row is-child" onclick="openSettingsChild('backups', 'git')">
+                    <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-git-branch" style="color:var(--muted)"></i>Git</span>
+                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                </button>
+                <div class="settings-mobile-section">Remote</div>
                 <button class="settings-mobile-row" onclick="switchSettingsPanel('agents'); loadAgentsList()">
                     <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-robot" style="color:var(--muted)"></i>Agents</span>
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
                 </button>
                 <button class="settings-mobile-row" id="msb-agent-keys-mobile" style="display:none" onclick="switchSettingsPanel('agent-keys'); loadActiveAgentKeys()">
                     <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-key" style="color:var(--muted)"></i>API Keys</span>
+                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                </button>
+                <div class="settings-mobile-section">System</div>
+                <button class="settings-mobile-row" onclick="switchSettingsPanel('ui')">
+                    <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-palette" style="color:var(--muted)"></i>Interface</span>
+                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                </button>
+                <button class="settings-mobile-row" id="msb-auth-mobile" onclick="switchSettingsPanel('auth')">
+                    <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-lock-key" style="color:var(--muted)"></i>Authentication</span>
+                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                </button>
+                <button class="settings-mobile-row is-child" onclick="openSettingsChild('auth', 'password')">
+                    <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-lock-key" style="color:var(--muted)"></i>Password & 2FA</span>
+                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                </button>
+                <button class="settings-mobile-row is-child" onclick="openSettingsChild('auth', 'apikeys')">
+                    <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-key" style="color:var(--muted)"></i>API Keys</span>
+                    <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                </button>
+                <button class="settings-mobile-row is-child" onclick="openSettingsChild('auth', 'oidc')">
+                    <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-fingerprint" style="color:var(--muted)"></i>OIDC / SSO</span>
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
                 </button>
                 <button class="settings-mobile-row" onclick="switchSettingsPanel('about')">
@@ -60,36 +101,56 @@
             </div>
 
             <div class="modal-sidebar">
-                <button class="modal-sidebar-btn active" id="msb-ui" onclick="switchSettingsPanel('ui', this)">
-                    <i class="ph-bold ph-sliders"></i> Interface
+                <div class="modal-sidebar-section">Traffic</div>
+                <button class="modal-sidebar-btn" id="msb-connection" onclick="switchSettingsPanel('connection', this)">
+                    <i class="ph-bold ph-broadcast"></i> Connection
                 </button>
-                <button class="modal-sidebar-btn" id="msb-auth" onclick="switchSettingsPanel('auth', this)">
-                    <i class="ph-bold ph-lock-key"></i> Authentication
+                <button class="modal-sidebar-btn" id="msb-routes" onclick="switchSettingsPanel('routes', this)">
+                    <i class="ph-bold ph-arrows-split"></i> Route Monitoring
                 </button>
-                <button class="modal-sidebar-btn" id="msb-backups" onclick="switchSettingsPanel('backups', this); loadBackups()">
-                    <i class="ph-bold ph-clock-counter-clockwise"></i> Backups
-                </button>
+                <div class="modal-sidebar-section">Observability</div>
                 <button class="modal-sidebar-btn" id="msb-system" onclick="switchSettingsPanel('system', this)">
                     <i class="ph-bold ph-monitor"></i> System Monitoring
                 </button>
-                <button class="modal-sidebar-btn" id="msb-routes" onclick="switchSettingsPanel('routes', this)">
-                    <i class="ph-bold ph-path"></i> Route Monitoring
-                </button>
-                <button class="modal-sidebar-btn" id="msb-connection" onclick="switchSettingsPanel('connection', this)">
-                    <i class="ph-bold ph-plugs-connected"></i> Connection
-                </button>
+                <div class="modal-sidebar-sub" id="mss-system">
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-system-tabs" onclick="openSettingsChild('system', 'tabs')"><i class="ph-bold ph-monitor"></i> Tab Visibility</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-system-paths" onclick="openSettingsChild('system', 'paths')"><i class="ph-bold ph-folder-open"></i> File Paths</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-system-crowdsec" onclick="openSettingsChild('system', 'crowdsec')"><i class="ph-bold ph-shield"></i> CrowdSec</button>
+                </div>
                 <button class="modal-sidebar-btn" id="msb-notifications" onclick="switchSettingsPanel('notifications', this)">
                     <i class="ph-bold ph-bell"></i> Notifications
                 </button>
+                <div class="modal-sidebar-section">Infrastructure</div>
+                <button class="modal-sidebar-btn" id="msb-static" onclick="switchSettingsPanel('static', this)" style="display:none">
+                    <i class="ph-bold ph-file-code"></i> Static Config
+                </button>
+                <button class="modal-sidebar-btn" id="msb-backups" onclick="switchSettingsPanel('backups', this); loadBackups()">
+                    <i class="ph-bold ph-archive-box"></i> Backups
+                </button>
+                <div class="modal-sidebar-sub" id="mss-backups">
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-backups-routes" onclick="openSettingsChild('backups', 'routes')"><i class="ph-bold ph-arrows-split"></i> Dynamic Config</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-backups-static" onclick="openSettingsChild('backups', 'static')"><i class="ph-bold ph-file-code"></i> Static Config</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-backups-git" onclick="openSettingsChild('backups', 'git')"><i class="ph-bold ph-git-branch"></i> Git</button>
+                </div>
+                <div class="modal-sidebar-section">Remote</div>
                 <button class="modal-sidebar-btn" id="msb-agents" onclick="switchSettingsPanel('agents', this); loadAgentsList()">
                     <i class="ph-bold ph-robot"></i> Agents
                 </button>
                 <button class="modal-sidebar-btn" id="msb-agent-keys" style="display:none" onclick="switchSettingsPanel('agent-keys', this); loadActiveAgentKeys()">
                     <i class="ph-bold ph-key"></i> API Keys
                 </button>
-                <button class="modal-sidebar-btn" id="msb-static" onclick="switchSettingsPanel('static', this)" style="display:none">
-                    <i class="ph-bold ph-file-code"></i> Static Config
+                <div class="modal-sidebar-section">System</div>
+                <button class="modal-sidebar-btn active" id="msb-ui" onclick="switchSettingsPanel('ui', this)">
+                    <i class="ph-bold ph-palette"></i> Interface
                 </button>
+                <button class="modal-sidebar-btn" id="msb-auth" onclick="switchSettingsPanel('auth', this)">
+                    <i class="ph-bold ph-lock-key"></i> Authentication
+                </button>
+                <div class="modal-sidebar-sub" id="mss-auth">
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-auth-password" onclick="openSettingsChild('auth', 'password')"><i class="ph-bold ph-lock-key"></i> Password &amp; 2FA</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-auth-apikeys" onclick="openSettingsChild('auth', 'apikeys')"><i class="ph-bold ph-key"></i> API Keys</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-auth-oidc" onclick="openSettingsChild('auth', 'oidc')"><i class="ph-bold ph-fingerprint"></i> OIDC / SSO</button>
+                </div>
                 <button class="modal-sidebar-btn" id="msb-about" onclick="switchSettingsPanel('about', this)">
                     <i class="ph-bold ph-info"></i> About
                 </button>
@@ -112,6 +173,10 @@
                 <div id="settingsNoMatch" class="text-center py-10 mx-5 mt-3 rounded-xl" style="display:none;color:var(--muted);border:1px solid var(--border)">No settings match your search</div>
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-connection">
+                    <div class="sc-lede">
+                        <div class="sc-lede-t">Connection</div>
+                        <div class="sc-lede-d">How Traefik Manager reaches your Traefik instance, and the defaults it offers when you build a route. The API URL is the only value here it cannot work without. Domains and certificate resolvers only seed the route form; they do not change your Traefik configuration.</div>
+                    </div>
                     <div style="margin-bottom:12px;">
                         <div class="sc-sec-head"><i class="ph-bold ph-signpost sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Routing defaults</span><span class="sc-sec-rule"></span></div>
                         <div class="sc-panel">
@@ -197,6 +262,10 @@
                 </div>
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-routes">
+                    <div class="sc-lede">
+                        <div class="sc-lede-t">Route Monitoring</div>
+                        <div class="sc-lede-d">Traefik discovers routes from providers other than your dynamic config file - Docker labels, a Kubernetes CRD, a KV store. Turn on a provider to get a read-only tab listing what it contributes. Traefik Manager can show those routes but cannot edit them, because they are defined where the provider lives.</div>
+                    </div>
                     <div>
                         <div class="sc-sec-head"><i class="ph-bold ph-cloud sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Provider tabs</span><span class="sc-sec-rule"></span></div>
                         <div class="text-xs mb-3" style="color:var(--muted)">Provider tabs pulled live from the Traefik API - no file mounts needed.</div>
@@ -253,10 +322,14 @@
                     </div>
                 </div>
 
-                                <div class="modal-panel" id="mpanel-system" style="gap:0;padding:0;overflow:hidden;">
+                                <div class="modal-panel has-subnav" id="mpanel-system" style="gap:0;padding:0;">
+                    <div class="sc-lede sc-lede-inset">
+                        <div class="sc-lede-t">System Monitoring</div>
+                        <div class="sc-lede-d">Views that read a file rather than the Traefik API: certificate expiry from your ACME store, the plugin list from your static config, and the access log. Each needs its file mounted into this container, and each view tells you the exact volume line if it is missing. CrowdSec is here too, since it reads its own local API.</div>
+                    </div>
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;">
 
-                        <div style="display:flex;gap:2px;padding:12px 16px 0;border-bottom:1px solid var(--border);flex-shrink:0;">
+                        <div class="sub-tab-strip" style="display:flex;gap:2px;padding:12px 20px 0;border-bottom:1px solid var(--border);flex-shrink:0;">
                             <button class="auth-sub-tab active" id="system-tab-tabs" onclick="switchSystemTab('tabs', this)">
                                 <i class="ph-bold ph-monitor"></i> Tab Visibility
                             </button>
@@ -405,10 +478,14 @@
                     </div>
                 </div>
 
-                                <div class="modal-panel" id="mpanel-auth" style="gap:0;padding:0;overflow:hidden;">
+                                <div class="modal-panel has-subnav" id="mpanel-auth" style="gap:0;padding:0;">
+                    <div class="sc-lede sc-lede-inset">
+                        <div class="sc-lede-t">Authentication</div>
+                        <div class="sc-lede-d">Who gets in, and how. The built-in password, two-factor, API keys for the mobile app and scripts, and OIDC single sign-on. If a forward-auth provider already sits in front of Traefik Manager you can leave the built-in login off and acknowledge the banner.</div>
+                    </div>
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;">
 
-                        <div style="display:flex;gap:2px;padding:12px 16px 0;border-bottom:1px solid var(--border);flex-shrink:0;">
+                        <div class="sub-tab-strip" style="display:flex;gap:2px;padding:12px 20px 0;border-bottom:1px solid var(--border);flex-shrink:0;">
                             <button class="auth-sub-tab active" id="auth-tab-password" onclick="switchAuthTab('password', this)">
                                 <i class="ph-bold ph-lock-key"></i> Password &amp; 2FA
                             </button>
@@ -420,7 +497,7 @@
                             </button>
                         </div>
 
-                        <div id="noAuthWarning" class="sig-root sc-root" style="display:none;margin:12px 16px 0;flex-shrink:0;">
+                        <div id="noAuthWarning" class="sig-root sc-root" style="display:none;margin:12px 20px 0;flex-shrink:0;">
                             <div class="sc-panel">
                                 <div class="sc-set" data-health="warn">
                                     <div class="sc-set-l">
@@ -435,7 +512,7 @@
                             </div>
                         </div>
 
-                        <div id="authDelegatedNote" class="sig-root sc-root" style="display:none;margin:12px 16px 0;flex-shrink:0;">
+                        <div id="authDelegatedNote" class="sig-root sc-root" style="display:none;margin:12px 20px 0;flex-shrink:0;">
                             <div class="sc-panel">
                                 <div class="sc-set">
                                     <div class="sc-set-l">
@@ -662,9 +739,13 @@
                     </div>
                 </div>
 
-                                <div class="modal-panel" id="mpanel-backups" style="gap:0;padding:0;overflow:hidden;">
+                                <div class="modal-panel has-subnav" id="mpanel-backups" style="gap:0;padding:0;">
+                    <div class="sc-lede sc-lede-inset">
+                        <div class="sc-lede-t">Backups</div>
+                        <div class="sc-lede-d">Every save writes a timestamped copy of the config first, kept locally. Git backup adds an off-box copy with history, diffs and restore from any commit. Restoring overwrites your live config, so it takes a typed confirmation.</div>
+                    </div>
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;">
-                        <div style="display:flex;gap:2px;padding:12px 16px 0;border-bottom:1px solid var(--border);flex-shrink:0;align-items:flex-end;">
+                        <div class="sub-tab-strip" style="display:flex;gap:2px;padding:12px 20px 0;border-bottom:1px solid var(--border);flex-shrink:0;align-items:flex-end;">
                             <button class="auth-sub-tab active" id="backup-tab-routes" onclick="switchBackupTab('routes', this)">
                                 <i class="ph-bold ph-path"></i> Dynamic Config
                             </button>
@@ -873,6 +954,10 @@
                 </div>
 
                 <div class="modal-panel active sig-root sc-root" id="mpanel-ui">
+                    <div class="sc-lede">
+                        <div class="sc-lede-t">Interface</div>
+                        <div class="sc-lede-d">How Traefik Manager looks and which tabs it shows. Theme and layout, what appears on the dashboard and in the navigation bar, and IP geolocation for the Logs and CrowdSec tabs. All of it is per-browser except the default theme and the tab list.</div>
+                    </div>
                     <div style="margin-bottom:12px;">
                         <div class="sc-sec-head"><i class="ph-bold ph-paint-brush sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Appearance</span><span class="sc-sec-rule"></span></div>
                         <div class="sc-panel">
@@ -1076,6 +1161,10 @@
                 </div>
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-notifications">
+                    <div class="sc-lede">
+                        <div class="sc-lede-t">Notifications</div>
+                        <div class="sc-lede-d">Send a message when a route is saved or deleted, a backup runs, or a restore completes. Discord, Slack, Gotify, ntfy, or a generic JSON payload you shape downstream.</div>
+                    </div>
                     <div style="margin-bottom:12px;">
                         <div class="sc-sec-head"><i class="ph-bold ph-webhooks-logo sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Webhook</span><span class="sc-sec-rule"></span></div>
                         <div class="sc-panel">
@@ -1112,6 +1201,10 @@
                 </div>
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-agents">
+                    <div class="sc-lede">
+                        <div class="sc-lede-t">Agents</div>
+                        <div class="sc-lede-d">Traefik Manager manages one Traefik instance. To manage more, run a lightweight agent next to each and register it here, then switch between them from the server switcher. Adding an agent generates the compose snippet and mints its API key.</div>
+                    </div>
                     <div id="agentListView" style="display:flex;flex-direction:column;">
                         <div class="sc-sec-head"><i class="ph-bold ph-robot sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Remote Agents</span><span class="sc-sec-rule"></span><div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)"><button onclick="startAddAgent()" class="proto-btn text-xs px-3 py-1.5" title="Add agent"><i class="ph-bold ph-plus"></i></button></div></div>
                         <div class="sc-panel" id="agentsListBody">
@@ -1414,6 +1507,10 @@
                 </div>
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-agent-keys">
+                    <div class="sc-lede">
+                        <div class="sc-lede-t">API Keys</div>
+                        <div class="sc-lede-d">Keys that let external clients talk to this agent - the mobile app, a script, another tool. Each key is shown once when created and stored as a hash, so a lost key is replaced rather than recovered.</div>
+                    </div>
                     <div>
                         <div class="sc-sec-head"><i class="ph-bold ph-key sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">API Keys</span><span class="d-n" id="agentKeysSubtitle"></span><span class="sc-sec-rule"></span><div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)"><button onclick="showActiveAgentAddKeyForm()" class="proto-btn text-xs px-3 py-1.5" title="Add key"><i class="ph-bold ph-plus"></i></button></div></div>
                         <div id="activeAgentKeysAddForm" class="sc-panel" style="display:none;flex-direction:column;gap:8px;padding:12px;margin-bottom:10px;">
@@ -1437,6 +1534,10 @@
                 </div>
 
                 <div class="modal-panel" id="mpanel-static">
+                    <div class="sc-lede">
+                        <div class="sc-lede-t">Static Config</div>
+                        <div class="sc-lede-d">Your <code class="font-mono">traefik.yml</code>: entry points, certificate resolvers, providers and plugins. This is the file Traefik reads at boot, so changes here need a Traefik restart, unlike the dynamic config that Traefik Manager writes live.</div>
+                    </div>
                     <div id="staticSettingsMount"></div>
                 </div>
 

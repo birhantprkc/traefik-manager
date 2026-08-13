@@ -630,10 +630,26 @@ select.input-field:disabled { opacity: 0.6; cursor: not-allowed; }
 .modal-box-trusted-ips{ width: 680px; min-width: min(680px, 95vw); }
 .modal-box-rm-groups  { width: 520px; min-width: min(520px, 95vw); overflow: hidden; display: flex; flex-direction: column; }
 .modal-box-rm-edit    { width: 500px; min-width: min(500px, 95vw); overflow: hidden; display: flex; flex-direction: column; }
-.modal-box-settings   { width: 840px; min-width: min(840px, 95vw); height: 88vh; max-height: 88vh; display: flex; flex-direction: column; }
+.modal-box-settings   { width: 960px; min-width: min(960px, 95vw); height: 88vh; max-height: 88vh; display: flex; flex-direction: column; }
 
 .modal-inner { display: flex; flex: 1; overflow: hidden; min-height: 380px; }
-.modal-sidebar { width: 180px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+.modal-sidebar { width: 200px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.modal-sidebar-section { font: 600 9.5px 'JetBrains Mono', monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); opacity: .75; padding: 0 10px; margin: 14px 0 6px; }
+.modal-sidebar-section:first-child { margin-top: 2px; }
+.modal-sidebar-sub { display: none; flex-direction: column; gap: 1px; margin: 1px 0 3px; }
+.modal-sidebar-sub.open { display: flex; }
+.modal-sidebar-btn.is-child { padding: 6px 10px 6px 32px; font-size: 12px; font-weight: 500; position: relative; }
+.modal-sidebar-btn.is-child::before {
+  content: ''; position: absolute; left: 19px; top: 0; bottom: 0; width: 1px; background: var(--border);
+}
+.modal-sidebar-btn.is-child.active::before { background: var(--blue); }
+.modal-sidebar-btn.is-child i { font-size: 12px; }
+.sub-tab-strip { display: none !important; }
+.sc-lede { margin-bottom: 18px; }
+.sc-lede-inset { padding: 18px 20px 0; margin-bottom: 12px; flex-shrink: 0; }
+.sc-lede-t { font-size: 17px; font-weight: 700; letter-spacing: -0.015em; color: var(--text); margin-bottom: 5px; }
+.sc-lede-d { font-size: 12.5px; line-height: 1.6; color: var(--muted); max-width: 82ch; }
+@media (max-width: 640px) { .sc-lede { margin-bottom: 14px; } .sc-lede-t { font-size: 16px; } }
 .modal-sidebar-btn { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; border: none; background: transparent; font-family: inherit; transition: all 0.15s; width: 100%; text-align: left; white-space: nowrap; }
 .modal-sidebar-btn:hover { color: var(--text); background: var(--btn-secondary-bg); }
 .modal-sidebar-btn.active { color: var(--blue); background: rgba(36,161,222,0.1); }
@@ -642,10 +658,15 @@ select.input-field:disabled { opacity: 0.6; cursor: not-allowed; }
 .settings-section-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; display: block; }
 .settings-mobile-row { display: flex; align-items: center; justify-content: space-between; padding: 15px 16px; border-bottom: 1px solid var(--border); background: none; border-left: none; border-right: none; border-top: none; cursor: pointer; color: var(--text); font-size: 14px; font-weight: 500; width: 100%; text-align: left; font-family: inherit; }
 .settings-mobile-row:active { background: var(--btn-secondary-bg); }
+.settings-mobile-row.is-child { padding-top: 12px; padding-bottom: 12px; font-size: 13px; color: var(--muted); }
+.settings-mobile-section { font: 600 9.5px 'JetBrains Mono', monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); opacity: .75; padding: 16px 16px 6px; }
 .auth-sub-tab { display: flex; align-items: center; gap: 6px; padding: 7px 12px; font-size: 12px; font-weight: 600; color: var(--muted); border: none; background: none; cursor: pointer; font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; white-space: nowrap; }
 .auth-sub-tab:hover { color: var(--text); }
 .auth-sub-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
 .auth-sub-panel { flex-direction: column; gap: 14px; padding: 16px 20px; overflow-y: auto; flex: 1; min-height: 0; }
+.modal-panel.has-subnav { overflow-y: auto; }
+.modal-panel.has-subnav > div { min-height: 0; }
+.modal-panel.has-subnav .auth-sub-panel { overflow: visible; flex: 0 0 auto; }
 .tab-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; background: var(--input-bg); transition: border-color 0.15s; }
 .tab-toggle-row:hover { border-color: var(--muted); }
 
@@ -1440,11 +1461,11 @@ html.tm-modern .tm-card-flat:hover { border-color: var(--border); box-shadow: no
 .static-state-restart-btn { color: var(--red) !important; border-color: rgba(239,68,68,0.35) !important; }
 html.tm-modern .sc-sec { margin-bottom: 26px; }
 html.tm-modern .sc-sec:last-child { margin-bottom: 0; }
-html.tm-modern .sc-sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-html.tm-modern .sc-sec-icon { font-size: 14px; flex-shrink: 0; }
-html.tm-modern .sc-sec-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); white-space: nowrap; }
+.sc-sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sc-sec-icon { font-size: 14px; flex-shrink: 0; }
+.sc-sec-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); white-space: nowrap; }
 html.tm-modern .sc-count { margin-left: 0; }
-html.tm-modern .sc-sec-rule { flex: 1; height: 1px; background: var(--border); }
+.sc-sec-rule { flex: 1; height: 1px; background: var(--border); }
 html.tm-modern .sc-sec [id^="staticPanel-"] { display: block !important; }
 html.tm-modern .sc-sec > [id^="staticPanel-"] > div:first-child { padding: 0 !important; }
 html.tm-modern .sc-sec[data-sc-sec="providers"] > [id^="staticPanel-"] > .px-4 { padding: 0 !important; }

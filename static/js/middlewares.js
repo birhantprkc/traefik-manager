@@ -745,7 +745,7 @@ async function refreshPluginsTab() {
         document.getElementById('pluginsTabCount').textContent = plugins.length;
         renderPluginCards();
     } catch(e) {
-        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-plug-slash text-5xl block mb-3 opacity-30"></i><p>Could not load plugin data</p></div>`;
+        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>Could not load plugin data</p></div>`;
     }
 }
 

@@ -27,17 +27,20 @@ const OPTIONAL_TABS = ['dashboard', 'routemap', 'docker', 'kubernetes', 'swarm',
 let _visibleTabsCache = {};
 let _localTabsCache   = {};
 
-const SIDE_NAV_GROUPS = {
-    providers: { label: 'Providers', tabs: ['docker', 'kubernetes', 'swarm', 'nomad', 'ecs', 'consulcatalog', 'redis', 'etcd', 'consul', 'zookeeper', 'http_provider', 'file_external'] },
-    system:    { label: 'System',    tabs: ['certs', 'tls', 'crowdsec', 'plugins', 'logs', 'static'] },
-};
+const SIDE_NAV_GROUPS = [
+    { label: 'Traffic',        tabs: ['dashboard', 'services', 'middlewares', 'live', 'routemap'] },
+    { label: 'Observability',  tabs: ['logs', 'crowdsec'] },
+    { label: 'Infrastructure', tabs: ['certs', 'tls', 'plugins'] },
+    { label: 'System',         tabs: ['static'] },
+    { label: 'Providers',      tabs: ['docker', 'kubernetes', 'swarm', 'nomad', 'ecs', 'consulcatalog', 'redis', 'etcd', 'consul', 'zookeeper', 'http_provider', 'file_external'] },
+];
 
 function buildSideNav() {
     const nav = document.getElementById('sideNavItems');
     const bar = document.getElementById('tabBar');
     if (!nav || !bar) return;
     nav.innerHTML = '';
-    const buckets = { core: [], providers: [], system: [] };
+    const items = {};
     bar.querySelectorAll('.tab-btn').forEach(btn => {
         const optional = btn.classList.contains('tab-optional');
         if (optional && btn.style.display !== 'block') return;
@@ -55,18 +58,18 @@ function buildSideNav() {
         item.title = (window.innerWidth >= 768 && document.documentElement.classList.contains('tm-nav-collapsed')) ? label : '';
         item.onclick = () => { closeSideNavDrawer(); switchTab(tab); };
         item.innerHTML = `${icon ? `<i class="${icon.className}"></i>` : ''}<span class="side-nav-label">${_esc(label)}</span>${count && count !== '-' ? `<span class="side-nav-count">${_esc(count)}</span>` : ''}`;
-        const group = SIDE_NAV_GROUPS.providers.tabs.includes(tab) ? 'providers'
-                    : SIDE_NAV_GROUPS.system.tabs.includes(tab) ? 'system' : 'core';
-        buckets[group].push(item);
+        items[tab] = item;
     });
-    buckets.core.forEach(i => nav.appendChild(i));
-    for (const key of ['providers', 'system']) {
-        if (!buckets[key].length) continue;
+    const grouped = new Set(SIDE_NAV_GROUPS.flatMap(g => g.tabs));
+    Object.keys(items).filter(t => !grouped.has(t)).forEach(t => nav.appendChild(items[t]));
+    for (const group of SIDE_NAV_GROUPS) {
+        const present = group.tabs.filter(t => items[t]);
+        if (!present.length) continue;
         const head = document.createElement('div');
         head.className = 'side-nav-section';
-        head.textContent = SIDE_NAV_GROUPS[key].label;
+        head.textContent = group.label;
         nav.appendChild(head);
-        buckets[key].forEach(i => nav.appendChild(i));
+        present.forEach(t => nav.appendChild(items[t]));
     }
 }
 

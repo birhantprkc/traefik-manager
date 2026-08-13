@@ -36,7 +36,7 @@ function renderCertCards() {
                 + (extra.length > 2 ? `<div class="tm-val"><i class="ph-bold ph-dot" style="opacity:0"></i><span class="tm-more" title="${_esc(extra.join(', '))}">+${extra.length - 2} more</span></div>` : '');
             return `<div class="tm-card tm-card-flat"${daysLeft !== null && daysLeft < 7 ? ' data-health="down"' : ''} style="--tm-accent:${expiryColor}">
                 <div class="tm-head">
-                    <span class="tm-ic tm-ic-tile"><i class="ph-bold ph-certificate"></i></span>
+                    <span class="tm-ic tm-ic-tile"><i class="ph-bold ph-shield-check"></i></span>
                     <div class="tm-head-txt">
                         <div class="tm-title"><span class="tm-name">${_esc(main)}</span></div>
                         <div class="tm-sub">${_esc(resolver)}</div>
@@ -101,7 +101,7 @@ async function refreshCertsTab() {
         document.getElementById('certsTabCount').textContent = certs.length;
         renderCertCards();
     } catch(e) {
-        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-plug-slash text-5xl block mb-3 opacity-30"></i><p>Could not load certificate data</p></div>`;
+        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>Could not load certificate data</p></div>`;
     }
 }
 

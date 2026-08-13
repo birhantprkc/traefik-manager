@@ -1,7 +1,7 @@
 <script>window._hostCsEnabled = {{ crowdsec_enabled | tojson }};</script>
 <div id="tab-crowdsec" class="tab-content">
     <div id="csNotConfigured" class="flex flex-col items-center justify-center py-20 gap-4" style="color:var(--muted);display:none!important">
-        <i class="ph-light ph-shield-slash text-5xl opacity-40"></i>
+        <i class="ph-light ph-shield text-5xl opacity-40"></i>
         <div class="text-center" id="csNotCfgHost">
             <p class="font-medium text-sm mb-1" style="color:var(--text)">CrowdSec not configured</p>
             <p class="text-xs">Add your LAPI URL plus a bouncer API key, machine credentials, or a mTLS client certificate in <strong>Settings &rarr; System Monitoring &rarr; CrowdSec</strong>.</p>

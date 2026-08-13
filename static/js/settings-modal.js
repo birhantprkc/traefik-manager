@@ -358,6 +358,8 @@ function _updateSettingsSidebarForAgent(active) {
     if (keysBtn) keysBtn.style.display = active ? '' : 'none';
     const keysMob = document.getElementById('msb-agent-keys-mobile');
     if (keysMob) keysMob.style.display = active ? '' : 'none';
+    const csChild = document.getElementById('msc-system-crowdsec');
+    if (csChild) csChild.style.display = active ? 'none' : '';
     const csTab = document.getElementById('system-tab-crowdsec');
     if (csTab) {
         csTab.style.display = active ? 'none' : '';
@@ -391,6 +393,43 @@ async function _loadAboutAgentInfo() {
     } catch (e) {}
 }
 
+const SETTINGS_CHILDREN = {
+    system:  { first: 'tabs',     switch: (k) => switchSystemTab(k) },
+    auth:    { first: 'password', switch: (k) => switchAuthTab(k) },
+    backups: { first: 'routes',   switch: (k) => switchBackupTab(k) },
+};
+
+function openSettingsChild(parent, child) {
+    switchSettingsPanel(parent);
+    const spec = SETTINGS_CHILDREN[parent];
+    if (spec) spec.switch(child);
+    _markSettingsChild(parent, child);
+    if (window.innerWidth < 640) {
+        document.getElementById('settingsMobileRoot').style.display = 'none';
+        document.getElementById('settingsPanelWrapper').style.display = 'flex';
+        document.getElementById('settingsMobileBack').style.display = 'flex';
+    }
+}
+
+function _markSettingsChild(parent, child) {
+    Object.keys(SETTINGS_CHILDREN).forEach(p => {
+        document.querySelectorAll('#mss-' + p + ' .modal-sidebar-btn').forEach(b => b.classList.remove('active'));
+    });
+    const btn = document.getElementById('msc-' + parent + '-' + child);
+    if (btn) btn.classList.add('active');
+}
+
+function _syncSettingsSubmenu(id) {
+    Object.keys(SETTINGS_CHILDREN).forEach(p => {
+        const sub = document.getElementById('mss-' + p);
+        if (sub) sub.classList.toggle('open', p === id);
+    });
+    const spec = SETTINGS_CHILDREN[id];
+    if (!spec) return;
+    const already = document.querySelector('#mss-' + id + ' .modal-sidebar-btn.active');
+    if (!already) _markSettingsChild(id, spec.first);
+}
+
 function switchSettingsPanel(id, btn) {
     setTimeout(() => {
         if (typeof filterSettings === 'function') filterSettings();
@@ -407,6 +446,7 @@ function switchSettingsPanel(id, btn) {
     const activeBtn = btn || document.getElementById('msb-' + id);
     if (activeBtn) activeBtn.classList.add('active');
     document.getElementById('mpanel-' + id).classList.add('active');
+    _syncSettingsSubmenu(id);
     if (id === 'about') _loadAboutAgentInfo();
     if (window.innerWidth < 640) {
         const titles = {connection:'Connection',routes:'Route Monitoring',system:'System Monitoring',auth:'Authentication',backups:'Backups',ui:'Interface',notifications:'Notifications',about:'About','agent-keys':'API Keys',static:'Static Config'};
@@ -443,7 +483,7 @@ async function openSettingsModal(panel) {
     document.body.style.overflow = 'hidden';
     _updateSettingsSidebarForAgent(!!_activeAgent);
 
-    if (window.innerWidth < 768 && !panel) {
+    if (window.innerWidth < 640 && !panel) {
         document.getElementById('settingsMobileRoot').style.display = 'flex';
         document.getElementById('settingsPanelWrapper').style.display = 'none';
         document.getElementById('settingsMobileBack').style.display = 'none';
@@ -529,8 +569,18 @@ async function openSettingsModal(panel) {
         console.error('Could not load settings', e);
     }
     const target = panel || 'ui';
+    const rootWasOpen = document.getElementById('settingsMobileRoot').style.display === 'flex';
     switchSettingsPanel(target);
+    if (rootWasOpen && !panel) _showSettingsMobileRoot();
     if (target === 'backups') loadBackups();
+}
+
+function _showSettingsMobileRoot() {
+    document.getElementById('settingsMobileRoot').style.display = 'flex';
+    document.getElementById('settingsPanelWrapper').style.display = 'none';
+    document.getElementById('settingsMobileBack').style.display = 'none';
+    document.getElementById('settingsGearIcon').style.display = '';
+    document.getElementById('settingsModalTitle').textContent = 'Settings';
 }
 
 function closeSettingsModal() {
@@ -835,7 +885,7 @@ function _renderBackupList(containerId, backups) {
     const list = document.getElementById(containerId);
     if (!list) return;
     if (!backups.length) {
-        list.innerHTML = `<div class="text-center py-8" style="color:var(--muted)"><i class="ph-light ph-archive text-4xl block mb-2 opacity-30"></i><p>No backups yet</p></div>`;
+        list.innerHTML = `<div class="text-center py-8" style="color:var(--muted)"><i class="ph-light ph-archive-box text-4xl block mb-2 opacity-30"></i><p>No backups yet</p></div>`;
         return;
     }
     list.innerHTML = backups.map(b => `
