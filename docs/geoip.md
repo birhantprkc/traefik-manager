@@ -8,6 +8,8 @@ All lookups happen **on the server against a local database**. IP addresses are 
 
 ## Enabling it
 
+The first-run setup wizard offers this on its Monitoring step. Afterwards:
+
 1. Open **Settings → Interface → Geolocation** and turn on **IP geolocation**.
 2. TM downloads the free country database automatically. You can also click **Download / Update** at any time to refresh it.
 

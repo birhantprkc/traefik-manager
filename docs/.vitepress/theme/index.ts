@@ -8,8 +8,9 @@ import MobileRelease from './components/MobileRelease.vue'
 import UnraidCAStatus from './components/UnraidCAStatus.vue'
 import ComposeUpgrader from './components/ComposeUpgrader.vue'
 import ShowcaseMockup from './components/ShowcaseMockup.vue'
-import InstallSection from './components/InstallSection.vue'
-import FeaturesSection from './components/FeaturesSection.vue'
+import HomeHero from './components/HomeHero.vue'
+import HomeShowcase from './components/HomeShowcase.vue'
+import HomeCta from './components/HomeCta.vue'
 import KoFiButton from './components/KoFiButton.vue'
 import './style.css'
 
@@ -33,8 +34,9 @@ export default {
   Layout() {
     return h(DefaultTheme.Layout, null, {
       'nav-bar-content-after': () => [h(KoFiButton), h(GitHubStars)],
-      'home-features-before': () => [h(InstallSection), h(ShowcaseMockup)],
-      'home-features-after': () => h(FeaturesSection),
+      'home-hero-before': () => h(HomeHero),
+      'home-features-before': () => [h(ShowcaseMockup), h(HomeCta)],
+      'home-features-after': () => h(HomeShowcase),
     })
   },
   enhanceApp({ app }: { app: any }) {
@@ -43,7 +45,5 @@ export default {
     app.component('UnraidCAStatus', UnraidCAStatus)
     app.component('ComposeUpgrader', ComposeUpgrader)
     app.component('ShowcaseMockup', ShowcaseMockup)
-    app.component('InstallSection', InstallSection)
-    app.component('FeaturesSection', FeaturesSection)
   },
 }

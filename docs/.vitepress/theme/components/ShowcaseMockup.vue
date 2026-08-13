@@ -1,148 +1,141 @@
 <script setup>
 import { withBase } from 'vitepress'
+import TiltIn from './TiltIn.vue'
 </script>
 
 <template>
-  <div class="showcase-wrap">
-    <div class="showcase-inner">
-      <div class="browser">
-        <div class="browser-bar">
-          <div class="browser-dots">
-            <span /><span /><span />
-          </div>
-          <div class="browser-url">manager.example.com</div>
-        </div>
-        <div class="browser-content">
-          <img :src="withBase('/images/light-routes-cards.png')" alt="Traefik Manager routes tab" class="browser-img shot-light" />
-          <img :src="withBase('/images/dark-routes-cards.png')" alt="Traefik Manager routes tab" class="browser-img shot-dark" />
-        </div>
+  <div class="sm-wrap">
+    <TiltIn>
+    <div class="sm-stage">
+      <div class="sm-glow sm-glow-a" />
+      <div class="sm-glow sm-glow-b" />
+      <div class="sm-glow sm-glow-c" />
 
-        <div class="devices">
-          <div class="tablet">
-            <div class="tablet-screen">
-              <img :src="withBase('/images/light-tablet-overview.png')" alt="Traefik Manager on a tablet" class="tablet-img shot-light" />
-              <img :src="withBase('/images/dark-tablet-overview.png')" alt="Traefik Manager on a tablet" class="tablet-img shot-dark" />
-            </div>
+      <div class="sm-monitor">
+        <div class="sm-monitor-bezel">
+          <div class="sm-monitor-screen">
+            <img :src="withBase('/images/light-dashboard.png')" alt="Traefik Manager dashboard" class="light-only" />
+            <img :src="withBase('/images/dark-dashboard.png')" alt="Traefik Manager dashboard" class="dark-only" />
           </div>
+        </div>
+        <div class="sm-monitor-neck" />
+        <div class="sm-monitor-foot" />
+      </div>
 
-          <div class="phone">
-            <div class="phone-screen">
-              <img :src="withBase('/images/light-mobile-overview.png')" alt="Traefik Manager mobile app" class="phone-img shot-light" />
-              <img :src="withBase('/images/dark-mobile-overview.png')" alt="Traefik Manager mobile app" class="phone-img shot-dark" />
-              <div class="phone-punch" />
-            </div>
-          </div>
+      <div class="sm-tablet">
+        <div class="sm-tablet-screen">
+          <img :src="withBase('/images/light-tablet-overview.png')" alt="Traefik Manager on a tablet" class="light-only" />
+          <img :src="withBase('/images/dark-tablet-overview.png')" alt="Traefik Manager on a tablet" class="dark-only" />
+        </div>
+      </div>
+
+      <div class="sm-phone">
+        <div class="sm-phone-screen">
+          <img :src="withBase('/images/light-mobile-overview.png')" alt="Traefik Manager mobile app" class="light-only" />
+          <img :src="withBase('/images/dark-mobile-overview.png')" alt="Traefik Manager mobile app" class="dark-only" />
+          <div class="sm-phone-punch" />
         </div>
       </div>
     </div>
+    </TiltIn>
   </div>
 </template>
 
 <style scoped>
-.showcase-wrap {
-  padding: 32px 24px 150px;
+.sm-wrap {
+  padding: 24px 24px 140px;
   width: 100%;
+  overflow: hidden;
 }
 
-.showcase-inner {
-  max-width: 880px;
+.sm-stage {
+  position: relative;
+  max-width: 960px;
   margin: 0 auto;
 }
 
-.browser {
-  position: relative;
-  border-radius: 10px;
-  overflow: visible;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
-  background: #e8eaed;
-  border: 1px solid #d0d7de;
+.sm-glow {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.35;
+  z-index: 0;
 }
 
+.sm-glow-a { width: 62%; aspect-ratio: 1; left: -4%; bottom: -10%; background: radial-gradient(circle closest-side, rgba(124, 58, 237, 0.45), transparent); }
+.sm-glow-b { width: 56%; aspect-ratio: 1; left: 28%; bottom: -12%; background: radial-gradient(circle closest-side, rgba(37, 99, 235, 0.45), transparent); }
+.sm-glow-c { width: 62%; aspect-ratio: 1; right: -3%; top: 0; background: radial-gradient(circle closest-side, rgba(13, 148, 136, 0.45), transparent); }
 
-.browser-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 14px;
+.dark .sm-glow { opacity: 0.75; }
+
+.sm-monitor {
+  position: relative;
+  width: 75%;
+  z-index: 1;
+}
+
+.sm-monitor-bezel {
+  background: #16191d;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+}
+
+.dark .sm-monitor-bezel {
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55);
+}
+
+.sm-monitor-screen {
+  border-radius: 5px;
+  overflow: hidden;
+  aspect-ratio: 1920 / 1080;
+}
+
+.sm-monitor-screen img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+  display: block;
+}
+
+.sm-monitor-neck {
+  width: 12%;
   height: 36px;
-  border-bottom: 1px solid #d0d7de;
-}
-
-
-.browser-dots {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.browser-dots span {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #d0d7de;
-}
-
-
-.browser-dots span:nth-child(1) { background: #ff5f57; }
-.browser-dots span:nth-child(2) { background: #febc2e; }
-.browser-dots span:nth-child(3) { background: #28c840; }
-
-.browser-url {
-  flex: 1;
-  background: #ffffff;
-  border: 1px solid #d0d7de;
-  border-radius: 6px;
-  height: 22px;
-  line-height: 22px;
-  text-align: center;
-  font-size: 11px;
-  color: #636c76;
-  font-family: system-ui, sans-serif;
-  max-width: 280px;
+  background: #1b1f24;
   margin: 0 auto;
-  padding: 0 8px;
 }
 
-
-.browser-content {
-  height: 400px;
-  overflow: hidden;
-  border-radius: 0 0 10px 10px;
+.sm-monitor-foot {
+  width: 30%;
+  height: 12px;
+  border-radius: 7px;
+  background: #23282e;
+  margin: 0 auto;
 }
 
-.browser-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top left;
-  display: block;
-}
-
-.devices {
+.sm-tablet {
   position: absolute;
-  right: -16px;
-  bottom: -72px;
-  z-index: 10;
-  display: block;
-}
-
-.tablet {
-  width: 238px;
+  left: 38%;
+  bottom: -44px;
+  width: 33%;
+  background: #16191d;
   border-radius: 16px;
-  background: #1c1f23;
+  padding: 8px;
   box-shadow: 0 22px 54px rgba(0, 0, 0, 0.3);
-  padding: 7px;
+  z-index: 2;
 }
 
-.tablet-screen {
-  width: 100%;
-  aspect-ratio: 1660 / 1721;
+.dark .sm-tablet {
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.6);
+}
+
+.sm-tablet-screen {
   border-radius: 10px;
   overflow: hidden;
-  position: relative;
+  aspect-ratio: 1660 / 1721;
 }
 
-.tablet-img {
+.sm-tablet-screen img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -150,26 +143,30 @@ import { withBase } from 'vitepress'
   display: block;
 }
 
-.phone {
+.sm-phone {
   position: absolute;
-  right: -30px;
-  bottom: -34px;
-  width: 106px;
+  left: 65%;
+  bottom: -66px;
+  width: 16.5%;
+  background: #16191d;
   border-radius: 24px;
-  background: #1c1f23;
-  box-shadow: -8px 14px 40px rgba(0, 0, 0, 0.38);
-  padding: 4px;
+  padding: 5px;
+  box-shadow: -12px 22px 54px rgba(0, 0, 0, 0.4);
+  z-index: 3;
 }
 
-.phone-screen {
-  width: 100%;
-  aspect-ratio: 864 / 1891;
+.dark .sm-phone {
+  box-shadow: -12px 22px 54px rgba(0, 0, 0, 0.68);
+}
+
+.sm-phone-screen {
   border-radius: 20px;
   overflow: hidden;
+  aspect-ratio: 864 / 1891;
   position: relative;
 }
 
-.phone-img {
+.sm-phone-screen img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -177,43 +174,47 @@ import { withBase } from 'vitepress'
   display: block;
 }
 
-.phone-punch {
+.sm-phone-punch {
   position: absolute;
-  top: 8px;
+  top: 7px;
   left: 50%;
   transform: translateX(-50%);
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #0b0d10;
-  z-index: 2;
+  background: #05070a;
+}
+
+.light-only,
+.dark-only {
+  display: block;
 }
 
 @media (max-width: 640px) {
-  .browser-img {
-    object-position: top center;
+  .sm-wrap {
+    padding-bottom: 90px;
   }
-  .devices {
-    right: -8px;
-    bottom: -46px;
-  }
-  .tablet {
+  .sm-tablet {
     display: none;
   }
-  .phone {
-    position: static;
-    width: 86px;
-    border-radius: 16px;
-    padding: 2px;
+  .sm-monitor {
+    width: 100%;
   }
-  .phone-screen {
-    border-radius: 14px;
+  .sm-phone {
+    left: auto;
+    right: 0;
+    bottom: -48px;
+    width: 24%;
+    border-radius: 18px;
+    padding: 3px;
   }
-  .phone-punch {
+  .sm-phone-screen {
+    border-radius: 15px;
+  }
+  .sm-phone-punch {
     width: 5px;
     height: 5px;
     top: 5px;
   }
 }
-
 </style>

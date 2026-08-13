@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="/static/vendor/fonts/inter.css">
     <link rel="stylesheet" href="/static/vendor/fonts/jetbrains-mono.css">
     <link rel="stylesheet" href="/static/vendor/phosphor.css">
+    <link rel="stylesheet" href="/static/css/tailwind.css?v={{ asset_version }}">
+    <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version }}">
     <script>
         (function() {
             var t = localStorage.getItem('tm-theme') || '{{ default_theme }}' || 'dark';
@@ -18,42 +20,11 @@
             var isDark = t === 'dark' || (t === 'system' && prefersDark);
             document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
             document.documentElement.setAttribute('data-tm-pref', t);
+            document.documentElement.classList.add('tm-modern');
         })();
     </script>
     <style>
-        :root {
-            --bg:       #0d1117;
-            --card:     #161b22;
-            --border:   #30363d;
-            --muted:    #8b949e;
-            --text:     #e6edf3;
-            --blue:     #24a1de;
-            --green:    #3fb950;
-            --red:      #f85149;
-            --input-bg: #0d1117;
-            --btn-secondary-bg: #21262d;
-            --btn-secondary-hover: #30363d;
-        }
-        [data-theme="light"] {
-            --bg:       #f6f8fa;
-            --card:     #ffffff;
-            --border:   #d0d7de;
-            --muted:    #656d76;
-            --text:     #1f2328;
-            --blue:     #0969da;
-            --green:    #1a7f37;
-            --red:      #d1242f;
-            --input-bg: #ffffff;
-            --btn-secondary-bg: #f6f8fa;
-            --btn-secondary-hover: #eaeef2;
-        }
-
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
         body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -61,80 +32,83 @@
             justify-content: center;
             padding: 24px;
         }
-
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            width: 100%;
-            padding: 36px 32px;
-        }
         .card-login  { max-width: 380px; }
-        .card-wizard { max-width: 480px; }
+
+        .wz-page { width: 100%; max-width: 1080px; display: flex; flex-direction: column; }
+        .wz-shell {
+            width: 100%; padding: 0; overflow: hidden;
+            display: flex; flex-direction: column;
+            height: min(760px, calc(100vh - 96px));
+        }
+        .wz-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+        }
+        .wz-progress { font: 600 10.5px 'JetBrains Mono', monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+        .wz-nav { width: 200px; padding: 12px 10px; overflow-y: auto; }
+        .wz-nav-label {
+            font: 600 9.5px 'JetBrains Mono', monospace; letter-spacing: .12em; text-transform: uppercase;
+            color: var(--muted); opacity: .75; padding: 0 10px; margin: 14px 0 6px;
+        }
+        .wz-nav-label:first-child { margin-top: 2px; }
+        .wz-nav-btn { gap: 10px; }
+        .wz-nav-btn .wiz-step {
+            width: 20px; height: 20px; padding: 0; flex-shrink: 0;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 10px; border-radius: 6px;
+        }
+
+        .wz-body { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+        .wz-error { margin: 14px 20px 0; }
+        .wz-lede { margin-bottom: 20px; }
+        .wz-title { font-size: 19px; font-weight: 700; letter-spacing: -0.015em; color: var(--text); margin-bottom: 6px; }
+        .wz-sub   { font-size: 13px; line-height: 1.6; color: var(--muted); max-width: 76ch; }
+        .wz-opt {
+            font: 600 9px 'JetBrains Mono', monospace; letter-spacing: .1em; text-transform: uppercase;
+            color: var(--muted); border: 1px solid var(--border); border-radius: 4px;
+            padding: 1px 5px; margin-left: 6px; vertical-align: 1px;
+        }
+        .wz-note { font: 400 11px/1.55 'JetBrains Mono', monospace; color: var(--muted); margin: 8px 2px 24px; max-width: 84ch; }
+        .wz-body .sc-root .sc-set { align-items: start; padding-top: 10px; padding-bottom: 10px; }
+        .wz-body .sc-root .sc-set-d { white-space: normal; overflow: visible; max-width: 68ch; }
+        .wz-body .sc-root .sc-sec-head { margin-top: 4px; }
+
+        .wz-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+        .wz-card { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 13px 14px; }
+        .wz-card > i { color: var(--blue); font-size: 16px; display: block; margin-bottom: 8px; }
+        .wz-card-n { font: 600 12px/1.35 'JetBrains Mono', monospace; letter-spacing: -.01em; color: var(--text); margin-bottom: 3px; }
+        .wz-card-d { font: 400 10.5px/1.55 'JetBrains Mono', monospace; color: var(--muted); }
+
+        .wz-foot {
+            display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+            padding: 12px 20px; border-top: 1px solid var(--border); background: var(--card);
+        }
+        .wz-skip-note { font: 400 10.5px 'JetBrains Mono', monospace; color: var(--muted); }
+
+        @media (max-width: 860px) {
+            body { padding: 0; }
+            .wz-shell { height: 100vh; border-radius: 0; border-left: none; border-right: none; }
+            .wz-nav { width: 60px; padding: 12px 6px; }
+            .wz-nav-btn { justify-content: center; font-size: 0; gap: 0; }
+            .wz-nav-label { display: none; }
+            .wz-cards { grid-template-columns: 1fr; }
+        }
 
         .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
         .logo-icon { font-size: 28px; color: var(--blue); }
         .logo-text { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
         .logo-text span { color: var(--blue); }
 
-        
-        .steps { display: flex; align-items: center; margin-bottom: 28px; }
-        .step-dot {
-            width: 28px; height: 28px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 11px; font-weight: 700;
-            border: 2px solid var(--border);
-            color: var(--muted); background: var(--card);
-            flex-shrink: 0; transition: all 0.2s; position: relative; z-index: 1;
-        }
-        .step-dot.active  { border-color: var(--blue); color: var(--blue); background: rgba(36,161,222,0.1); }
-        .step-dot.done    { border-color: var(--green); color: #fff; background: var(--green); }
-        .step-line { flex: 1; height: 2px; background: var(--border); transition: background 0.3s; }
-        .step-line.done { background: var(--green); }
-
-        .step-panel { display: none; }
-        .step-panel.active { display: block; }
 
         .step-title    { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
         .step-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
 
         .field { margin-bottom: 14px; }
-        label {
-            display: block; font-size: 11px; font-weight: 700;
-            color: var(--muted); text-transform: uppercase;
-            letter-spacing: 0.05em; margin-bottom: 5px;
-        }
-        input[type="text"], input[type="password"], input[type="url"] {
-            width: 100%; background: var(--input-bg);
-            border: 1px solid var(--border); border-radius: 8px;
-            padding: 10px 12px; font-size: 13px; color: var(--text);
-            font-family: 'Inter', sans-serif; outline: none;
-            transition: border-color 0.15s, box-shadow 0.15s;
-        }
-        input[type="password"] { font-family: 'JetBrains Mono', monospace; }
-        input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(36,161,222,0.1); }
         .field-hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
 
         .btn-row { display: flex; gap: 8px; margin-top: 20px; }
-        .btn-primary {
-            flex: 1; background: var(--blue); color: #fff;
-            border: none; border-radius: 8px;
-            padding: 11px; font-size: 13px; font-weight: 600;
-            font-family: 'Inter', sans-serif; cursor: pointer;
-            transition: filter 0.15s;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
-        }
-        .btn-primary:hover  { filter: brightness(1.1); }
         .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
-        .btn-secondary {
-            background: var(--btn-secondary-bg); color: var(--text);
-            border: 1px solid var(--border); border-radius: 8px;
-            padding: 11px 18px; font-size: 13px; font-weight: 600;
-            font-family: 'Inter', sans-serif; cursor: pointer;
-            transition: background 0.15s;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
-        }
-        .btn-secondary:hover { background: var(--btn-secondary-hover); }
         .btn-inline {
             background: none; border: 1px solid var(--border);
             border-radius: 6px; padding: 6px 10px;
@@ -158,43 +132,19 @@
         #apiTestResult { font-size: 11px; color: var(--muted); }
 
         .tab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .tab-toggle-row {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 10px 12px; border-radius: 8px; cursor: pointer;
-            border: 1px solid var(--border); background: var(--input-bg);
-            transition: border-color 0.15s; user-select: none;
-        }
-        .tab-toggle-row:hover { border-color: var(--blue); }
         .tab-toggle-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
         .tab-toggle-label i { color: var(--muted); font-size: 14px; }
-        .toggle-switch {
-            width: 32px; height: 18px; border-radius: 99px;
-            background: var(--border); position: relative;
-            transition: background 0.2s; flex-shrink: 0;
-        }
-        .toggle-switch.on { background: var(--blue); }
-        .toggle-knob {
-            position: absolute; top: 2px; left: 2px;
-            width: 14px; height: 14px; border-radius: 50%;
-            background: #fff; transition: transform 0.2s;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        }
-        .toggle-switch.on .toggle-knob { transform: translateX(14px); }
 
-        .welcome-icon {
-            width: 56px; height: 56px; border-radius: 14px;
-            background: rgba(36,161,222,0.1); border: 1px solid rgba(36,161,222,0.2);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 26px; color: var(--blue); margin-bottom: 20px;
+        .seg { display: flex; gap: 6px; }
+        .seg button {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 8px 10px; font-size: 12px; font-weight: 500;
+            border: 1px solid var(--border); border-radius: 8px;
+            background: var(--input-bg); color: var(--muted); cursor: pointer;
+            transition: border-color .15s, color .15s, background .15s;
         }
-        .feature-list { list-style: none; margin: 16px 0 24px; }
-        .feature-list li {
-            display: flex; align-items: center; gap: 10px;
-            font-size: 13px; color: var(--muted);
-            padding: 8px 0; border-bottom: 1px solid var(--border);
-        }
-        .feature-list li:last-child { border-bottom: none; }
-        .feature-list li i { color: var(--blue); font-size: 15px; flex-shrink: 0; }
+        .seg button:hover { border-color: var(--muted); }
+        .seg button.on { border-color: var(--blue); color: var(--blue); background: rgba(36,161,222,0.08); }
 
         .topbar { display: flex; justify-content: flex-end; margin-bottom: 16px; }
         .theme-toggle {
@@ -236,7 +186,15 @@
             border-radius: 6px; font-family: 'JetBrains Mono', monospace;
             font-size: 11px; color: var(--blue); word-break: break-all;
         }
-    </style>
+    
+        label.flex {
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 500;
+            font-size: 13px;
+            margin-bottom: 0;
+        }
+</style>
 </head>
 <body>
 
@@ -269,13 +227,13 @@
                 <label for="new_password">New password</label>
                 <input type="password" id="new_password" name="new_password"
                        placeholder="At least 8 characters" autofocus autocomplete="new-password"
-                       oninput="checkForcePwMatch()">
+                       oninput="checkForcePwMatch()" class="input-field">
             </div>
             <div class="field">
                 <label for="confirm_password">Confirm password</label>
                 <input type="password" id="confirm_password" name="confirm_password"
                        placeholder="Repeat your password" autocomplete="new-password"
-                       oninput="checkForcePwMatch()">
+                       oninput="checkForcePwMatch()" class="input-field">
                 <p class="field-hint" id="forcePwHint" style="display:none"></p>
             </div>
             <div class="btn-row">
@@ -322,7 +280,7 @@
                 <input type="text" id="code" name="code"
                        placeholder="000000" autofocus autocomplete="one-time-code"
                        inputmode="numeric" maxlength="6"
-                       style="font-family:'JetBrains Mono',monospace;letter-spacing:.2em;font-size:20px;text-align:center">
+                       style="font-family:'JetBrains Mono',monospace;letter-spacing:.2em;font-size:20px;text-align:center" class="input-field">
             </div>
             <div class="btn-row">
                 <button type="submit" class="btn-primary">
@@ -382,7 +340,7 @@
             <div class="field">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password"
-                       placeholder="Your password" autofocus autocomplete="current-password">
+                       placeholder="Your password" autofocus autocomplete="current-password" class="input-field">
             </div>
             <label class="flex items-center gap-2 text-sm mb-3" style="color:var(--muted);cursor:pointer">
                 <input type="checkbox" name="remember" value="on" checked style="accent-color:var(--blue)">
@@ -429,286 +387,484 @@
 
 {% else %}
 
-<div style="width:100%;max-width:480px">
-    <div class="topbar">
-        <button class="theme-toggle" onclick="cycleTheme()" title="Toggle theme">
-            <i class="ph-bold ph-moon tm-theme-icon" data-pref="dark"></i>
-            <i class="ph-bold ph-sun tm-theme-icon" data-pref="light"></i>
-            <i class="ph-bold ph-desktop tm-theme-icon" data-pref="system"></i>
-        </button>
-    </div>
-    <div class="card card-wizard">
-        <div class="logo">
-            <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
-            <span class="logo-text">Traefik <span>Manager</span></span>
-        </div>
+<div class="wz-page">
+    <div class="card wz-shell">
 
-        <div class="steps" id="stepIndicator" style="display:none">
-            <div class="step-dot active" id="dot-1">1</div>
-            <div class="step-line" id="line-1"></div>
-            <div class="step-dot" id="dot-2">2</div>
-            <div class="step-line" id="line-2"></div>
-            <div class="step-dot" id="dot-3">3</div>
-            {% if not temp_password_mode %}
-            <div class="step-line" id="line-3"></div>
-            <div class="step-dot" id="dot-4"><i class="ph-bold ph-lock-key" style="font-size:11px"></i></div>
-            {% endif %}
-        </div>
-
-        
-        <div id="globalError" class="banner banner-error" style="display:none">
-            <i class="ph-bold ph-warning-circle" style="flex-shrink:0;margin-top:1px"></i>
-            <span id="globalErrorMsg"></span>
-        </div>
-
-        
-        <div class="step-panel active" id="panel-0">
-            <div class="step-title" style="font-size:17px">Welcome to Traefik Manager</div>
-            <p class="step-subtitle" style="margin-top:6px">This quick setup takes about a minute. We'll configure your connection and create your password.</p>
-            <ul class="feature-list">
-                <li><i class="ph-bold ph-layout"></i> Manage routes, middlewares &amp; services</li>
-                <li><i class="ph-bold ph-activity"></i> Live stats from the Traefik API</li>
-                <li><i class="ph-bold ph-shield-check"></i> View TLS certificates &amp; access logs</li>
-                <li><i class="ph-bold ph-lock-key"></i> Protected by a password you set</li>
-            </ul>
-            <div class="btn-row">
-                <button class="btn-primary" onclick="goTo(1)">
-                    Get started <i class="ph-bold ph-arrow-right"></i>
+        <div class="wz-head">
+            <div class="logo" style="margin:0">
+                <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:26px;height:26px">
+                <span class="logo-text">Traefik <span>Manager</span></span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="wz-progress" id="wzProgress"></span>
+                <button class="theme-toggle" onclick="cycleTheme()" title="Toggle theme">
+                    <i class="ph-bold ph-moon tm-theme-icon" data-pref="dark"></i>
+                    <i class="ph-bold ph-sun tm-theme-icon" data-pref="light"></i>
+                    <i class="ph-bold ph-desktop tm-theme-icon" data-pref="system"></i>
                 </button>
             </div>
         </div>
 
-        
-        <div class="step-panel" id="panel-1">
-            <div class="step-title">Connection &amp; domains</div>
-            <p class="step-subtitle">Tell Traefik Manager how to reach your Traefik instance and which domains you manage.</p>
+        <div class="modal-inner">
 
-            <div class="field">
-                <label for="s_domains">Domains</label>
-                <input type="text" id="s_domains" placeholder="example.com, example.net"
-                       value="{{ defaults.domains | join(', ') }}">
-                <p class="field-hint">Comma-separated list of base domains shown in the Add Route dropdown.</p>
-            </div>
-            <div class="field">
-                <label for="s_resolver">Certificate Resolver</label>
-                <input type="text" id="s_resolver" placeholder="cloudflare"
-                       value="{{ defaults.cert_resolver }}">
-                <p class="field-hint">One or more resolver names from your <code style="font-family:monospace;color:var(--blue)">traefik.yml</code>, comma-separated - e.g. <code style="font-family:monospace;color:var(--blue)">cloudflare</code> or <code style="font-family:monospace;color:var(--blue)">letsencrypt, cloudflare</code>. The first is used as the default per route. If you manage certificates externally and don't use ACME, type <code style="font-family:monospace;color:var(--blue)">none</code>.</p>
-            </div>
-            <div class="field">
-                <label for="s_apiurl">Traefik API URL</label>
-                <input type="text" id="s_apiurl" placeholder="http://traefik:8080"
-                       value="{{ defaults.traefik_api_url }}">
-                <p class="field-hint">Internal URL of the Traefik API. Usually <code style="font-family:monospace;color:var(--blue)">http://traefik:8080</code> when on the same Docker network.</p>
-            </div>
-            <div class="field">
-                <label for="s_apiuser">Traefik API Username <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
-                <input type="text" id="s_apiuser" placeholder="Leave blank if no auth required" autocomplete="off">
-                <p class="field-hint">Only needed if your Traefik dashboard uses <code style="font-family:monospace;color:var(--blue)">api.insecure: false</code> with basic auth.</p>
-            </div>
-            <div class="field">
-                <label for="s_apipassword">Traefik API Password <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
-                <input type="password" id="s_apipassword" placeholder="Leave blank if no auth required" autocomplete="off">
-                <div class="api-test-row">
-                    <button class="btn-inline" onclick="testApi()">
-                        <i class="ph-bold ph-plugs-connected"></i> Test connection
-                    </button>
-                    <span id="apiTestResult"></span>
-                </div>
-            </div>
-
-            <div class="btn-row">
-                <button class="btn-secondary" onclick="goTo(0)">
-                    <i class="ph-bold ph-arrow-left"></i> Back
+            <div class="modal-sidebar wz-nav">
+                <div class="wz-nav-label">Start</div>
+                <button type="button" class="modal-sidebar-btn wz-nav-btn active" id="wzb-0" onclick="goTo(0)">
+                    <span class="wiz-step" id="wzn-0">1</span> Welcome
                 </button>
-                <button class="btn-primary" onclick="validateStep1()">
-                    Next <i class="ph-bold ph-arrow-right"></i>
+
+                <div class="wz-nav-label">Connect</div>
+                <button type="button" class="modal-sidebar-btn wz-nav-btn" id="wzb-1" onclick="goTo(1)">
+                    <span class="wiz-step" id="wzn-1">2</span> Traefik
                 </button>
-            </div>
-        </div>
-
-        <div class="step-panel" id="panel-2">
-            <div class="step-title">Self route <span class="text-xs font-normal" style="color:var(--muted)">(optional)</span></div>
-            <p class="step-subtitle">Let Traefik route traffic to this Traefik Manager instance. Creates a <code style="font-family:monospace">traefik-manager-self.yml</code> in your config directory.</p>
-
-            <div class="field">
-                <label for="s_self_domain">Traefik Manager URL</label>
-                <input type="text" id="s_self_domain" placeholder="manager.example.com" value="{{ detected_self_domain or '' }}">
-                {% if detected_self_domain %}<p class="field-hint" style="color:var(--green)"><i class="ph-bold ph-check-circle"></i> Auto-detected from your configuration.</p>{% else %}<p class="field-hint">The hostname you want to use to access Traefik Manager. Leave blank to skip.</p>{% endif %}
-            </div>
-            <div class="field">
-                <label for="s_self_service">Internal service URL</label>
-                <input type="text" id="s_self_service" placeholder="http://traefik-manager:5000" value="{{ detected_self_svc or 'http://traefik-manager:5000' }}">
-                <p class="field-hint">Internal URL Docker/Traefik uses to reach this container. Usually the service name on the same network.</p>
-            </div>
-            <div class="field">
-                <label for="s_self_entrypoint">Entry point</label>
-                <input type="text" id="s_self_entrypoint" placeholder="websecure" value="{{ detected_self_entry_point or 'websecure' }}">
-                <p class="field-hint">Traefik entry point to attach this route to (e.g. <code style="font-family:monospace">websecure</code>, <code style="font-family:monospace">https</code>).</p>
-            </div>
-
-            <div class="btn-row">
-                <button class="btn-secondary" onclick="goTo(1)">
-                    <i class="ph-bold ph-arrow-left"></i> Back
+                <button type="button" class="modal-sidebar-btn wz-nav-btn" id="wzb-2" onclick="goTo(2)">
+                    <span class="wiz-step" id="wzn-2">3</span> Self route
                 </button>
-                <button class="btn-secondary" onclick="goTo(3)" style="margin-left:auto;margin-right:8px;">
-                    Skip
+
+                <div class="wz-nav-label">Optional</div>
+                <button type="button" class="modal-sidebar-btn wz-nav-btn" id="wzb-3" onclick="goTo(3)">
+                    <span class="wiz-step" id="wzn-3">4</span> Monitoring
                 </button>
-                <button class="btn-primary" onclick="goTo(3)">
-                    Next <i class="ph-bold ph-arrow-right"></i>
+                <button type="button" class="modal-sidebar-btn wz-nav-btn" id="wzb-4" onclick="goTo(4)">
+                    <span class="wiz-step" id="wzn-4">5</span> CrowdSec
                 </button>
-            </div>
-        </div>
-
-        <div class="step-panel" id="panel-3">
-            <div class="step-title">Optional monitoring</div>
-            <p class="step-subtitle">Enable extra views for deeper insight into your Traefik setup. All of these are optional - you can turn them on or off anytime in Settings.</p>
-
-            <div class="text-xs font-semibold mb-2" style="color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Visualizations</div>
-            <div class="tab-grid" style="margin-bottom:16px">
-                <div class="tab-toggle-row" onclick="toggleSetupTab('dashboard')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-squares-four"></i> Dashboard</span>
-                    <div class="toggle-switch" id="sw-dashboard"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('routemap')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-graph"></i> Route Map</span>
-                    <div class="toggle-switch" id="sw-routemap"><div class="toggle-knob"></div></div>
-                </div>
-            </div>
-
-            <div class="text-xs font-semibold mb-2" style="color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Route Monitoring</div>
-            <div class="tab-grid" style="margin-bottom:16px">
-                <div class="tab-toggle-row" onclick="toggleSetupTab('docker')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-cube"></i> Docker</span>
-                    <div class="toggle-switch" id="sw-docker"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('kubernetes')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-circles-three"></i> Kubernetes</span>
-                    <div class="toggle-switch" id="sw-kubernetes"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('swarm')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-graph"></i> Swarm</span>
-                    <div class="toggle-switch" id="sw-swarm"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('nomad')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-circles-four"></i> Nomad</span>
-                    <div class="toggle-switch" id="sw-nomad"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('ecs')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-cloud"></i> ECS</span>
-                    <div class="toggle-switch" id="sw-ecs"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('consulcatalog')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-address-book"></i> Consul Catalog</span>
-                    <div class="toggle-switch" id="sw-consulcatalog"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('redis')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-database"></i> Redis</span>
-                    <div class="toggle-switch" id="sw-redis"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('etcd')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-database"></i> etcd</span>
-                    <div class="toggle-switch" id="sw-etcd"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('consul')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-database"></i> Consul KV</span>
-                    <div class="toggle-switch" id="sw-consul"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('zookeeper')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-database"></i> ZooKeeper</span>
-                    <div class="toggle-switch" id="sw-zookeeper"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('http_provider')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-link"></i> HTTP Provider</span>
-                    <div class="toggle-switch" id="sw-http_provider"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('file_external')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-file-text"></i> File (external)</span>
-                    <div class="toggle-switch" id="sw-file_external"><div class="toggle-knob"></div></div>
-                </div>
-            </div>
-
-            <div class="text-xs font-semibold mb-2" style="color:var(--muted);text-transform:uppercase;letter-spacing:.05em">System Monitoring</div>
-            <div class="tab-grid" style="margin-bottom:12px">
-                <div class="tab-toggle-row" onclick="toggleSetupTab('certs')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-shield-check"></i> Certs</span>
-                    <div class="toggle-switch" id="sw-certs"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('plugins')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-puzzle-piece"></i> Plugins</span>
-                    <div class="toggle-switch" id="sw-plugins"><div class="toggle-knob"></div></div>
-                </div>
-                <div class="tab-toggle-row" onclick="toggleSetupTab('logs')">
-                    <span class="tab-toggle-label"><i class="ph-bold ph-terminal"></i> Logs</span>
-                    <div class="toggle-switch" id="sw-logs"><div class="toggle-knob"></div></div>
-                </div>
-            </div>
-
-            <div class="banner banner-info" style="margin-bottom:0">
-                <i class="ph-bold ph-info" style="flex-shrink:0;margin-top:1px"></i>
-                <span>System Monitoring tabs (Certs, Plugins, Logs) each need a file mounted into this container. If not yet mounted, each view will show the exact volume line to add to your <code style="font-family:monospace">docker-compose.yml</code>.</span>
-            </div>
-
-            <div class="btn-row">
-                <button class="btn-secondary" onclick="goTo(2)">
-                    <i class="ph-bold ph-arrow-left"></i> Back
+                <button type="button" class="modal-sidebar-btn wz-nav-btn" id="wzb-5" onclick="goTo(5)">
+                    <span class="wiz-step" id="wzn-5">6</span> Git backup
                 </button>
-                {% if temp_password_mode %}
-                <button class="btn-primary" onclick="submitSetup()">
-                    <i class="ph-bold ph-check"></i> Finish setup
+                <button type="button" class="modal-sidebar-btn wz-nav-btn" id="wzb-6" onclick="goTo(6)">
+                    <span class="wiz-step" id="wzn-6">7</span> Notifications
                 </button>
-                {% else %}
-                <button class="btn-primary" onclick="goTo(4)">
-                    Next <i class="ph-bold ph-arrow-right"></i>
+
+                {% if not temp_password_mode %}
+                <div class="wz-nav-label">Finish</div>
+                <button type="button" class="modal-sidebar-btn wz-nav-btn" id="wzb-7" onclick="goTo(7)">
+                    <span class="wiz-step" id="wzn-7">8</span> Password
                 </button>
                 {% endif %}
             </div>
+
+            <div class="wz-body">
+
+                <div id="globalError" class="banner banner-error wz-error" style="display:none">
+                    <i class="ph-bold ph-warning-circle" style="flex-shrink:0;margin-top:1px"></i>
+                    <span id="globalErrorMsg"></span>
+                </div>
+
+                <div class="modal-panel sc-root active" id="panel-0">
+                    <div class="wz-lede">
+                        <h1 class="wz-title">Welcome to Traefik Manager</h1>
+                        <p class="wz-sub">A web interface for the routes, middlewares and services Traefik already serves. This setup takes about a minute: point it at your Traefik API, pick the views you want, and set a password. Everything here can be changed later in Settings.</p>
+                    </div>
+
+                    <div class="wz-cards">
+                        <div class="wz-card">
+                            <i class="ph-bold ph-layout"></i>
+                            <div class="wz-card-n">Routes, middlewares, services</div>
+                            <div class="wz-card-d">Create, edit and disable them through a form or raw YAML, written straight to your dynamic config file.</div>
+                        </div>
+                        <div class="wz-card">
+                            <i class="ph-bold ph-activity"></i>
+                            <div class="wz-card-n">Live from the Traefik API</div>
+                            <div class="wz-card-d">Router, service and middleware health read from Traefik itself, not from a cached copy.</div>
+                        </div>
+                        <div class="wz-card">
+                            <i class="ph-bold ph-shield-check"></i>
+                            <div class="wz-card-n">Certificates and access logs</div>
+                            <div class="wz-card-d">Expiry dates from your ACME store, and the access log read as analytics rather than a wall of text.</div>
+                        </div>
+                        <div class="wz-card">
+                            <i class="ph-bold ph-lock-key"></i>
+                            <div class="wz-card-n">Yours alone</div>
+                            <div class="wz-card-d">Nothing leaves the container. No account, no telemetry, no outbound calls you did not configure.</div>
+                        </div>
+                    </div>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-palette sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">Appearance</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Default theme</div>
+                        <div class="sc-set-d">What Traefik Manager looks like for anyone who has not chosen for themselves. Each person can still override it from the toolbar.</div>
+                        <div class="seg">
+                            <button type="button" id="th-dark"   onclick="setSetupTheme('dark')"><i class="ph-bold ph-moon"></i> Dark</button>
+                            <button type="button" id="th-light"  onclick="setSetupTheme('light')"><i class="ph-bold ph-sun"></i> Light</button>
+                            <button type="button" id="th-system" onclick="setSetupTheme('system')"><i class="ph-bold ph-desktop"></i> System</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-panel sc-root" id="panel-1">
+                    <div class="wz-lede">
+                        <h1 class="wz-title">Connect to Traefik</h1>
+                        <p class="wz-sub">Traefik Manager reads everything through the Traefik API. This is the one step it cannot work without.</p>
+                    </div>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-plugs-connected sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">Traefik API</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">API URL</div>
+                        <div class="sc-set-d">Where this container reaches the Traefik API. On the same Docker network that is usually <code class="font-mono">http://traefik:8080</code> - the service name, not <code class="font-mono">localhost</code>. Requires <code class="font-mono">api: {}</code> in your static config.</div>
+                        <input type="text" id="s_apiurl" placeholder="http://traefik:8080"
+                               value="{{ defaults.traefik_api_url }}" class="input-field">
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">API credentials <span class="wz-opt">optional</span></div>
+                        <div class="sc-set-d">Only if your Traefik dashboard sits behind basic auth. Leave both blank when the API is reachable without credentials.</div>
+                        <div class="flex gap-2">
+                            <input type="text" id="s_apiuser" placeholder="Username" autocomplete="off" class="input-field" style="flex:1">
+                            <input type="password" id="s_apipassword" placeholder="Password" autocomplete="off" class="input-field" style="flex:1">
+                        </div>
+                        <div class="api-test-row">
+                            <button type="button" class="btn-inline" onclick="testApi()">
+                                <i class="ph-bold ph-plugs-connected"></i> Test connection
+                            </button>
+                            <span id="apiTestResult"></span>
+                        </div>
+                    </div>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-globe sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">Routing defaults</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Domains</div>
+                        <div class="sc-set-d">A convenience list for the route form's host dropdown. It does not change your Traefik config, your TLS, or your routing - domains found in existing routes are picked up automatically, so this is just seeding.</div>
+                        <input type="text" id="s_domains" placeholder="example.com, example.net"
+                               value="{{ defaults.domains | join(', ') }}" class="input-field">
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Certificate resolver</div>
+                        <div class="sc-set-d">Resolver names from your <code class="font-mono">traefik.yml</code>, comma-separated. The first becomes the per-route default. If you manage certificates outside ACME, enter <code class="font-mono">none</code>.</div>
+                        <input type="text" id="s_resolver" placeholder="letsencrypt, cloudflare"
+                               value="{{ defaults.cert_resolver }}" class="input-field">
+                    </div>
+                </div>
+
+                <div class="modal-panel sc-root" id="panel-2">
+                    <div class="wz-lede">
+                        <h1 class="wz-title">Route to Traefik Manager itself</h1>
+                        <p class="wz-sub">Give this interface its own hostname through Traefik, so you can reach it over TLS instead of a published port. Writes a <code class="font-mono">traefik-manager-self.yml</code> into your config directory. Skip it if you already route to this container yourself.</p>
+                    </div>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-signpost sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">Self route</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Hostname</div>
+                        <div class="sc-set-d">{% if detected_self_domain %}Detected from your existing configuration. Clear it to skip this step.{% else %}The hostname you want to open Traefik Manager on. Leave blank to skip this step entirely.{% endif %}</div>
+                        <input type="text" id="s_self_domain" placeholder="manager.example.com" value="{{ detected_self_domain or '' }}" class="input-field">
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Internal service URL</div>
+                        <div class="sc-set-d">How Traefik reaches this container from inside the network. Normally the compose service name and port.</div>
+                        <input type="text" id="s_self_service" placeholder="http://traefik-manager:5000" value="{{ detected_self_svc or 'http://traefik-manager:5000' }}" class="input-field">
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Entry point</div>
+                        <div class="sc-set-d">The Traefik entry point to attach the router to, as named in your static config - commonly <code class="font-mono">websecure</code> or <code class="font-mono">https</code>.</div>
+                        <input type="text" id="s_self_entrypoint" placeholder="websecure" value="{{ detected_self_entry_point or 'websecure' }}" class="input-field">
+                    </div>
+                </div>
+
+                <div class="modal-panel sc-root" id="panel-3">
+                    <div class="wz-lede">
+                        <h1 class="wz-title">Choose your views</h1>
+                        <p class="wz-sub">Each of these adds a tab to the navigation. Turn on what you use - an unused tab is just noise. All of them can be toggled later under Settings, so nothing here is a commitment.</p>
+                    </div>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-chart-donut sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">Visualizations</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="tab-grid">
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('dashboard')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-squares-four"></i> Dashboard</span>
+                            <div class="toggle-switch" id="sw-dashboard"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('routemap')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-graph"></i> Route Map</span>
+                            <div class="toggle-switch" id="sw-routemap"><div class="toggle-knob"></div></div>
+                        </div>
+                    </div>
+                    <p class="wz-note">An overview of every router grouped by entry point, and a graph of how requests reach each service.</p>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-path sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">Provider tabs</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="tab-grid">
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('docker')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-cube"></i> Docker</span>
+                            <div class="toggle-switch" id="sw-docker"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('kubernetes')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-circles-three"></i> Kubernetes</span>
+                            <div class="toggle-switch" id="sw-kubernetes"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('swarm')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-graph"></i> Swarm</span>
+                            <div class="toggle-switch" id="sw-swarm"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('nomad')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-circles-four"></i> Nomad</span>
+                            <div class="toggle-switch" id="sw-nomad"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('ecs')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-cloud"></i> ECS</span>
+                            <div class="toggle-switch" id="sw-ecs"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('consulcatalog')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-address-book"></i> Consul Catalog</span>
+                            <div class="toggle-switch" id="sw-consulcatalog"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('redis')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-database"></i> Redis</span>
+                            <div class="toggle-switch" id="sw-redis"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('etcd')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-database"></i> etcd</span>
+                            <div class="toggle-switch" id="sw-etcd"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('consul')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-database"></i> Consul KV</span>
+                            <div class="toggle-switch" id="sw-consul"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('zookeeper')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-database"></i> ZooKeeper</span>
+                            <div class="toggle-switch" id="sw-zookeeper"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('http_provider')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-link"></i> HTTP Provider</span>
+                            <div class="toggle-switch" id="sw-http_provider"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('file_external')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-file-text"></i> File (external)</span>
+                            <div class="toggle-switch" id="sw-file_external"><div class="toggle-knob"></div></div>
+                        </div>
+                    </div>
+                    <p class="wz-note">Read-only views of routes Traefik discovers from other providers. Turn on the ones you actually run - these routes live in Docker labels or a KV store, so Traefik Manager shows them but cannot edit them.</p>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-heartbeat sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">System</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="tab-grid">
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('certs')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-shield-check"></i> Certificates</span>
+                            <div class="toggle-switch" id="sw-certs"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('plugins')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-puzzle-piece"></i> Plugins</span>
+                            <div class="toggle-switch" id="sw-plugins"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupTab('logs')">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-terminal"></i> Logs</span>
+                            <div class="toggle-switch" id="sw-logs"><div class="toggle-knob"></div></div>
+                        </div>
+                        <div class="tab-toggle-row" onclick="toggleSetupGeoip()">
+                            <span class="tab-toggle-label"><i class="ph-bold ph-flag"></i> GeoIP lookup</span>
+                            <div class="toggle-switch" id="sw-geoip"><div class="toggle-knob"></div></div>
+                        </div>
+                    </div>
+                    <p class="wz-note">Certificates, Plugins and Logs each read a file that has to be mounted into this container. If it is not mounted yet, the view tells you the exact volume line to add. GeoIP resolves client addresses to countries in Logs and CrowdSec, downloading a free database on first use.</p>
+                </div>
+
+                <div class="modal-panel sc-root" id="panel-4">
+                    <div class="wz-lede">
+                        <h1 class="wz-title">CrowdSec</h1>
+                        <p class="wz-sub">If you run CrowdSec, Traefik Manager can read its local API and show who is probing this host, from which networks, with which scenarios, and what is already blocked. Leave the URL blank to skip.</p>
+                    </div>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-shield-checkered sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">Local API</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">LAPI URL</div>
+                        <div class="sc-set-d">Where the CrowdSec local API listens. On the same Docker network that is usually <code class="font-mono">http://crowdsec:8080</code>.</div>
+                        <input type="url" id="s_cs_url" placeholder="http://crowdsec:8080" class="input-field">
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Bouncer API key</div>
+                        <div class="sc-set-d">Reads active decisions - the bans in force. Generate one with <code class="font-mono">cscli bouncers add traefik-manager</code>.</div>
+                        <input type="password" id="s_cs_key" placeholder="cscli bouncers add traefik-manager" class="input-field">
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Machine login <span class="wz-opt">optional</span></div>
+                        <div class="sc-set-d">Reads alerts, which is where scenarios, targeted paths and attacking networks come from. This complements the bouncer key rather than replacing it: with only the bouncer key you see bans but not the attacks behind them.</div>
+                        <div class="flex gap-2">
+                            <input type="text" id="s_cs_machine_id" placeholder="Machine ID" class="input-field" style="flex:1">
+                            <input type="password" id="s_cs_machine_pw" placeholder="Password" class="input-field" style="flex:1">
+                        </div>
+                        <div class="api-test-row">
+                            <button type="button" class="btn-inline" onclick="testCrowdSec()">
+                                <i class="ph-bold ph-plugs-connected"></i> Test connection
+                            </button>
+                            <span id="csTestResult"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-panel sc-root" id="panel-5">
+                    <div class="wz-lede">
+                        <h1 class="wz-title">Git backup</h1>
+                        <p class="wz-sub">Commit every configuration change to a git repository, so you get history, diffs and a one-click restore to any earlier commit. Local file backups happen regardless - this adds an off-box copy. Leave the URL blank to skip.</p>
+                    </div>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-git-branch sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">Repository</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Repository URL</div>
+                        <div class="sc-set-d">Any HTTPS git remote: GitHub, GitLab, Gitea, Forgejo, or self-hosted. Use a private repository - your dynamic config is in it.</div>
+                        <input type="url" id="s_git_repo" placeholder="https://github.com/you/traefik-configs" class="input-field">
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Branch and username</div>
+                        <div class="sc-set-d">The branch to commit to, and the account the token belongs to.</div>
+                        <div class="flex gap-2">
+                            <input type="text" id="s_git_branch" value="main" placeholder="main" class="input-field" style="flex:1">
+                            <input type="text" id="s_git_user" placeholder="Username" class="input-field" style="flex:1">
+                        </div>
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Access token</div>
+                        <div class="sc-set-d">A personal access token with write access to that one repository. Stored encrypted, and never shown again after setup.</div>
+                        <input type="password" id="s_git_token" placeholder="ghp_..." class="input-field">
+                        <div class="api-test-row">
+                            <button type="button" class="btn-inline" onclick="testGitRepo()">
+                                <i class="ph-bold ph-git-branch"></i> Test repository
+                            </button>
+                            <span id="gitTestResult"></span>
+                        </div>
+                    </div>
+                    <div class="sc-panel">
+                        <div class="sc-set">
+                            <div class="sc-set-l">
+                                <div class="sc-set-n">Push automatically</div>
+                                <div class="sc-set-d">Commit and push on every configuration change. With this off, you push by hand from the Backups pane.</div>
+                            </div>
+                            <div class="sc-set-v">
+                                <div class="toggle-switch on" id="sw-gitauto" onclick="toggleGitAuto()"><div class="toggle-knob"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-panel sc-root" id="panel-6">
+                    <div class="wz-lede">
+                        <h1 class="wz-title">Notifications</h1>
+                        <p class="wz-sub">Send a message when a route is saved or deleted, a backup runs, or a restore completes. Leave the URL blank to skip.</p>
+                    </div>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-bell sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">Webhook</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Destination</div>
+                        <div class="sc-set-d">Sets the payload format. Generic sends a plain JSON body you can shape yourself downstream.</div>
+                        <select id="s_webhook_type" class="input-field">
+                            <option value="discord">Discord</option>
+                            <option value="slack">Slack</option>
+                            <option value="gotify">Gotify</option>
+                            <option value="ntfy">ntfy</option>
+                            <option value="generic">Generic webhook</option>
+                        </select>
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Webhook URL</div>
+                        <div class="sc-set-d">Where notifications are delivered. You can send a test message from the Notifications pane once setup is done.</div>
+                        <input type="url" id="s_webhook_url" placeholder="https://discord.com/api/webhooks/..." class="input-field">
+                    </div>
+                </div>
+
+                {% if not temp_password_mode %}
+                <div class="modal-panel sc-root" id="panel-7">
+                    <div class="wz-lede">
+                        <h1 class="wz-title">Set your password</h1>
+                        <p class="wz-sub">This is the last step. The password protects the whole interface and is stored as a bcrypt hash, never in plain text. You can change it, add two-factor, or switch to an identity provider later in Settings.</p>
+                    </div>
+
+                    <div class="sc-sec-head">
+                        <i class="ph-bold ph-lock-key sc-sec-icon" style="color:var(--blue)"></i>
+                        <span class="sc-sec-label">Password</span>
+                        <span class="sc-sec-rule"></span>
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Password</div>
+                        <div class="sc-set-d">At least 8 characters. A long passphrase beats a short complicated one.</div>
+                        <input type="password" id="s_password" placeholder="At least 8 characters"
+                               autocomplete="new-password" oninput="checkPwMatch()" class="input-field">
+                    </div>
+                    <div class="sc-fld">
+                        <div class="sc-set-n">Confirm password</div>
+                        <div class="sc-set-d">Type it again so a typo does not lock you out.</div>
+                        <input type="password" id="s_confirm" placeholder="Repeat your password"
+                               autocomplete="new-password" oninput="checkPwMatch()" class="input-field">
+                        <p class="field-hint" id="pwMatchHint" style="display:none"></p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="wz-foot">
+                    <button type="button" class="btn-secondary" id="wzBack" onclick="goTo(currentStep - 1)">
+                        <i class="ph-bold ph-arrow-left"></i> Back
+                    </button>
+                    <div class="flex items-center gap-2" style="margin-left:auto">
+                        <span class="wz-skip-note" id="wzSkipNote"></span>
+                        <button type="button" class="btn-primary" id="wzNext" onclick="nextStep()">
+                            Continue <i class="ph-bold ph-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-
-        {% if not temp_password_mode %}
-        <div class="step-panel" id="panel-4">
-            <div class="step-title">Create your password</div>
-            <p class="step-subtitle">Protects access to Traefik Manager. You can change it anytime from Settings.</p>
-
-            <div class="field">
-                <label for="s_password">Password</label>
-                <input type="password" id="s_password" placeholder="At least 8 characters"
-                       autocomplete="new-password" oninput="checkPwMatch()">
-            </div>
-            <div class="field">
-                <label for="s_confirm">Confirm password</label>
-                <input type="password" id="s_confirm" placeholder="Repeat your password"
-                       autocomplete="new-password" oninput="checkPwMatch()">
-                <p class="field-hint" id="pwMatchHint" style="display:none"></p>
-            </div>
-
-            <div class="btn-row">
-                <button class="btn-secondary" onclick="goTo(3)">
-                    <i class="ph-bold ph-arrow-left"></i> Back
-                </button>
-                <button class="btn-primary" id="finishBtn" onclick="submitSetup()" disabled>
-                    <i class="ph-bold ph-check"></i> Finish setup
-                </button>
-            </div>
-        </div>
-        {% endif %}
-
-        <form method="POST" action="{{ url_for('setup') }}" id="setupForm" style="display:none">
-            <input type="hidden" name="csrf_token"        value="{{ csrf_token }}">
-            <input type="hidden" name="domains"           id="f_domains">
-            <input type="hidden" name="cert_resolver"     id="f_resolver">
-            <input type="hidden" name="traefik_api_url"      id="f_apiurl">
-            <input type="hidden" name="traefik_api_user"     id="f_apiuser">
-            <input type="hidden" name="traefik_api_password" id="f_apipassword">
-            <input type="hidden" name="visible_tabs"         id="f_visible_tabs">
-            <input type="hidden" name="password"          id="f_password">
-            <input type="hidden" name="confirm"           id="f_confirm">
-            <input type="hidden" name="self_route_domain"      id="f_self_domain">
-            <input type="hidden" name="self_route_service"     id="f_self_service">
-            <input type="hidden" name="self_route_entry_point" id="f_self_entrypoint">
-        </form>
-
     </div>
+
+    <form method="POST" action="{{ url_for('setup') }}" id="setupForm" style="display:none">
+        <input type="hidden" name="csrf_token"        value="{{ csrf_token }}">
+        <input type="hidden" name="domains"           id="f_domains">
+        <input type="hidden" name="cert_resolver"     id="f_resolver">
+        <input type="hidden" name="traefik_api_url"      id="f_apiurl">
+        <input type="hidden" name="traefik_api_user"     id="f_apiuser">
+        <input type="hidden" name="traefik_api_password" id="f_apipassword">
+        <input type="hidden" name="visible_tabs"         id="f_visible_tabs">
+        <input type="hidden" name="password"          id="f_password">
+        <input type="hidden" name="confirm"           id="f_confirm">
+        <input type="hidden" name="self_route_domain"      id="f_self_domain">
+        <input type="hidden" name="self_route_service"     id="f_self_service">
+        <input type="hidden" name="self_route_entry_point" id="f_self_entrypoint">
+        <input type="hidden" name="crowdsec_lapi_url"         id="f_cs_url">
+        <input type="hidden" name="crowdsec_api_key"          id="f_cs_key">
+        <input type="hidden" name="crowdsec_machine_id"       id="f_cs_machine_id">
+        <input type="hidden" name="crowdsec_machine_password" id="f_cs_machine_pw">
+        <input type="hidden" name="git_backup_repo"      id="f_git_repo">
+        <input type="hidden" name="git_backup_branch"    id="f_git_branch">
+        <input type="hidden" name="git_backup_username"  id="f_git_user">
+        <input type="hidden" name="git_backup_token"     id="f_git_token">
+        <input type="hidden" name="git_backup_auto_push" id="f_git_autopush">
+        <input type="hidden" name="webhook_url"  id="f_webhook_url">
+        <input type="hidden" name="webhook_type" id="f_webhook_type">
+        <input type="hidden" name="geoip_enabled" id="f_geoip">
+        <input type="hidden" name="default_theme" id="f_default_theme">
+    </form>
+
     <div class="footer">
         <a href="https://github.com/traefik/traefik" target="_blank">Traefik</a>
         &nbsp;·&nbsp;
@@ -739,45 +895,74 @@ applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
 const TEMP_PW_MODE = {{ 'true' if temp_password_mode else 'false' }};
 let currentStep = 0;
 const setupTabs = { dashboard: false, routemap: false, docker: false, certs: false, plugins: false, logs: false };
-const MAX_STEP   = TEMP_PW_MODE ? 3 : 4;
+const MAX_STEP   = TEMP_PW_MODE ? 6 : 7;
+
+const STEPS = [
+    { label: 'Welcome',       note: '' },
+    { label: 'Traefik',       note: '' },
+    { label: 'Self route',    note: 'Leave the hostname blank to skip' },
+    { label: 'Monitoring',    note: 'Every tab can be changed later' },
+    { label: 'CrowdSec',      note: 'Leave the URL blank to skip' },
+    { label: 'Git backup',    note: 'Leave the URL blank to skip' },
+    { label: 'Notifications', note: 'Leave the URL blank to skip' },
+    { label: 'Password',      note: '' },
+];
 
 function goTo(step) {
+    if (step < 0 || step > MAX_STEP) return;
     hideError();
     document.getElementById('panel-' + currentStep).classList.remove('active');
     currentStep = step;
-    document.getElementById('panel-' + step).classList.add('active');
-
-    const indicator = document.getElementById('stepIndicator');
-    if (step === 0) {
-        indicator.style.display = 'none';
-    } else {
-        indicator.style.display = 'flex';
-        for (let i = 1; i <= MAX_STEP; i++) {
-            const dot  = document.getElementById('dot-' + i);
-            const line = document.getElementById('line-' + i);
-            if (!dot) continue;
-            if (i < step) {
-                dot.className = 'step-dot done';
-                dot.innerHTML = '<i class="ph-bold ph-check" style="font-size:10px"></i>';
-                if (line) line.classList.add('done');
-            } else if (i === step) {
-                dot.className = 'step-dot active';
-                dot.innerHTML = (!TEMP_PW_MODE && i === MAX_STEP)
-                    ? '<i class="ph-bold ph-lock-key" style="font-size:11px"></i>'
-                    : String(i);
-                if (line) line.classList.remove('done');
-            } else {
-                dot.className = 'step-dot';
-                dot.innerHTML = (!TEMP_PW_MODE && i === MAX_STEP)
-                    ? '<i class="ph-bold ph-lock-key" style="font-size:11px"></i>'
-                    : String(i);
-                if (line) line.classList.remove('done');
-            }
-        }
-    }
     const panel = document.getElementById('panel-' + step);
-    const first = panel.querySelector('input:not([type=hidden])');
-    if (first) setTimeout(() => first.focus(), 80);
+    panel.classList.add('active');
+    panel.scrollTop = 0;
+
+    for (let i = 0; i <= MAX_STEP; i++) {
+        const btn = document.getElementById('wzb-' + i);
+        const num = document.getElementById('wzn-' + i);
+        if (!btn) continue;
+        btn.classList.toggle('active', i === step);
+        if (!num) continue;
+        num.classList.toggle('on', i === step);
+        num.classList.toggle('done', i < step);
+        num.innerHTML = i < step
+            ? '<i class="ph-bold ph-check" style="font-size:9px"></i>'
+            : String(i + 1);
+    }
+
+    document.getElementById('wzProgress').textContent =
+        'Step ' + (step + 1) + ' of ' + (MAX_STEP + 1);
+
+    const back = document.getElementById('wzBack');
+    const next = document.getElementById('wzNext');
+    const note = document.getElementById('wzSkipNote');
+    back.style.visibility = step === 0 ? 'hidden' : 'visible';
+    note.textContent = (STEPS[step] && STEPS[step].note) || '';
+
+    if (step === MAX_STEP) {
+        next.id = 'wzNext';
+        next.innerHTML = '<i class="ph-bold ph-check"></i> Finish setup';
+        next.disabled = !TEMP_PW_MODE && !_pwOk();
+    } else {
+        next.innerHTML = (step === 0 ? 'Get started' : 'Continue')
+            + ' <i class="ph-bold ph-arrow-right"></i>';
+        next.disabled = false;
+    }
+
+    const first = panel.querySelector('input:not([type=hidden]), select');
+    if (first && step !== 0) setTimeout(() => first.focus(), 80);
+}
+
+function nextStep() {
+    if (currentStep === 1) { validateStep1(); return; }
+    if (currentStep === MAX_STEP) { submitSetup(); return; }
+    goTo(currentStep + 1);
+}
+
+function _pwOk() {
+    const pw = document.getElementById('s_password');
+    const cf = document.getElementById('s_confirm');
+    return !!pw && pw.value.length >= 8 && pw.value === cf.value;
 }
 
 function showError(msg) {
@@ -835,11 +1020,33 @@ function toggleSetupTab(tab) {
     document.getElementById('sw-' + tab).classList.toggle('on', setupTabs[tab]);
 }
 
+let setupGeoip = false;
+function toggleSetupGeoip() {
+    setupGeoip = !setupGeoip;
+    document.getElementById('sw-geoip').classList.toggle('on', setupGeoip);
+}
+
+let setupGitAuto = true;
+function toggleGitAuto() {
+    setupGitAuto = !setupGitAuto;
+    document.getElementById('sw-gitauto').classList.toggle('on', setupGitAuto);
+}
+
+let setupTheme = localStorage.getItem(THEME_KEY) || 'dark';
+function setSetupTheme(pref) {
+    setupTheme = pref;
+    ['dark', 'light', 'system'].forEach(p =>
+        document.getElementById('th-' + p).classList.toggle('on', p === pref));
+    localStorage.setItem(THEME_KEY, pref);
+    applyTheme(pref);
+}
+setSetupTheme(setupTheme);
+
 function checkPwMatch() {
     const pw      = document.getElementById('s_password').value;
     const confirm = document.getElementById('s_confirm').value;
     const hint    = document.getElementById('pwMatchHint');
-    const btn     = document.getElementById('finishBtn');
+    const btn     = document.getElementById('wzNext');
     if (!pw && !confirm) { hint.style.display = 'none'; btn.disabled = true; return; }
     if (pw.length > 0 && pw.length < 8) {
         hint.textContent = 'Password must be at least 8 characters.';
@@ -859,6 +1066,45 @@ function checkPwMatch() {
     hint.style.display = 'none'; btn.disabled = true;
 }
 
+async function testCrowdSec() {
+    const out = document.getElementById('csTestResult');
+    const url = (document.getElementById('s_cs_url').value || '').trim();
+    const key = (document.getElementById('s_cs_key').value || '').trim();
+    if (!url) { out.textContent = 'Enter a LAPI URL first'; out.style.color = 'var(--muted)'; return; }
+    out.textContent = 'Testing...'; out.style.color = 'var(--muted)';
+    try {
+        const res = await fetch('{{ url_for("setup_test_crowdsec") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token }}' },
+            body: JSON.stringify({ url, key }),
+        });
+        const data = await res.json();
+        out.textContent = data.ok ? 'Reachable' : (data.error || 'Failed');
+        out.style.color = data.ok ? 'var(--green)' : 'var(--red)';
+    } catch (e) { out.textContent = 'Request failed'; out.style.color = 'var(--red)'; }
+}
+
+async function testGitRepo() {
+    const out = document.getElementById('gitTestResult');
+    const repo = (document.getElementById('s_git_repo').value || '').trim();
+    if (!repo) { out.textContent = 'Enter a repository URL first'; out.style.color = 'var(--muted)'; return; }
+    out.textContent = 'Testing...'; out.style.color = 'var(--muted)';
+    try {
+        const res = await fetch('{{ url_for("setup_test_git") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token }}' },
+            body: JSON.stringify({
+                repo_url: repo,
+                username: (document.getElementById('s_git_user').value || '').trim(),
+                token: (document.getElementById('s_git_token').value || '').trim(),
+            }),
+        });
+        const data = await res.json();
+        out.textContent = data.ok ? 'Reachable' : (data.error || 'Failed');
+        out.style.color = data.ok ? 'var(--green)' : 'var(--red)';
+    } catch (e) { out.textContent = 'Request failed'; out.style.color = 'var(--red)'; }
+}
+
 function submitSetup() {
     hideError();
 
@@ -872,6 +1118,21 @@ function submitSetup() {
     document.getElementById('f_self_service').value     = (document.getElementById('s_self_service')?.value     || '').trim();
     document.getElementById('f_self_entrypoint').value  = (document.getElementById('s_self_entrypoint')?.value  || '').trim() || 'websecure';
 
+    const v = (id) => (document.getElementById(id)?.value || '').trim();
+    document.getElementById('f_cs_url').value         = v('s_cs_url');
+    document.getElementById('f_cs_key').value         = v('s_cs_key');
+    document.getElementById('f_cs_machine_id').value  = v('s_cs_machine_id');
+    document.getElementById('f_cs_machine_pw').value  = v('s_cs_machine_pw');
+    document.getElementById('f_git_repo').value       = v('s_git_repo');
+    document.getElementById('f_git_branch').value     = v('s_git_branch') || 'main';
+    document.getElementById('f_git_user').value       = v('s_git_user');
+    document.getElementById('f_git_token').value      = v('s_git_token');
+    document.getElementById('f_git_autopush').value   = setupGitAuto ? 'on' : '';
+    document.getElementById('f_webhook_url').value    = v('s_webhook_url');
+    document.getElementById('f_webhook_type').value   = v('s_webhook_type');
+    document.getElementById('f_geoip').value          = setupGeoip ? 'on' : '';
+    document.getElementById('f_default_theme').value  = setupTheme;
+
     if (!TEMP_PW_MODE) {
         const pw      = document.getElementById('s_password').value;
         const confirm = document.getElementById('s_confirm').value;
@@ -879,7 +1140,7 @@ function submitSetup() {
         if (pw !== confirm) { showError('Passwords do not match.'); return; }
         document.getElementById('f_password').value = pw;
         document.getElementById('f_confirm').value  = confirm;
-        const btn = document.getElementById('finishBtn');
+        const btn = document.getElementById('wzNext');
         btn.disabled  = true;
         btn.innerHTML = '<i class="ph-bold ph-circle-notch" style="animation:spin 0.8s linear infinite"></i> Saving…';
     }

@@ -669,6 +669,36 @@ def setup():
             if self_route_domain:
                 sr = {'domain': self_route_domain, 'service_url': self_route_svc, 'entry_point': self_route_ep}
                 _write_self_route(self_route_domain, self_route_svc, resolver, entry_point=self_route_ep)
+            cs_url  = request.form.get('crowdsec_lapi_url', '').strip()
+            git_repo = request.form.get('git_backup_repo', '').strip()
+            wh_url   = request.form.get('webhook_url', '').strip()
+            extra = {}
+            if cs_url:
+                extra.update(
+                    crowdsec_lapi_url=cs_url,
+                    crowdsec_api_key=request.form.get('crowdsec_api_key', '').strip(),
+                    crowdsec_machine_id=request.form.get('crowdsec_machine_id', '').strip(),
+                    crowdsec_machine_password=request.form.get('crowdsec_machine_password', '').strip(),
+                )
+            if git_repo:
+                extra.update(
+                    git_backup_enabled=True,
+                    git_backup_repo=git_repo,
+                    git_backup_branch=request.form.get('git_backup_branch', '').strip() or 'main',
+                    git_backup_username=request.form.get('git_backup_username', '').strip(),
+                    git_backup_token=request.form.get('git_backup_token', '').strip(),
+                    git_backup_auto_push=request.form.get('git_backup_auto_push', '') == 'on',
+                )
+            if wh_url:
+                extra.update(
+                    webhook_url=wh_url,
+                    webhook_type=request.form.get('webhook_type', 'discord').strip() or 'discord',
+                )
+            if request.form.get('geoip_enabled', '') == 'on':
+                extra['geoip_enabled'] = True
+            theme = request.form.get('default_theme', '').strip().lower()
+            if theme in ('dark', 'light', 'system'):
+                extra['default_theme'] = theme
             save_settings(
                 domains=domains,
                 cert_resolver=resolver,
@@ -681,6 +711,7 @@ def setup():
                 must_change_password=current.get('must_change_password', False),
                 setup_complete=True,
                 self_route=sr,
+                **extra,
             )
             logger.info(f"Setup wizard completed from {request.remote_addr}")
 
@@ -702,6 +733,58 @@ def setup():
                            detected_self_domain=detected_domain,
                            detected_self_svc=detected_svc,
                            detected_self_entry_point=detected_entry_point)
+
+
+def _setup_open() -> bool:
+    return not load_settings().get('setup_complete', False)
+
+
+@app.route('/setup/test-crowdsec', methods=['POST'])
+@limiter.limit("10 per minute")
+def setup_test_crowdsec():
+    if not _setup_open():
+        abort(404)
+    _check_csrf()
+    data = request.get_json(silent=True) or {}
+    url  = str(data.get('url', '')).strip()
+    key  = str(data.get('key', '')).strip()
+    if not url or not url.startswith(('http://', 'https://')):
+        return jsonify({'ok': False, 'error': 'Enter an http:// or https:// URL'}), 400
+    if not _ssrf_ok(url):
+        return jsonify({'ok': False, 'error': 'Target address not allowed'}), 400
+    try:
+        resp = requests.get(f"{url.rstrip('/')}/v1/decisions",
+                            headers={'X-Api-Key': key, 'Accept': 'application/json'},
+                            timeout=5)
+        if resp.status_code in (401, 403):
+            return jsonify({'ok': False, 'error': 'Reached the LAPI, but the key was refused'})
+        resp.raise_for_status()
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)[:120]})
+
+
+@app.route('/setup/test-git', methods=['POST'])
+@limiter.limit("10 per minute")
+def setup_test_git():
+    if not _setup_open():
+        abort(404)
+    _check_csrf()
+    data     = request.get_json(silent=True) or {}
+    repo_url = str(data.get('repo_url', '')).strip()
+    token    = str(data.get('token', '')).strip()
+    if not repo_url:
+        return jsonify({'ok': False, 'error': 'No repository URL'}), 400
+    if not _valid_git_url(repo_url):
+        return jsonify({'ok': False, 'error': 'Unsupported URL - use https://, http://, ssh:// or git://'}), 400
+    creds = {'username': str(data.get('username', '')).strip(), 'token': token} if token else None
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _, err, rc = _git_run(['ls-remote', '--quiet', '--', repo_url], cwd=tmpdir, credentials=creds)
+    if rc == 0:
+        return jsonify({'ok': True})
+    safe = err.replace(token, '***') if token else err
+    return jsonify({'ok': False, 'error': (safe or 'Could not reach repository')[:160]})
 
 
 @app.route('/logout', methods=['POST'])

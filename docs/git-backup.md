@@ -2,6 +2,8 @@
 
 Traefik Manager can automatically push your Traefik configuration to a Git repository after every change, giving you a full version history, off-site backup, and one-click restore.
 
+You can set this up during the first-run setup wizard, or at any time under Settings - Backups.
+
 ::: tip Remote agents
 When a remote agent is active in the [server switcher](agent.md), the Backups - Git tab shows **that agent's** git backup. Agents can back up in two ways:
 

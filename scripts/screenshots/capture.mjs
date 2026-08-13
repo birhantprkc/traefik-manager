@@ -11,10 +11,10 @@ async function capture(theme) {
     const js = code => page.evaluate(code);
     const tab = async (t, ms=1800) => { await js(`switchTab('${t}')`); await sleep(ms); };
 
-    await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await js(`localStorage.setItem('tm-theme', '${theme}'); localStorage.setItem('tm-static-setup-v1', '1');`);
-    await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60000 });
-    await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await sleep(4500);
     await js(`document.querySelectorAll('body > div[style*="--red"]').forEach(b => b.remove())`);
     await js(`fetch('/api/settings/ui', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', ..._csrfHeaders() }, body: JSON.stringify({ ui_prefs: { layoutMode: 'modern', statBarScope: 'all' } }) })`);
@@ -69,6 +69,20 @@ async function capture(theme) {
     await js(`switchSettingsPanel('system')`); await sleep(900); await shot('settings-system');
     await js(`switchSettingsPanel('routes')`); await sleep(900); await shot('settings-routes');
     await js(`switchSettingsPanel('connection')`); await sleep(900); await shot('settings-connection');
+    await js(`switchSettingsPanel('notifications')`); await sleep(900); await shot('settings-notifications');
+    await js(`switchSettingsPanel('agents'); loadAgentsList()`);
+    await page.waitForFunction(
+        `!/Loading agents/.test(document.getElementById('agentsListBody')?.textContent || '')`,
+        { timeout: 20000 }).catch(() => console.log('  ! agents list never finished loading'));
+    await sleep(1500); await shot('settings-agents');
+    const agentId = await js(`document.querySelector('#agentsListBody [data-agent-id]')?.dataset.agentId || ''`);
+    if (agentId) {
+        await js(`openAgentKeys('${agentId}', 'edge-vps')`);
+        await sleep(2500); await shot('settings-agent-keys');
+        await js(`closeAgentKeys()`); await sleep(400);
+    } else {
+        console.log('  ! no agent row to open keys from, skipping settings-agent-keys');
+    }
     await js(`switchSettingsPanel('about')`); await sleep(1200); await shot('settings-about');
     await js(`closeSettingsModal()`);
 
