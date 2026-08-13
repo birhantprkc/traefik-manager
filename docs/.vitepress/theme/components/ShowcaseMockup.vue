@@ -43,7 +43,7 @@ import TiltIn from './TiltIn.vue'
 
 <style scoped>
 .sm-wrap {
-  padding: 24px 24px 140px;
+  padding: 72px 24px 140px;
   width: 100%;
   overflow: hidden;
 }
