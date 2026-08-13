@@ -5,20 +5,12 @@ description: The Traefik Manager dashboard, routes, middlewares, services, logs,
 
 # UI Examples
 
-**The screenshots below follow whichever theme you are reading this page in** - switch it with the toggle in the header to see the other one. Click any image to open it full screen.
-
 <style>
-.shot-phones {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 16px;
-}
-.shot-phones .screenshot { margin: 0; }
-@media (max-width: 640px) {
-  .shot-phones { grid-template-columns: repeat(2, 1fr); }
-}
+.shot-device { max-width: 360px; margin-left: auto; margin-right: auto; }
+.shot-device-wide { max-width: 760px; margin-left: auto; margin-right: auto; }
 </style>
+
+**The screenshots below follow whichever theme you are reading this page in** - switch it with the toggle in the header to see the other one. Click any image to open it full screen.
 
 ## Dashboard
 
@@ -159,31 +151,18 @@ Interface, authentication with API keys and OIDC, backups, system and route moni
 <img class="screenshot dark-only" src="/images/dark-settings-about.png" alt="About">
 <img class="screenshot light-only" src="/images/light-settings-about.png" alt="About">
 
-## Android
+## Android and tablet
 
-The companion app, connected to the same instance.
+The companion app, connected to the same instance. Both tours cycle through every screen - overview, routes, middlewares, services, logs, CrowdSec, certificates, plugins, backups and settings.
 
-<div class="shot-phones">
-  <img class="screenshot dark-only" src="/images/dark-mobile-connect.png" alt="Mobile connect">
-  <img class="screenshot light-only" src="/images/light-mobile-connect.png" alt="Mobile connect">
-  <img class="screenshot dark-only" src="/images/dark-mobile-dashboard.png" alt="Mobile dashboard">
-  <img class="screenshot light-only" src="/images/light-mobile-dashboard.png" alt="Mobile dashboard">
-  <img class="screenshot dark-only" src="/images/dark-mobile-routes.png" alt="Mobile routes">
-  <img class="screenshot light-only" src="/images/light-mobile-routes.png" alt="Mobile routes">
-  <img class="screenshot dark-only" src="/images/dark-mobile-routes-add.png" alt="Mobile add route">
-  <img class="screenshot light-only" src="/images/light-mobile-routes-add.png" alt="Mobile add route">
-  <img class="screenshot dark-only" src="/images/dark-mobile-middleware.png" alt="Mobile middlewares">
-  <img class="screenshot light-only" src="/images/light-mobile-middleware.png" alt="Mobile middlewares">
-  <img class="screenshot dark-only" src="/images/dark-mobile-middleware-add.png" alt="Mobile add middleware">
-  <img class="screenshot light-only" src="/images/light-mobile-middleware-add.png" alt="Mobile add middleware">
-  <img class="screenshot dark-only" src="/images/dark-mobile-services-live.png" alt="Mobile services">
-  <img class="screenshot light-only" src="/images/light-mobile-services-live.png" alt="Mobile services">
-  <img class="screenshot dark-only" src="/images/dark-mobile-plugins.png" alt="Mobile plugins">
-  <img class="screenshot light-only" src="/images/light-mobile-plugins.png" alt="Mobile plugins">
-  <img class="screenshot dark-only" src="/images/dark-mobile-certs.png" alt="Mobile certificates">
-  <img class="screenshot light-only" src="/images/light-mobile-certs.png" alt="Mobile certificates">
-  <img class="screenshot dark-only" src="/images/dark-mobile-logs.png" alt="Mobile logs">
-  <img class="screenshot light-only" src="/images/light-mobile-logs.png" alt="Mobile logs">
-  <img class="screenshot dark-only" src="/images/dark-mobile-settings.png" alt="Mobile settings">
-  <img class="screenshot light-only" src="/images/light-mobile-settings.png" alt="Mobile settings">
-</div>
+### Phone
+
+<img class="screenshot shot-device dark-only" src="/images/mobile-dark.gif" alt="Traefik Manager on a phone">
+<img class="screenshot shot-device light-only" src="/images/mobile-light.gif" alt="Traefik Manager on a phone">
+
+### Tablet
+
+The tablet layout swaps the bottom tab bar for a side rail and lays the cards out in two columns.
+
+<img class="screenshot shot-device-wide dark-only" src="/images/tablet-dark.gif" alt="Traefik Manager on a tablet">
+<img class="screenshot shot-device-wide light-only" src="/images/tablet-light.gif" alt="Traefik Manager on a tablet">
