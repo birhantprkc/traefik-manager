@@ -9,7 +9,7 @@ TMA is a lightweight Go daemon that runs alongside Traefik on a remote server. I
 3. TM generates an API key - save it and set it as `TMA_API_KEY` in the agent's environment
 4. Use the **server switcher** in the TM navigation bar to switch between the Host and remote servers
 
-Each agent card in Settings - Agents has four action buttons:
+Each agent card in Settings - Agents has three action buttons on the right, plus inline pencil buttons next to the name and the URL:  | Pencil next to the name | Rename the agent - click to edit inline, Enter or click the checkmark to save |  | Pencil next to the URL | Change the agent's URL the same way |
 
 | Button | Action |
 |---|---|
@@ -24,10 +24,10 @@ When a remote agent is active:
 - **Middlewares** - The Middlewares tab shows only middlewares managed by TM - those in config files under `CONFIG_PATH` with the `@file` provider suffix. Traefik built-in and other provider middlewares are excluded from the badge count and the chip selector. You can add and edit middlewares on the agent exactly as you would locally.
 - **Services** - Shows the agent's services from the remote Traefik API.
 - **Route Map** - The route map diagram renders the agent's routes and services.
-- **Tab visibility** - Provider and monitoring tab toggles (Docker, Kubernetes, Certs, Plugins, etc.) are stored per-server in the browser. Changes made while on an agent do not affect the Host or other agents.
+- **Tab visibility** - Provider and monitoring tab toggles (Docker, Kubernetes, Certs, Plugins, etc.) are stored per-server: an agent's toggles are saved with its registration in `agents.yml`, the Host's in `manager.yml`. Changes made while on an agent do not affect the Host or other agents. Changes made while on an agent do not affect the Host or other agents.
 - **Static Config tab** - Available if the agent has `STATIC_CONFIG_PATH` set and `traefik.yml` mounted read-write. With that agent selected in the server switcher, the Off / Settings / Tab choice appears under **Settings - Interface** and it offers the same section editing as the Host: entrypoint, cert resolver, plugin and provider cards, the API/log panels, the trusted-IPs helper and the raw YAML editor. Changes are staged and written to the agent's file on save, with a `.bak` backup first. Traefik restart after save works if the agent has `RESTART_METHOD` configured. See [Static config editing](#static-config-editing).
 - **Plugins tab** - Lists and manages the plugins declared under `experimental.plugins` in the agent's static config (requires `STATIC_CONFIG_PATH`). Install from a pasted snippet, edit and remove all work against the agent's `traefik.yml`; a generated middleware snippet is written to the agent config file you pick in the install form (default `plugin-middlewares.yml`).
-- **Backups** (Settings - Backups) - Shows the agent's local `.bak` backup files. The agent creates a `.bak` automatically before every config write; you can also create a manual backup at any time. In the Git sub-tab you can enable **Use Host Repository** to have the Host push this agent's config to the Host's git repository on a dedicated branch (no agent-side git config needed), or leave the agent autonomous via its `GIT_BACKUP_*` env vars. The Static Config backup sub-tab is not shown for agents.
+- **Backups** (Settings - Backups) - Shows the agent's local `.bak` backup files. The agent creates a `.bak` automatically before every config write; you can also create a manual backup at any time. In the Git sub-tab you can enable **Use Host Repository** to have the Host push this agent's config to the Host's git repository on a dedicated branch (no agent-side git config needed), or leave the agent autonomous via its `GIT_BACKUP_*` env vars. The Static Config backup sub-tab appears for an agent when it has `STATIC_CONFIG_PATH` set (or already has static backups); it lists the `traefik.yml` backups separately from the route config backups.
 - **Logs** - The Logs tab shows the agent's access log when `ACCESS_LOG_PATH` is set on the agent. When installed via the installer script alongside Traefik, this is set automatically.
 - **Certificates** - The Certificates tab shows certs from the agent's `acme.json` when `ACME_JSON_PATH` is set. When installed via the installer script alongside Traefik, this is set automatically.
 - **CrowdSec** - If the agent has `CROWDSEC_LAPI_URL` plus a bouncer key, machine credentials, or both, the CrowdSec tab shows that server's attack surface: who is hitting it, from which networks, which scenarios fired, what they were going after, and the bans in force. The Host does not need any access to that CrowdSec instance - every call is proxied through the agent. See [CrowdSec on an agent](#crowdsec-on-an-agent).
@@ -247,7 +247,7 @@ A directory is read **one level deep**, not recursively. Point it at the folder 
 | `ACME_JSON_PATH` | - | Path to `acme.json` - enables cert info reads. Accepts several files comma-separated, or a directory whose `.json` files are all read (Traefik writes one storage file per cert resolver). |
 | `ACCESS_LOG_PATH` | - | Path to Traefik access log file |
 | `PLUGINS_DIR` | - | Path to Traefik plugins directory |
-| `BACKUP_DIR` | `/app/backups` | Directory where local `.bak` backup files are stored |
+| `BACKUP_DIR` | `/app/backups` | Agent data directory. `.bak` files are written to `<BACKUP_DIR>/backups`, the API key store to `<BACKUP_DIR>/api_keys.json`, and the git clone to `<BACKUP_DIR>/git-repo` |
 | `BACKUP_KEEP_COUNT` | `0` | Keep only the last N `.bak` files per config file (0 = keep all) |
 
 ### Traefik restart
@@ -387,7 +387,7 @@ When an agent is active in the TM server switcher, Settings - Backups shows the 
 
 - **Dynamic Config tab** - lists and restores the agent's local `.bak` backups. The agent automatically creates a `.bak` file before every config write (route or middleware save), so changes can always be rolled back. Manual "Create Backup" backs up all config files at once. Backup files are named `filename.YYYYMMDD_HHMMSS.bak` and stored in `BACKUP_DIR`.
 - **Git tab** - shows the agent's git history, status, and allows manual push and git restore; git configuration fields are hidden (managed by env vars on the agent)
-- **Static Config tab** - not shown for agents (static config is part of the regular backup)
+- - **Static Config tab** - shown when the agent has `STATIC_CONFIG_PATH` configured; lists and restores the agent's `traefik.yml` backups
 
 See [API Reference - Agent](api-agent.md) for the full endpoint list.
 

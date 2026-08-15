@@ -74,16 +74,18 @@ Then in the setup wizard set the Traefik API URL to `http://traefik:8080`.
 
 ## Optional monitoring mounts
 
-Add these volume lines to enable optional tabs:
+Add these volume lines, then switch the matching tab on in **Settings -> System Monitoring** - optional tabs are hidden until enabled there, mounting the file alone does not reveal them:
 
 ```yaml
 volumes:
   - /path/to/traefik/acme.json:/app/acme.json:ro          # Certs tab
-  - /path/to/traefik/traefik.yml:/app/traefik.yml          # Plugins + Static Config tab (read-write)
+  - /path/to/traefik/traefik.yml:/app/traefik.yml          # Plugins + Static Config tab (read-write, also set STATIC_CONFIG_PATH=/app/traefik.yml)
+
+Unlike acme.json and access.log, this mount alone is not enough: `STATIC_CONFIG_PATH` has no default, so it must be set (or the path filled in under Settings) for the Plugins and Static Config tabs to see the file. Add `STATIC_CONFIG_PATH=/app/traefik.yml` to the environment block of the full example too.
   - /path/to/traefik/logs/access.log:/app/logs/access.log:ro  # Logs tab
 ```
 
-> Mount `traefik.yml` without `:ro` if you want to use the Static Config editor. Read-only mounts enable only the Plugins tab.
+> Mount `traefik.yml` without `:ro` if you want to use the Static Config editor. With a read-only mount the Static Config tab still opens, but saving fails with a write error - only the Plugins tab is fully usable.
 
 ### Full compose example (all monitoring enabled)
 
@@ -249,7 +251,7 @@ networks:
 | Variable | Values | Default | Description |
 |---|---|---|---|
 | `STATIC_CONFIG_PATH` | path | - | Path to `traefik.yml` inside the container. Must be set for the Static Config and Plugins tabs to work. |
-| `RESTART_METHOD` | `proxy`, `socket`, `poison-pill` | - | How to restart Traefik after a static config change |
+| `RESTART_METHOD` | `proxy`, `socket`, `poison-pill` | `proxy` | How to restart Traefik after a static config change. When unset the app behaves as `proxy` and tries a Docker API restart. |
 | `TRAEFIK_CONTAINER` | container name | `traefik` | Name of the Traefik container to restart (`proxy` and `socket` methods) |
 | `DOCKER_HOST` | URL | - | Docker host URL for the socket proxy method (e.g. `tcp://socket-proxy:2375`) |
 | `SIGNAL_FILE_PATH` | path | `/signals/restart.sig` | Signal file path for the `poison-pill` method |
@@ -295,7 +297,7 @@ volumes:
 ```
 
 == CONFIG_DIR (auto-discover from directory)
-Point at a directory and every `.yml` file inside it is picked up automatically. Useful when the number of config files changes over time.
+Point at a directory and every `.yml` and `.yaml` file inside it - including files in subdirectories - is picked up automatically. Useful when the number of config files changes over time.
 
 ```yaml
 environment:

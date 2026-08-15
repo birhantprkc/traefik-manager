@@ -66,7 +66,7 @@ GET /health
 
 Response (no auth required):
 ```json
-{"ok": true, "version": "1.5.1"}
+{"ok": true, "version": "1.10.1"}
 ```
 
 ## Error responses
@@ -83,7 +83,7 @@ All errors return `{"error": "message"}`.
 
 ## Backup format
 
-Local backups use per-file `.bak` files, not zip archives. Each backup is named `filename.YYYYMMDD_HHMMSS.bak` (e.g. `dynamic.yml.20250601_143022.bak`). When restoring, the agent strips the timestamp suffix to recover the original filename and writes it back to `CONFIG_PATH`.
+Local backups use per-file `.bak` files, not zip archives. Each backup is named `filename.YYYYMMDD_HHMMSS.bak` (e.g. `dynamic.yml.20250601_143022.bak`). When restoring, the agent strips the timestamp suffix to recover the original filename and writes it back to `CONFIG_PATH` - or to `STATIC_CONFIG_PATH` when the recovered name is that of the static config file. A `.bak` of the destination is taken before the restore overwrites it.
 
 `POST /api/backup/create` creates one `.bak` file per config file found in `CONFIG_PATH` (and `STATIC_CONFIG_PATH` if configured) in a single request. `POST /api/configs` (config write) also creates a `.bak` for the affected file automatically before writing - this is the pre-write safety backup.
 
@@ -101,14 +101,14 @@ If the agent cannot reach its Traefik API, or Traefik answers with a non-`200` s
 
 ## API keys
 
-The agent supports multiple named API keys stored in `BACKUP_DIR/keys.json` (encrypted). The primary `TMA_API_KEY` from the environment always works regardless of the key store. Additional keys can be created, listed, and deleted via `/api/keys`. This is useful when multiple TM instances need to connect to the same agent.
+The agent supports multiple named API keys stored in `BACKUP_DIR/api_keys.json`. Only a SHA-256 hash of each key is stored - the raw key is shown once at creation and cannot be recovered. The primary `TMA_API_KEY` from the environment always works regardless of the key store. Additional keys can be created, listed, and deleted via `/api/keys`. This is useful when multiple TM instances need to connect to the same agent.
 
 ## Proxying through TM
 
 TM proxies agent calls server-side via `/api/agents/proxy/<agent-id>/<path>`. For example:
 
 ```
-GET /api/agents/proxy/abc123/api/traefik/routers
+GET /api/agents/proxy/abc123/traefik/routers
 ```
 
 Routes to:

@@ -12,7 +12,7 @@ Traefik Manager is designed to run behind a reverse proxy on a trusted network. 
 
 The login password is hashed with **bcrypt at cost 12** before storage in `manager.yml`. The plaintext password is never written to disk.
 
-Login attempts are rate-limited to **5 per minute per IP** to slow brute-force attacks. After three failed attempts within a short window, the rate limit will block further attempts temporarily.
+Login attempts are rate-limited to **5 per minute per IP** to slow brute-force attacks. Remove the sentence, or replace with: "The limit counts every login POST from an IP, successful or not, so a burst of guesses is throttled after five attempts in a minute."
 
 ### Session management
 
@@ -21,7 +21,7 @@ Sessions use signed client-side cookies (Flask SecureCookieSession). The signing
 | Setting | Value |
 |---|---|
 | Max session lifetime | 7 days (when "Remember me" is checked) |
-| Inactivity timeout | 120 minutes for regular sessions (configurable via `INACTIVITY_TIMEOUT_MINUTES`); 24 hours for "Remember me" sessions |
+| Inactivity timeout | 120 minutes for regular sessions (configurable via `INACTIVITY_TIMEOUT_MINUTES`); 24x that value for "Remember me" sessions - 48 hours at the default |
 | Cookie flags | `HttpOnly`, `SameSite=Lax` |
 | Secure flag | Off by default - set `COOKIE_SECURE=true` when behind HTTPS |
 
@@ -71,7 +71,7 @@ See the [OIDC setup guide](oidc.md) for full configuration details.
 
 TM supports TOTP-based 2FA compatible with any standard authenticator app (Google Authenticator, Authy, etc.).
 
-The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encryption key is derived from the session secret key and stored alongside the secret in `manager.yml`.
+The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encryption key is independent of the session signing key: it is taken from the `OTP_ENCRYPTION_KEY` environment variable, or generated once and persisted to `/app/config/.otp_key`. Only the encrypted secret is stored in `manager.yml`.
 
 2FA can be reset via the [reset password page](reset-password.md) if you lose access to your authenticator.
 
@@ -83,7 +83,7 @@ API keys are used by the mobile app and scripts to access the API without a brow
 
 - Up to **10 keys** can exist simultaneously, each with a **device name** for identification
 - Each key is **hashed with SHA-256** - the plaintext is shown once at creation and never stored
-- Keys are revoked individually by device name - revoking one device does not affect others
+- Keys are revoked individually by their key preview (the `X-Api-Key` request field is `preview`); the device name is display-only. Revoking one device does not affect others
 - API key requests bypass CSRF checks only when the key is valid - an invalid or missing key still requires a CSRF token
 - Generation is rate-limited to **5 per hour per IP**
 
@@ -119,10 +119,10 @@ Traefik Manager's built-in auth can be disabled when using an external provider 
 |---|---|
 | Login, OTP verification | 5 / min per IP |
 | OIDC login initiation | 10 / min per IP |
-| Password change, OTP management | 10 / min per IP |
+| Password change | 10 / min per IP |
 | API key generation | 5 / hour per IP |
 | Backup restore | 10 / min per IP |
-| All other endpoints | Unlimited |
+Add rows "| GeoIP database update | 6 / hour per IP |" and "| Setup connection tests (CrowdSec, git) | 10 / min per IP |" before the "All other endpoints | Unlimited" row.
 
 ---
 
@@ -159,7 +159,7 @@ Private and loopback targets are still allowed, because reaching internal servic
 
 ## IP geolocation
 
-[IP geolocation](geoip.md) (off by default) resolves client IPs to countries entirely **on the server against a local database** - IP addresses are never sent to any third-party geolocation API. The only outbound request is to download the database file itself (once a month, from `download.db-ip.com`), and only when the feature is enabled. Point `GEOIP_DB_PATH` at your own `.mmdb` to avoid the download entirely and run fully offline.
+[IP geolocation](geoip.md) (off by default) resolves client IPs to countries entirely **on the server against a local database** - IP addresses are never sent to any third-party geolocation API. The only outbound request is to download the database file itself (once a month, from `download.db-ip.com`), and only when the feature is enabled. Point `GEOIP_DB_PATH` at your own `.mmdb` to control which database is used. Note that if the file is older than 35 days Traefik Manager will still attempt the monthly DB-IP download and overwrite it, so keep its mtime fresh (or leave the feature disabled) to stay fully offline.
 
 ---
 
@@ -184,7 +184,7 @@ Recommended configuration:
 2. **Set `COOKIE_SECURE=true`** in your docker-compose environment
 3. **Enable 2FA** via Settings → Authentication → Two-Factor Authentication
 4. **Use per-device API keys** - generate a separate key for each device/script, revoke individually if compromised
-5. **Mount config files read-only** where possible - TM only needs write access to `CONFIG_DIR` and `/app/config`
+5. **Mount config files read-only** where possible - TM needs write access to `CONFIG_DIR`, `/app/config`, and `BACKUP_DIR` (default `/app/backups`)
 
 ---
 

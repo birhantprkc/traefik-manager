@@ -2,9 +2,19 @@
 
 All supported environment variables for Traefik Manager.
 
-::: info Override variables vs env-only
-Variables marked ✅ **override** the corresponding `manager.yml` field on every restart - the env var always wins. Variables marked **-** are **env-only** and never written to `manager.yml`. To manage a setting through the UI instead, remove the env var and the value saved in `manager.yml` will be used.
-:::
+## Precedence
+
+Each variable below is labelled with one of these:
+
+| Label | Behaviour |
+|---|---|
+| **Overrides** | Env always wins. `AUTH_ENABLED` and `ADMIN_PASSWORD` only. |
+| **Seeds** | Used on first start only. Once the setting is saved, `manager.yml` wins - even if you clear the field. |
+| **Fallback for** | The Settings field wins while it has a value. Clear it and the variable takes over. |
+| _(neither)_ | Env-only, never saved to `manager.yml`. |
+
+Adding a **Seeds** variable to an existing install does nothing. Change the value in Settings, or delete the key
+from `manager.yml` and restart.
 
 ---
 
@@ -12,7 +22,7 @@ Variables marked ✅ **override** the corresponding `manager.yml` field on every
 
 ### Connection & Traefik
 
-| Variable | Default | Override | Description |
+| Variable | Default | Seeds | Description |
 |---|---|---|---|
 | `TRAEFIK_API_URL` | `http://traefik:8080` | ✅ `traefik_api_url` | Traefik API URL |
 | `TRAEFIK_API_USER` | _(unset)_ | ✅ `traefik_api_user` | Username for Traefik API basic auth |
@@ -22,7 +32,7 @@ Variables marked ✅ **override** the corresponding `manager.yml` field on every
 
 ### Authentication
 
-| Variable | Default | Override | Description |
+| Variable | Default | Seeds | Description |
 |---|---|---|---|
 | `COOKIE_SECURE` | `false` | - | Mark session cookie as `Secure` - required for HTTPS |
 | `AUTH_ENABLED` | `true` | ✅ `auth_enabled` | Set to `false` to disable built-in login entirely |
@@ -30,27 +40,27 @@ Variables marked ✅ **override** the corresponding `manager.yml` field on every
 
 ### Routes & Domains
 
-| Variable | Default | Override | Description |
+| Variable | Default | Seeds | Description |
 |---|---|---|---|
 | `DOMAINS` | `example.com` | ✅ `domains` | Comma-separated base domains for the Add Route form |
 | `CERT_RESOLVER` | `cloudflare` | ✅ `cert_resolver` | Default ACME resolver name. Use `none` for external certs |
 
 ### Config Files
 
-| Variable | Default | Override | Description |
+| Variable | Default | Seeds | Description |
 |---|---|---|---|
 | `CONFIG_DIR` | _(unset)_ | - | Directory - all `.yml` files loaded automatically |
 | `CONFIG_PATHS` | _(unset)_ | - | Comma-separated list of config file paths |
 | `CONFIG_PATH` | `/app/config/dynamic.yml` | - | Single config file (default) |
 | `BACKUP_DIR` | `/app/backups` | - | Directory for timestamped config backups |
-| `BACKUP_KEEP_COUNT` | `0` | - | Keep only the last N `.bak` files per config file (0 = keep all) |
+| `BACKUP_KEEP_COUNT` | `0` | seeds | Keep only the last N `.bak` files per config file (0 = keep all) |
 | `SETTINGS_PATH` | `/app/config/manager.yml` | - | Path to the TM settings file |
 
 ### Static Config & Restart
 
-| Variable | Default | Override | Description |
+| Variable | Default | Seeds | Description |
 |---|---|---|---|
-| `STATIC_CONFIG_PATH` | `/app/traefik.yml` | - | Traefik static config - required for Plugins tab and Static Config editor |
+| `STATIC_CONFIG_PATH` | _(unset)_ | fallback | Traefik static config - required for Plugins tab and Static Config editor |
 | `RESTART_METHOD` | _(unset)_ | - | `proxy`, `socket`, or `poison-pill` |
 | `TRAEFIK_CONTAINER` | `traefik` | - | Container name for `proxy` and `socket` restart methods |
 | `DOCKER_HOST` | _(unset)_ | - | Docker socket URL - set to `tcp://socket-proxy:2375` for proxy method |
@@ -58,32 +68,32 @@ Variables marked ✅ **override** the corresponding `manager.yml` field on every
 
 ### Monitoring
 
-| Variable | Default | Override | Description |
-|---|---|---|---|
-| `ACME_JSON_PATH` | `/app/acme.json` | - | Path to `acme.json` for the Certificates tab. Accepts several files comma-separated, or a directory |
-| `ACCESS_LOG_PATH` | `/app/logs/access.log` | - | Path to access log for the Logs tab |
-| `PLUGINS_DIR` | _(unset)_ | - | Path to Traefik's plugins directory, for local plugin listing |
-| `GEOIP_DB_PATH` | _(auto-downloaded)_ | ✅ `geoip_db_path` | Path to a custom GeoIP `.mmdb` for [IP geolocation](geoip.md) |
-| `CROWDSEC_LAPI_URL` | _(unset)_ | ✅ `crowdsec_lapi_url` | CrowdSec LAPI base URL (e.g. `http://crowdsec:8080`) |
-| `CROWDSEC_API_KEY` | _(unset)_ | ✅ `crowdsec_api_key` | CrowdSec bouncer API key, reads decisions (stored encrypted) |
-| `CROWDSEC_MACHINE_ID` | _(unset)_ | ✅ `crowdsec_machine_id` | CrowdSec machine login, reads alerts and enables unban |
-| `CROWDSEC_MACHINE_PASSWORD` | _(unset)_ | ✅ `crowdsec_machine_password` | Password for the machine login (stored encrypted) |
-| `CROWDSEC_CLIENT_CERT` | _(unset)_ | ✅ `crowdsec_client_cert` | Path to a TLS client certificate for a LAPI behind mTLS, replaces the API key and machine login |
-| `CROWDSEC_CLIENT_KEY` | _(unset)_ | ✅ `crowdsec_client_key` | Path to the client certificate's private key |
-| `CROWDSEC_CA_CERT` | _(unset)_ | ✅ `crowdsec_ca_cert` | Path to the CA certificate that signed the LAPI's own certificate (private PKI) |
-| `CROWDSEC_READ_TIMEOUT` | `20` | ✅ `crowdsec_read_timeout` | Seconds to wait for the LAPI to answer. Raise it on a busy or large LAPI. Capped at 25 so it stays inside the worker budget |
-| `CROWDSEC_CONNECT_TIMEOUT` | `5` | - | Seconds to wait for the TCP/TLS connection itself |
-| `CROWDSEC_ALERT_LIMIT` | `500` | ✅ `crowdsec_alert_limit` | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
+| Variable                    | Default                | Seeds                         | Description                                                                                                                 |
+| -----------------------------| ------------------------| -------------------------------| -----------------------------------------------------------------------------------------------------------------------------|
+| `ACME_JSON_PATH`            | `/app/acme.json`       | -                             | Path to `acme.json` for the Certificates tab. Accepts several files comma-separated, or a directory                         |
+| `ACCESS_LOG_PATH`           | `/app/logs/access.log` | -                             | Path to access log for the Logs tab                                                                                         |
+| `PLUGINS_DIR`               | _(unset)_              | -                             | Path to Traefik's plugins directory, for local plugin listing                                                               |
+| `GEOIP_DB_PATH`             | _(auto-downloaded)_    | ✅ `geoip_db_path`             | Path to a custom GeoIP `.mmdb` for [IP geolocation](geoip.md)                                                               |
+| `CROWDSEC_LAPI_URL`         | _(unset)_              | ✅ `crowdsec_lapi_url`         | CrowdSec LAPI base URL (e.g. `http://crowdsec:8080`)                                                                        |
+| `CROWDSEC_API_KEY`          | _(unset)_              | ✅ `crowdsec_api_key`          | CrowdSec bouncer API key, reads decisions (stored encrypted)                                                                |
+| `CROWDSEC_MACHINE_ID`       | _(unset)_              | ✅ `crowdsec_machine_id`       | CrowdSec machine login, reads alerts and enables unban                                                                      |
+| `CROWDSEC_MACHINE_PASSWORD` | _(unset)_              | ✅ `crowdsec_machine_password` | Password for the machine login (stored encrypted)                                                                           |
+| `CROWDSEC_CLIENT_CERT`      | _(unset)_              | ✅ `crowdsec_client_cert`      | Path to a TLS client certificate for a LAPI behind mTLS, replaces the API key and machine login                             |
+| `CROWDSEC_CLIENT_KEY`       | _(unset)_              | ✅ `crowdsec_client_key`       | Path to the client certificate's private key                                                                                |
+| `CROWDSEC_CA_CERT`          | _(unset)_              | ✅ `crowdsec_ca_cert`          | Path to the CA certificate that signed the LAPI's own certificate (private PKI)                                             |
+| `CROWDSEC_READ_TIMEOUT`     | `20`                   | ✅ `crowdsec_read_timeout`     | Seconds to wait for the LAPI to answer. Raise it on a busy or large LAPI. Capped at 25 so it stays inside the worker budget |
+| `CROWDSEC_CONNECT_TIMEOUT`  | `5`                    | -                             | Seconds to wait for the TCP/TLS connection itself                                                                           |
+| `CROWDSEC_ALERT_LIMIT`      | `500`                  | ✅ `crowdsec_alert_limit`      | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI                            |
 
 ### Agents
 
-| Variable | Default | Override | Description |
+| Variable | Default | Seeds | Description |
 |---|---|---|---|
-| `AGENT_API_RATE_LIMIT` | `30` | - | Max requests/minute on `/api/agents/*` endpoints in TM (per IP) |
+| `AGENT_API_RATE_LIMIT` | `30` | seeds | Max requests/minute on `/api/agents/*` endpoints in TM (per IP) |
 
 ### Security
 
-| Variable | Default | Override | Description |
+| Variable | Default | Seeds | Description |
 |---|---|---|---|
 | `SECRET_KEY` | _(auto-generated)_ | - | Flask session signing key |
 | `INACTIVITY_TIMEOUT_MINUTES` | `120` | - | Log out after this many minutes of inactivity |
@@ -98,7 +108,7 @@ Variables marked ✅ **override** the corresponding `manager.yml` field on every
 ### `TRAEFIK_API_URL`
 
 **Default:** `http://traefik:8080`
-**Overrides:** `traefik_api_url` in `manager.yml`
+**Seeds:** `traefik_api_url` in `manager.yml` - the saved value wins once it is set
 
 The URL of the Traefik API. Must be reachable from the host running Traefik Manager.
 
@@ -119,7 +129,7 @@ Environment=TRAEFIK_API_URL=http://localhost:8080
 ### `TRAEFIK_API_USER`
 
 **Default:** _(unset)_  
-**Overrides:** `traefik_api_user` in `manager.yml`
+**Seeds:** `traefik_api_user` in `manager.yml` - the saved value wins once it is set
 
 Username for HTTP Basic Auth on the Traefik API. Set this when `api.insecure: false` and basic auth is configured on the Traefik dashboard. Must be set together with `TRAEFIK_API_PASSWORD`.
 
@@ -130,7 +140,7 @@ Can also be configured via **Settings → Connection** without a restart.
 ### `TRAEFIK_API_PASSWORD`
 
 **Default:** _(unset)_  
-**Overrides:** `traefik_api_password` in `manager.yml` (stored encrypted)
+**Seeds:** `traefik_api_password` in `manager.yml` - the saved value wins once it is set (stored encrypted)
 
 Password for HTTP Basic Auth on the Traefik API. Stored encrypted at rest. Leave blank to keep the existing value when updating other settings.
 
@@ -168,7 +178,7 @@ If you are behind a reverse proxy with HTTPS and do not set this, logins will fa
 ### `AUTH_ENABLED`
 
 **Default:** `true`
-**Overrides:** `auth_enabled` in `manager.yml`
+**Overrides:** `auth_enabled` in `manager.yml` - the environment variable always wins
 
 Set to `false` to disable the built-in login entirely. Use when TM is protected by an external auth provider (Authentik, Authelia, Traefik `basicAuth`, etc.).
 
@@ -193,7 +203,7 @@ When disabled, the UI is fully open. Only use this behind another authentication
 ### `ADMIN_PASSWORD`
 
 **Default:** _(unset)_
-**Overrides:** `password_hash` in `manager.yml`
+**Overrides:** `password_hash` in `manager.yml` (hashed at runtime) - the environment variable always wins
 
 Set the admin password in plain text. Hashed with bcrypt at runtime. Useful for scripted deployments.
 
@@ -220,7 +230,7 @@ When set, the in-UI password change and `flask reset-password` have no effect. R
 ### `DOMAINS`
 
 **Default:** `example.com`
-**Overrides:** `domains` in `manager.yml`
+**Seeds:** `domains` in `manager.yml` - the saved value wins once it is set
 
 Comma-separated list of base domains shown in the Add Route form. This is a form convenience only - it does not affect Traefik configuration, TLS, or routing. Domains found in existing routes are added to the form automatically, and the form's **+** chip accepts any other domain, so this list is optional seeding.
 
@@ -241,7 +251,7 @@ Environment=DOMAINS=example.com,home.lab
 ### `CERT_RESOLVER`
 
 **Default:** `cloudflare`
-**Overrides:** `cert_resolver` in `manager.yml`
+**Seeds:** `cert_resolver` in `manager.yml` - the saved value wins once it is set
 
 One or more ACME cert resolver names, comma-separated. The first is the default for new routes. Each route can override this individually in the Add/Edit Route form.
 
@@ -285,7 +295,7 @@ Only one should be set. When multiple config files are loaded, a **Config File**
 
 **Default:** _(unset)_
 
-Point to a directory and every `.yml` file inside it is loaded automatically.
+Point to a directory and every `.yml` and `.yaml` file inside it, including subdirectories, is loaded automatically.
 
 :::tabs
 == Docker / Podman
@@ -408,7 +418,7 @@ Environment=SETTINGS_PATH=/var/lib/traefik-manager/manager.yml
 
 ### `STATIC_CONFIG_PATH`
 
-**Default:** `/app/traefik.yml`
+**Default:** _(unset - the Plugins tab and Static Config editor stay unavailable until this or the Settings field is set)_
 
 Path to Traefik's static config (`traefik.yml` or `traefik.toml`). Required for the **Plugins** tab and **Static Config** editor. Mount **read-write** (no `:ro`) to allow editing. Can also be set via **Settings → System Monitoring → File Paths** without a restart.
 
@@ -572,8 +582,10 @@ Environment=ACCESS_LOG_PATH=/var/log/traefik/access.log
 
 ### `GEOIP_DB_PATH`
 
-**Default:** _(auto-downloaded to `CONFIG_DIR/geoip/dbip-country-lite.mmdb`)_
-**Overrides:** `geoip_db_path` in `manager.yml`
+**Default:** _(auto-downloaded next to `manager.yml`, i.e. `/app/config/geoip/dbip-country-lite.mmdb`. The location
+follows `SETTINGS_PATH`; setting `CONFIG_DIR` does not move it.)_
+
+**Fallback for:** `geoip_db_path` in `manager.yml` - the Settings value wins while it has a value; clear that field and this variable takes over.
 
 Path to a MaxMind DB format (`.mmdb`) GeoIP database for [IP geolocation](geoip.md) in the Logs and CrowdSec tabs. Leave unset to use the free DB-IP Lite country database that TM downloads automatically. Set it to use your own database (e.g. MaxMind GeoLite2). Geolocation must be enabled in **Settings → Interface → Geolocation**.
 
@@ -596,7 +608,7 @@ Environment=GEOIP_DB_PATH=/var/lib/traefik-manager/GeoLite2-Country.mmdb
 ### `CROWDSEC_LAPI_URL`
 
 **Default:** _(unset)_  
-**Overrides:** `crowdsec_lapi_url` in `manager.yml`
+**Fallback for:** `crowdsec_lapi_url` in `manager.yml` - the Settings value wins while it has a value; clear that field and this variable takes over.
 
 Base URL of the CrowdSec Local API. Required to enable the CrowdSec tab, together with a bouncer API key, machine credentials, or both. The value set in **Settings → System Monitoring → CrowdSec** takes priority over this env var; the env var is used as a fallback when the settings field is blank.
 
@@ -617,7 +629,7 @@ Environment=CROWDSEC_LAPI_URL=http://crowdsec:8080
 ### `CROWDSEC_API_KEY`
 
 **Default:** _(unset)_  
-**Overrides:** `crowdsec_api_key` in `manager.yml` (stored encrypted)
+**Fallback for:** `crowdsec_api_key` in `manager.yml` - the Settings value wins while it has a value; clear that field and this variable takes over.
 
 CrowdSec bouncer API key, used to read decisions. Generate one with `cscli bouncers add traefik-manager` inside the CrowdSec container. The settings field value takes priority over this env var.
 
@@ -638,7 +650,7 @@ Environment=CROWDSEC_API_KEY=your-bouncer-key
 ### `CROWDSEC_MACHINE_ID` / `CROWDSEC_MACHINE_PASSWORD`
 
 **Default:** _(unset)_  
-**Overrides:** `crowdsec_machine_id` / `crowdsec_machine_password` in `manager.yml` (password stored encrypted)
+**Fallback for:** `crowdsec_machine_id` / `crowdsec_machine_password` in `manager.yml` - the Settings values win while they have a value; clear those fields and these variables take over.
 
 CrowdSec machine credentials. Required to read **alerts** and to **unban** (delete decisions) from the CrowdSec tab - bouncer keys get `403 access forbidden` on those endpoints. Alerts are where every attack card on that tab comes from, so without these the tab can only show the bans already in force. The two credentials are complementary rather than tiered: CrowdSec refuses the machine token on `/v1/decisions`, so `CROWDSEC_API_KEY` is still needed alongside these. Create a machine with `cscli machines add traefik-manager --auto` and copy the `login` / `password` from `local_api_credentials.yaml`. The settings field values take priority over these env vars.
 
@@ -663,7 +675,7 @@ Environment=CROWDSEC_MACHINE_PASSWORD=your-machine-password
 ### `CROWDSEC_CLIENT_CERT` / `CROWDSEC_CLIENT_KEY` / `CROWDSEC_CA_CERT`
 
 **Default:** _(unset)_  
-**Overrides:** `crowdsec_client_cert` / `crowdsec_client_key` / `crowdsec_ca_cert` in `manager.yml`
+**Fallback for:** `crowdsec_client_cert` / `crowdsec_client_key` / `crowdsec_ca_cert` in `manager.yml` - the Settings values win while they have a value; clear those fields and these variables take over.
 
 Mutual TLS for the LAPI connection. If your LAPI authenticates bouncers and machines with client certificates (`tls` auth, `bouncers_allowed_ou` / `agents_allowed_ou`), point these at the PEM files mounted into the container. The certificate then authenticates **decisions** in place of the API key and **alerts** in place of the machine login - one certificate covers both when its OU is allowed on both sides, and the LAPI auto-provisions the bouncer and machine on first contact. `CROWDSEC_CA_CERT` verifies the LAPI's own server certificate when it comes from a private PKI. The cert works alongside key or machine credentials too; any one of them makes the tab configured.
 

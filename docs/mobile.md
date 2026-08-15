@@ -22,7 +22,7 @@ A `forwardAuth` middleware in front of Traefik Manager blocks the app before Tra
 
 ### 1. Generate an API key
 
-In the Traefik Manager web UI go to **Settings → Authentication → App / Mobile API Keys** and click **Add Key**. Enter a device name (e.g. `My Phone`) and click **Generate**. Copy the full key - it is only shown once.
+In the Traefik Manager web UI go to **Settings → Authentication → API Keys** and click **Add Key**. (Apply the same correction at line 62.) Enter a device name (e.g. `My Phone`) and click **Generate**. Copy the full key - it is only shown once.
 
 ::: tip One key per device
 Each device should have its own key. You can have up to 10 keys at once. Keys are identified by their device name in the settings list, so you can revoke a single device without affecting others.

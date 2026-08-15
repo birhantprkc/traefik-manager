@@ -43,4 +43,4 @@ providers:
 
 No extra file mounts into the traefik-manager container are needed - data is pulled live from the Traefik API.
 
-> **Note:** traefik-manager's own `dynamic.yml` also uses the file provider. Routes from that file are shown in the main Routes tab and are automatically excluded from this tab to avoid duplication.
+> **Note:** traefik-manager's own `dynamic.yml` also uses the file provider. Routes from that file are shown in the main Routes tab and are excluded from this tab to avoid duplication. The exclusion currently covers routers in the first config file only, so with several config files mounted (`CONFIG_DIR` / `CONFIG_PATHS`) managed routes from the additional files can still appear here.

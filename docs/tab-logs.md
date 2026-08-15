@@ -175,5 +175,5 @@ For hairpin-NAT'd LAN traffic the real client IP is already gone at the network 
 ## Notes
 
 - Only the most recent entries are shown (tail view)
-- The log is not streamed live - refresh the tab to see new entries
-- For real-time log output, use the **Live Monitor** tab
+- The log is not a push stream; turn on auto refresh (the play button) to repoll every 10s, or reload the tab manually
+

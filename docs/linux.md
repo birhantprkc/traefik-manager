@@ -268,7 +268,7 @@ Environment=TRAEFIK_CONTAINER=traefik
 
 | Variable | Values | Default | Description |
 |---|---|---|---|
-| `RESTART_METHOD` | `socket`, `poison-pill` | `proxy` | How to restart Traefik after a static config change |
+| `RESTART_METHOD` | `proxy`, `socket`, `poison-pill` | `proxy` | How to restart Traefik after a static config change (`proxy` and `socket` both restart the container over the Docker API) |
 | `TRAEFIK_CONTAINER` | container name | `traefik` | Docker container name to restart (socket method) |
 | `SIGNAL_FILE_PATH` | path | `/signals/restart.sig` | Signal file path for the `poison-pill` method |
 
@@ -304,7 +304,7 @@ Environment=CONFIG_PATHS=/etc/traefik/routes.yml,/etc/traefik/services.yml
 Make sure `traefik-manager` user has read/write access to each file.
 
 == CONFIG_DIR (auto-discover from directory)
-Point at a directory and every `.yml` file inside it is picked up automatically. Useful when the number of config files changes over time.
+Point at a directory and every `.yml` and `.yaml` file inside it - including files in subdirectories - is picked up automatically. Useful when the number of config files changes over time. Useful when the number of config files changes over time.
 
 ```ini
 # In the [Service] section of the systemd unit:

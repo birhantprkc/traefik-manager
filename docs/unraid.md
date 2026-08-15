@@ -27,7 +27,7 @@ Traefik Manager can be installed on Unraid using a custom template hosted at [un
 |---|---|
 | **Web UI Port** | Port to access the UI - default `5000` |
 | **Config Directory** | Persistent storage for settings, password, and session key. Default: `/mnt/user/appdata/traefik-manager/config` |
-| **Dynamic Config File** | Path to your Traefik dynamic config file on the Unraid host. Map this to `/app/config/dynamic.yml` inside the container |
+| **Config File Path (single file)** | Container-side path to your Traefik dynamic config (`CONFIG_PATH`, default `/app/config/dynamic.yml`). Add a path mapping so the host file lands at that path inside the container |  — and at line 74 change "Leave the **Dynamic Config File** field empty" to "Leave **Config File Path (single file)** at its default; `CONFIG_DIR` takes precedence over it".
 | **Traefik API URL** | URL of the Traefik API - usually `http://traefik:8080` if on the same Docker network |
 | **Domains** | Comma-separated base domains for the Add Route form - e.g. `example.com,home.lab` |
 
@@ -46,8 +46,8 @@ Traefik Manager can be installed on Unraid using a custom template hosted at [un
 |---|---|
 | **Auth Enabled** | Set to `false` to disable built-in login when using an external provider like Authentik |
 | **Config Directory Path** | Use instead of the single config file field when managing multiple `.yml` files in a directory (`CONFIG_DIR`) |
-| **Config Paths** | Comma-separated list of config file paths for 2-5 named files (`CONFIG_PATHS`) |
-| **Settings File Path** | Custom path to `manager.yml` if you want it separate from the config directory |
+| **Config Paths** | Comma-separated list of config file paths to manage (`CONFIG_PATHS`). Any number of files. |
+| **Settings File Path** | Custom path to `manager.yml` (`SETTINGS_PATH`). Its parent directory becomes the config directory: `agents.yml`, `templates.yml`, `notifications.yml`, `dashboard.yml`, the cache, the GeoIP database, `.otp_key` and `.secret_key` all live beside it, so that directory must be persistent |
 | **Inactivity Timeout** | Minutes before a non-remembered session is logged out - default `120` |
 | **OTP Encryption Key** | Fernet key for encrypting the 2FA secret at rest. Auto-generated if not set |
 | **Secret Key** | Session signing key. Auto-generated if not set. Set this to survive a full config wipe |
@@ -57,7 +57,7 @@ Traefik Manager can be installed on Unraid using a custom template hosted at [un
 | **Access Log Path** | Only needed when the access log is not at the default location |
 | **Plugins Directory** | Traefik's local plugins directory, for the Plugins tab |
 | **Backup Retention** | Keep only the last N backups per config file. `0` keeps everything |
-| **GeoIP Database Path** | Custom MaxMind `.mmdb`. Leave empty to use the bundled DB-IP Lite database |
+| **GeoIP Database Path** | Custom MaxMind-format `.mmdb`. Leave empty to use the free DB-IP Lite database, which is downloaded on demand into the config directory once GeoIP is enabled in Settings |
 
 Every field maps to an environment variable - see [Environment Variables](env-vars.md) for the full reference and defaults.
 
@@ -85,6 +85,9 @@ To enable optional tabs, add path mappings in the Unraid template:
 |---|---|---|---|
 | Certs | `/mnt/user/appdata/traefik/acme.json` | `/app/acme.json` | Read-only |
 | Plugins | `/mnt/user/appdata/traefik/traefik.yml` | `/app/traefik.yml` | Read-only |
+| Plugins + Static Config | `/mnt/user/appdata/traefik/traefik.yml` | `/app/traefik.yml` | Read-write |
+
+For both traefik.yml rows you must also set the **Static Config Path** variable (`STATIC_CONFIG_PATH`) to `/app/traefik.yml` - unlike acme.json and access.log, this path has no built-in default.
 | Plugins + Static Config | `/mnt/user/appdata/traefik/traefik.yml` | `/app/traefik.yml` | Read-write |
 | Logs | `/mnt/user/appdata/traefik/logs/access.log` | `/app/logs/access.log` | Read-only |
 
@@ -144,7 +147,7 @@ Add an extra path mapping: host `/var/run/docker.sock` → container `/var/run/d
 3. Complete the setup wizard - it configures your domains, Traefik API connection, and initial password
 
 ::: tip Set COOKIE_SECURE if using HTTPS
-If you access Traefik Manager through a Traefik reverse proxy with TLS, set **Cookie Secure** to `true`. Without it, session cookies will not work correctly over HTTPS.
+If you access Traefik Manager through a Traefik reverse proxy with TLS, set **Cookie Secure** to `true`. This marks the session cookie `Secure` so it is never sent over plain HTTP, and enables the HSTS response header. Sessions still work without it, but the cookie is not protected.
 :::
 
 ---

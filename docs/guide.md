@@ -125,7 +125,7 @@ Every change writes a timestamped backup first, and any of them can be restored 
 
 ## Visualizations
 
-Optional tabs - toggle on in **Settings - Interface - Tabs** or during the setup wizard. No extra mounts needed.
+Optional tabs. Dashboard, Route Map and TLS Options toggle on in **Settings - Interface - Tabs**; CrowdSec toggles on in **Settings - System Monitoring - Tab Visibility**. The setup wizard offers Dashboard and Route Map, but not TLS Options or CrowdSec. No extra mounts needed. No extra mounts needed.
 
 | Tab                           | Description                                                                    |
 | -------------------------------| --------------------------------------------------------------------------------|
@@ -143,7 +143,7 @@ Optional tabs - each requires a file mounted into the container.
 | Tab | Mount required | Description |
 |-----|----------------|-------------|
 | [Certificates](tab-certs.md) | `acme.json:/app/acme.json:ro` | TLS certificates with expiry tracking. `ACME_JSON_PATH` accepts several files or a directory, for setups with one resolver per storage file |
-| [Plugins](tab-plugins.md) | `traefik.yml:/app/traefik.yml:ro` | Plugins declared in your static config |
+| [Plugins](tab-plugins.md) | `traefik.yml:/app/traefik.yml:ro` plus `STATIC_CONFIG_PATH=/app/traefik.yml` (no default) | Plugins declared in your static config |
 | [Logs](tab-logs.md) | `access.log:/app/logs/access.log:ro` | Access log analytics: status, latency, paths, clients and services as clickable cards over a live tail, with optional auto refresh and a [world map](geoip.md) |
 
 ---
@@ -334,7 +334,7 @@ accessLog:
 
 A companion Android app for managing Traefik Manager on the go. See the [requirements table](mobile.md#requirements) for which server version each app release needs.
 
-Connect it with an API key: go to **Settings - Authentication - App / Mobile API Keys**, click **Add Key**, enter a device name, and copy the generated key. Each device gets its own key, so one can be revoked without affecting the others.
+Connect it with an API key: go to **Settings - Authentication - API Keys**, click **Add Key**, enter a device name, and copy the generated key. Each device gets its own key, so one can be revoked without affecting the others.
 
 <div class="vp-grid-cards">
 <div class="vp-card">
@@ -357,7 +357,7 @@ Authenticates via the API key from **Settings → Authentication**.
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.11 · Flask 3.1 · Gunicorn |
-| Agent | Go 1.23 · Alpine Linux (TMA - remote agent daemon) |
+| Agent | Go 1.25 · Alpine Linux (TMA - remote agent daemon) |
 | Config | ruamel.yaml (preserves comments and Go templates) |
 | Auth | bcrypt · pyotp (TOTP) · Flask sessions · CSRF · Flask-Limiter · Fernet |
 | Frontend | Vanilla JS · Tailwind CSS 3.4 · Phosphor Icons |

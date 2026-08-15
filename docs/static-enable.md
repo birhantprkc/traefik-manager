@@ -183,7 +183,7 @@ Open Traefik Manager - a **Static Config** row appears under **Settings → Inte
 | **Settings** | Inside the Settings window, as a **Static Config** panel in the sidebar. |
 | **Tab** | As its own tab in the side navigation. |
 
-If the row does not appear, check that `STATIC_CONFIG_PATH` is set and the file exists at that path inside the container:
+If the row does not appear, check that a static config path is set - either the `static_config_path` field in `manager.yml` (which takes precedence) or the `STATIC_CONFIG_PATH` environment variable - and that the file exists at that path inside the container:
 
 ```bash
 docker exec traefik-manager ls -la /app/traefik.yml

@@ -117,7 +117,7 @@ The Static Config settings covers:
 | API | Enable/disable the Traefik API and Dashboard, insecure mode, and debug mode |
 | Logging | Set log level (DEBUG / INFO / WARN / ERROR) and toggle access logging |
 | Providers | Toggle Docker and File providers; add and remove other provider types (Swarm, HTTP, ECS, etc.) |
-| Advanced | Full raw YAML editor (Monaco) for anything not covered by the sections above |
+Replace the row with: | Raw YAML | The code-icon button in the Static Config toolbar opens a full Monaco YAML editor for anything not covered by the sections above |
 
 For existing installs that did not enable the static config editor during setup, you have two options:
 
@@ -435,7 +435,7 @@ sudo systemctl restart tma
 ### Next steps after install
 
 1. In TM Settings - Agents, click **Add Agent**
-2. Enter the agent URL (e.g. `http://server-ip:8090`) and the API key
+2. Enter a name and the agent URL (e.g. `http://server-ip:8090`). Traefik Manager generates the API key for you and shows it once - copy it and set it as `TMA_API_KEY` on the agent (re-run the installer or edit the agent's env if you already installed it with a different key).
 3. Use the **server switcher** in the TM nav bar to switch to this agent
 
 ---
@@ -461,4 +461,4 @@ sudo journalctl -u traefik-manager | grep -A3 "AUTO-GENERATED"
 ```
 :::
 
-Log in with the temporary password. On your next login you will be redirected to a forced password-change screen before you can access the dashboard.
+Log in with the temporary password. You are taken straight to the setup wizard, and as soon as you finish it a forced password-change screen appears before you can reach the dashboard.

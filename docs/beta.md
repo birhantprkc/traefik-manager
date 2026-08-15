@@ -1,6 +1,6 @@
 # Beta Program
 
-Traefik Manager v1 is currently in beta. This page explains how to join, test, and report issues.
+Traefik Manager v1 is generally available. The `:beta` tag tracks the `dev` branch, ahead of the next release - this page explains how to run it, test it, and report issues.
 
 ---
 

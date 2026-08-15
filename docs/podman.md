@@ -171,7 +171,7 @@ volumes:
   - /path/to/traefik/logs/access.log:/app/logs/access.log:ro,z
 ```
 
-> Mount `traefik.yml` without `:ro` if you want to use the Static Config editor. Read-only enables only the Plugins tab.
+> Mount `traefik.yml` without `:ro` if you want to use the Static Config editor. Read-only still shows the Static Config tab, but saving fails with a write error.
 
 ---
 
@@ -263,7 +263,7 @@ services:
 | Variable | Values | Default | Description |
 |---|---|---|---|
 | `STATIC_CONFIG_PATH` | path | - | Path to `traefik.yml` inside the container. Must be set for the Static Config and Plugins tabs to work. |
-| `RESTART_METHOD` | `proxy`, `socket`, `poison-pill` | - | How to restart Traefik after a static config change |
+| `RESTART_METHOD` | `proxy`, `socket`, `poison-pill` | `proxy` | How to restart Traefik after a static config change. When unset the app behaves as `proxy` and tries a socket-based container restart. |
 | `TRAEFIK_CONTAINER` | container name | `traefik` | Name of the Traefik container to restart |
 | `SIGNAL_FILE_PATH` | path | `/signals/restart.sig` | Signal file path for the `poison-pill` method |
 

@@ -210,8 +210,8 @@ This mirrors CrowdSec's own auth model: `cscli decisions list` uses the bouncer/
 
 ## Fetching
 
-- **Decisions** are read with cursor pagination (`id_gt`), 1000 rows per page up to 200 pages. Expired rows are dropped. There is no display cap: every active decision is fetched, and the strip on the Bans card rescales rather than truncating, printing its own `1 cell = N` legend.
-- **Alerts** are read in one uncapped request with `with_decisions=false`. That flag stays: a single community blocklist alert can embed 15,000 decision objects.
+- **Decisions** are read from `/v1/decisions/stream` - a full sync on first read, then cached deltas, resynced hourly. On a LAPI with no stream endpoint it falls back to cursor pagination (`id_gt`), 1000 rows per page up to 200 pages. Expired rows are dropped. Expired rows are dropped. There is no display cap: every active decision is fetched, and the strip on the Bans card rescales rather than truncating, printing its own `1 cell = N` legend.
+- **Alerts** are read in one request with `with_decisions=false` and a row limit - 500 by default, configurable via the `CROWDSEC_ALERT_LIMIT` env var (or the `crowdsec_alert_limit` setting, 0-100000). That flag stays: a single community blocklist alert can embed 15,000 decision objects. That flag stays: a single community blocklist alert can embed 15,000 decision objects.
 - Both are refetched together whenever you open the tab or press Refresh. The feed renders one page at a time, so a busy instance never builds tens of thousands of rows at once.
 
 ## Docker Compose example

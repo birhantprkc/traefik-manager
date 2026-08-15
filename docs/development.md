@@ -12,12 +12,12 @@ core/                   Shared logic, one module per concern
 agent/                  TMA - the Go agent for remote servers
 tests/                  pytest suite
 templates/
-    index.html          SPA shell, no application JS
+    index.html          SPA shell, plus the theme/pref bootstrap and the agent-switcher JS
     sections/           Navbar, stats bar
     tabs/               One file per tab
     modals/             Route, middleware, settings and other modals
 static/
-    css/app.css         All custom styles
+    css/app.css         Custom styles for the app shell (login.html and index.html each carry their own inline <style> block)
     js/                 Application JS, one file per area
     vendor/             Third-party JS/CSS, bundled at image build
 docs/                   This VitePress site
