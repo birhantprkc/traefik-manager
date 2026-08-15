@@ -88,6 +88,7 @@ def load_settings() -> dict:
         'password_hash':        '',
         'visible_tabs':         {t: False for t in OPTIONAL_TABS},
         'must_change_password': False,
+        'setup_password_reset': False,
         'setup_complete':       False,
         'otp_secret':           '',
         'otp_enabled':          False,
@@ -181,6 +182,8 @@ def load_settings() -> dict:
             merged['visible_tabs'] = vt
         if 'must_change_password' in data:
             merged['must_change_password'] = bool(data['must_change_password'])
+        if 'setup_password_reset' in data:
+            merged['setup_password_reset'] = bool(data['setup_password_reset'])
         if 'setup_complete' in data:
             merged['setup_complete'] = bool(data['setup_complete'])
         if 'otp_secret' in data:
@@ -312,7 +315,7 @@ def load_settings() -> dict:
 
 def save_settings(domains, cert_resolver, traefik_api_url,
                   auth_enabled=True, auth_external_ack=None, password_hash='', visible_tabs=None,
-                  must_change_password=None, setup_complete=None,
+                  must_change_password=None, setup_password_reset=None, setup_complete=None,
                   otp_secret=None, otp_enabled=None,
                   api_keys=None,
                   disabled_routes=None,
@@ -347,6 +350,8 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         auth_external_ack = _cur.get('auth_external_ack', False)
     if must_change_password is None:
         must_change_password = _cur.get('must_change_password', False)
+    if setup_password_reset is None:
+        setup_password_reset = _cur.get('setup_password_reset', False)
     if setup_complete is None:
         setup_complete = _cur.get('setup_complete', False)
     if otp_secret is None:
@@ -462,6 +467,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'password_hash':        password_hash,
         'visible_tabs':         visible_tabs,
         'must_change_password': must_change_password,
+        'setup_password_reset': bool(setup_password_reset),
         'setup_complete':       setup_complete,
         'otp_secret':           otp_secret,
         'otp_enabled':          otp_enabled,

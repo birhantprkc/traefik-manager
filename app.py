@@ -617,13 +617,52 @@ def setup():
 
     current = load_settings()
 
-    if current.get('setup_complete', False):
-        if current.get('must_change_password', False):
-            return redirect(url_for('force_change_password'))
-        return redirect(url_for('index'))
+    # A password reset skips the wizard entirely: only the password step is shown, and the flag
+    # clears itself once a new password is set. Everything else in manager.yml is left alone.
+    reset_mode = bool(current.get('setup_password_reset', False))
 
-    if _has_password_set() and not session.get('authenticated'):
-        return redirect(url_for('login'))
+    if not reset_mode:
+        if current.get('setup_complete', False):
+            if current.get('must_change_password', False):
+                return redirect(url_for('force_change_password'))
+            return redirect(url_for('index'))
+
+        if _has_password_set() and not session.get('authenticated'):
+            return redirect(url_for('login'))
+
+    if reset_mode and request.method == 'POST':
+        _check_csrf()
+        new_pw  = request.form.get('password', '')
+        confirm = request.form.get('confirm', '')
+        err = None
+        if len(new_pw) < 8:
+            err = 'Password must be at least 8 characters.'
+        elif new_pw != confirm:
+            err = 'Passwords do not match.'
+        if err:
+            return render_template('login.html', setup_mode=True, reset_mode=True,
+                                   error=err, csrf_token=_get_csrf_token(),
+                                   defaults={'domains': current['domains'],
+                                             'cert_resolver': current['cert_resolver'],
+                                             'traefik_api_url': current['traefik_api_url']},
+                                   temp_password_mode=False,
+                                   detected_self_domain='', detected_self_svc='',
+                                   detected_self_entry_point='')
+        save_settings(
+            domains=current['domains'],
+            cert_resolver=current['cert_resolver'],
+            traefik_api_url=current['traefik_api_url'],
+            auth_enabled=current.get('auth_enabled', True),
+            password_hash=_hash_password(new_pw),
+            visible_tabs=current['visible_tabs'],
+            must_change_password=False,
+            setup_password_reset=False,
+        )
+        session.clear()
+        session['authenticated'] = True
+        session['login_time'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')
+        logger.warning(f"Password reset completed from {request.remote_addr}")
+        return redirect(url_for('index'))
 
     temp_password_mode = current.get('must_change_password', False) and bool(current.get('password_hash', ''))
 
@@ -734,6 +773,7 @@ def setup():
     detected_domain, detected_svc = _detect_setup_self_route()
     detected_entry_point = load_settings().get('self_route', {}).get('entry_point', '') or _best_entrypoint()
     return render_template('login.html', setup_mode=True, error=error,
+                           reset_mode=reset_mode,
                            defaults=defaults, csrf_token=_get_csrf_token(),
                            temp_password_mode=temp_password_mode,
                            detected_self_domain=detected_domain,
@@ -851,6 +891,7 @@ def reset_password_cli(disable_otp):
         password_hash=_hash_password(password),
         visible_tabs=settings['visible_tabs'],
         must_change_password=True,
+        setup_password_reset=True,
         setup_complete=settings.get('setup_complete', True),
         otp_secret='' if disable_otp else None,
         otp_enabled=False if disable_otp else None,

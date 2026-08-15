@@ -36,6 +36,7 @@ static_config_path: ""
 auth_enabled: true
 password_hash: "$2b$12$..."
 must_change_password: false
+setup_password_reset: false
 setup_complete: true
 otp_enabled: false
 otp_secret: ""
@@ -162,6 +163,17 @@ python3 -c "import bcrypt; print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()
 **Type:** boolean - **Default:** `false`
 
 When `true`, the user is redirected to a forced password-change screen after login. Set automatically by the CLI reset command.
+
+---
+
+### `setup_password_reset`
+
+**Type:** boolean - **Default:** `false`
+
+When `true`, opening Traefik Manager asks for a new password and nothing else - the setup wizard is
+skipped and the rest of `manager.yml` is left alone. Clears itself once the password is set. Set by the
+CLI reset command, or by hand to recover from a lost password (see
+[Reset Password](/reset-password#method-2-manual-reset-via-manager-yml)).
 
 ---
 
