@@ -27,7 +27,7 @@ Traefik Manager can be installed on Unraid using a custom template hosted at [un
 |---|---|
 | **Web UI Port** | Port to access the UI - default `5000` |
 | **Config Directory** | Persistent storage for settings, password, and session key. Default: `/mnt/user/appdata/traefik-manager/config` |
-| **Config File Path (single file)** | Container-side path to your Traefik dynamic config (`CONFIG_PATH`, default `/app/config/dynamic.yml`). Add a path mapping so the host file lands at that path inside the container |  — and at line 74 change "Leave the **Dynamic Config File** field empty" to "Leave **Config File Path (single file)** at its default; `CONFIG_DIR` takes precedence over it".
+| **Config File Path (single file)** | Container-side path to your Traefik dynamic config (`CONFIG_PATH`, default `/app/config/dynamic.yml`). Add a path mapping so the host file lands at that path inside the container |  - and at line 74 change "Leave the **Dynamic Config File** field empty" to "Leave **Config File Path (single file)** at its default; `CONFIG_DIR` takes precedence over it".
 | **Traefik API URL** | URL of the Traefik API - usually `http://traefik:8080` if on the same Docker network |
 | **Domains** | Comma-separated base domains for the Add Route form - e.g. `example.com,home.lab` |
 
