@@ -724,7 +724,7 @@ function _routeIconHtml(app) {
 }
 
 function _tmModern() {
-    return document.documentElement.classList.contains('tm-modern');
+    return true;
 }
 
 function _tmFolderMode(apps) {
@@ -830,8 +830,7 @@ function renderRouteGrid(apps) {
         });
     }
     if (_activeAgent) apps = apps.filter(a => !a.provider || a.provider === 'file');
-    const countEl = document.getElementById('countRoutes');
-    if (countEl) countEl.textContent = apps.filter(a => (!a.provider || a.provider === 'file') && a.enabled !== false).length;
+    setTabCount('services', apps.filter(a => (!a.provider || a.provider === 'file') && a.enabled !== false).length);
     const grid = document.getElementById('routeGrid');
     if (!grid) return;
     const emptyEl = document.getElementById('routeEmpty');

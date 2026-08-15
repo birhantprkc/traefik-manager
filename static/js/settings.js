@@ -38,14 +38,10 @@ async function toggleTabVisibility(tab) {
     const newVal = !_visibleTabsCache[tab];
 
     _visibleTabsCache[tab] = newVal;
-    const sw  = document.getElementById('toggle-' + tab);
-    const btn = document.getElementById('btn-' + tab);
-    if (sw)  sw.classList.toggle('on', newVal);
-    if (btn) {
-        btn.style.display = newVal ? 'block' : 'none';
-        if (!newVal && btn.classList.contains('active')) switchTab('services');
-        buildSideNav();
-    }
+    const sw = document.getElementById('toggle-' + tab);
+    if (sw) sw.classList.toggle('on', newVal);
+    if (!newVal && _activeTab === tab) switchTab('services');
+    buildSideNav();
 
     if (_activeAgent) {
         const key = 'tm_tabs_agent_' + _activeAgent.id;

@@ -45,8 +45,7 @@ document.addEventListener('keydown', e => {
             case 'X': e.preventDefault(); openStaticYamlPopoutFromShortcut(); break;
             case 'P': e.preventDefault(); openSettingsModal(); break;
             case 'D': {
-                const b = document.getElementById('btn-dashboard');
-                if (b && b.offsetParent !== null) { e.preventDefault(); switchTab('dashboard'); }
+                if (_tabVisible('dashboard')) { e.preventDefault(); switchTab('dashboard'); }
                 break;
             }
             case 'A': {

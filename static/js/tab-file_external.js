@@ -37,7 +37,7 @@ async function refreshFileExternalTab() {
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return mwProv === 'file'; });
         renderProviderMiddlewareSection(_mws, 'fileExternalMiddlewares');
-        document.getElementById('fileExternalTabCount').textContent = _allFileExternalRoutes.length;
+        setTabCount('file_external', _allFileExternalRoutes.length);
         renderFileExternalRoutes();
     } catch(e) {
         container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Traefik API not reachable</p></div>`;

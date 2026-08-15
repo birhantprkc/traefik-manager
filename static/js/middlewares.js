@@ -524,8 +524,7 @@ function renderMwGrid(middlewares) {
         grid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4';
     }
     _mwCardEls = Array.from(grid.querySelectorAll('.mw-card'));
-    const _mwCountEl = document.getElementById('countMw');
-    if (_mwCountEl) _mwCountEl.textContent = middlewares.length;
+    setTabCount('middlewares', middlewares.length);
     filterMw();
 }
 
@@ -724,7 +723,7 @@ async function refreshPluginsTab() {
                     &nbsp;&nbsp;- /path/to/traefik.yml:/traefik.yml
                 </div>
             </div>`;
-            document.getElementById('pluginsTabCount').textContent = '0';
+            setTabCount('plugins', '0');
             return;
         }
 
@@ -737,12 +736,12 @@ async function refreshPluginsTab() {
                 <p class="font-medium mb-1">No plugins configured</p>
                 ${addHint}
             </div>`;
-            document.getElementById('pluginsTabCount').textContent = '0';
+            setTabCount('plugins', '0');
             return;
         }
 
         _allPlugins = plugins;
-        document.getElementById('pluginsTabCount').textContent = plugins.length;
+        setTabCount('plugins', plugins.length);
         renderPluginCards();
     } catch(e) {
         container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>Could not load plugin data</p></div>`;

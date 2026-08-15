@@ -83,7 +83,7 @@ async function refreshCertsTab() {
                 ],
                 note: 'No Traefik restart needed - only traefik-manager needs to be updated.'
             });
-            document.getElementById('certsTabCount').textContent = '0';
+            setTabCount('certs', '0');
             return;
         }
 
@@ -93,12 +93,12 @@ async function refreshCertsTab() {
                 <p class="font-medium">No certificates found</p>
                 <p class="text-xs mt-1">acme.json may be empty - certs are issued on first request.</p>
             </div>`;
-            document.getElementById('certsTabCount').textContent = '0';
+            setTabCount('certs', '0');
             return;
         }
 
         _allCerts = certs;
-        document.getElementById('certsTabCount').textContent = certs.length;
+        setTabCount('certs', certs.length);
         renderCertCards();
     } catch(e) {
         container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>Could not load certificate data</p></div>`;
