@@ -2680,7 +2680,10 @@ def api_logs():
             f.seek(0, 2)
             remaining = f.tell()
             partial = b''
-            while remaining > 0 and len(lines) < lines_req:
+            # Count only non-blank lines: a log ending in a newline yields a trailing empty
+            # element, which would otherwise consume one of the requested slots and return
+            # lines_req - 1 rows.
+            while remaining > 0 and sum(1 for ln in lines if ln.strip()) < lines_req:
                 chunk = min(buf_size, remaining)
                 remaining -= chunk
                 f.seek(remaining)
@@ -2690,7 +2693,8 @@ def api_logs():
                 lines = split[1:] + lines
             if partial:
                 lines = [partial] + lines
-        result = [l.decode('utf-8', errors='replace').rstrip() for l in lines[-lines_req:] if l]
+        kept = [ln for ln in lines if ln.strip()]
+        result = [ln.decode('utf-8', errors='replace').rstrip() for ln in kept[-lines_req:]]
         return jsonify({'lines': result})
     except Exception as e:
         return jsonify({'error': str(e), 'lines': []})

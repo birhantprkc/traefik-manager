@@ -291,7 +291,7 @@ function renderServicesTable() {
         document.getElementById('liveContent').innerHTML = `<div class="${cls}">${cards}${empty}</div>`;
     }
 
-    document.getElementById('svcTabCount').textContent = _allServices.filter(s => s._proto === 'HTTP').length;
+    setTabCount('live', _allServices.length);
 }
 
 function openSvcDetail(idx) {

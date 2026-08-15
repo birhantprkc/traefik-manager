@@ -655,7 +655,7 @@ function _sdBuild(data) {
         objs: objs,
         pairs: pairs,
         avail: avail,
-        counts: { httpSvc: httpS.length },
+        counts: { httpSvc: httpS.length, allSvc: httpS.length + tcpS.length + udpS.length },
         entrypoints: eps,
         overview: _sdOverview(data.overview),
         version: (data.version && !data.version.error) ? data.version : null,
@@ -1118,10 +1118,8 @@ async function loadOverviewStats() {
         _sdModel = model;
         _sdRender(model);
 
-        const dockerEl = document.getElementById('dockerTabCount');
-        if (dockerEl) dockerEl.textContent = model.pairs.filter(p => p.obj.provider === 'docker').length || '-';
-        const svcEl = document.getElementById('svcTabCount');
-        if (svcEl && model.avail.service) svcEl.textContent = model.counts.httpSvc;
+        setTabCount('docker', model.pairs.filter(p => p.obj.provider === 'docker').length || '-');
+        if (model.avail.service) setTabCount('live', model.counts.allSvc);
 
         _sdApiStatusMap = {};
         model.pairs.forEach(p => {
@@ -1153,11 +1151,11 @@ async function loadOverviewStats() {
 
     agentFetch('/api/traefik/certs').then(r => r.json()).then(res => {
         const n = (res.certs || []).length;
-        document.getElementById('certsTabCount').textContent = n || '-';
+        setTabCount('certs', n || '-');
     }).catch(() => {});
 
     agentFetch('/api/traefik/plugins').then(r => r.json()).then(res => {
         const n = (res.plugins || []).length;
-        document.getElementById('pluginsTabCount').textContent = n || '-';
+        setTabCount('plugins', n || '-');
     }).catch(() => {});
 }
