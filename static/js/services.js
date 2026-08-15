@@ -68,7 +68,7 @@ async function refreshLiveView() {
         const r = await agentFetch('/api/traefik/services');
         const res = await r.json();
         if (res.error) {
-            container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-plug-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Traefik API not reachable</p><p class="text-sm mt-2 font-mono px-4" style="color:var(--text-secondary);word-break:break-all">${_esc(res.error)}</p></div>`;
+            container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Traefik API not reachable</p><p class="text-sm mt-2 font-mono px-4" style="color:var(--text-secondary);word-break:break-all">${_esc(res.error)}</p></div>`;
             return;
         }
         const http = (res.http || []).map(s => ({ ...s, _proto: 'HTTP' }));
@@ -77,13 +77,13 @@ async function refreshLiveView() {
         _allServices = [...http, ...tcp, ...udp].sort((a,b) => (a.name||'').localeCompare(b.name||''));
 
         if (_allServices.length === 0) {
-            container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-plug-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Traefik API not reachable</p><p class="text-sm mt-1">Set <code class="font-mono">TRAEFIK_API_URL</code> and enable <code class="font-mono">api: {}</code> in Traefik static config</p></div>`;
+            container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Traefik API not reachable</p><p class="text-sm mt-1">Set <code class="font-mono">TRAEFIK_API_URL</code> and enable <code class="font-mono">api: {}</code> in Traefik static config</p></div>`;
             return;
         }
 
         renderServicesTable();
     } catch(e) {
-        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-plug-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Traefik API not reachable</p></div>`;
+        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Traefik API not reachable</p></div>`;
     }
 }
 
@@ -160,14 +160,12 @@ function renderServicesTable() {
         const stColor = st === 'success' ? 'var(--green)' : st === 'error' ? 'var(--red)' : 'var(--yellow)';
         const stLabel = st === 'success' ? 'Success'      : st === 'error' ? 'Error'      : 'Warning';
 
-        // Server health from serverStatus map (Traefik API)
         const serverStatus  = s.serverStatus || {};
         const serverEntries = Object.entries(serverStatus);
         const activeCount   = serverEntries.filter(([,v]) => (v||'').toLowerCase() === 'up').length;
         const serverSummary = serverEntries.length > 0 ? `${activeCount}/${serverEntries.length} active` : null;
         const srvColor      = serverEntries.length > 0 && activeCount === serverEntries.length ? 'var(--green)' : 'var(--orange)';
 
-        // Used-by router chips
         const usedBy = s.usedBy || [];
         const usedByHtml = usedBy.length > 0 ? `
             <div class="svc-card-usedby">
@@ -228,7 +226,7 @@ function renderServicesTable() {
             <div class="svc-card-name">${_esc(name)}</div>
             <div class="svc-card-meta">
                 <span class="svc-meta-chip"><i class="ph-bold ph-database" style="font-size:10px"></i>${_esc(provider)}</span>
-                ${serverSummary ? `<span class="svc-meta-chip" style="color:${srvColor};background:color-mix(in srgb,${srvColor} 10%,transparent);border-color:color-mix(in srgb,${srvColor} 35%,transparent)"><i class="ph-bold ph-server" style="font-size:10px"></i>${serverSummary}</span>` : ''}
+                ${serverSummary ? `<span class="svc-meta-chip" style="color:${srvColor};background:color-mix(in srgb,${srvColor} 10%,transparent);border-color:color-mix(in srgb,${srvColor} 35%,transparent)"><i class="ph-bold ph-hard-drives" style="font-size:10px"></i>${serverSummary}</span>` : ''}
             </div>
             ${usedByHtml}
         </div>`;
@@ -274,7 +272,7 @@ function renderServicesTable() {
                 <div class="svc-list-col-name">${_esc(name)}</div>
                 <div class="svc-list-col-url overflow-hidden">${serverUrlHtml}</div>
                 <div class="svc-list-col-provider"><span class="d-flat d-off"><i class="ph-bold ph-database" style="font-size:10px;margin-right:4px"></i>${_esc(provider)}</span></div>
-                <div class="svc-list-col-servers">${serverSummary ? `<span class="d-flat" style="color:${srvColor}"><i class="ph-bold ph-server" style="font-size:10px;margin-right:4px"></i>${serverSummary}</span>` : '<span class="d-flat d-off">-</span>'}</div>
+                <div class="svc-list-col-servers">${serverSummary ? `<span class="d-flat" style="color:${srvColor}"><i class="ph-bold ph-hard-drives" style="font-size:10px;margin-right:4px"></i>${serverSummary}</span>` : '<span class="d-flat d-off">-</span>'}</div>
                 <div class="svc-list-col-usedby">${usedBy.length > 0 ? `<span class="d-flat d-mw"><i class="ph-bold ph-git-branch" style="font-size:9px;margin-right:4px"></i>${usedBy.length}</span>` : '<span class="d-flat d-off">-</span>'}</div>
             </div>`;
         }).join('');

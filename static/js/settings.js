@@ -91,12 +91,12 @@ function _renderApiKeyList(keys) {
     }
     if (addBtn) addBtn.style.display = keys.length >= 10 ? 'none' : '';
     list.innerHTML = keys.map(k => `
-        <div class="flex items-center justify-between" style="background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
-            <div class="flex flex-col" style="gap:2px;">
-                <span class="text-xs font-semibold" style="color:var(--text)">${k.name.replace(/</g,'&lt;')}</span>
-                <code class="text-xs font-mono" style="color:var(--muted);font-size:10px;letter-spacing:.05em">${k.preview}</code>
+        <div class="sc-set">
+            <div class="sc-set-l">
+                <div class="sc-set-n">${k.name.replace(/</g,'&lt;')}</div>
+                <div class="sc-set-d"><code class="font-mono" style="letter-spacing:.05em">${k.preview}</code></div>
             </div>
-            <button onclick="revokeApiKey('${k.preview.replace(/'/g,"\\'")}')" class="nav-btn text-xs" style="color:var(--red);border-color:rgba(248,81,73,0.3);flex-shrink:0;"><i class="ph-bold ph-x"></i> Revoke</button>
+            <div class="sc-set-v"><button onclick="revokeApiKey('${k.preview.replace(/'/g,"\\'")}')" class="nav-btn text-xs" style="color:var(--red);border-color:rgba(248,81,73,0.3);flex-shrink:0;"><i class="ph-bold ph-x"></i> Revoke</button></div>
         </div>`).join('');
 }
 
@@ -379,7 +379,6 @@ const TRAEFIK_ADVISORIES = [
         url: 'https://github.com/traefik/traefik/security/advisories/GHSA-5m6w-wvh7-57vm',
         forwardAuthRelated: true,
         summary: 'ForwardAuth authentication bypass via forwarded header aliases',
-        // Fixed in 2.11.43 / 3.6.14 / 3.7.0-rc.2. Any 3.x below 3.6.14 (3.7.0+ is above) or 2.x below 2.11.43 is affected.
         affected: (p) => {
             const [maj, min, pat] = p;
             if (maj < 2) return true;

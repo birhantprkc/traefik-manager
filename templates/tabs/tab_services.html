@@ -50,7 +50,7 @@
     </div>
 
     <div id="bulkBar" style="display:none;position:sticky;bottom:16px;z-index:50;margin-top:12px">
-        <div class="flex items-center gap-2 px-4 py-3 rounded-xl" style="background:var(--card-bg);border:1px solid var(--blue);box-shadow:0 4px 24px rgba(0,0,0,0.3)">
+        <div class="flex items-center gap-2 px-4 py-3 rounded-xl" style="background:var(--card);border:1px solid var(--blue);box-shadow:0 4px 24px rgba(0,0,0,0.3)">
             <span id="bulkCount" class="text-sm font-semibold" style="color:var(--text)">0 selected</span>
             <div class="flex-1"></div>
             <button onclick="bulkEnable()" class="proto-btn active-http text-xs px-3 py-1.5" style="border-radius:6px"><i class="ph-bold ph-toggle-right" style="margin-right:4px"></i>Enable</button>
@@ -65,7 +65,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="routeGrid"></div>
 
     <div id="routeEmpty" class="text-center py-20" style="display:none;color:var(--muted)">
-        <i class="ph-light ph-list-plus text-6xl block mb-4 opacity-30"></i>
+        <i class="ph-light ph-arrows-split text-6xl block mb-4 opacity-30"></i>
         <p class="text-base font-medium" id="routeEmptyText">No routes yet</p>
         <p class="text-sm mt-1 mb-5" id="routeEmptySub">Create your first route to start managing your Traefik proxy.</p>
         <button onclick="openModal()" id="routeEmptyCta" class="nav-btn nav-btn-primary" style="display:inline-flex">

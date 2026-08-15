@@ -4,7 +4,7 @@ Traefik Manager can fire an HTTP POST to a webhook URL on every notification eve
 
 Configure webhooks in **Settings - Notifications**.
 
-Every message the UI shows as a toast is also kept in the notification drawer behind the bell, so a message that disappears before you read it can still be found. Messages raised in the browser (validation errors, failed requests) are recorded there but are not sent to webhooks; only server-side events fire a webhook. Repeats of the same message within a few seconds are recorded once.
+Every message the UI shows as a toast is also kept in the notification drawer behind the bell, so a message that disappears before you read it can still be found. Messages raised in the browser (validation errors, failed requests) are recorded there but are not sent to webhooks. The exceptions are the **Ping all** summary and Traefik version-update notices, which are raised by the UI and do fire a webhook. Repeats of the same message within a few seconds are recorded once.
 
 ---
 
@@ -30,7 +30,7 @@ Payload format:
 {
   "embeds": [{
     "title": "Route my-app saved",
-    "color": 4088960,
+    "color": 4176208,
     "footer": { "text": "Traefik Manager - 2026-05-18 12:00:00" }
   }]
 }
@@ -93,5 +93,5 @@ Payload format:
 |---|---|
 | `success` | Route saved, middleware saved, backup created |
 | `warning` | Route deleted, backup restored, ping failures |
-| `error` | Save errors, restore errors |
+| `error` | Git push failures, git backup failures, git restore errors |
 | `info` | Login events, ping all results, version updates |

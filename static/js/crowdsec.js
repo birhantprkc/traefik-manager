@@ -319,6 +319,10 @@ function _atkSpec(obj) {
 function _atkActive() { return Object.keys(_atkFacet).filter(k => _atkFacet[k]); }
 function _atkClearFacets() { Object.keys(_atkFacet).forEach(k => { _atkFacet[k] = ''; }); }
 
+function _atkRevealFeed() {
+    revealBelowFold(document.querySelector('#csStats .atk-feed'));
+}
+
 function _atkOpenCsSettings() {
     if (typeof openSettingsModal !== 'function') return;
     openSettingsModal('system');
@@ -345,30 +349,42 @@ function _atkGo(spec) {
             const box = document.getElementById('csSearch');
             if (box) box.value = '';
         }
+        if (_atkViewAuto) { _atkView = 'alerts'; _atkViewAuto = false; }
         _atkPage = 1; _atkOpen = '';
         _csRender();
+        _atkRevealFeed();
         return;
     }
     if ('cfg' in p) { _atkOpenCsSettings(); return; }
     if ('reload' in p) { refreshCrowdSecTab(); return; }
     if ('unban' in p) { csUnban(Number(p.unban)); return; }
     if ('ban' in p) { openCsBanModal(p.ban); return; }
-    if ('page' in p) { _atkPage = Math.max(1, parseInt(p.page, 10) || 1); _atkOpen = ''; _csRender(); return; }
-    if ('open' in p) { _atkOpen = (_atkOpen === p.open) ? '' : p.open; _csRender(); return; }
+    if ('page' in p) { _atkPage = Math.max(1, parseInt(p.page, 10) || 1); _atkOpen = ''; _csRender(); _atkRevealFeed(); return; }
+    if ('open' in p) { _atkOpen = (_atkOpen === p.open) ? '' : p.open; _csRender(); _atkRevealFeed(); return; }
     if ('view' in p) {
         _atkView = p.view === 'decisions' ? 'decisions' : 'alerts';
+        _atkViewAuto = false;
         _atkPage = 1; _atkOpen = '';
-        if (Object.keys(p).length === 1) { _csRender(); return; }
+        if (Object.keys(p).length === 1) { _csRender(); _atkRevealFeed(); return; }
     }
     const keys = Object.keys(p).filter(k => k in _atkFacet);
-    if (!keys.length) { _csRender(); return; }
+    if (!keys.length) { _csRender(); _atkRevealFeed(); return; }
     const same = !('view' in p) && keys.every(k => _atkFacet[k] === p[k]);
     keys.forEach(k => { _atkFacet[k] = same ? '' : p[k]; });
-    if (!('view' in p) && !same && keys.some(k => ATK_DEC_ONLY[k])) _atkView = 'decisions';
+    if (!('view' in p) && !same) {
+        if (keys.some(k => ATK_DEC_ONLY[k])) {
+            if (_atkView !== 'decisions') { _atkView = 'decisions'; _atkViewAuto = true; }
+        } else if (keys.some(k => ATK_ALERT_ONLY[k]) && _atkView !== 'alerts') {
+            _atkView = 'alerts'; _atkViewAuto = true;
+        }
+    }
+    if (same && _atkViewAuto && !_atkActive().length) { _atkView = 'alerts'; _atkViewAuto = false; }
     _atkPage = 1; _atkOpen = '';
     _csRender();
+    _atkRevealFeed();
 }
 
+let _atkViewAuto = false;
 let _atkBound = false;
 function _atkBind() {
     if (_atkBound) return;
@@ -483,6 +499,14 @@ function _csSetConfigured(on) {
     if (notCfg) notCfg.style.setProperty('display', on ? 'none' : 'flex', 'important');
     if (bar) bar.style.display = on ? '' : 'none';
     if (el && !on) el.innerHTML = '';
+    if (on) return;
+    const onAgent = !!_activeAgent;
+    const hostBlock  = document.getElementById('csNotCfgHost');
+    const agentBlock = document.getElementById('csNotCfgAgent');
+    const agentName  = document.getElementById('csNotCfgAgentName');
+    if (hostBlock)  hostBlock.style.display  = onAgent ? 'none' : '';
+    if (agentBlock) agentBlock.style.display = onAgent ? '' : 'none';
+    if (agentName && onAgent) agentName.textContent = _activeAgent.name || 'this agent';
 }
 
 function _csSkeleton() {
@@ -1114,6 +1138,13 @@ function _atkKeyRow(d, sel) {
         }
         html += '<button type="button" class="sig-key-item" data-atk="clear=all" title="Clear every filter and the search box"><i class="ph-bold ph-x"></i>clear</button>';
     }
+    if (_atkView === 'decisions') {
+        html += '<span class="sig-key-lab">showing</span>'
+            + '<span class="sig-key-item sig-key-on lg-static" title="The feed below is listing active decisions rather than the alerts that caused them">'
+            + '<i class="ph-bold ph-shield-check"></i>bans in force</span>'
+            + '<button type="button" class="sig-key-item" data-atk="view=alerts" title="Go back to the attack evidence, the primary view">'
+            + '<i class="ph-bold ph-crosshair"></i>back to alerts</button>';
+    }
     const scoped = facets.length || _atkQuery;
     const scopeTxt = scoped
         ? _sdNum(sel.alerts.length) + ' of ' + _sdNum(d.retained) + ' retained alerts'
@@ -1564,6 +1595,7 @@ async function submitCsBan() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to add decision');
         document.getElementById('csBanIp').value = '';
+        closeCsBanModal();
         showToast(`Decision added: ${_csBanType} ${ip} for ${duration}`, 'success');
         setTimeout(refreshCrowdSecTab, 800);
     } catch(e) {

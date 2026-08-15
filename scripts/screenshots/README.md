@@ -6,7 +6,14 @@ demo environment, in both themes, at 1920x1080 in the Modern layout, which uses 
 ```bash
 scripts/screenshots/run.sh                 # shoot ghcr.io/chr0nzz/traefik-manager:beta
 scripts/screenshots/run.sh ghcr.io/chr0nzz/traefik-manager:latest
+scripts/screenshots/run.sh --setup         # also retake the setup wizard pages
+scripts/screenshots/run.sh --login         # also retake the login page
+scripts/screenshots/run.sh --auth          # both of the above
 ```
+
+The setup wizard and login page are skipped by default - their screenshots
+rarely change, and each needs its own app restart with different settings.
+Pass `--setup`, `--login` or `--auth` to retake them.
 
 What it does:
 
@@ -24,6 +31,5 @@ What it does:
    existing names, and rebuilds both README carousel GIFs
    (`install_images.py`).
 
-Not covered: the setup wizard (needs an unconfigured instance), the plugins
-tab (demo Traefik has none), and all mobile screenshots. Everything runs in
-throwaway containers and a temp dir; review the git diff before committing.
+Not covered: all mobile screenshots. Everything runs in throwaway containers
+and a temp dir; review the git diff before committing.

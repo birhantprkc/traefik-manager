@@ -50,8 +50,6 @@ def safe_file_path(path: str) -> str:
 
 
 def readable_config_path(path: str) -> str:
-    """Realpath if within the allowed prefixes or a directory of an env-configured
-    Traefik file. Blocks reading arbitrary files via web-set path settings."""
     if not path:
         return ''
     resolved = os.path.realpath(path)
@@ -75,7 +73,6 @@ def readable_config_path(path: str) -> str:
 
 
 def is_safe_path(path: str) -> bool:
-    """Return True if path is inside ACTIVE_CONFIG_DIR (prevents path traversal)."""
     if not env.ACTIVE_CONFIG_DIR:
         return False
     try:
@@ -85,9 +82,6 @@ def is_safe_path(path: str) -> bool:
 
 
 def resolve_config_path(s: str) -> str:
-    """Validate a config file given a basename or full path against CONFIG_PATHS.
-    Returns the canonical path if valid, '' otherwise.
-    If ACTIVE_CONFIG_DIR is set and s is a plain filename, allows new files in CONFIG_DIR."""
     if not s:
         return env.CONFIG_PATH
     s = s.strip()
@@ -151,7 +145,6 @@ def load_config(path=None):
 
 
 def strip_empty_sections(config: dict) -> dict:
-    """Remove empty routers/services/middlewares dicts to avoid Traefik 'standalone element' errors."""
     for proto in ('http', 'tcp', 'udp'):
         if proto in config:
             for section in ('routers', 'services', 'middlewares'):

@@ -2,7 +2,7 @@
 
 The **Static Config** tab lets you view and edit Traefik's static configuration (`traefik.yml`) directly from the Traefik Manager UI. It is an optional tab, off by default - enable it under **Settings → Interface** once the file is available. Changes are staged and backed up before saving; a banner then prompts you to restart Traefik with one click, using whichever restart method you configure.
 
-The tab toggle only appears when `STATIC_CONFIG_PATH` is set and the file exists. In the Modern layout the sections tile into responsive columns; in Classic they appear as sub-tabs.
+The tab toggle only appears once a static config path is configured and the file exists. The path comes from the `static_config_path` field in `manager.yml` (Settings) if set, otherwise from the `STATIC_CONFIG_PATH` environment variable - the manager.yml value wins when both are present. In the Modern layout the sections tile into responsive columns; in Classic they appear as sub-tabs.
 
 Everything on this page also works for [remote agents](agent.md#static-config-editing): with an agent selected in the server switcher, the same section editors read and write the agent's own `traefik.yml`, with the agent's backup and restart flow.
 
@@ -242,8 +242,8 @@ For existing installs, see [Enable static config editor](static-enable.md).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STATIC_CONFIG_PATH` | `/app/traefik.yml` | Path to `traefik.yml` inside TM's container (or host path for native) |
-| `RESTART_METHOD` | _(unset)_ | `proxy`, `socket`, or `poison-pill` |
+| `STATIC_CONFIG_PATH` | _(unset)_ | Path to `traefik.yml` inside TM's container (or host path for native). No default - the editor stays hidden until it is set. |
+| `RESTART_METHOD` | `proxy` | `proxy`, `socket`, or `poison-pill`. When unset, TM behaves as `proxy` and tries a Docker restart via `DOCKER_HOST`. |
 | `TRAEFIK_CONTAINER` | `traefik` | Container name to restart (used by `proxy` and `socket` methods) |
 | `DOCKER_HOST` | _(unset)_ | Docker socket URL - set to `tcp://socket-proxy:2375` for the proxy method |
 | `SIGNAL_FILE_PATH` | `/signals/restart.sig` | Path to the signal file (poison pill method only) |

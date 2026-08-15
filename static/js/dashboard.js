@@ -22,10 +22,10 @@ const SD_PROV = {
 };
 
 const SD_CARD_META = {
-    http:       { title: 'HTTP Routers',      icon: 'ph-signpost',          accent: 'var(--blue)',   label: 'HTTP routers' },
+    http:       { title: 'HTTP Routers',      icon: 'ph-arrows-split',          accent: 'var(--blue)',   label: 'HTTP routers' },
     stream:     { title: 'TCP / UDP Routers', icon: 'ph-arrows-left-right', accent: 'var(--teal)',   label: 'stream routers' },
     service:    { title: 'Services',          icon: 'ph-hard-drives',       accent: 'var(--green)',  label: 'services' },
-    middleware: { title: 'Middlewares',       icon: 'ph-plugs-connected',   accent: 'var(--purple)', label: 'middlewares' },
+    middleware: { title: 'Middlewares',       icon: 'ph-stack',   accent: 'var(--purple)', label: 'middlewares' },
 };
 
 const SD_PROV_ALIAS = {
@@ -448,7 +448,7 @@ function _sdEpGlyphs(ep, info) {
         'TLS terminated' + (tls.certResolver ? ', certResolver ' + tls.certResolver : ', no certResolver set')]);
     if (ep.http3) g.push(['ph-bold ph-lightning', 'd-mw',
         'HTTP/3 advertised' + (ep.http3.advertisedPort ? ' on port ' + ep.http3.advertisedPort : '')]);
-    if (mws.length) g.push(['ph-bold ph-plugs-connected', 'd-mw',
+    if (mws.length) g.push(['ph-bold ph-stack', 'd-mw',
         'Entry point middlewares ' + mws.join(', ') + ' are prepended into every router on this entry point']);
     if (red) g.push(['ph-bold ph-arrow-bend-up-right', 'd-blue',
         (red.permanent === false ? 'Temporary' : 'Permanent') + ' redirect to ' + (red.to || 'another entry point')

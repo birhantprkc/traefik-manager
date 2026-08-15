@@ -33,14 +33,17 @@ Add routes, manage middlewares, monitor services, and view TLS certificates - al
 
 ## Highlights
 
+- **New design** - full-width layout with a collapsible side navigation, redesigned cards, and slide-in editors throughout
 - **Routes** - add, edit, clone, and enable/disable HTTP, TCP, and UDP routes from the browser
 - **Load balancing** - multiple backends per route, sticky sessions, health checks, and router priority
 - **Middlewares** - 24 guided wizards plus a raw YAML editor, for HTTP and TCP
 - **Multi-server** - manage unlimited remote Traefik instances through a lightweight Go agent
 - **Static config editor** - edit the full `traefik.yml` from the UI and apply it with a one-click Traefik restart
 - **Backups** - timestamped local backups plus git push with history, diffs, and one-click restore
-- **Monitoring** - live services, certificates, access logs, CrowdSec, and CVE advisory warnings
-- **Mobile app** - Android companion app on Google Play
+- **Monitoring** - live services, certificates, CVE advisory warnings, plus access logs and CrowdSec rebuilt as
+  click-through analytics rather than raw lists
+- **Searchable settings** - one box finds any setting by name, description, or current value, across every pane
+- **Mobile app** - native Android companion app on Google Play
 
 ## Quick Start
 
@@ -106,6 +109,7 @@ Open **http://your-server:5000** - the setup wizard will guide you through the r
 
 - **24 guided wizards**: Basic/Digest Auth, Forward Auth (with Authentik, Authelia, and Gatekeeper presets), OIDC Auth, Rate Limit, In-Flight Requests, IP Allowlist, Secure Headers, CORS, Redirects, Strip/Add/Replace Prefix, Retry, Circuit Breaker, Buffering, Compress, Chain, Encoded Characters, and more
 - **Raw YAML editor** for anything the wizards don't cover
+- **Custom templates** - manage your own reusable YAML from a slide-in panel in the middlewares toolbar, and start a new middleware from one in the Add form. Shared across every server
 - **Client IP source selector** in the IP Allowlist wizard - match the real client instead of your proxy, via trusted hop depth (`ipStrategy.depth`) or excluded proxy IPs (`ipStrategy.excludedIPs`)
 - **TCP middlewares** alongside HTTP
 - **Provider middlewares** (Docker, Kubernetes, etc.) shown read-only in the provider tabs
@@ -120,6 +124,8 @@ Open **http://your-server:5000** - the setup wizard will guide you through the r
   - **Route Map** - entry points, routes, middlewares, and services in a visual topology
   - **TLS Options** - create and manage named `tls.options` profiles, assignable per route
   - **CrowdSec** - decisions and alerts from a LAPI; ban, captcha, bypass, or unban IPs with one click
+- **Logs as analytics** - the access log becomes seven click-through cards (status codes, response time, methods, domains, paths, clients, services) with a "where it fails" panel naming the worst status-and-path pairs; every count is a filter, and an optional auto-refresh polls without losing your filters or scroll position
+- **CrowdSec around the attack** - attacking sources, networks by ASN, scenarios, targeted paths, tooling by user agent, and bans in force; colour marks only what is *not* already handled, so a host being probed but absorbed cleanly reads calm. Authenticates with a bouncer key, machine login, or a client certificate for mTLS setups
 - **IP geolocation** *(optional, off by default)* - country flags and a shaded, clickable **world map** of where your traffic and bans come from, on the Logs and CrowdSec tabs; lookups run on the server against a local [DB-IP](https://db-ip.com) database (no IPs leave your machine), or point `GEOIP_DB_PATH` at your own MaxMind `.mmdb`
 - Optional tabs that read a mounted file:
   - **Certs** *(mount `acme.json`)* - TLS certificates with expiry tracking; accepts several storage files or a directory, one per cert resolver
@@ -130,12 +136,15 @@ Open **http://your-server:5000** - the setup wizard will guide you through the r
 - **Configurable file paths** - set the `acme.json`, access log, and static config paths from **Settings → File Paths** without a container restart; UI settings override env vars
 - **Light, dark, or system theme** - the nav-bar toggle sets the default for the whole instance, including the login page
 - Card/list view toggle on Routes, Middlewares, and Services
+- **Typed confirmation for destructive actions** - deleting a route, a middleware, or a bulk selection asks for `DELETE`; restoring a backup or a git commit asks for `RESTORE`. Each says what is lost before it goes, and the word is click-to-copy
+- **Settings search** - filter any pane by setting name, description, or current value, with match counts on the other panes so a setting can be found without knowing which pane holds it
 
 ### Static Config Editor *(optional - mount `traefik.yml` read-write)*
 
 - Edit every part of `traefik.yml` from the UI - **Entrypoints, Cert Resolvers, Plugins, API, Logging, and Providers** sections, plus a raw **Monaco** YAML editor for the full file
 - Changes are staged and backed up; apply them with a **one-click Traefik restart** - via socket proxy (recommended), poison pill (no socket needed), or direct socket
 - Full-screen reconnect overlay polls until Traefik is back up
+- **Show it where you want** - off, inside the Settings window, or as its own tab, grouped into Traffic in, Certificates and Operations with a verdict line naming anything that needs attention
 
 ### Backups
 
@@ -196,12 +205,14 @@ Full documentation at **[traefik-manager.xyzlab.dev](https://traefik-manager.xyz
 | [API Reference](https://traefik-manager.xyzlab.dev/api.html)              | REST API for integrations and the mobile app          |
 | [Agent API](https://traefik-manager.xyzlab.dev/api-agent.html)            | TMA endpoints, auth, and health checks                |
 | [Static Config Editor](https://traefik-manager.xyzlab.dev/static.html)    | Entrypoints, cert resolvers, and the restart flow     |
+| [Enable Static Config](https://traefik-manager.xyzlab.dev/static-enable.html) | Turn it on for an existing install, without re-running setup |
 | [IP Geolocation](https://traefik-manager.xyzlab.dev/geoip.html)           | Country flags, world map, and bring-your-own database |
 | [Notification Webhooks](https://traefik-manager.xyzlab.dev/webhooks.html) | Discord, Slack, ntfy, and generic JSON payloads       |
 | [OIDC / SSO](https://traefik-manager.xyzlab.dev/oidc.html)                | OIDC setup, provider examples, and access control     |
 | [Git Repository Backup](https://traefik-manager.xyzlab.dev/git-backup.html) | Auto-push, commit history, diff viewer, and one-click restore |
 | [Mobile App](https://traefik-manager.xyzlab.dev/mobile.html)              | Android companion app setup and features              |
 | [Reset Password](https://traefik-manager.xyzlab.dev/reset-password.html)  | CLI reset, TOTP recovery, manual reset                |
+| [Beta Program](https://traefik-manager.xyzlab.dev/beta.html)              | Run the `:beta` image and test changes before release |
 | [UI Examples](https://traefik-manager.xyzlab.dev/ui-examples.html)        | Screenshots and walkthroughs                          |
 | [Provider Tabs](https://traefik-manager.xyzlab.dev/tab-docker.html)       | Docker, Kubernetes, Swarm, Nomad, ECS, and more       |
 
@@ -209,7 +220,7 @@ Full documentation at **[traefik-manager.xyzlab.dev](https://traefik-manager.xyz
 
 ## Mobile App
 
-**traefik-manager-mobile** is a React Native companion app for managing Traefik Manager from your phone. Requires **Traefik Manager v1.0.0 or higher**.
+**traefik-manager-mobile** is a native Android companion app for managing Traefik Manager from your phone. Version 2.0 is a ground-up rewrite in Kotlin and Jetpack Compose. Requires **Traefik Manager v1.10.1 or higher**.
 
 |          |                                                                                                |
 | ----------| ------------------------------------------------------------------------------------------------|
@@ -221,7 +232,7 @@ Full documentation at **[traefik-manager.xyzlab.dev](https://traefik-manager.xyz
   <img src="static/icons/GetItOnGooglePlay.svg" alt="Get it on Google Play" height="60" />
 </a>
 
-Features: browse routes, middlewares, and services · enable/disable routes · add and edit routes and middlewares with guided wizards · multiple domains per route · per-service insecureSkipVerify · multi-config file picker · edit mode for bulk actions · CrowdSec tab · system light/dark theme.
+Features: the signal desk on Home · routes, middlewares and services with guided wizards and raw YAML · live log tail with analytics · the full CrowdSec desk with a world map · certificates and plugins · local and Git backups with restore · multi-server switching between the host and every agent · configurable home screen widgets · biometric app lock · system light/dark theme.
 
 ---
 
@@ -230,14 +241,14 @@ Features: browse routes, middlewares, and services · enable/disable routes · a
 | Layer     | Technology                                    |
 | -----------| -----------------------------------------------|
 | Backend   | Python 3.11 · Flask 3.1 · Gunicorn            |
-| Agent     | Go 1.23 · Alpine Linux (TMA - remote agent daemon) |
+| Agent     | Go 1.25 · Alpine Linux (TMA - remote agent daemon) |
 | Config    | ruamel.yaml (preserves comments and Go templates) |
 | Auth      | bcrypt · pyotp (TOTP) · Flask sessions · CSRF · Flask-Limiter · Fernet |
 | Frontend  | Vanilla JS · Tailwind CSS 3.4 · Phosphor Icons |
 | Editor    | Monaco Editor 0.52 (VS Code engine)           |
 | Route Map | dagre 0.8 (graph layout)                      |
 | Geolocation | maxminddb · DB-IP Lite (local lookups, no external calls) |
-| Tests     | pytest · pyflakes · `go test` - run on every pull request |
+| Tests     | pytest · ruff · `go test` - run on every pull request |
 | Container | Docker · Alpine Linux · all JS/CSS dependencies bundled at build time (no CDN at runtime) |
 
 ---

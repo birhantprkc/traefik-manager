@@ -11,10 +11,10 @@ async function capture(theme) {
     const js = code => page.evaluate(code);
     const tab = async (t, ms=1800) => { await js(`switchTab('${t}')`); await sleep(ms); };
 
-    await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await js(`localStorage.setItem('tm-theme', '${theme}'); localStorage.setItem('tm-static-setup-v1', '1');`);
-    await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60000 });
-    await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await sleep(4500);
     await js(`document.querySelectorAll('body > div[style*="--red"]').forEach(b => b.remove())`);
     await js(`fetch('/api/settings/ui', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', ..._csrfHeaders() }, body: JSON.stringify({ ui_prefs: { layoutMode: 'modern', statBarScope: 'all' } }) })`);
@@ -53,22 +53,36 @@ async function capture(theme) {
     await js(`if (typeof _visibleTabsCache !== 'undefined' && !_visibleTabsCache.crowdsec) toggleTabVisibility('crowdsec')`); await sleep(700);
     await tab('crowdsec', 4000);
     await shot('crowdsec');
-    await tab('logs', 2500);
+    await tab('logs', 3000);
+    await shot('logs');
     await tab('plugins', 2000);
     await shot('plugins');
     await js(`openPluginForm()`); await sleep(1200); await shot('plugins-add');
     await js(`closePluginForm()`); await sleep(500);
-    await shot('logs');
 
     await tab('services', 600);
     await js(`openSettingsModal('ui')`); await sleep(1400); await shot('settings-interface');
-    await js(`switchSettingsPanel('auth')`); await sleep(900); await shot('settings-auth-password');
-    await js(`switchAuthTab('apikeys', document.getElementById('auth-tab-apikeys'))`); await sleep(700); await shot('settings-auth-apikeys');
-    await js(`switchAuthTab('oidc', document.getElementById('auth-tab-oidc'))`); await sleep(700); await shot('settings-auth-oidc');
-    await js(`switchSettingsPanel('backups'); loadBackups()`); await sleep(1200); await shot('settings-backups');
-    await js(`switchSettingsPanel('system')`); await sleep(900); await shot('settings-system');
+    await js(`openSettingsChild('auth','password')`); await sleep(1000); await shot('settings-auth-password');
+    await js(`openSettingsChild('auth','apikeys')`); await sleep(900); await shot('settings-auth-apikeys');
+    await js(`openSettingsChild('auth','oidc')`); await sleep(900); await shot('settings-auth-oidc');
+    await js(`openSettingsChild('backups','routes'); loadBackups()`); await sleep(1300); await shot('settings-backups');
+    await js(`openSettingsChild('system','tabs')`); await sleep(1000); await shot('settings-system');
     await js(`switchSettingsPanel('routes')`); await sleep(900); await shot('settings-routes');
     await js(`switchSettingsPanel('connection')`); await sleep(900); await shot('settings-connection');
+    await js(`switchSettingsPanel('notifications')`); await sleep(900); await shot('settings-notifications');
+    await js(`switchSettingsPanel('agents'); loadAgentsList()`);
+    await page.waitForFunction(
+        `!/Loading agents/.test(document.getElementById('agentsListBody')?.textContent || '')`,
+        { timeout: 20000 }).catch(() => console.log('  ! agents list never finished loading'));
+    await sleep(1500); await shot('settings-agents');
+    const agentId = await js(`document.querySelector('#agentsListBody [data-agent-id]')?.dataset.agentId || ''`);
+    if (agentId) {
+        await js(`openAgentKeys('${agentId}', 'edge-vps')`);
+        await sleep(2500); await shot('settings-agent-keys');
+        await js(`closeAgentKeys()`); await sleep(400);
+    } else {
+        console.log('  ! no agent row to open keys from, skipping settings-agent-keys');
+    }
     await js(`switchSettingsPanel('about')`); await sleep(1200); await shot('settings-about');
     await js(`closeSettingsModal()`);
 
@@ -79,6 +93,12 @@ async function capture(theme) {
     await tab('dashboard', 3000);
     const row = await page.$('.rm-route-link');
     if (row) { await row.hover(); await sleep(400); await shot('dashboard-hover'); }
+
+    await js(`setDashPodDensity('icons')`);
+    await sleep(3000);
+    await shot('dashboard-icons');
+    await js(`setDashPodDensity('list')`);
+    await sleep(1500);
 
     await page.close(); await ctx.close();
 }

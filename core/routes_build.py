@@ -1,9 +1,3 @@
-"""Building route and middleware views from the dynamic config.
-
-Shared by the Host and by remote agents: the same builders turn a parsed config
-plus live Traefik API data into the route objects the UI and mobile app consume,
-and the same merge helpers write them back.
-"""
 import ipaddress
 import os
 from io import StringIO
@@ -449,7 +443,7 @@ def _build_all_apps(include_external=True, include_internal=False):
         }
     for route_id, rdata in settings.get('disabled_routes', {}).items():
         if route_id.startswith('agent_'):
-            continue  # agent disabled routes belong to that agent, not the host
+            continue
         rname    = route_id.split('::', 1)[1] if '::' in route_id else route_id
         proto    = rdata.get('protocol', 'http')
         router   = rdata.get('router', {})

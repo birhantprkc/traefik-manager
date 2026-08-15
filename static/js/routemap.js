@@ -431,7 +431,6 @@ function rmRenderTopology(routes) {
     if (W < contW * 0.9) {
         const sx = contW / W;
         g.nodes().forEach(v => { const nd = g.node(v); if (nd) nd.x = nd.x * sx; });
-        // edge points no longer used for main map drawing - DOM positions used instead
         W = Math.ceil(contW);
     }
     _rmDagreW = W;

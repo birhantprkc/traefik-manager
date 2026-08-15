@@ -151,6 +151,8 @@ CrowdSec's LAPI uses **two different credentials**, and they are **complementary
 
 Neither credential is a superset of the other, so set **both** for the full tab. The tab is considered configured as soon as the LAPI URL plus either credential is present, and it says plainly which half is missing.
 
+A **TLS client certificate** is the third option: if your LAPI authenticates with mutual TLS (`bouncers_allowed_ou` / `agents_allowed_ou`), one certificate covers both halves of the table and no key or password is needed. See below.
+
 ### Option 1 - Settings UI
 
 Go to **Settings → System Monitoring → CrowdSec** and fill in:
@@ -158,8 +160,9 @@ Go to **Settings → System Monitoring → CrowdSec** and fill in:
 - **LAPI URL** - the base URL of your CrowdSec LAPI (e.g. `http://crowdsec:8080`)
 - **API key** - a bouncer API key, reads decisions (see below)
 - **Machine Credentials** - machine ID + password, reads alerts and enables unban
+- **Client Certificate mTLS** - cert, key and CA paths for a LAPI behind mutual TLS, replaces both credentials above
 
-Values are stored encrypted in `manager.yml`.
+Values are stored encrypted in `manager.yml` (the certificate fields are paths, not secrets).
 
 ### Option 2 - Environment variables
 
@@ -170,6 +173,17 @@ CROWDSEC_API_KEY=your-bouncer-api-key
 CROWDSEC_MACHINE_ID=traefik-manager
 CROWDSEC_MACHINE_PASSWORD=your-machine-password
 ```
+
+Or with a LAPI behind mutual TLS, a client certificate instead of both credentials - mount the PEM files into the container read-only:
+
+```bash
+CROWDSEC_LAPI_URL=https://crowdsec:8080
+CROWDSEC_CLIENT_CERT=/certs/tm-client.crt
+CROWDSEC_CLIENT_KEY=/certs/tm-client.key
+CROWDSEC_CA_CERT=/certs/ca.crt
+```
+
+The certificate's OU must be listed in the LAPI's `bouncers_allowed_ou` to read decisions and `agents_allowed_ou` to read alerts and unban - list the same OU in both to do it all with one certificate. CrowdSec auto-provisions the bouncer and the machine on first contact, so nothing is created up front.
 
 ### Generating a bouncer API key
 
@@ -196,8 +210,8 @@ This mirrors CrowdSec's own auth model: `cscli decisions list` uses the bouncer/
 
 ## Fetching
 
-- **Decisions** are read with cursor pagination (`id_gt`), 1000 rows per page up to 200 pages. Expired rows are dropped. There is no display cap: every active decision is fetched, and the strip on the Bans card rescales rather than truncating, printing its own `1 cell = N` legend.
-- **Alerts** are read in one uncapped request with `with_decisions=false`. That flag stays: a single community blocklist alert can embed 15,000 decision objects.
+- **Decisions** are read from `/v1/decisions/stream` - a full sync on first read, then cached deltas, resynced hourly. On a LAPI with no stream endpoint it falls back to cursor pagination (`id_gt`), 1000 rows per page up to 200 pages. Expired rows are dropped. Expired rows are dropped. There is no display cap: every active decision is fetched, and the strip on the Bans card rescales rather than truncating, printing its own `1 cell = N` legend.
+- **Alerts** are read in one request with `with_decisions=false` and a row limit - 500 by default, configurable via the `CROWDSEC_ALERT_LIMIT` env var (or the `crowdsec_alert_limit` setting, 0-100000). That flag stays: a single community blocklist alert can embed 15,000 decision objects. That flag stays: a single community blocklist alert can embed 15,000 decision objects.
 - Both are refetched together whenever you open the tab or press Refresh. The feed renders one page at a time, so a busy instance never builds tens of thousands of rows at once.
 
 ## Docker Compose example

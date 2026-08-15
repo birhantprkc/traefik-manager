@@ -36,7 +36,7 @@ Every template switches to **Wizard** mode - a structured form with labeled fiel
 
 | Category | Templates |
 |---|---|
-| Auth | Basic Auth, Digest Auth, Forward Auth, Forward Auth (Authentik), Forward Auth (Authelia), Forward Auth (Gatekeeper) |
+| Auth | Basic Auth, Digest Auth, Forward Auth, Forward Auth (Authentik), Forward Auth (Authelia), Forward Auth (Gatekeeper), OIDC Auth (traefik-oidc-auth) |
 | Security | IP Allow List, IP Allow List (Private Ranges), Rate Limit, Secure Headers, CORS Headers, Encoded Characters (Traefik 3.7+) |
 | Routing | Redirect to HTTPS, Redirect Regex, Strip Prefix, Add Prefix, Replace Path |
 | Advanced | Gzip Compress, Retry, Circuit Breaker, Buffering, Middleware Chain, In-Flight Limit |
@@ -45,9 +45,19 @@ The Forward Auth wizards (including Authentik, Authelia, and Gatekeeper) expose 
 
 The **IP Allow List** wizard includes a **Client IP source** (`ipStrategy`) selector. When Traefik is exposed directly, leave it on **Direct connection**. When a reverse proxy (Cloudflare, another Traefik, nginx) sits in front, the allow-list would otherwise match the proxy's IP on every request - pick **trusted hop depth** to set `ipStrategy.depth` (the number of proxies in front), or **exclude proxy IPs** to set `ipStrategy.excludedIPs` when the proxy's own addresses vary. Depth and excluded IPs are mutually exclusive, matching Traefik's own constraint.
 
+### Custom templates
+
+The built-in list covers the common cases. For YAML you reuse across servers, save it as a custom template: click the templates icon in the middlewares toolbar to open the **Middleware Templates** panel, then **Add Template**. Give it a name and the middleware body, without the name line above it.
+
+Saved templates appear in the **Template** dropdown of the middleware form under a **My Templates** group, below the built-ins. Selecting one loads its YAML into the editor, which you can then edit before saving - the template is a starting point, not a link, so changing a template later does not alter middlewares already created from it.
+
+Templates are stored in `templates.yml` and are shared across every server. They are not per-agent, so one saved on the Host is available when an agent is selected too.
+
 ### Middleware ordering in routes
 
 When attaching middlewares to a route, order matters - Traefik processes them left to right. The middleware chip selector in the route form shows selected middlewares first (numbered by position) with a divider before unselected ones, so you can see the processing order at a glance.
+
+Once an instance has a dozen or more middlewares the selector gains a filter box. Typing narrows the unselected pool and reports how many are hidden; already-selected middlewares always stay visible, so the form never hides what is actually attached to the route.
 
 ## Editing a middleware
 
@@ -55,7 +65,7 @@ Click the pencil icon on any middleware card.
 
 ## Attaching a middleware to a route
 
-When creating or editing a route, enter middleware names in the **Middlewares** field as a comma-separated list, e.g. `auth@file, redirect-https@file`. The `@file` suffix tells Traefik the middleware is defined in the file provider.
+When creating or editing a route, pick middlewares from the **Middlewares** chip selector - click a chip to attach or detach it. Selected chips are numbered by processing order. (The form falls back to a plain text field, comma-separated, only when the Traefik API returns no middlewares.) The `@file` suffix tells Traefik the middleware is defined in the file provider.
 
 TCP routes have their own **Middlewares** chip selector in the route form, offering the TCP middlewares defined in your config; HTTP routes only offer HTTP middlewares.
 

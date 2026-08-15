@@ -2,14 +2,16 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
-const Version = "1.10.0"
+const Version = "1.10.1"
 
 type Config struct {
 	APIKey                    string
@@ -32,6 +34,11 @@ type Config struct {
 	CrowdSecAPIKey            string
 	CrowdSecMachineID         string
 	CrowdSecMachinePassword   string
+	CrowdSecClientCert        string
+	CrowdSecClientKey         string
+	CrowdSecCACert            string
+	CrowdSecReadTimeout       int
+	CrowdSecAlertLimit        int
 	GitBackupEnabled          bool
 	GitBackupRepo             string
 	GitBackupBranch           string
@@ -48,7 +55,43 @@ type App struct {
 	cfg        *Config
 	rl         *perIPLimiter
 	httpClient *http.Client
+	csClient   *http.Client
 	keys       *keyStore
+}
+
+func buildCSClient(cfg *Config) *http.Client {
+	tlsCfg := &tls.Config{}
+	configured := false
+	if cfg.CrowdSecClientCert != "" && cfg.CrowdSecClientKey != "" {
+		pair, err := tls.LoadX509KeyPair(cfg.CrowdSecClientCert, cfg.CrowdSecClientKey)
+		if err != nil {
+			log.Printf("crowdsec client certificate unusable, mTLS disabled: %v", err)
+		} else {
+			tlsCfg.Certificates = []tls.Certificate{pair}
+			configured = true
+		}
+	}
+	if cfg.CrowdSecCACert != "" {
+		pem, err := os.ReadFile(cfg.CrowdSecCACert)
+		if err != nil {
+			log.Printf("crowdsec CA certificate unreadable: %v", err)
+		} else {
+			pool := x509.NewCertPool()
+			if pool.AppendCertsFromPEM(pem) {
+				tlsCfg.RootCAs = pool
+				configured = true
+			} else {
+				log.Printf("crowdsec CA certificate contains no usable PEM data")
+			}
+		}
+	}
+	if !configured {
+		return &http.Client{Timeout: time.Duration(csReadTimeout(cfg)) * time.Second}
+	}
+	return &http.Client{
+		Timeout:   time.Duration(csReadTimeout(cfg)) * time.Second,
+		Transport: &http.Transport{TLSClientConfig: tlsCfg, TLSHandshakeTimeout: 10 * time.Second},
+	}
 }
 
 func envOr(key, def string) string {
@@ -96,10 +139,15 @@ func loadConfig() *Config {
 		TraefikContainer:          envOr("TRAEFIK_CONTAINER", "traefik"),
 		DockerHost:                os.Getenv("DOCKER_HOST"),
 		SignalFilePath:            os.Getenv("SIGNAL_FILE_PATH"),
+		CrowdSecReadTimeout:       envIntRange("CROWDSEC_READ_TIMEOUT", 20, 1, 120),
+		CrowdSecAlertLimit:        envIntRange("CROWDSEC_ALERT_LIMIT", 500, 0, 100000),
 		CrowdSecLAPIURL:           os.Getenv("CROWDSEC_LAPI_URL"),
 		CrowdSecAPIKey:            os.Getenv("CROWDSEC_API_KEY"),
 		CrowdSecMachineID:         os.Getenv("CROWDSEC_MACHINE_ID"),
 		CrowdSecMachinePassword:   os.Getenv("CROWDSEC_MACHINE_PASSWORD"),
+		CrowdSecClientCert:        os.Getenv("CROWDSEC_CLIENT_CERT"),
+		CrowdSecClientKey:         os.Getenv("CROWDSEC_CLIENT_KEY"),
+		CrowdSecCACert:            os.Getenv("CROWDSEC_CA_CERT"),
 		GitBackupEnabled:          envBool("GIT_BACKUP_ENABLED", false),
 		GitBackupRepo:             os.Getenv("GIT_BACKUP_REPO"),
 		GitBackupBranch:           envOr("GIT_BACKUP_BRANCH", "main"),
@@ -126,6 +174,7 @@ func main() {
 		cfg:        cfg,
 		rl:         newPerIPLimiter(cfg.RateLimit),
 		httpClient: &http.Client{Transport: transport},
+		csClient:   buildCSClient(cfg),
 		keys:       newKeyStore(cfg.BackupDir),
 	}
 
@@ -230,4 +279,25 @@ func (a *App) router(w http.ResponseWriter, r *http.Request) {
 	default:
 		jsonError(w, "not found", http.StatusNotFound)
 	}
+}
+
+func csReadTimeout(cfg *Config) int {
+	if cfg == nil || cfg.CrowdSecReadTimeout <= 0 {
+		return 20
+	}
+	return cfg.CrowdSecReadTimeout
+}
+
+func envIntRange(name string, def, lo, hi int) int {
+	v, err := strconv.Atoi(strings.TrimSpace(os.Getenv(name)))
+	if err != nil {
+		return def
+	}
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }

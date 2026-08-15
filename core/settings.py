@@ -1,8 +1,3 @@
-"""manager.yml load/save.
-
-Depends on core.agents_store only for the one-time migration of agent entries
-out of manager.yml into agents.yml.
-"""
 import os
 import threading
 
@@ -21,7 +16,17 @@ UI_PREF_VIEWS = ('routeViewMode', 'mwViewMode', 'svcViewMode')
 UI_PREF_SCOPES = ('statBarScope',)
 UI_PREF_LAYOUTS = ('layoutMode',)
 UI_PREF_DENSITY = ('dashPodDensity',)
-UI_PREF_KEYS = UI_PREF_BOOLS + UI_PREF_VIEWS + UI_PREF_SCOPES + UI_PREF_DENSITY + UI_PREF_LAYOUTS
+UI_PREF_PLACEMENTS = ('staticPlacement',)
+STATIC_SECTION_KEYS = ('entrypoints', 'resolvers', 'providers', 'api', 'log', 'observability', 'system', 'plugins')
+SETTINGS_SECTION_KEYS = ('connection', 'routes', 'system', 'auth', 'backups', 'ui',
+                         'notifications', 'agents', 'agent-keys', 'about')
+UI_PREF_SECTION_ALLOW = {
+    'staticOpenSections': STATIC_SECTION_KEYS,
+    'settingsOpenSections': SETTINGS_SECTION_KEYS,
+}
+UI_PREF_SECTION_LISTS = tuple(UI_PREF_SECTION_ALLOW)
+UI_PREF_KEYS = (UI_PREF_BOOLS + UI_PREF_VIEWS + UI_PREF_SCOPES + UI_PREF_DENSITY
+                + UI_PREF_LAYOUTS + UI_PREF_PLACEMENTS + UI_PREF_SECTION_LISTS)
 
 
 def sanitize_visible_tabs(tabs) -> dict:
@@ -57,6 +62,19 @@ def sanitize_ui_prefs(prefs) -> dict:
             v = str(prefs[k]).strip().lower()
             if v in ('list', 'icons'):
                 out[k] = v
+    for k in UI_PREF_PLACEMENTS:
+        if k in prefs:
+            v = str(prefs[k]).strip().lower()
+            if v in ('off', 'settings', 'tab'):
+                out[k] = v
+    for k, allowed in UI_PREF_SECTION_ALLOW.items():
+        if k in prefs and isinstance(prefs[k], list):
+            seen = []
+            for item in prefs[k]:
+                s = str(item).strip()
+                if s in allowed and s not in seen:
+                    seen.append(s)
+            out[k] = seen
     return out
 
 
@@ -66,6 +84,7 @@ def load_settings() -> dict:
         'cert_resolver':        os.environ.get('CERT_RESOLVER', 'cloudflare'),
         'traefik_api_url':      os.environ.get('TRAEFIK_API_URL', 'http://traefik:8080'),
         'auth_enabled':         True,
+        'auth_external_ack':    False,
         'password_hash':        '',
         'visible_tabs':         {t: False for t in OPTIONAL_TABS},
         'must_change_password': False,
@@ -89,6 +108,7 @@ def load_settings() -> dict:
         'oidc_allowed_groups':  '',
         'oidc_groups_claim':    'groups',
         'oidc_allow_any_authenticated': False,
+        'oidc_auto_login':      False,
         'default_theme':        'dark',
         'ui_prefs':             {},
         'geoip_enabled':        False,
@@ -101,6 +121,11 @@ def load_settings() -> dict:
         'crowdsec_api_key':     '',
         'crowdsec_machine_id':       '',
         'crowdsec_machine_password': '',
+        'crowdsec_client_cert':      '',
+        'crowdsec_client_key':       '',
+        'crowdsec_ca_cert':          '',
+        'crowdsec_read_timeout':     '',
+        'crowdsec_alert_limit':      '',
         'traefik_api_user':          os.environ.get('TRAEFIK_API_USER', ''),
         'traefik_api_password':      os.environ.get('TRAEFIK_API_PASSWORD', ''),
         'git_backup_enabled':        False,
@@ -144,6 +169,8 @@ def load_settings() -> dict:
             merged['traefik_api_url'] = config.safe_api_url(str(data['traefik_api_url'])) or defaults['traefik_api_url']
         if 'auth_enabled' in data:
             merged['auth_enabled'] = bool(data['auth_enabled'])
+        if 'auth_external_ack' in data:
+            merged['auth_external_ack'] = bool(data['auth_external_ack'])
         if 'password_hash' in data:
             merged['password_hash'] = str(data['password_hash']).strip()
         if 'visible_tabs' in data and isinstance(data['visible_tabs'], dict):
@@ -218,6 +245,8 @@ def load_settings() -> dict:
             merged['oidc_allow_any_authenticated'] = bool(data['oidc_allow_any_authenticated'])
         if 'oidc_groups_claim' in data:
             merged['oidc_groups_claim'] = str(data['oidc_groups_claim']).strip()
+        if 'oidc_auto_login' in data:
+            merged['oidc_auto_login'] = bool(data['oidc_auto_login'])
         if 'default_theme' in data:
             _dt = str(data['default_theme']).strip().lower()
             merged['default_theme'] = _dt if _dt in ('dark', 'light', 'system') else 'dark'
@@ -243,6 +272,10 @@ def load_settings() -> dict:
             merged['crowdsec_machine_id'] = str(data['crowdsec_machine_id']).strip()
         if 'crowdsec_machine_password' in data:
             merged['crowdsec_machine_password'] = crypto.decrypt_secret(str(data['crowdsec_machine_password']))
+        for _ck in ('crowdsec_client_cert', 'crowdsec_client_key', 'crowdsec_ca_cert',
+                    'crowdsec_read_timeout', 'crowdsec_alert_limit'):
+            if _ck in data:
+                merged[_ck] = str(data[_ck]).strip()
         if 'traefik_api_user' in data:
             merged['traefik_api_user'] = str(data['traefik_api_user']).strip()
         if 'traefik_api_password' in data:
@@ -278,7 +311,7 @@ def load_settings() -> dict:
         return defaults
 
 def save_settings(domains, cert_resolver, traefik_api_url,
-                  auth_enabled=True, password_hash='', visible_tabs=None,
+                  auth_enabled=True, auth_external_ack=None, password_hash='', visible_tabs=None,
                   must_change_password=None, setup_complete=None,
                   otp_secret=None, otp_enabled=None,
                   api_keys=None,
@@ -292,10 +325,13 @@ def save_settings(domains, cert_resolver, traefik_api_url,
                   oidc_client_secret=None, oidc_display_name=None,
                   oidc_allowed_emails=None, oidc_allowed_groups=None,
                   oidc_allow_any_authenticated=None,
+                  oidc_auto_login=None,
                   oidc_groups_claim=None, webhook_url=None, webhook_type=None,
                   webhook_username=None, webhook_password=None,
                   crowdsec_lapi_url=None, crowdsec_api_key=None,
                   crowdsec_machine_id=None, crowdsec_machine_password=None,
+                  crowdsec_client_cert=None, crowdsec_client_key=None,
+                  crowdsec_ca_cert=None,
                   traefik_api_user=None, traefik_api_password=None,
                   git_backup_enabled=None, git_backup_repo=None,
                   git_backup_branch=None, git_backup_username=None,
@@ -307,6 +343,8 @@ def save_settings(domains, cert_resolver, traefik_api_url,
     if visible_tabs is None:
         visible_tabs = {t: False for t in OPTIONAL_TABS}
     _cur = load_settings()
+    if auth_external_ack is None:
+        auth_external_ack = _cur.get('auth_external_ack', False)
     if must_change_password is None:
         must_change_password = _cur.get('must_change_password', False)
     if setup_complete is None:
@@ -359,6 +397,8 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         oidc_allow_any_authenticated = _cur.get('oidc_allow_any_authenticated', False)
     if oidc_groups_claim is None:
         oidc_groups_claim = _cur.get('oidc_groups_claim', 'groups')
+    if oidc_auto_login is None:
+        oidc_auto_login = _cur.get('oidc_auto_login', False)
     if webhook_url is None:
         webhook_url = _cur.get('webhook_url', '')
     if webhook_type is None:
@@ -375,6 +415,12 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         crowdsec_machine_id = _cur.get('crowdsec_machine_id', '')
     if crowdsec_machine_password is None:
         crowdsec_machine_password = _cur.get('crowdsec_machine_password', '')
+    if crowdsec_client_cert is None:
+        crowdsec_client_cert = _cur.get('crowdsec_client_cert', '')
+    if crowdsec_client_key is None:
+        crowdsec_client_key = _cur.get('crowdsec_client_key', '')
+    if crowdsec_ca_cert is None:
+        crowdsec_ca_cert = _cur.get('crowdsec_ca_cert', '')
     if traefik_api_user is None:
         traefik_api_user = _cur.get('traefik_api_user', '')
     if traefik_api_password is None:
@@ -412,6 +458,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'cert_resolver':        cert_resolver,
         'traefik_api_url':      traefik_api_url,
         'auth_enabled':         auth_enabled,
+        'auth_external_ack':    auth_external_ack,
         'password_hash':        password_hash,
         'visible_tabs':         visible_tabs,
         'must_change_password': must_change_password,
@@ -434,6 +481,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'oidc_allowed_emails':  oidc_allowed_emails,
         'oidc_allowed_groups':  oidc_allowed_groups,
         'oidc_allow_any_authenticated': bool(oidc_allow_any_authenticated),
+        'oidc_auto_login':      bool(oidc_auto_login),
         'default_theme':        default_theme,
         'ui_prefs':             ui_prefs,
         'geoip_enabled':        bool(geoip_enabled),
@@ -447,6 +495,9 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'crowdsec_api_key':     crypto.encrypt_secret(crowdsec_api_key) if crowdsec_api_key else '',
         'crowdsec_machine_id':       crowdsec_machine_id,
         'crowdsec_machine_password': crypto.encrypt_secret(crowdsec_machine_password) if crowdsec_machine_password else '',
+        'crowdsec_client_cert':      str(crowdsec_client_cert).strip(),
+        'crowdsec_client_key':       str(crowdsec_client_key).strip(),
+        'crowdsec_ca_cert':          str(crowdsec_ca_cert).strip(),
         'traefik_api_user':          traefik_api_user,
         'traefik_api_password':      crypto.encrypt_secret(traefik_api_password) if traefik_api_password else '',
         'git_backup_enabled':        git_backup_enabled,
@@ -478,12 +529,6 @@ def _get_acme_json_path() -> str:
 
 
 def get_acme_json_paths() -> list:
-    """Every acme storage file to read, in order.
-
-    The setting takes a comma-separated list, and any entry that is a directory
-    contributes its .json files. Traefik writes one storage file per resolver,
-    so a setup with several resolvers has several files.
-    """
     raw = _get_acme_json_path()
     out = []
     for part in (p.strip() for p in raw.split(',')):

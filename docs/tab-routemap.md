@@ -47,7 +47,7 @@ Middleware nodes show a usage count badge (e.g. `3x`) when they are used by more
 
 ## Route grouping
 
-Each route is shown as an individual node in the topology. Routes that share a name prefix are visually related - clicking any route node opens the popup, and clicking a related node within the popup drills into its connections.
+Routes that share a name prefix are collapsed into a single group node showing the member count (`×3`); routes with no prefix partner render as individual nodes. Clicking a group node opens the popup with all its routes. Set **Group By** to ungrouped to show every route as its own node.
 
 ---
 
@@ -72,7 +72,7 @@ The Entry Points column updates to show only the entry points used by the curren
 
 Fetches from:
 
-- `/api/routes` - routes from all providers (file-managed + live from Traefik API)
+- `/api/routes/all` - routes from all providers (file-managed + live from Traefik API); `/api/agents/<id>/routes` when a remote agent is selected
 - `/api/traefik/entrypoints` - entry point names from the Traefik API
 
 No extra mounts or configuration required beyond a working Traefik API connection.

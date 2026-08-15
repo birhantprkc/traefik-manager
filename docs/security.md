@@ -12,7 +12,7 @@ Traefik Manager is designed to run behind a reverse proxy on a trusted network. 
 
 The login password is hashed with **bcrypt at cost 12** before storage in `manager.yml`. The plaintext password is never written to disk.
 
-Login attempts are rate-limited to **5 per minute per IP** to slow brute-force attacks. After three failed attempts within a short window, the rate limit will block further attempts temporarily.
+Login attempts are rate-limited to **5 per minute per IP** to slow brute-force attacks. Remove the sentence, or replace with: "The limit counts every login POST from an IP, successful or not, so a burst of guesses is throttled after five attempts in a minute."
 
 ### Session management
 
@@ -21,7 +21,7 @@ Sessions use signed client-side cookies (Flask SecureCookieSession). The signing
 | Setting | Value |
 |---|---|
 | Max session lifetime | 7 days (when "Remember me" is checked) |
-| Inactivity timeout | 120 minutes for regular sessions (configurable via `INACTIVITY_TIMEOUT_MINUTES`); 24 hours for "Remember me" sessions |
+| Inactivity timeout | 120 minutes for regular sessions (configurable via `INACTIVITY_TIMEOUT_MINUTES`); 24x that value for "Remember me" sessions - 48 hours at the default |
 | Cookie flags | `HttpOnly`, `SameSite=Lax` |
 | Secure flag | Off by default - set `COOKIE_SECURE=true` when behind HTTPS |
 
@@ -38,9 +38,15 @@ Traefik Manager has two independent web-UI auth mechanisms - **built-in password
 | Enabled | Off | Password login (optionally with 2FA). |
 | Enabled | Enabled | Login page offers both. |
 | **Disabled** | **Enabled** | **OIDC is the sole login** - the password form is hidden and users are sent to your identity provider. |
-| Disabled | Off | **No authentication - the UI is publicly accessible.** A red warning is shown in the app and Settings, and logged at startup. Avoid this outside a fully trusted, isolated network. |
+| Disabled | Off | **No authentication - the UI is publicly accessible.** A red warning is shown in the app and Settings, and logged at startup. Avoid this outside a fully trusted, isolated network, or [acknowledge it](#authentication-handled-by-a-reverse-proxy) if a reverse proxy already requires a login. |
 
 Disabling built-in authentication only turns off the password form - it does **not** disable OIDC. **API keys keep working in every mode**, so the mobile app and automation are unaffected when OIDC is your only interactive login.
+
+### Authentication handled by a reverse proxy
+
+If something in front of Traefik Manager already requires a login - Authelia, Authentik, GateKeeper, or any forward-auth middleware - then running with both mechanisms off is a deliberate choice, and the red warning is noise. Under **Settings -> Authentication**, the warning offers **Acknowledge and hide this warning**. It is stored in `manager.yml` as `auth_external_ack`, so it applies to every browser and survives restarts, and the startup log drops from a `SECURITY:` warning to an informational line.
+
+This changes what you are told, never what is enforced. Traefik Manager still authenticates nobody, so anything that reaches it directly - another container on the same Docker network, a LAN client hitting the port, a route that bypasses your middleware - has full administrative access. The acknowledgement cannot be set while a password or OIDC is active, and Settings keeps showing a neutral note stating that authentication is delegated, with an **Undo** link.
 
 > **Recovery / lockout safety:** disabling built-in authentication preserves your password hash in `manager.yml`. If your OIDC provider becomes unreachable and you are locked out, set `auth_enabled: true` in `manager.yml` and restart the container - the password form returns and you can log in with your existing password. You can also generate a fresh password with `flask reset-password` (see the [Reset Password](reset-password.md) guide).
 
@@ -65,7 +71,7 @@ See the [OIDC setup guide](oidc.md) for full configuration details.
 
 TM supports TOTP-based 2FA compatible with any standard authenticator app (Google Authenticator, Authy, etc.).
 
-The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encryption key is derived from the session secret key and stored alongside the secret in `manager.yml`.
+The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encryption key is independent of the session signing key: it is taken from the `OTP_ENCRYPTION_KEY` environment variable, or generated once and persisted to `/app/config/.otp_key`. Only the encrypted secret is stored in `manager.yml`.
 
 2FA can be reset via the [reset password page](reset-password.md) if you lose access to your authenticator.
 
@@ -77,7 +83,7 @@ API keys are used by the mobile app and scripts to access the API without a brow
 
 - Up to **10 keys** can exist simultaneously, each with a **device name** for identification
 - Each key is **hashed with SHA-256** - the plaintext is shown once at creation and never stored
-- Keys are revoked individually by device name - revoking one device does not affect others
+- Keys are revoked individually by their key preview (the `X-Api-Key` request field is `preview`); the device name is display-only. Revoking one device does not affect others
 - API key requests bypass CSRF checks only when the key is valid - an invalid or missing key still requires a CSRF token
 - Generation is rate-limited to **5 per hour per IP**
 
@@ -99,7 +105,7 @@ API key requests are exempt from CSRF checks only when a **valid** key is provid
 
 ## External auth providers
 
-Traefik Manager's built-in auth can be disabled when using an external provider such as Authentik, Authelia, or Keycloak via Traefik's `forwardAuth` middleware.
+Traefik Manager's built-in auth can be disabled when using an external provider such as Authentik, Authelia, or Keycloak via Traefik's `forwardAuth` middleware. Once it is, [acknowledge the no-authentication warning](#authentication-handled-by-a-reverse-proxy) under Settings so it stops being reported as a misconfiguration.
 
 ::: warning Mobile app compatibility
 `forwardAuth` intercepts all requests including mobile app API calls. To use the mobile app alongside an external auth provider, split the Traefik route so `/api/*` bypasses `forwardAuth` and relies on Traefik Manager's built-in API key auth. See the [mobile app docs](mobile.md#external-auth-providers) for the full example.
@@ -113,10 +119,10 @@ Traefik Manager's built-in auth can be disabled when using an external provider 
 |---|---|
 | Login, OTP verification | 5 / min per IP |
 | OIDC login initiation | 10 / min per IP |
-| Password change, OTP management | 10 / min per IP |
+| Password change | 10 / min per IP |
 | API key generation | 5 / hour per IP |
 | Backup restore | 10 / min per IP |
-| All other endpoints | Unlimited |
+Add rows "| GeoIP database update | 6 / hour per IP |" and "| Setup connection tests (CrowdSec, git) | 10 / min per IP |" before the "All other endpoints | Unlimited" row.
 
 ---
 
@@ -153,7 +159,7 @@ Private and loopback targets are still allowed, because reaching internal servic
 
 ## IP geolocation
 
-[IP geolocation](geoip.md) (off by default) resolves client IPs to countries entirely **on the server against a local database** - IP addresses are never sent to any third-party geolocation API. The only outbound request is to download the database file itself (once a month, from `download.db-ip.com`), and only when the feature is enabled. Point `GEOIP_DB_PATH` at your own `.mmdb` to avoid the download entirely and run fully offline.
+[IP geolocation](geoip.md) (off by default) resolves client IPs to countries entirely **on the server against a local database** - IP addresses are never sent to any third-party geolocation API. The only outbound request is to download the database file itself (once a month, from `download.db-ip.com`), and only when the feature is enabled. Point `GEOIP_DB_PATH` at your own `.mmdb` to control which database is used. Note that if the file is older than 35 days Traefik Manager will still attempt the monthly DB-IP download and overwrite it, so keep its mtime fresh (or leave the feature disabled) to stay fully offline.
 
 ---
 
@@ -178,7 +184,7 @@ Recommended configuration:
 2. **Set `COOKIE_SECURE=true`** in your docker-compose environment
 3. **Enable 2FA** via Settings → Authentication → Two-Factor Authentication
 4. **Use per-device API keys** - generate a separate key for each device/script, revoke individually if compromised
-5. **Mount config files read-only** where possible - TM only needs write access to `CONFIG_DIR` and `/app/config`
+5. **Mount config files read-only** where possible - TM needs write access to `CONFIG_DIR`, `/app/config`, and `BACKUP_DIR` (default `/app/backups`)
 
 ---
 

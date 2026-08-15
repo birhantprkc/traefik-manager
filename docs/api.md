@@ -18,16 +18,43 @@ X-Api-Key: your-api-key
 
 **Session cookie** - log in via the web UI. The browser session cookie is used automatically.
 
+### When authentication fails
+
+Every `/api/` endpoint answers an unauthenticated or expired request with **`401`** and a JSON body. It never redirects.
+
+```json
+{ "ok": false, "error": "Not authenticated", "auth_required": true }
+```
+
+This matters if you write a client: treat `401` on any `/api/` path as "log in again", not as an empty result. Sessions also expire on inactivity (`INACTIVITY_TIMEOUT_MINUTES`), so a long-lived script using session auth will start receiving `401` even though it authenticated successfully earlier. API keys do not expire.
+
+Page routes (everything outside `/api/`) still redirect to `/login` as a browser expects.
+
+::: tip Changed in v1.10.1
+Before v1.10.1, `/api/` paths also redirected to `/login`, which returned the login page's HTML with status `200`. Clients could not distinguish "logged out" from "no data". If you parsed those responses, switch to checking for `401`.
+:::
+
 ---
 
 ## Response format
 
-All endpoints return JSON.
+All `/api/` endpoints return JSON. The form endpoints `POST /save`, `POST /delete/{id}`, `POST /save-middleware` and `POST /delete-middleware/{name}` return JSON only when the request sends `X-Requested-With: fetch`; otherwise they redirect (302) to the UI.
 
 | Outcome | Shape |
 |---|---|
 | Success | `{ "ok": true }` or `{ "success": true }` |
 | Error | `{ "ok": false, "message": "..." }` or `{ "error": "..." }` |
+
+Common status codes:
+
+| Code | Meaning |
+|---|---|
+| `400` | Invalid or missing parameters |
+| `401` | Not authenticated, or the session expired |
+| `403` | CSRF token missing or invalid |
+| `404` | Object not found |
+| `429` | Rate limit exceeded |
+| `502` | An upstream (Traefik, an agent, CrowdSec, a remote repo) could not be reached |
 
 State-changing endpoints (POST / DELETE) require an `X-CSRF-Token` header when using session auth. API key requests skip this.
 
@@ -72,7 +99,7 @@ When multiple config files are loaded, route `id` is prefixed as `configFile::na
 | `healthCheck` | object | `loadBalancer.healthCheck`, or `{}` when unset. HTTP only |
 | `priority` | integer \| null | Router priority, `null` when unset. HTTP and TCP only |
 | `middlewares` | string[] | Applied middleware names |
-| `tls` | boolean | |
+| `tls` | boolean \| object \| null | Boolean for HTTP and UDP. For TCP it is the router's `tls` mapping (e.g. `{"passthrough": true}`), or `null` when TLS is not set |
 | `certResolver` | string | ACME resolver name, or empty for external certs |
 | `configFile` | string | Source config file |
 
@@ -110,7 +137,7 @@ Create or update a route. Accepts `application/x-www-form-urlencoded`.
 | `protocol` | string | `http`, `tcp`, or `udp` |
 | `middlewares` | string | Comma-separated middleware names |
 | `scheme` | string | `http` or `https` (default: `http`) |
-| `passHostHeader` | boolean | Default: `true` |
+| `passHostHeader` | boolean | Send `true` to keep the host header. Omitting the field writes `passHostHeader: false` into the service |
 | `certResolver` | string | ACME resolver name. Use `none` to write `tls: {}` with no resolver (external certs). |
 | `tlsWildcardMain` | string | Main domain for `tls.domains` (e.g. `example.com`). Use with DNS challenge resolvers for wildcard certs. |
 | `tlsWildcardSans` | string | Newline-separated SANs for `tls.domains` (e.g. `*.example.com`). |
@@ -138,7 +165,7 @@ A service can point at several servers. Send the `backendsJson*` field matching 
 - Rows with an empty `host` are skipped. Invalid JSON falls back to `targetIp`/`targetPort` rather than failing the save.
 - `interval` and `timeout` take Go durations (`10s`, `1m`); a bare number is read as seconds.
 - `sticky`, `healthCheck`, and `priority` apply to HTTP. TCP accepts `servers` and `priority`; UDP accepts `servers` only.
-- TCP and UDP require a port. Sending it joined to the host (`targetIp=10.0.0.9:5432` with an empty `targetPort`) is accepted and split back apart, including bracketed IPv6; a target with no port at all is refused with `400`.
+- Add before this bullet: "`targetIp`, `targetPort` and `certResolver` are repeated fields indexed by protocol - index 0 for HTTP, 1 for TCP, 2 for UDP - so a TCP save must send two `targetIp` values (the first may be empty)." then keep the existing sentence about the joined `host:port` form at that index.
 
 ::: warning Sending `backendsJson*` replaces the whole service
 A save that includes `backendsJson*` is authoritative for that service: `servers` is replaced outright, and `sticky` or `healthCheck` absent from the payload are **deleted**. A client that edits backends must read the route first and echo `sticky`, `healthCheck`, and `priority` back, or it will silently drop them. Omit `backendsJson*` entirely to use the merge behaviour described below instead.
@@ -170,6 +197,30 @@ Enable or disable a route without deleting it. Config is preserved in `manager.y
 ```json
 { "enable": true }
 ```
+
+---
+
+### `GET /api/routes/{route_id}/raw`
+
+The YAML for one route and its service, as stored. `route_id` is either the router name or `file.yml::router` on a multi-file install. Go template expressions are preserved rather than being expanded.
+
+```json
+{ "raw": "http:\n  routers:\n    my-app:\n      ...", "configFile": "dynamic.yml", "proto": "http" }
+```
+
+`404` if no config file contains that router.
+
+---
+
+### `POST /api/routes/{route_id}/raw`
+
+Replace that route's YAML. A backup is taken first, and Go templates in your content are preserved.
+
+```json
+{ "content": "http:\n  routers:\n    my-app:\n      rule: Host(`app.example.com`)" }
+```
+
+Returns `400` for empty content or invalid YAML, `404` if the route cannot be located.
 
 ---
 
@@ -295,7 +346,7 @@ List TLS certificates from ACME (`acme.json`) and file-based (`tls.yml`) sources
 | `main` | Primary domain |
 | `sans` | Subject alternative names |
 | `not_after` | Expiry timestamp (ISO 8601) |
-| `certFile` | Source file |
+Replace the row with two rows: "| `source` | acme.json file the certificate came from (ACME entries) |" and "| `certFile` | Certificate path (file-provider entries, `resolver` is `file`) |", and note the response shape is `{ "certs": [ ... ] }`.
 
 ---
 
@@ -342,6 +393,27 @@ Get saved dashboard configuration - custom groups and per-route icon, name, link
 
 Pass `?server=<agent-id>` to read an agent's configuration. Without it you get the Host's. Each server keeps its own groups and overrides.
 
+```json
+{
+  "custom_groups": [{ "name": "Media" }],
+  "route_overrides": {
+    "dynamic.yml::jellyfin": {
+      "display_name": "Jellyfin",
+      "icon_type": "slug",
+      "icon_slug": "jellyfin",
+      "icon_url": "",
+      "group": "Media",
+      "url": "https://jellyfin.example.com",
+      "hidden": false,
+      "link_disabled": false
+    }
+  },
+  "tm_route_name": "traefik-manager"
+}
+```
+
+Keys of `route_overrides` are route ids (`<config-file>::<router-name>`, or just the router name on a single-file install). `tm_route_name` is read-only and names the router that points at Traefik Manager itself, so a client can give it TM's own icon.
+
 ---
 
 ### `POST /api/dashboard/config`
@@ -366,7 +438,25 @@ Pass `?server=<agent-id>`, or a `server` key in the body, to write an agent's co
 
 ### `GET /api/dashboard/icon/{slug}`
 
-Serve a cached app icon by slug (e.g. `plex`, `grafana`). Fetches from the selfh.st CDN on cache miss. Responses include `Cache-Control: max-age=86400`.
+Serve a cached app icon by slug (e.g. `plex`, `grafana`). Fetches from the [selfh.st](https://selfh.st/icons/) CDN on cache miss and stores the PNG on disk. Responses include `Cache-Control: max-age=86400`.
+
+Misses are cached too: a slug with no icon returns `404` immediately on later requests instead of hitting the CDN again. Prefer this endpoint over the CDN directly - a client that goes to the CDN itself makes one request per route on every render and loses the negative cache.
+
+The slug is lowercased and stripped to `a-z0-9-`; anything else returns `404`.
+
+#### Resolving a route's icon
+
+The dashboard resolves icons client-side. To match it:
+
+1. `icon_type: "url"` - use `icon_url` as-is.
+2. `icon_type: "slug"` - use `icon_slug`.
+3. Route name equals `tm_route_name` - use Traefik Manager's own icon.
+4. Otherwise (`icon_type: "auto"`, or no override) - derive the slug from the route name:
+   - strip a trailing `:port`
+   - strip one trailing `-service`, `-svc`, `-router`, `-app`, `-container` or `-pod`, with an optional `s`, separated by `-` or `_`
+   - lowercase, then remove every character that is not `a-z`, `0-9` or `-`
+
+So `Jellyfin-Service` and `jellyfin` both resolve to `jellyfin`. Fall back to a monogram of the route's first letters when the request returns `404`.
 
 ---
 
@@ -392,13 +482,13 @@ Get current application settings. Password hash is never included.
 | `traefik_api_password_set` | `true` if a Traefik API password is saved          |
 | `crowdsec_lapi_url`        | CrowdSec LAPI URL                                  |
 | `crowdsec_api_key_set`     | `true` if a CrowdSec API key is saved              |
-| `crowdsec_enabled`         | `true` if both LAPI URL and API key are configured |
+| `crowdsec_enabled`         | `true` when a LAPI URL is set plus either a bouncer API key or machine credentials |
 
 ---
 
 ### `POST /api/settings`
 
-Update settings. Send only the fields you want to change. Also accepts: `traefik_api_user`, `traefik_api_password` (leave blank to keep existing), `crowdsec_lapi_url`, `crowdsec_api_key` (leave blank to keep existing).
+Replace with: "Update settings. This is a full replace, not a patch: `domains` is required (400 without it) and any omitted field is reset to its default - send the current values you want to keep. Only `git_backup_*`, `backup_keep_count` and `default_theme` are updated only when present, and blank `traefik_api_password`, `crowdsec_api_key`, `crowdsec_machine_password`, `webhook_password` and `git_backup_token` keep the stored secret." Also accepts: `traefik_api_user`, `traefik_api_password` (leave blank to keep existing), `crowdsec_lapi_url`, `crowdsec_api_key` (leave blank to keep existing).
 
 ---
 
@@ -414,7 +504,7 @@ Send a test payload to a webhook URL without saving it.
 
 ### `GET /api/settings/self-route`
 
-Get the saved self-route domain. If none is saved, TM scans config files for an existing route pointing to the TM service.
+Get the saved self-route domain. If none is saved and `?hostname=<host>` is supplied, TM scans the config files for an existing route pointing to the TM service. The response always includes `default_entry_point`.
 
 ---
 
@@ -466,9 +556,33 @@ Update one or more preferences. Keys not sent keep their current value.
 { "ui_prefs": { "showDocsLink": false, "mwViewMode": "list" } }
 ```
 
-Accepted keys are the booleans `showStatCards`, `compactStatCards`, `showEntrypoints`, `showDocsLink`, `showApiLink`, `showShortcutsBtn`, `showIpDiagBtn`, `showTraefikBadge`, `showTmBadge`, `showRouteIcons`, the view modes `routeViewMode`, `mwViewMode`, `svcViewMode`, each `grid` or `list`, `statBarScope`, a comma separated list of the tabs that show the stat cards (`dashboard`, `services`, `middlewares`, `live`), or `all` for every one of them and `none` for no tab, `logsAutoRefresh`, `layoutMode`, `classic` or `modern`, and `dashPodDensity`, `list` or `icons`.
+Accepted keys are the booleans `showStatCards`, `compactStatCards`, `showEntrypoints`, `showDocsLink`, `showApiLink`, `showShortcutsBtn`, `showIpDiagBtn`, `showTraefikBadge`, `showTmBadge`, `showRouteIcons`, the view modes `routeViewMode`, `mwViewMode`, `svcViewMode`, each `grid` or `list`, `statBarScope`, either `all` (stat cards on every tab) or `dashboard` (dashboard only), `logsAutoRefresh`, `layoutMode`, `classic` or `modern`, and `dashPodDensity`, `list` or `icons`.
 
 Anything else is dropped rather than stored - this endpoint writes into `manager.yml`, so it only ever accepts the keys above. Returns `400` if `ui_prefs` is not an object.
+
+---
+
+### `POST /api/settings/theme`
+
+Set the default theme for new browsers. One of `dark`, `light`, `system`.
+
+```json
+{ "default_theme": "system" }
+```
+
+`400` for any other value.
+
+---
+
+### `POST /api/settings/geoip`
+
+Enable GeoIP and set the database path. Omitted keys keep their current value.
+
+```json
+{ "geoip_enabled": true, "geoip_db_path": "/app/config/geoip/dbip-city-lite.mmdb" }
+```
+
+Returns `{ "success": true, "status": { } }` carrying the same payload as `GET /api/geoip/status`.
 
 ---
 
@@ -515,7 +629,7 @@ Create or update a TLS options profile. Sends JSON body.
 
 ---
 
-### `DELETE /api/tls-options/<name>`
+### `DELETE /api/tls-options/{name}`
 
 Delete a TLS options profile by name.
 
@@ -532,14 +646,14 @@ Delete a TLS options profile by name.
 List all backup files, newest first.
 
 ```json
-[{ "name": "backup_2026-03-24T22-00-00.yml", "size": 1024, "modified": "2026-03-24T22:00:00" }]
+[{ "name": "dynamic.yml.20260324_220000.bak", "size": 1024, "modified": "2026-03-24 22:00:00", "kind": "routes" }]
 ```
 
 ---
 
 ### `POST /api/backup/create`
 
-Create a manual backup. Returns the backup filename.
+Create a manual backup of every loaded config file. Returns `{ "success": true, "names": ["dynamic.yml.20260324_220000.bak"], "count": 1 }`, or `400` when there is nothing to back up.
 
 ---
 
@@ -552,6 +666,98 @@ Restore configuration from a backup file. Rate-limited to 10/min.
 ### `POST /api/backup/delete/{filename}`
 
 Delete a backup file.
+
+---
+
+### `POST /api/static/backup/create`
+
+Create a backup of `traefik.yml` on demand. `POST /api/backup/static/create` is an alias for the same handler.
+
+```json
+{ "success": true, "name": "traefik.yml.20260812_051500.bak" }
+```
+
+Returns `400` if `STATIC_CONFIG_PATH` is not set or the file is missing.
+
+---
+
+### `POST /api/settings/backup-retention`
+
+Set how many backups to keep per file. `0` keeps all of them.
+
+```json
+{ "backup_keep_count": 20 }
+```
+
+---
+
+## Git backup
+
+Every endpoint here accepts an optional `?agent_id=<agent-id>` to act on an agent's repository instead of the Host's.
+
+### `GET /api/backup/git/status`
+
+```json
+{ "enabled": true, "configured": true, "last_sha": "a1b2c3d4", "last_push": "2026-08-12 05:15:00 +0000" }
+```
+
+Agent requests also return `branch`.
+
+---
+
+### `POST /api/backup/git/push`
+
+Commit and push the current config. An optional `message` overrides the configured commit template for this push only.
+
+```json
+{ "message": "before the entrypoint change" }
+```
+
+---
+
+### `POST /api/backup/git/test`
+
+Test repository credentials without pushing, via `git ls-remote`. Falls back to the saved settings when the body is empty, so it can verify an existing configuration.
+
+```json
+{ "repo_url": "https://github.com/you/configs", "username": "you", "token": "ghp_..." }
+```
+
+Returns `{ "ok": true }`, or `400` with the git error. Tokens are redacted from the message.
+
+---
+
+### `GET /api/backup/git/commits`
+
+The 50 most recent commits. Returns `[]` rather than an error when git backup is not configured.
+
+```json
+[{ "sha": "a1b2...", "sha_short": "a1b2c3d4", "timestamp": "2026-08-12 05:15:00 +0000", "message": "Update dynamic config" }]
+```
+
+---
+
+### `GET /api/backup/git/commit/{sha}/diff`
+
+The diffstat plus the old and new content of every file in that commit, which is what the UI's diff viewer renders.
+
+```json
+{ "stat": " dynamic/app.yml | 4 ++--", "files": [{ "filename": "dynamic/app.yml", "status": "M", "old": "...", "new": "..." }] }
+```
+
+`400` if `sha` is not a hex SHA of 7 to 40 characters.
+
+---
+
+### `POST /api/backup/git/restore/{sha}`
+
+Restore the config from a commit. A local backup is taken first. On an agent, the files are pushed back through the agent.
+
+---
+
+### `DELETE /api/backup/git/repo`
+
+Delete the local clone. The next push re-initialises it. Use this when the repository or credentials change and the clone is stale.
 
 ---
 
@@ -580,6 +786,42 @@ Delete a single notification by timestamp.
 ### `POST /api/notifications/clear`
 
 Clear all notifications.
+
+::: tip Changed in v1.10.1
+`add`, `delete` and `clear` enforced CSRF unconditionally, so an API key request was rejected with `403` even though API keys are meant to skip CSRF. All three now honour the key. On v1.10.0 and earlier, they are session-only.
+:::
+
+---
+
+### `POST /api/notifications/add`
+
+Add a notification. Unlike `/log`, this also fires the configured webhook.
+
+```json
+{ "type": "info", "message": "Deployment finished" }
+```
+
+---
+
+### `POST /api/notifications/log`
+
+Record a UI toast in the notification history without firing a webhook. `type` is one of `info`, `success`, `warning`, `error` and falls back to `info`. The message is truncated to 300 characters.
+
+```json
+{ "ok": true, "stored": true }
+```
+
+`stored` is `false` when the message is empty or identical to one recorded in the last 8 seconds (duplicate suppression).
+
+---
+
+### `POST /api/notifications/update`
+
+Record an "update available" notification. `product` is `manager` for Traefik Manager, anything else means Traefik.
+
+```json
+{ "version": "1.10.1", "product": "manager" }
+```
 
 ---
 
@@ -702,6 +944,22 @@ Test connectivity to an OIDC provider's discovery endpoint.
 
 ---
 
+### `POST /api/auth/external-ack`
+
+Acknowledge that an external provider (a Traefik forward-auth middleware, for example) already protects this instance, which hides the "no authentication" banner.
+
+```json
+{ "auth_external_ack": true }
+```
+
+```json
+{ "success": true, "auth_external_ack": true }
+```
+
+Returns `400` if a password or OIDC is active, since there is then nothing to acknowledge. This changes only what the UI reports - it never changes what is enforced. Setting and clearing it are both logged.
+
+---
+
 ## Static Config
 
 Requires `STATIC_CONFIG_PATH` to be set. See [Enable Static Config](/static-enable).
@@ -731,7 +989,7 @@ Read and parse the current static config file.
 Validate and write an updated static config. A timestamped backup is created before writing.
 
 ```json
-{ "yaml": "entryPoints:\n  web:\n    address: ':80'\n" }
+{ "content": "entryPoints:\n  web:\n    address: ':80'\n" }   (the key `raw` is also accepted)
 ```
 
 Returns `400` with `{ "error": "..." }` if the YAML is invalid.
@@ -842,14 +1100,14 @@ Get the deployed Traefik Manager version.
 Get all router names across every protocol. Useful for autocomplete.
 
 ```json
-["my-app@file", "api@file"]
+["my-app", "api"]
 ```
 
 ---
 
 ### `POST /api/setup/test-connection`
 
-Test connectivity to a Traefik API URL. No authentication required.
+Replace with: "Test connectivity to a Traefik API URL during first-time setup. Requires authentication like every other `/api/` endpoint, and returns `403` once setup is complete."
 
 ```json
 { "url": "http://traefik:8080" }
@@ -871,13 +1129,147 @@ Ping a route's domain from the TM server and return latency. Used by the route h
 
 On failure: `{ "ok": false, "error": "Timeout", "latency_ms": null }`
 
+A URL pointing at Traefik Manager's own hostname, or at the configured self-route domain, short-circuits to `{ "ok": true, "latency_ms": 0, "status_code": 200, "self": true }` without a request. Targets that fail the SSRF guard return `400`. An optional `fallback` URL is tried if the first attempt fails.
+
+---
+
+### `GET /api/health`
+
+Liveness probe. The only `/api/` endpoint that needs no authentication, so it can be used as a container healthcheck.
+
+```json
+{ "ok": true }
+```
+
+---
+
+### `GET /api/traefik/runtime`
+
+How Traefik Manager expects to reach Traefik in order to restart it. The Static Config tab uses this to tailor its "new entrypoints need a port mapping" guidance.
+
+```json
+{ "method": "proxy", "runtime": "docker", "container": "traefik" }
+```
+
+`runtime` is `docker`, `native` or `unknown`. With `RESTART_METHOD=poison-pill` it probes the Docker API and reports `native` when the container cannot be seen.
+
+---
+
+### `POST /api/tools/htpasswd`
+
+Generate an APR1 hash for a basicauth middleware.
+
+```json
+{ "username": "admin", "password": "secret" }
+```
+
+```json
+{ "ok": true, "hash": "admin:$apr1$..." }
+```
+
+---
+
+### `POST /api/tools/digestauth`
+
+Generate an MD5 hash for a digestauth middleware. `realm` is required as well.
+
+```json
+{ "username": "admin", "realm": "traefik", "password": "secret" }
+```
+
+```json
+{ "ok": true, "hash": "admin:traefik:5f4dcc3b..." }
+```
+
+---
+
+### `GET /api/geoip/status`
+
+Whether GeoIP is enabled, whether a database is readable, and its vintage.
+
+---
+
+### `POST /api/geoip/lookup`
+
+Resolve a batch of IPs. Set `aggregate` to get per-country counts instead of per-IP detail, which is what the Logs and CrowdSec maps use.
+
+```json
+{ "ips": ["1.2.3.4", "5.6.7.8"], "aggregate": false }
+```
+
+Per-IP: `{ "enabled": true, "available": true, "results": { "1.2.3.4": { "country": "...", "country_code": "..." } } }`
+
+Aggregated: `{ "enabled": true, "available": true, "counts": { "US": { "count": 2, "country": "United States" } }, "codes": { "1.2.3.4": "US" } }`
+
+Duplicate and unresolvable addresses are skipped. When GeoIP is off, returns `{ "enabled": false, "available": false, "results": {} }` rather than an error.
+
+---
+
+### `POST /api/geoip/update`
+
+Download the current DB-IP city-lite database. Rate-limited to 6/hour.
+
+```json
+{ "success": true, "db_month": "2026-08", "status": { } }
+```
+
+Returns `502` if the download fails.
+
+---
+
+### `POST /api/plugins/install`
+
+Install a Traefik plugin by pasting the YAML from its plugin page. `static_yaml` must contain an `experimental.plugins` (or top-level `plugins`) block. `middleware_yaml` optionally creates the middleware that uses it, and `config_file` chooses which dynamic config file it is written to. Pass `server` to install on an agent.
+
+```json
+{ "static_yaml": "experimental:\n  plugins:\n    ...", "middleware_yaml": "...", "config_file": "dynamic.yml", "server": "" }
+```
+
+Returns `400` when the YAML is invalid or no plugins block is found, and `404` for an unknown agent.
+
+---
+
+## Middleware templates
+
+Templates are reusable middleware snippets shown in the middlewares toolbar. They are stored on the Host and are not per-server.
+
+### `GET /api/mw/templates`
+
+```json
+{ "templates": [{ "id": "uuid", "name": "Secure headers", "yaml": "headers:\n  ..." }] }
+```
+
+---
+
+### `POST /api/mw/templates`
+
+Create a template. `name` is required and truncated to 100 characters.
+
+```json
+{ "name": "Secure headers", "yaml": "headers:\n  sslRedirect: true" }
+```
+
+Returns `{ "ok": true, "template": { "id": "uuid", "name": "...", "yaml": "..." } }`.
+
+---
+
+### `PUT /api/mw/templates/{template_id}`
+
+Update a template. `name` and `yaml` are both optional; only what you send is changed. `404` if the id is unknown.
+
+---
+
+### `DELETE /api/mw/templates/{template_id}`
+
+Delete a template. Succeeds even if the id does not exist.
+
 ---
 
 ## CrowdSec
 
 ### `GET /api/crowdsec/decisions`
 
-List active CrowdSec decisions (bans, captchas, bypasses). Returns an empty list if CrowdSec is not configured.
+List active CrowdSec decisions (bans, captchas, bypasses). Returns `503` with `{"error": "CrowdSec not configured"}` when no LAPI URL, bouncer key or client certificate is configured, and `502` when the LAPI cannot be reached.
 
 **Response**
 
@@ -898,7 +1290,7 @@ List active CrowdSec decisions (bans, captchas, bypasses). Returns an empty list
 
 ### `GET /api/crowdsec/alerts`
 
-List recent CrowdSec alerts (up to 50).
+List recent CrowdSec alerts. The default cap is 500, configurable with the `crowdsec_alert_limit` setting or `CROWDSEC_ALERT_LIMIT`; the applied cap is returned in the `X-CS-Alert-Limit` header.
 
 **Response**
 
@@ -915,6 +1307,25 @@ List recent CrowdSec alerts (up to 50).
 
 ---
 
+### `POST /api/crowdsec/decisions`
+
+Add a decision - ban, captcha or bypass an address or range. Written to the LAPI as an alert, using the machine
+credentials when configured, otherwise the bouncer API key.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `value` | string | **Required.** IP or CIDR range |
+| `type` | string | `ban` (default), `captcha` or `bypass` |
+| `duration` | string | Go duration, default `24h` |
+| `reason` | string | Defaults to `manual ban from Traefik Manager` |
+
+```json
+{ "value": "203.0.113.10", "type": "ban", "duration": "24h", "reason": "brute force" }
+```
+
+Returns `{ "ok": true }`. Errors: `400` when `value` is missing or `type` is not one of the three,
+`503` when CrowdSec is not configured, `502` when the LAPI call fails (commonly missing write permission).
+
 ### `DELETE /api/crowdsec/decisions/{id}`
 
 Unban / remove a decision by ID.
@@ -925,7 +1336,7 @@ Unban / remove a decision by ID.
 { "ok": true }
 ```
 
-Returns `{ "ok": false, "error": "..." }` if the deletion fails or CrowdSec is not reachable.
+Returns `503` with `{"error": "CrowdSec not configured"}` when CrowdSec is not configured, and `500` with `{"error": "Failed to delete decision"}` when the LAPI call fails.
 
 ---
 
@@ -1018,7 +1429,7 @@ Returns `"ok": false` if the agent is unreachable.
 Generate a new API key for an agent. The new key is returned once as `api_key_raw`.
 
 ```json
-{ "ok": true, "agent": { "id": "uuid", "api_key": "***" }, "api_key_raw": "the-new-key" }
+{ "ok": true, "agent": { "id": "uuid", "api_key": "***", "api_key_raw": "the-new-key" } }
 ```
 
 The old key stops working immediately, so the agent is unreachable until its `TMA_API_KEY` is updated and it is restarted.
@@ -1061,7 +1472,7 @@ Accepts `GET`, `POST`, `PUT`, `DELETE` and `PATCH`. The method, query string and
 
 For example, `GET /api/agents/proxy/abc123/traefik/routers` proxies to `GET https://agent-host:8090/api/traefik/routers`.
 
-Returns `502` if the agent cannot be reached.
+Returns `502` if the agent refuses the connection, `504` if it times out, and `500` for any other proxy error.
 
 See the [Agent API Reference](api-agent.md) for every endpoint an agent exposes.
 

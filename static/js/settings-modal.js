@@ -5,7 +5,12 @@ function _backupFetch(path, opts) {
 
 async function createAndLoadStaticBackup() {
     if (typeof _activeAgent !== 'undefined' && _activeAgent) {
-        showToast('Static config backup is included in the dynamic config backup for remote agents', 'info');
+        try {
+            const res  = await _backupFetch('/api/backups', { method: 'POST' });
+            const data = await res.json();
+            if (data.ok) { showToast('Backup created on ' + _activeAgent.name, 'success'); loadBackups(); }
+            else showToast(data.error || 'Backup failed', 'error');
+        } catch(e) { showToast('Backup failed', 'error'); }
         return;
     }
     const btn = document.querySelector('[onclick="createAndLoadStaticBackup()"]');
@@ -27,16 +32,12 @@ async function createAndLoadStaticBackup() {
 
 function switchBackupTab(id, btn) {
     const isAgent = typeof _activeAgent !== 'undefined' && !!_activeAgent;
-    const staticTabBtn = document.getElementById('backup-tab-static');
-    if (staticTabBtn) staticTabBtn.style.display = isAgent ? 'none' : '';
     const chip = document.getElementById('backupRemoteChip');
     if (chip) { chip.textContent = isAgent ? _activeAgent.name : ''; chip.style.display = isAgent ? '' : 'none'; }
-    if (isAgent && id === 'static') id = 'routes';
     document.querySelectorAll('#mpanel-backups .auth-sub-tab').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('#mpanel-backups .auth-sub-panel').forEach(p => p.style.display = 'none');
-    if (btn && id !== 'static') btn.classList.add('active');
-    const activeTabBtn = document.getElementById('backup-tab-' + id);
-    if (activeTabBtn && isAgent && id !== 'static') activeTabBtn.classList.add('active');
+    const activeTabBtn = btn || document.getElementById('backup-tab-' + id);
+    if (activeTabBtn) activeTabBtn.classList.add('active');
     const panel = document.getElementById('backup-sub-' + id);
     if (panel) panel.style.display = 'flex';
     if (id === 'git') loadGitTab();
@@ -164,15 +165,15 @@ async function loadGitCommits() {
             return;
         }
         list.innerHTML = commits.map(c => `
-            <div class="flex items-center justify-between py-2.5 px-3 mb-2 rounded-lg" style="background:var(--bg);border:1px solid var(--border)">
-                <div style="min-width:0;flex:1;">
+            <div class="sc-set">
+                <div class="sc-set-l">
                     <div class="flex items-center gap-1.5">
                         <span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background:var(--input-bg);color:var(--muted);flex-shrink:0;">${c.sha_short}</span>
-                        <span class="text-xs truncate" style="color:var(--text)">${_esc(c.message)}</span>
+                        <span class="sc-set-n truncate">${_esc(c.message)}</span>
                     </div>
-                    <div class="text-xs mt-0.5" style="color:var(--muted)">${c.timestamp}</div>
+                    <div class="sc-set-d">${c.timestamp}</div>
                 </div>
-                <div class="flex gap-1 ml-2 flex-shrink-0">
+                <div class="sc-set-v">
                     <button onclick="gitViewDiff('${c.sha}')" class="btn-secondary text-xs py-1 px-2" title="View diff">
                         <i class="ph-bold ph-code text-xs"></i>
                     </button>
@@ -295,7 +296,8 @@ async function gitResetRepo() {
 }
 
 async function gitRestoreCommit(sha, shaShort) {
-    if (!await _confirm(`Restore config from commit ${shaShort}? Local backups will be created first.`, 'Git Restore', 'Restore')) return;
+    if (!await _confirm(`Restore every config file from commit ${shaShort}? Local backups are created first.`,
+                        'Git Restore', 'Restore', 'RESTORE')) return;
     try {
         const res  = await _gitFetch(`/api/backup/git/restore/${sha}`, { method: 'POST', headers: _csrfHeaders() });
         const data = await res.json();
@@ -356,6 +358,8 @@ function _updateSettingsSidebarForAgent(active) {
     if (keysBtn) keysBtn.style.display = active ? '' : 'none';
     const keysMob = document.getElementById('msb-agent-keys-mobile');
     if (keysMob) keysMob.style.display = active ? '' : 'none';
+    const csChild = document.getElementById('msc-system-crowdsec');
+    if (csChild) csChild.style.display = active ? 'none' : '';
     const csTab = document.getElementById('system-tab-crowdsec');
     if (csTab) {
         csTab.style.display = active ? 'none' : '';
@@ -374,7 +378,7 @@ async function _loadAboutAgentInfo() {
     document.getElementById('agentVersionCurrent').textContent = '-';
     document.getElementById('agentVersionHint').classList.add('hidden');
     row.classList.remove('hidden');
-    row.style.display = 'flex';
+    row.style.removeProperty('display');
     try {
         const d = await fetch('/api/agents/' + _activeAgent.id + '/health').then(r => r.json());
         const cur = (d.version || '').replace(/^v/, '');
@@ -389,15 +393,63 @@ async function _loadAboutAgentInfo() {
     } catch (e) {}
 }
 
+const SETTINGS_CHILDREN = {
+    system:  { first: 'tabs',     switch: (k) => switchSystemTab(k) },
+    auth:    { first: 'password', switch: (k) => switchAuthTab(k) },
+    backups: { first: 'routes',   switch: (k) => switchBackupTab(k) },
+};
+
+function openSettingsChild(parent, child) {
+    switchSettingsPanel(parent);
+    const spec = SETTINGS_CHILDREN[parent];
+    if (spec) spec.switch(child);
+    _markSettingsChild(parent, child);
+    if (window.innerWidth < 640) {
+        document.getElementById('settingsMobileRoot').style.display = 'none';
+        document.getElementById('settingsPanelWrapper').style.display = 'flex';
+        document.getElementById('settingsMobileBack').style.display = 'flex';
+    }
+}
+
+function _markSettingsChild(parent, child) {
+    Object.keys(SETTINGS_CHILDREN).forEach(p => {
+        document.querySelectorAll('#mss-' + p + ' .modal-sidebar-btn').forEach(b => b.classList.remove('active'));
+    });
+    const btn = document.getElementById('msc-' + parent + '-' + child);
+    if (btn) btn.classList.add('active');
+}
+
+function _syncSettingsSubmenu(id) {
+    Object.keys(SETTINGS_CHILDREN).forEach(p => {
+        const sub = document.getElementById('mss-' + p);
+        if (sub) sub.classList.toggle('open', p === id);
+    });
+    const spec = SETTINGS_CHILDREN[id];
+    if (!spec) return;
+    const already = document.querySelector('#mss-' + id + ' .modal-sidebar-btn.active');
+    if (!already) _markSettingsChild(id, spec.first);
+}
+
 function switchSettingsPanel(id, btn) {
+    setTimeout(() => {
+        if (typeof filterSettings === 'function') filterSettings();
+        if (id === 'static') {
+            if (typeof applyStaticPlacement === 'function' && typeof getStaticPlacement === 'function') {
+                applyStaticPlacement(getStaticPlacement());
+            }
+            if (typeof openStaticTab === 'function') openStaticTab();
+            if (typeof _applyStaticWarnState === 'function') _applyStaticWarnState();
+        }
+    }, 0);
     document.querySelectorAll('.modal-sidebar-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.modal-panel').forEach(p => p.classList.remove('active'));
     const activeBtn = btn || document.getElementById('msb-' + id);
     if (activeBtn) activeBtn.classList.add('active');
     document.getElementById('mpanel-' + id).classList.add('active');
+    _syncSettingsSubmenu(id);
     if (id === 'about') _loadAboutAgentInfo();
     if (window.innerWidth < 640) {
-        const titles = {connection:'Connection',routes:'Route Monitoring',system:'System Monitoring',auth:'Authentication',backups:'Backups',ui:'Interface',notifications:'Notifications',about:'About','agent-keys':'API Keys'};
+        const titles = {connection:'Connection',routes:'Route Monitoring',system:'System Monitoring',auth:'Authentication',backups:'Backups',ui:'Interface',notifications:'Notifications',about:'About','agent-keys':'API Keys',static:'Static Config'};
         document.getElementById('settingsModalTitle').textContent = titles[id] || 'Settings';
         document.getElementById('settingsGearIcon').style.display = 'none';
         document.getElementById('settingsMobileRoot').style.display = 'none';
@@ -415,6 +467,7 @@ function settingsMobileBack() {
 }
 
 async function openSettingsModal(panel) {
+    document.documentElement.classList.add('tm-settings-open');
     document.getElementById('settingsSavedNotice').classList.add('hidden');
     document.getElementById('apiTestResult').textContent = '';
 
@@ -430,7 +483,7 @@ async function openSettingsModal(panel) {
     document.body.style.overflow = 'hidden';
     _updateSettingsSidebarForAgent(!!_activeAgent);
 
-    if (window.innerWidth < 768 && !panel) {
+    if (window.innerWidth < 640 && !panel) {
         document.getElementById('settingsMobileRoot').style.display = 'flex';
         document.getElementById('settingsPanelWrapper').style.display = 'none';
         document.getElementById('settingsMobileBack').style.display = 'none';
@@ -462,6 +515,12 @@ async function openSettingsModal(panel) {
         if (csMidEl) csMidEl.value = data.crowdsec_machine_id || '';
         const csMachineHint = document.getElementById('crowdsecMachineSetHint');
         if (csMachineHint) csMachineHint.classList.toggle('hidden', !data.crowdsec_machine_password_set);
+        const csCcEl = document.getElementById('settingsCrowdSecClientCert');
+        if (csCcEl) csCcEl.value = data.crowdsec_client_cert || '';
+        const csCkEl = document.getElementById('settingsCrowdSecClientKey');
+        if (csCkEl) csCkEl.value = data.crowdsec_client_key || '';
+        const csCaEl = document.getElementById('settingsCrowdSecCaCert');
+        if (csCaEl) csCaEl.value = data.crowdsec_ca_cert || '';
         const whEl = document.getElementById('webhookUrlInput');
         if (whEl) whEl.value = data.webhook_url || '';
         const whType = document.getElementById('webhookTypeSelect');
@@ -505,17 +564,27 @@ async function openSettingsModal(panel) {
             }
             if (changePwForm) changePwForm.style.display = isOn ? '' : 'none';
         }
-        const noAuthWarn = document.getElementById('noAuthWarning');
-        if (noAuthWarn) noAuthWarn.style.display = data.no_auth ? '' : 'none';
+        _paintAuthState(data.no_auth, data.auth_external_ack);
     } catch(e) {
         console.error('Could not load settings', e);
     }
     const target = panel || 'ui';
+    const rootWasOpen = document.getElementById('settingsMobileRoot').style.display === 'flex';
     switchSettingsPanel(target);
+    if (rootWasOpen && !panel) _showSettingsMobileRoot();
     if (target === 'backups') loadBackups();
 }
 
+function _showSettingsMobileRoot() {
+    document.getElementById('settingsMobileRoot').style.display = 'flex';
+    document.getElementById('settingsPanelWrapper').style.display = 'none';
+    document.getElementById('settingsMobileBack').style.display = 'none';
+    document.getElementById('settingsGearIcon').style.display = '';
+    document.getElementById('settingsModalTitle').textContent = 'Settings';
+}
+
 function closeSettingsModal() {
+    document.documentElement.classList.remove('tm-settings-open');
     document.getElementById('settingsModal').style.display = 'none';
     document.body.style.overflow = '';
 }
@@ -556,6 +625,51 @@ async function changePassword() {
     }
 }
 
+function _paintAuthState(noAuth, ack) {
+    const warn = document.getElementById('noAuthWarning');
+    const note = document.getElementById('authDelegatedNote');
+    if (warn) warn.style.display = (noAuth && !ack) ? '' : 'none';
+    if (note) note.style.display = (noAuth && ack) ? '' : 'none';
+    _paintSettingsVerdict(noAuth && !ack);
+}
+
+function _paintSettingsVerdict(noAuth) {
+    const el = document.getElementById('settingsVerdict');
+    if (!el) return;
+    const items = [];
+    if (noAuth) {
+        items.push('<button type="button" class="sig-flag d-bad" onclick="switchSettingsPanel(\'auth\')"'
+            + ' title="No password and no OIDC - anything that reaches this instance has full access">'
+            + '<i class="ph-bold ph-lock-open"></i><span class="sig-fl">no authentication</span></button>');
+    }
+    if (!items.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = '';
+    el.dataset.health = 'down';
+    el.innerHTML = '<i class="ph-fill ph-warning-octagon sig-verdict-ic"></i>'
+        + '<span class="sig-verdict-txt">' + items.length + (items.length === 1 ? ' thing' : ' things') + ' to look at</span>'
+        + '<span class="sig-verdict-items">' + items.join('') + '</span>';
+}
+
+async function setAuthExternalAck(on) {
+    if (on && !await _confirm(
+        'Only do this if something in front of Traefik Manager already requires a login, such as Authelia, Authentik or a forward-auth middleware. '
+        + 'Traefik Manager will stop warning you, but it still does not check who you are, so anything that reaches it directly gets full access.',
+        'Authentication is handled elsewhere', 'I understand')) return;
+    try {
+        const res = await fetch('/api/auth/external-ack', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
+            body: JSON.stringify({ auth_external_ack: !!on }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) { showToast(data.error || 'Failed to update.', 'error'); return; }
+        _paintAuthState(true, !!on);
+        const banner = document.getElementById('noAuthBanner');
+        if (banner) banner.style.display = on ? 'none' : '';
+        showToast(on ? 'Warning hidden. Traefik Manager still does not authenticate anyone.' : 'Warning restored.', 'success');
+    } catch (e) { showToast('Request failed.', 'error'); }
+}
+
 async function toggleAuth() {
     const stateLabel  = document.getElementById('authStateLabel');
     const toggleLabel = document.getElementById('authToggleLabel');
@@ -578,7 +692,7 @@ async function toggleAuth() {
             stateLabel.style.color = newState ? 'var(--green)' : 'var(--muted)';
             toggleLabel.textContent = newState ? 'Disable' : 'Enable';
             if (changePwForm) changePwForm.style.display = newState ? '' : 'none';
-            const naw = document.getElementById('noAuthWarning'); if (naw) naw.style.display = 'none';
+            _paintAuthState(false, false);
             showToast(`Authentication ${newState ? 'enabled' : 'disabled'}.`, 'success');
         } else {
             showToast(data.error || 'Failed to update auth.', 'error');
@@ -617,6 +731,7 @@ async function loadGeoipSettings() {
         _geoipEnabledState = !!r.enabled;
         const tog = document.getElementById('toggle-geoip');
         if (tog) tog.classList.toggle('on', _geoipEnabledState);
+        if (typeof applyGeoipRelevance === 'function') applyGeoipRelevance();
         const st = document.getElementById('geoipDbStatus');
         if (st) st.textContent = r.available ? `Ready${r.db_date ? ' - ' + r.db_date : ''}` : 'Not downloaded';
         const btn = document.getElementById('geoipUpdateBtn');
@@ -677,6 +792,9 @@ async function saveSettings() {
     const crowdsecApiKey      = document.getElementById('settingsCrowdSecKey')?.value || '';
     const crowdsecMachineId       = document.getElementById('settingsCrowdSecMachineId')?.value.trim() || '';
     const crowdsecMachinePassword = document.getElementById('settingsCrowdSecMachinePassword')?.value || '';
+    const crowdsecClientCert      = document.getElementById('settingsCrowdSecClientCert')?.value.trim() || '';
+    const crowdsecClientKey       = document.getElementById('settingsCrowdSecClientKey')?.value.trim() || '';
+    const crowdsecCaCert          = document.getElementById('settingsCrowdSecCaCert')?.value.trim() || '';
     const traefikApiUser      = document.getElementById('settingsApiUser')?.value.trim() || '';
     const traefikApiPassword  = document.getElementById('settingsApiPassword')?.value || '';
     if (!domains.length) return;
@@ -684,7 +802,7 @@ async function saveSettings() {
         const res  = await fetch('/api/settings', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
-            body: JSON.stringify({ domains, cert_resolver: resolver, traefik_api_url: apiUrl, acme_json_path: acmeJsonPath, access_log_path: accessLogPath, static_config_path: staticConfigPath, webhook_url: webhookUrl, webhook_type: webhookType, webhook_username: webhookUsername, webhook_password: webhookPassword, crowdsec_lapi_url: crowdsecLapiUrl, crowdsec_api_key: crowdsecApiKey, crowdsec_machine_id: crowdsecMachineId, crowdsec_machine_password: crowdsecMachinePassword, traefik_api_user: traefikApiUser, traefik_api_password: traefikApiPassword })
+            body: JSON.stringify({ domains, cert_resolver: resolver, traefik_api_url: apiUrl, acme_json_path: acmeJsonPath, access_log_path: accessLogPath, static_config_path: staticConfigPath, webhook_url: webhookUrl, webhook_type: webhookType, webhook_username: webhookUsername, webhook_password: webhookPassword, crowdsec_lapi_url: crowdsecLapiUrl, crowdsec_api_key: crowdsecApiKey, crowdsec_machine_id: crowdsecMachineId, crowdsec_machine_password: crowdsecMachinePassword, crowdsec_client_cert: crowdsecClientCert, crowdsec_client_key: crowdsecClientKey, crowdsec_ca_cert: crowdsecCaCert, traefik_api_user: traefikApiUser, traefik_api_password: traefikApiPassword })
         });
         const data = await res.json();
         if (data.success) {
@@ -730,6 +848,10 @@ async function resetCrowdSecConfig() {
     const csMpw = document.getElementById('settingsCrowdSecMachinePassword');
     if (csMpw) csMpw.value = '';
     document.getElementById('crowdsecMachineSetHint')?.classList.add('hidden');
+    ['settingsCrowdSecClientCert', 'settingsCrowdSecClientKey', 'settingsCrowdSecCaCert'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
     await saveSettings();
 }
 
@@ -764,20 +886,24 @@ function _renderBackupList(containerId, backups) {
     const list = document.getElementById(containerId);
     if (!list) return;
     if (!backups.length) {
-        list.innerHTML = `<div class="text-center py-8" style="color:var(--muted)"><i class="ph-light ph-archive text-4xl block mb-2 opacity-30"></i><p>No backups yet</p></div>`;
+        list.innerHTML = `<div class="text-center py-8" style="color:var(--muted)"><i class="ph-light ph-archive-box text-4xl block mb-2 opacity-30"></i><p>No backups yet</p></div>`;
         return;
     }
     list.innerHTML = backups.map(b => `
-        <div class="flex items-center justify-between py-2.5 rounded-lg px-3 mb-2" style="background:var(--bg);border:1px solid var(--border)">
-            <div>
-                <div class="font-mono text-xs" style="color:var(--text)">${b.name}</div>
-                <div class="text-xs mt-0.5" style="color:var(--muted)">${b.modified} · ${formatBytes(b.size)}</div>
+        <div class="sc-set">
+            <div class="sc-set-l">
+                <div class="sc-set-n">${b.name}</div>
+                <div class="sc-set-d">${b.modified} · ${formatBytes(b.size)}</div>
             </div>
-            <div class="flex gap-1">
-                <button onclick="restoreBackup('${b.name}')" class="btn-secondary text-xs py-1 px-2.5">
+            <div class="sc-set-v">
+                ${b.restoreBlocked
+                    ? `<button class="btn-secondary text-xs py-1 px-2.5" disabled style="opacity:.5;cursor:not-allowed" title="This agent is running an older version that restores static backups to the wrong path. Update the agent, then restore.">
+                        <i class="ph-bold ph-arrow-counter-clockwise text-xs"></i> Restore
+                    </button>`
+                    : `<button onclick="restoreBackup('${b.name}')" class="btn-secondary text-xs py-1 px-2.5">
                     <i class="ph-bold ph-arrow-counter-clockwise text-xs"></i> Restore
-                </button>
-                <button onclick="deleteBackup('${b.name}')" class="btn-danger p-1.5">
+                </button>`}
+                <button onclick="deleteBackup('${b.name}')" class="btn-icon" title="Delete" style="color:var(--red)">
                     <i class="ph-bold ph-trash text-sm"></i>
                 </button>
             </div>
@@ -788,7 +914,6 @@ function _renderBackupList(containerId, backups) {
 async function loadBackups() {
     const isAgent    = typeof _activeAgent !== 'undefined' && !!_activeAgent;
     const staticTab  = document.getElementById('backup-tab-static');
-    if (staticTab)  staticTab.style.display = isAgent ? 'none' : '';
     const chip = document.getElementById('backupRemoteChip');
     if (chip) { chip.textContent = isAgent ? _activeAgent.name : ''; chip.style.display = isAgent ? '' : 'none'; }
     const retRow     = document.getElementById('backupRetentionRow');
@@ -802,7 +927,6 @@ async function loadBackups() {
             const sres = await fetch('/api/settings');
             const sdat = await sres.json();
             _setVal('backupKeepCount', (sdat.backup_keep_count ?? 0));
-            _setVal('backupKeepCountStatic', (sdat.backup_keep_count ?? 0));
         } catch (e) {}
     }
     const routesList  = document.getElementById('sm-backups-list');
@@ -820,11 +944,19 @@ async function loadBackups() {
             return;
         }
         const rawArr  = Array.isArray(raw) ? raw : (raw.backups || []);
-        const backups = rawArr.map(b => ({ ...b, modified: b.modified || b.date || '' }));
-        const routes  = isAgent ? backups : backups.filter(b => b.kind !== 'static');
+        const oldAgent = isAgent && rawArr.length > 0 && !rawArr.some(b => b.kind);
+        const kindOf  = b => b.kind || (/^traefik\.ya?ml\.\d{8}_\d{6}\.bak$/.test(b.name) ? 'static' : 'routes');
+        const backups = rawArr.map(b => ({ ...b, kind: kindOf(b), modified: b.modified || b.date || '',
+            restoreBlocked: isAgent && oldAgent && kindOf(b) === 'static' }));
+        const routes  = backups.filter(b => b.kind !== 'static');
         const statics = backups.filter(b => b.kind === 'static');
+        const hasStaticSide = !isAgent || !!raw.static_configured || statics.length > 0;
+        if (staticTab) staticTab.style.display = hasStaticSide ? '' : 'none';
         _renderBackupList('sm-backups-list', routes);
-        if (!isAgent) _renderBackupList('sm-static-backups-list', statics);
+        _renderBackupList('sm-static-backups-list', statics);
+        if (isAgent && !hasStaticSide && document.getElementById('backup-sub-static')?.style.display !== 'none') {
+            switchBackupTab('routes', document.getElementById('backup-tab-routes'));
+        }
     } catch (e) {
         if (routesList) routesList.innerHTML = `<p class="text-sm px-1" style="color:var(--red)">Failed to load backups</p>`;
         if (staticList) staticList.innerHTML = `<p class="text-sm px-1" style="color:var(--red)">Failed to load backups</p>`;
@@ -834,12 +966,11 @@ async function loadBackups() {
 async function saveBackupKeepCount(sourceId) {
     const input = document.getElementById(sourceId || 'backupKeepCount');
     if (!input) return;
-    const btnId = sourceId === 'backupKeepCountStatic' ? 'backupKeepBtnStatic' : 'backupKeepBtn';
+    const btnId = 'backupKeepBtn';
     const btn   = document.getElementById(btnId);
     let n = parseInt(input.value, 10);
     if (isNaN(n) || n < 0) n = 0;
     _setVal('backupKeepCount', n);
-    _setVal('backupKeepCountStatic', n);
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ph-light ph-spinner-gap animate-spin text-xs"></i> Saving…'; }
     try {
         const res = await fetch('/api/settings/backup-retention', {
@@ -875,7 +1006,8 @@ async function createAndLoadBackups() {
 }
 
 async function restoreBackup(name) {
-    if (!await _confirm(`Restore backup "${name}"? Your current config will be backed up first.`, 'Restore Backup', 'Restore')) return;
+    if (!await _confirm(`Restore "${name}"? This replaces the config file it came from. Your current config is backed up first.`,
+                        'Restore Backup', 'Restore', 'RESTORE')) return;
     try {
         const res  = await _backupFetch(`/api/restore/${encodeURIComponent(name)}`, { method: 'POST', headers: _csrfHeaders() });
         const data = await res.json();
@@ -1022,7 +1154,6 @@ function renderReleaseNotes(md) {
     while (i < lines.length) {
         const line = lines[i].trimEnd();
 
-        // Table - collect all consecutive table rows
         if (isTableRow(line)) {
             if (inList) { html += '</ul>'; inList = false; }
             const block = [];
@@ -1042,21 +1173,40 @@ function renderReleaseNotes(md) {
             continue;
         }
 
-        // Blockquote
-        if (/^> /.test(line)) {
+        if (/^>\s?/.test(line)) {
             if (inList) { html += '</ul>'; inList = false; }
-            html += `<div style="margin:6px 0;padding:5px 10px;border-left:3px solid var(--blue);background:rgba(58,130,246,0.06);border-radius:0 4px 4px 0;font-size:11px;color:var(--muted)">${inline(line.replace(/^> /, ''))}</div>`;
-            i++; continue;
+            const quote = [];
+            while (i < lines.length && /^>\s?/.test(lines[i].trimEnd())) {
+                quote.push(lines[i].trimEnd().replace(/^>\s?/, ''));
+                i++;
+            }
+            const ALERTS = {
+                NOTE:      ['var(--blue)',   'ph-info'],
+                TIP:       ['var(--green)',  'ph-lightbulb'],
+                IMPORTANT: ['var(--purple)', 'ph-seal-warning'],
+                WARNING:   ['var(--orange)', 'ph-warning'],
+                CAUTION:   ['var(--red)',    'ph-prohibit'],
+            };
+            const tag  = quote.length ? quote[0].trim().match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]$/i) : null;
+            const key  = tag ? tag[1].toUpperCase() : null;
+            const col  = key ? ALERTS[key][0] : 'var(--blue)';
+            const body = (key ? quote.slice(1) : quote).filter(l => l.trim()).map(inline).join('<br>');
+            const head = key
+                ? `<div style="font-weight:700;color:${col};display:flex;align-items:center;gap:5px;margin-bottom:3px">`
+                    + `<i class="ph-bold ${ALERTS[key][1]}"></i>${key.charAt(0)}${key.slice(1).toLowerCase()}</div>`
+                : '';
+            html += `<div style="margin:8px 0;padding:7px 10px;border-left:3px solid ${col};`
+                + `background:color-mix(in srgb, ${col} 8%, transparent);border-radius:0 4px 4px 0;`
+                + `font-size:11px;color:var(--muted)">${head}${body}</div>`;
+            continue;
         }
 
-        // Horizontal rule
         if (/^---+$/.test(line.trim())) {
             if (inList) { html += '</ul>'; inList = false; }
             html += '<hr style="border:none;border-top:1px solid var(--border);margin:10px 0">';
             i++; continue;
         }
 
-        // Headings
         if (/^#{1,4} /.test(line)) {
             if (inList) { html += '</ul>'; inList = false; }
             const lvl   = line.match(/^(#{1,4}) /)[1].length;
@@ -1068,20 +1218,17 @@ function renderReleaseNotes(md) {
             i++; continue;
         }
 
-        // List item
         if (/^[-*] /.test(line)) {
             if (!inList) { html += '<ul style="margin:4px 0 6px;padding-left:16px;list-style:disc">'; inList = true; }
             html += `<li style="margin:2px 0;color:var(--text)">${inline(line.replace(/^[-*] /, ''))}</li>`;
             i++; continue;
         }
 
-        // Blank line
         if (line.trim() === '') {
             if (inList) { html += '</ul>'; inList = false; }
             i++; continue;
         }
 
-        // Paragraph
         if (inList) { html += '</ul>'; inList = false; }
         html += `<p style="margin:3px 0;color:var(--muted)">${inline(line)}</p>`;
         i++;
@@ -1235,7 +1382,6 @@ async function otpToggleFlow() {
         } catch(e) { showToast('Request failed', 'error'); }
         return;
     }
-    // Start setup flow
     try {
         const res  = await fetch('/api/auth/otp/setup', { method: 'POST', headers: _csrfHeaders() });
         const data = await res.json();
@@ -1312,6 +1458,7 @@ async function loadOidcStatus() {
         set(['oidcAllowedGroups', data.oidc_allowed_groups]);
         set(['oidcGroupsClaim', data.oidc_groups_claim]);
         const _anyEl = document.getElementById('oidcAllowAny'); if (_anyEl) _anyEl.checked = !!data.oidc_allow_any_authenticated;
+        const _autoEl = document.getElementById('oidcAutoLogin'); if (_autoEl) _autoEl.checked = !!data.oidc_auto_login;
         document.getElementById('oidcClientSecret') && (document.getElementById('oidcClientSecret').value = '');
         const secretLabel = document.getElementById('oidcSecretSetLabel');
         if (secretLabel) secretLabel.classList.toggle('hidden', !data.oidc_client_secret_set);
@@ -1330,11 +1477,12 @@ async function oidcToggleEnabled() {
     const ag    = document.getElementById('oidcAllowedGroups')?.value.trim() || '';
     const gc    = document.getElementById('oidcGroupsClaim')?.value.trim() || 'groups';
     const any   = document.getElementById('oidcAllowAny')?.checked || false;
+    const auto  = document.getElementById('oidcAutoLogin')?.checked || false;
     try {
         const res = await fetch('/api/auth/oidc', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
-            body: JSON.stringify({ oidc_enabled: !isOn, oidc_provider_url: url, oidc_client_id: id, oidc_client_secret: sec, oidc_display_name: disp, oidc_allowed_emails: ae, oidc_allowed_groups: ag, oidc_groups_claim: gc, oidc_allow_any_authenticated: any })
+            body: JSON.stringify({ oidc_enabled: !isOn, oidc_provider_url: url, oidc_client_id: id, oidc_client_secret: sec, oidc_display_name: disp, oidc_allowed_emails: ae, oidc_allowed_groups: ag, oidc_groups_claim: gc, oidc_allow_any_authenticated: any, oidc_auto_login: auto })
         });
         const data = await res.json();
         if (data.ok) {
@@ -1360,13 +1508,14 @@ async function saveOidcConfig() {
     const ag   = document.getElementById('oidcAllowedGroups')?.value.trim() || '';
     const gc   = document.getElementById('oidcGroupsClaim')?.value.trim() || 'groups';
     const any  = document.getElementById('oidcAllowAny')?.checked || false;
+    const auto = document.getElementById('oidcAutoLogin')?.checked || false;
     const label = document.getElementById('oidcStatusLabel');
     const isOn  = label && label.textContent.trim() === 'Enabled';
     try {
         const res = await fetch('/api/auth/oidc', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
-            body: JSON.stringify({ oidc_enabled: isOn, oidc_provider_url: url, oidc_client_id: id, oidc_client_secret: sec, oidc_display_name: disp, oidc_allowed_emails: ae, oidc_allowed_groups: ag, oidc_groups_claim: gc, oidc_allow_any_authenticated: any })
+            body: JSON.stringify({ oidc_enabled: isOn, oidc_provider_url: url, oidc_client_id: id, oidc_client_secret: sec, oidc_display_name: disp, oidc_allowed_emails: ae, oidc_allowed_groups: ag, oidc_groups_claim: gc, oidc_allow_any_authenticated: any, oidc_auto_login: auto })
         });
         const data = await res.json();
         if (data.ok) {
@@ -1423,20 +1572,20 @@ async function loadAgentsList() {
             return;
         }
         body.innerHTML = agents.map(a => `
-            <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-2" data-agent-id="${a.id}" style="background:var(--bg);border:1px solid var(--border);">
-                <div style="flex:1;min-width:0;">
+            <div class="sc-set" data-agent-id="${a.id}">
+                <div class="sc-set-l">
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full flex-shrink-0" id="agent-dot-${a.id}" style="background:var(--muted)"></span>
-                        <span class="agent-name-label text-xs font-medium truncate" style="color:var(--text)">${_esc(a.name)}</span>
+                        <span class="agent-name-label sc-set-n truncate">${_esc(a.name)}</span>
+                        <button onclick="inlineEditAgent('${a.id}','name','${_esc(a.name)}')" class="btn-icon agent-rename-btn flex-shrink-0" title="Rename" style="opacity:0.5;padding:0 2px;"><i class="ph-bold ph-pencil-simple" style="font-size:10px;"></i></button>
                     </div>
-                    <div class="flex items-center gap-1 mt-0.5">
-                        <span class="agent-url-label text-xs truncate font-mono" style="color:var(--muted)">${_esc(a.url)}</span>
+                    <div class="flex items-center gap-1">
+                        <span class="agent-url-label sc-set-d truncate">${_esc(a.url)}</span>
                         <button onclick="inlineEditAgent('${a.id}','url','${_esc(a.url)}')" class="btn-icon agent-url-btn flex-shrink-0" title="Edit URL" style="opacity:0.5;padding:0 2px;"><i class="ph-bold ph-pencil-simple" style="font-size:10px;"></i></button>
                     </div>
                 </div>
-                <div class="flex items-center gap-1 flex-shrink-0">
+                <div class="sc-set-v">
                     <button onclick="openAgentKeys('${a.id}','${_esc(a.name)}')" class="btn-icon" title="API Keys"><i class="ph-bold ph-key text-xs"></i></button>
-                    <button onclick="inlineEditAgent('${a.id}','name','${_esc(a.name)}')" class="btn-icon agent-rename-btn" title="Rename"><i class="ph-bold ph-pencil-simple text-xs"></i></button>
                     <button onclick="openAgentSetup('${a.id}')" class="btn-icon" title="Edit Settings"><i class="ph-bold ph-gear text-xs"></i></button>
                     <button onclick="deleteAgent('${a.id}','${_esc(a.name)}')" class="btn-icon" title="Remove" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button>
                 </div>
@@ -1478,13 +1627,12 @@ async function loadAgentKeys() {
             return;
         }
         list.innerHTML = keys.map(k => `
-            <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg" style="background:var(--bg);border:1px solid var(--border);">
-                <i class="ph-bold ph-key text-xs flex-shrink-0" style="color:var(--muted)"></i>
-                <div style="flex:1;min-width:0;">
-                    <div class="text-xs font-medium" style="color:var(--text)">${_esc(k.name)}</div>
-                    <div class="text-xs" style="color:var(--muted)">Created ${new Date(k.created_at).toLocaleDateString()}${k.last_used_at ? ' &middot; Last used ' + new Date(k.last_used_at).toLocaleDateString() : ''}</div>
+            <div class="sc-set">
+                <div class="sc-set-l">
+                    <div class="sc-set-n">${_esc(k.name)}</div>
+                    <div class="sc-set-d">Created ${new Date(k.created_at).toLocaleDateString()}${k.last_used_at ? ' &middot; Last used ' + new Date(k.last_used_at).toLocaleDateString() : ''}</div>
                 </div>
-                <button onclick="deleteAgentKey('${_keysAgentId}','${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button>
+                <div class="sc-set-v"><button onclick="deleteAgentKey('${_keysAgentId}','${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button></div>
             </div>`).join('');
     } catch(e) {
         list.innerHTML = '<div class="text-xs" style="color:var(--red)">Failed to load keys</div>';
@@ -1564,13 +1712,12 @@ async function loadActiveAgentKeys() {
             return;
         }
         list.innerHTML = keys.map(k => `
-            <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg" style="background:var(--bg);border:1px solid var(--border);">
-                <i class="ph-bold ph-key text-xs flex-shrink-0" style="color:var(--muted)"></i>
-                <div style="flex:1;min-width:0;">
-                    <div class="text-xs font-medium" style="color:var(--text)">${_esc(k.name)}</div>
-                    <div class="text-xs" style="color:var(--muted)">Created ${new Date(k.created_at).toLocaleDateString()}${k.last_used_at ? ' &middot; Last used ' + new Date(k.last_used_at).toLocaleDateString() : ''}</div>
+            <div class="sc-set">
+                <div class="sc-set-l">
+                    <div class="sc-set-n">${_esc(k.name)}</div>
+                    <div class="sc-set-d">Created ${new Date(k.created_at).toLocaleDateString()}${k.last_used_at ? ' &middot; Last used ' + new Date(k.last_used_at).toLocaleDateString() : ''}</div>
                 </div>
-                <button onclick="deleteActiveAgentKey('${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button>
+                <div class="sc-set-v"><button onclick="deleteActiveAgentKey('${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button></div>
             </div>`).join('');
     } catch(e) {
         list.innerHTML = '<div class="text-xs" style="color:var(--red)">Failed to load keys</div>';
@@ -1741,6 +1888,9 @@ async function openAgentSetup(id, titleOverride) {
             if (a.signal_file_path)   document.getElementById('agCfgSignalFile').value  = a.signal_file_path;
             if (a.crowdsec_lapi_url)  document.getElementById('agCfgCsUrl').value       = a.crowdsec_lapi_url;
             if (a.crowdsec_machine_id) document.getElementById('agCfgCsMachineId').value = a.crowdsec_machine_id;
+            if (a.crowdsec_client_cert) document.getElementById('agCfgCsClientCert').value = a.crowdsec_client_cert;
+            if (a.crowdsec_client_key)  document.getElementById('agCfgCsClientKey').value  = a.crowdsec_client_key;
+            if (a.crowdsec_ca_cert)    document.getElementById('agCfgCsCaCert').value     = a.crowdsec_ca_cert;
             if (a.restart_method)     selectRestartMethod(a.restart_method, null);
             const container = a.traefik_container || '';
             if (container) {
@@ -1803,6 +1953,9 @@ function resetAgentWizardCfgFields() {
     document.getElementById('agCfgCsKey').value       = '';
     document.getElementById('agCfgCsMachineId').value = '';
     document.getElementById('agCfgCsMachinePassword').value = '';
+    document.getElementById('agCfgCsClientCert').value = '';
+    document.getElementById('agCfgCsClientKey').value  = '';
+    document.getElementById('agCfgCsCaCert').value     = '';
     document.getElementById('agCfgInsecureTLS')?.classList.remove('on');
     selectRestartMethod('', document.querySelector('#restartMethodChips .agent-chip'));
 }
@@ -1813,8 +1966,8 @@ function showAgentWizStep(n) {
         if (el) el.style.display = i === n ? '' : 'none';
         const pill = document.getElementById('wiz-step-pill-' + i);
         if (pill) {
-            pill.style.background = i === n ? 'var(--blue)' : (i < n ? 'var(--green)' : 'var(--border)');
-            pill.style.color      = i <= n ? '#fff' : 'var(--muted)';
+            pill.classList.toggle('on', i === n);
+            pill.classList.toggle('done', i < n);
         }
     });
     _agentWizStep = n;
@@ -1948,6 +2101,9 @@ function buildAgentCfgPayload() {
         crowdsec_api_key:   document.getElementById('agCfgCsKey').value,
         crowdsec_machine_id:       document.getElementById('agCfgCsMachineId').value.trim(),
         crowdsec_machine_password: document.getElementById('agCfgCsMachinePassword').value,
+        crowdsec_client_cert:      document.getElementById('agCfgCsClientCert').value.trim(),
+        crowdsec_client_key:       document.getElementById('agCfgCsClientKey').value.trim(),
+        crowdsec_ca_cert:          document.getElementById('agCfgCsCaCert').value.trim(),
         git_backup_enabled: document.getElementById('agCfgGitEnabled').checked,
         git_backup_repo:    document.getElementById('agCfgGitRepo').value.trim(),
         git_backup_branch:  document.getElementById('agCfgGitBranch').value.trim() || 'main',
@@ -1977,6 +2133,9 @@ function agentCfgChanged() {
     const csKey     = document.getElementById('agCfgCsKey').value.trim();
     const csMid     = document.getElementById('agCfgCsMachineId').value.trim();
     const csMpw     = document.getElementById('agCfgCsMachinePassword').value.trim();
+    const csCc      = document.getElementById('agCfgCsClientCert').value.trim();
+    const csCk      = document.getElementById('agCfgCsClientKey').value.trim();
+    const csCa      = document.getElementById('agCfgCsCaCert').value.trim();
     const gitOn     = document.getElementById('agCfgGitEnabled').checked;
     const gitRepo   = document.getElementById('agCfgGitRepo').value.trim();
     const gitBranch = document.getElementById('agCfgGitBranch').value.trim() || 'main';
@@ -2006,6 +2165,9 @@ function agentCfgChanged() {
     if (csKey)       envLines.push(`      - CROWDSEC_API_KEY=${csKey}`);
     if (csMid)       envLines.push(`      - CROWDSEC_MACHINE_ID=${csMid}`);
     if (csMpw)       envLines.push(`      - CROWDSEC_MACHINE_PASSWORD=${csMpw}`);
+    if (csCc)        envLines.push(`      - CROWDSEC_CLIENT_CERT=${csCc}`);
+    if (csCk)        envLines.push(`      - CROWDSEC_CLIENT_KEY=${csCk}`);
+    if (csCa)        envLines.push(`      - CROWDSEC_CA_CERT=${csCa}`);
     if (gitOn) {
         envLines.push(`      - GIT_BACKUP_ENABLED=true`);
         if (gitRepo)   envLines.push(`      - GIT_BACKUP_REPO=${gitRepo}`);
@@ -2022,6 +2184,9 @@ function agentCfgChanged() {
     if (acmePath)    volLines.push(`      - ${acmePath}:${acmePath}:ro`);
     if (logPath)     volLines.push(`      - ${logPath}:${logPath}:ro`);
     if (pluginsDir)  volLines.push(`      - ${pluginsDir}:${pluginsDir}:ro`);
+    if (csCc)        volLines.push(`      - ${csCc}:${csCc}:ro`);
+    if (csCk)        volLines.push(`      - ${csCk}:${csCk}:ro`);
+    if (csCa)        volLines.push(`      - ${csCa}:${csCa}:ro`);
     if (restart === 'socket') volLines.push(`      - /var/run/docker.sock:/var/run/docker.sock:ro`);
     if (restart === 'poison-pill') volLines.push(`      - traefik-signals:/signals`);
 
@@ -2029,8 +2194,31 @@ function agentCfgChanged() {
     if (!backupDir) namedVols.push(`  tma_backups:`);
     if (restart === 'poison-pill') namedVols.push(`  traefik-signals:`);
 
+    const proxyHost = restart === 'proxy'
+        ? (/^tcp:\/\/([A-Za-z][A-Za-z0-9._-]*):(\d+)/.exec(dockerHost || '') || [])
+        : [];
+    const proxyName = proxyHost[1] && proxyHost[1] !== 'localhost' ? proxyHost[1] : '';
+    const proxyPort = proxyHost[2] || '2375';
+    const proxyNet  = proxyName ? `${proxyName}-net` : '';
+
     let compose = `services:\n  traefik-manager-agent:\n    image: ghcr.io/chr0nzz/traefik-manager-agent:latest\n    restart: unless-stopped\n    ports:\n      - "${agentPort}:${agentPort}"\n    environment:\n${envLines.join('\n')}\n    volumes:\n${volLines.join('\n')}`;
+    if (proxyName) compose += `\n    networks:\n      - ${proxyNet}`;
+
+    if (proxyName) {
+        compose += `\n\n  ${proxyName}:\n    image: tecnativa/docker-socket-proxy\n    restart: unless-stopped\n    environment:\n      CONTAINERS: 1\n      POST: 1\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n    networks:\n      - ${proxyNet}`;
+        if (proxyPort !== '2375') compose += `\n    expose:\n      - "${proxyPort}"`;
+    }
+
     if (namedVols.length) compose += `\n\nvolumes:\n${namedVols.join('\n')}`;
+    if (proxyName) compose += `\n\nnetworks:\n  ${proxyNet}:\n    internal: true`;
+    if (restart === 'poison-pill') {
+        compose += `\n\n# The poison pill also needs a healthcheck on your Traefik service:\n`
+            + `#   healthcheck:\n`
+            + `#     test: ["CMD-SHELL", "[ ! -f ${signalFile || '/signals/restart.sig'} ] || (rm ${signalFile || '/signals/restart.sig'} && kill -TERM 1)"]\n`
+            + `#     interval: 5s\n`
+            + `#   volumes:\n`
+            + `#     - traefik-signals:/signals`;
+    }
 
     const runParts = [`docker run -d \\`, `  --name traefik-manager-agent \\`, `  -p ${agentPort}:${agentPort} \\`];
     envLines.forEach(e => runParts.push(`  -e ${e.replace(/^\s+- /, '')} \\`));
@@ -2049,8 +2237,26 @@ function updateServerSwitcher(agents) {
 
 let _editingTemplateId = null;
 
+function openTemplatesPanel() {
+    const panel = document.getElementById('mwTplPanel');
+    const back  = document.getElementById('mwTplBackdrop');
+    if (!panel) return;
+    closeTemplateEditor(true);
+    loadTemplatesList();
+    panel.classList.add('open');
+    if (back) back.classList.add('open');
+    if (!setDetailDockOpen(true)) document.body.style.overflow = 'hidden';
+}
+
+function closeTemplatesPanel() {
+    setDetailDockOpen(false);
+    document.getElementById('mwTplPanel')?.classList.remove('open');
+    document.getElementById('mwTplBackdrop')?.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
 async function loadTemplatesList() {
-    const listEl = document.getElementById('templateListView');
+    const listEl = document.getElementById('templateListItems');
     if (!listEl) return;
     try {
         const res  = await fetch('/api/mw/templates');
@@ -2058,7 +2264,7 @@ async function loadTemplatesList() {
         const templates = data.templates || [];
         if (templates.length === 0) {
             listEl.innerHTML = `<div class="text-center py-10" style="color:var(--muted)">
-                <i class="ph-light ph-puzzle-piece text-3xl block mb-2 opacity-40"></i>
+                <i class="ph-light ph-cards text-3xl block mb-2 opacity-40"></i>
                 <p class="text-xs">No custom templates yet. Click <strong>Add Template</strong> to create one.</p>
             </div>`;
             return;
@@ -2066,7 +2272,7 @@ async function loadTemplatesList() {
         listEl.innerHTML = templates.map(t => `
             <div class="flex items-center justify-between px-3 py-2.5 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)">
                 <div class="flex items-center gap-2 min-w-0">
-                    <i class="ph-bold ph-puzzle-piece text-sm flex-shrink-0" style="color:var(--blue)"></i>
+                    <i class="ph-bold ph-cards text-sm flex-shrink-0" style="color:var(--blue)"></i>
                     <span class="text-sm font-medium truncate" style="color:var(--text)">${_esc(t.name)}</span>
                 </div>
                 <div class="flex gap-1 flex-shrink-0">
@@ -2082,8 +2288,9 @@ async function loadTemplatesList() {
 async function openTemplateEditor(id) {
     _editingTemplateId = id;
     document.getElementById('templateListView').style.display = 'none';
-    document.getElementById('templateEditorView').style.display = 'flex';
-    document.getElementById('templateEditorTitle').textContent = id ? 'Edit Template' : 'Add Template';
+    document.getElementById('templateEditorView').style.display = '';
+    document.getElementById('mwTplFoot').style.display = '';
+    document.getElementById('mwTplPanelTitle').textContent = id ? 'Edit Template' : 'Add Template';
     document.getElementById('tplName').value = '';
     document.getElementById('tplYaml').value = '';
     if (id) {
@@ -2099,11 +2306,17 @@ async function openTemplateEditor(id) {
     }
 }
 
-function closeTemplateEditor() {
+function closeTemplateEditor(skipReload) {
     _editingTemplateId = null;
-    document.getElementById('templateEditorView').style.display = 'none';
-    document.getElementById('templateListView').style.display = 'flex';
-    loadTemplatesList();
+    const ed = document.getElementById('templateEditorView');
+    const li = document.getElementById('templateListView');
+    const ft = document.getElementById('mwTplFoot');
+    const ti = document.getElementById('mwTplPanelTitle');
+    if (ed) ed.style.display = 'none';
+    if (li) li.style.display = '';
+    if (ft) ft.style.display = 'none';
+    if (ti) ti.textContent = 'Middleware Templates';
+    if (skipReload !== true) loadTemplatesList();
 }
 
 async function saveTemplate() {
@@ -2135,7 +2348,10 @@ async function saveTemplate() {
 }
 
 async function deleteTemplate(id) {
-    if (!confirm('Delete this template?')) return;
+    const ok = (typeof _confirm === 'function')
+        ? await _confirm('Delete this template? Middlewares already created from it are not affected.', 'Delete template', 'Delete')
+        : confirm('Delete this template?');
+    if (!ok) return;
     try {
         const res  = await fetch('/api/mw/templates/' + id, { method: 'DELETE', headers: _csrfHeaders() });
         const data = await res.json();
@@ -2147,4 +2363,104 @@ async function deleteTemplate(id) {
             showToast(data.error || 'Delete failed', 'error');
         }
     } catch(e) { showToast('Request failed', 'error'); }
+}
+
+const SETTINGS_SEARCH_FIELDS = '.sc-set-n, .sc-set-d, .settings-section-label, .tab-toggle-row > span, label';
+
+function _setUnitText(el) {
+    let out = '';
+    el.querySelectorAll(SETTINGS_SEARCH_FIELDS).forEach(f => { out += ' ' + f.textContent; });
+    if (!out.trim()) out = el.textContent;
+    return out.toLowerCase();
+}
+
+function _settingsUnits(pane) {
+    const units = [];
+    pane.querySelectorAll('.sc-set, .tab-toggle-row, .sc-fld').forEach(el => units.push(el));
+    if (units.length) return units;
+    pane.querySelectorAll(':scope > div, :scope > .auth-sub-panel > div').forEach(el => {
+        if (el.querySelector('input, select, textarea, .toggle-switch, button')) units.push(el);
+    });
+    return units;
+}
+
+function _scopeBlocks(pane) {
+    const sub = pane.querySelectorAll(':scope > div > .auth-sub-panel');
+    if (sub.length) {
+        const out = [];
+        sub.forEach(sp => sp.querySelectorAll(':scope > div').forEach(d => out.push(d)));
+        return out;
+    }
+    return [...pane.querySelectorAll(':scope > div')];
+}
+
+function _scHide(el, off) {
+    el.classList.toggle('sc-filtered-out', !!off);
+}
+
+function _filterOnePane(pane, q) {
+    const units = _settingsUnits(pane);
+    let hits = 0;
+    units.forEach(el => {
+        const match = !q || _setUnitText(el).indexOf(q) !== -1;
+        _scHide(el, !match);
+        if (match) hits++;
+    });
+    _scopeBlocks(pane).forEach(block => {
+        const own = block.querySelectorAll('.sc-set, .tab-toggle-row, .sc-fld');
+        if (!own.length) {
+            if (units.indexOf(block) === -1) _scHide(block, !!q);
+            return;
+        }
+        const alive = [...own].some(c => !c.classList.contains('sc-filtered-out'));
+        _scHide(block, !!q && !alive);
+    });
+    pane.querySelectorAll('.sc-panel').forEach(g => {
+        const kids = [...g.children].filter(c => !c.classList.contains('sc-filtered-out'));
+        _scHide(g, !!q && kids.length === 0);
+    });
+    return hits;
+}
+
+function filterSettings() {
+    const box = document.getElementById('settingsSearch');
+    const q = (box ? box.value : '').trim().toLowerCase();
+    const wrap = document.getElementById('settingsClearWrap');
+    if (wrap) wrap.style.display = q ? '' : 'none';
+
+    let activeHits = 0;
+    const scBox = document.getElementById('staticSearch');
+    if (scBox && typeof filterStatic === 'function') {
+        scBox.value = q;
+        filterStatic();
+    }
+    document.querySelectorAll('#settingsPanelWrapper .modal-panel').forEach(pane => {
+        if (pane.id === 'mpanel-static' || pane.id === 'mpanel-about') return;
+        const hits = _filterOnePane(pane, q);
+        const btn = document.getElementById('msb-' + pane.id.replace('mpanel-', ''));
+        if (btn) {
+            let tag = btn.querySelector('.settings-hit');
+            if (q && hits) {
+                if (!tag) {
+                    tag = document.createElement('span');
+                    tag.className = 'settings-hit d-n';
+                    btn.appendChild(tag);
+                }
+                tag.textContent = hits;
+            } else if (tag) {
+                tag.remove();
+            }
+        }
+        if (pane.classList.contains('active')) activeHits = hits;
+    });
+
+    const empty = document.getElementById('settingsNoMatch');
+    if (empty) empty.style.display = (q && activeHits === 0) ? '' : 'none';
+}
+
+function clearSettingsSearch() {
+    const box = document.getElementById('settingsSearch');
+    if (box) box.value = '';
+    filterSettings();
+    if (box) box.focus();
 }

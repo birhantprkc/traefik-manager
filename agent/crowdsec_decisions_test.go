@@ -11,12 +11,6 @@ import (
 	"testing"
 )
 
-// Models the real LAPI contract for GET /v1/decisions, verified against
-// crowdsec v1.7.8 pkg/database/decisionfilter.go L82-102:
-//   - limit and id_gt are honoured
-//   - unknown params (page, offset on some paths) are SILENTLY IGNORED, which is
-//     what made the old page= sweep return the same rows over and over
-//   - results are not ordered by the server, so a client must drive the cursor
 func newLAPIStub(capiCount int, localIP string) *httptest.Server {
 	return newLAPIStubOrigin(capiCount, localIP, "crowdsec")
 }
@@ -35,7 +29,6 @@ func newLAPIStubOrigin(capiCount int, localIP, localOrigin string) *httptest.Ser
 		pool = append(pool, dec{ID: i + 1, Origin: "CAPI", Value: fmt.Sprintf("10.0.%d.%d", i/256, i%256),
 			Type: "ban", Scenario: "capi", Until: "2099-01-01T00:00:00Z"})
 	}
-	// Sorts last by id, so it is only reachable by walking the cursor to the end.
 	pool = append(pool, dec{ID: 999999, Origin: localOrigin, Value: localIP, Type: "ban",
 		Scenario: "crowdsecurity/http-probing", Until: "2099-01-01T00:00:00Z"})
 
@@ -88,7 +81,6 @@ func fetchDecisions(t *testing.T, lapi *httptest.Server) []string {
 	return decisionValues(t, rec.Body.Bytes())
 }
 
-// Issue #130: a local decision existing only past the old 5000 cap was unreachable.
 func TestLocalDecisionsSurvivePaginationCap(t *testing.T) {
 	const localIP = "45.148.10.125"
 	lapi := newLAPIStub(6000, localIP)
@@ -102,8 +94,6 @@ func TestLocalDecisionsSurvivePaginationCap(t *testing.T) {
 	t.Fatalf("local decision %s past the old cap was dropped (issue #130)", localIP)
 }
 
-// Decisions added through Traefik Manager get origin "manual" (handlers.go), so a
-// ban added from the UI must be reachable too.
 func TestManuallyAddedDecisionsAreFound(t *testing.T) {
 	const manualIP = "198.51.100.7"
 	lapi := newLAPIStubOrigin(6000, manualIP, "manual")
@@ -117,8 +107,6 @@ func TestManuallyAddedDecisionsAreFound(t *testing.T) {
 	t.Fatalf("a ban added through the UI (origin manual) past the cap was dropped")
 }
 
-// The old page= sweep returned the same rows on every request because LAPI ignores
-// unknown params. Walking id_gt must not repeat a decision.
 func TestDecisionsAreNotDuplicated(t *testing.T) {
 	lapi := newLAPIStub(6000, "45.148.10.125")
 	defer lapi.Close()
@@ -135,7 +123,6 @@ func TestDecisionsAreNotDuplicated(t *testing.T) {
 	}
 }
 
-// The cap is gone: everything LAPI holds must come back, not the first 5000.
 func TestAllDecisionsAreReturned(t *testing.T) {
 	lapi := newLAPIStub(6000, "45.148.10.125")
 	defer lapi.Close()
@@ -145,7 +132,6 @@ func TestAllDecisionsAreReturned(t *testing.T) {
 	}
 }
 
-// An expired decision must still be dropped by the handler.
 func TestExpiredDecisionsAreDropped(t *testing.T) {
 	lapi := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q, _ := url.ParseQuery(r.URL.RawQuery)

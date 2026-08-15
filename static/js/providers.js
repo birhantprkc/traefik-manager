@@ -1,4 +1,3 @@
-// ── Shared provider card renderer (matches Routes tab card style) ─────────────
 function renderProviderMiddlewareSection(middlewares, containerId) {
     const el = document.getElementById(containerId);
     if (!el) return;

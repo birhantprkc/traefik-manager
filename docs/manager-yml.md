@@ -14,7 +14,7 @@ TM stores some data in separate files alongside `manager.yml` in the same config
 |---|---|
 | `manager.yml` | All TM settings - auth, domains, tabs, webhooks, OIDC, git backup, CrowdSec, disabled routes |
 | `agents.yml` | Remote agent registrations (encrypted API keys). Auto-created and migrated from `manager.yml` on first start after v1.5.0 |
-| `templates.yml` | Custom middleware templates created in Settings - Templates |
+| `templates.yml` | Custom middleware templates created from the Middlewares tab toolbar |
 | `notifications.yml` | Recent notification history |
 | `dashboard.yml` | Dashboard custom groups and per-card overrides, kept per server |
 
@@ -140,7 +140,7 @@ auth_enabled: false
 ```
 
 ::: warning
-When `false`, the UI is fully open. Only disable behind another auth layer.
+When `false` and OIDC is also disabled, the UI is fully open (TM logs a SECURITY warning at startup). If `oidc_enabled` is `true`, OIDC login is still enforced. Only disable behind another auth layer.
 :::
 
 ---
@@ -210,7 +210,9 @@ List of active API keys. Each entry contains `name`, `hash`, `preview`, and `cre
 ```yaml
 api_keys:
   - name: My Phone
-    hash: "$2b$12$..."
+    hash: "sha256:3f9a..."
+    preview: "abcd1234...ef56"
+    created_at: "2026-04-03 12:00"
     preview: "abcd1234...ef56"
     created_at: "2026-04-03 12:00"
 ```
@@ -266,9 +268,9 @@ Label on the login button: "Sign in with [display name]".
 
 ### `oidc_allowed_emails`
 
-**Type:** string (comma-separated) - **Default:** `""` (allow any)
+**Type:** string (comma-separated) - **Default:** `""`
 
-Restrict login to specific email addresses. Leave empty to allow any authenticated account.
+Restrict login to specific email addresses. Leaving this **and** `oidc_allowed_groups` empty denies all OIDC logins - to allow any authenticated account you must set `oidc_allow_any_authenticated: true` (Settings - Authentication - OIDC / SSO - Access Control).
 
 ---
 
@@ -324,7 +326,7 @@ Optional basic auth password. Stored encrypted at rest. Do not edit by hand.
 
 ## File Paths
 
-These can be changed without a container restart via **Settings - Connection**. The UI setting takes priority over the env var.
+These can be changed without a container restart via **Settings - System Monitoring - File Paths**. The UI setting takes priority over the env var.
 
 ### `acme_json_path`
 
@@ -356,7 +358,7 @@ access_log_path: /var/log/traefik/access.log
 
 ### `static_config_path`
 
-**Type:** string - **Default:** `""` (falls back to `STATIC_CONFIG_PATH` env var, then `/app/traefik.yml`)
+**Type:** string - **Default:** `""` (falls back to the `STATIC_CONFIG_PATH` env var; if neither is set, the Plugins tab and Static Config editor stay unconfigured - there is no built-in default path)
 
 Path to Traefik's static config. Required for the Plugins tab and Static Config editor.
 
@@ -389,7 +391,7 @@ Display preferences, stored here rather than in the browser so they follow you a
 | `showStatCards`, `compactStatCards`, `showEntrypoints` | boolean | `true`, `false`, `true` |
 | `layoutMode` | `classic` \| `modern` | Classic top tab row, or the Modern collapsible sidebar with full-width content |
 | `dashPodDensity` | `list` \| `icons` | Dashboard categories as rows with domains, or a compact grid of app icons |
-| `statBarScope` | string | Which tabs show the stat cards and entry points. A comma separated list of `dashboard`, `services` (Routes), `middlewares` and `live` (Services). `all` (default) means all four, `none` means no tab. The cards never appear on any other tab. |
+| `statBarScope` | `all` \| `dashboard` | Which tabs show the stat cards and entry points. `all` (default) means Dashboard, Routes, Middlewares and Services; `dashboard` limits them to the Dashboard tab. Only these two values are stored - any other value (including `none` or a comma-separated list) is discarded when the file is loaded. |
 | `logsAutoRefresh` | boolean | `false` - poll the access log while the Logs tab is open and visible |
 | `showDocsLink`, `showApiLink`, `showShortcutsBtn`, `showIpDiagBtn` | boolean | `true`, `false`, `true`, `true` |
 | `showTraefikBadge`, `showTmBadge`, `showRouteIcons` | boolean | `true`, `true`, `false` |

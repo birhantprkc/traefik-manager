@@ -9,16 +9,15 @@ For bug reports and feature requests see [CONTRIBUTING.md](https://github.com/ch
 ```
 app.py                  Flask app, routes, CLI
 core/                   Shared logic, one module per concern
-blueprints/             (planned) route modules
 agent/                  TMA - the Go agent for remote servers
 tests/                  pytest suite
 templates/
-    index.html          SPA shell, no application JS
+    index.html          SPA shell, plus the theme/pref bootstrap and the agent-switcher JS
     sections/           Navbar, stats bar
     tabs/               One file per tab
     modals/             Route, middleware, settings and other modals
 static/
-    css/app.css         All custom styles
+    css/app.css         Custom styles for the app shell (login.html and index.html each carry their own inline <style> block)
     js/                 Application JS, one file per area
     vendor/             Third-party JS/CSS, bundled at image build
 docs/                   This VitePress site
@@ -58,7 +57,7 @@ Two conventions exist because breaking them caused real bugs:
 
 ### `static/js/`
 
-Classic scripts, loaded in order, no bundler and no ES modules. Around 287 functions are called from inline `onclick=` handlers in the templates, so **every top-level function must stay a global**. `init.js` loads last and holds the code that runs at load time; everything else is function declarations and self-contained state.
+Classic scripts, loaded in order, no bundler and no ES modules. Over 200 functions are called from inline `onclick=` handlers in the templates, so **every top-level function must stay a global**. `init.js` holds the code that runs at load time; everything else is function declarations and self-contained state. It is loaded near the end, though not strictly last - check `templates/index.html` for the real order before assuming.
 
 ::: warning Tailwind purges what it cannot see
 `tailwind.config.js` scans `templates/**/*.html` and `static/js/**/*.js`. Utility classes used only in JS-generated markup are purged if the file is not covered by those globs. Moving class-bearing markup to a new location means updating the glob - `tests/test_assets.py` fails if you forget.
@@ -71,7 +70,7 @@ pip install -r requirements.txt
 TRAEFIK_API_URL=http://your-traefik:8080 CONFIG_PATH=config/dynamic.yml python3 app.py
 ```
 
-The UI is at `http://localhost:5000`. See [CONTRIBUTING.md](https://github.com/chr0nzz/traefik-manager/blob/main/CONTRIBUTING.md) for the full environment variable list and the Docker build.
+The UI is at `http://localhost:5000`. See [Environment Variables](env-vars.md) for the full list, and [CONTRIBUTING.md](https://github.com/chr0nzz/traefik-manager/blob/main/CONTRIBUTING.md) for the Docker build.
 
 ## Tests
 
@@ -101,6 +100,16 @@ The suite runs against a temporary config directory and never touches a real Tra
 | `test_css.py` | No unshrinkable `min-width`/`min-height` floors in `app.css`; `resize` always paired with a scroll context |
 | `test_lint.py` | No undefined names; every `core` alias in `app.py` resolves |
 | `test_ui_prefs.py` | Interface preferences round-trip through settings; unknown keys are dropped |
+| `test_version_sync.py` | Every version string matches `core/env.py` |
+| `test_api_docs_coverage.py` | Every `/api/` route appears in `docs/api.md` and both OpenAPI copies, and the two specs are identical |
+| `test_api_auth_401.py` | API paths answer an expired session with `401`, not a redirect; page routes still redirect |
+| `test_api_key_csrf.py` | API keys skip CSRF, as documented |
+| `test_crowdsec_mtls.py`, `test_crowdsec_scale.py` | Client-certificate auth to the LAPI; the streaming read and its fallback |
+| `test_restore_static_target.py` | A static backup restores to `traefik.yml`, never over the dynamic config |
+| `test_static_provider_keys.py` | Saving a provider section preserves keys the form does not manage |
+| `test_no_dashes.py` | No em dashes anywhere |
+
+The table is not exhaustive - `tests/` holds more than this. Run `pytest --collect-only -q` for the full list.
 
 ### Screenshots
 
@@ -133,14 +142,17 @@ after visual changes and review the git diff. Details in
 
 ## Releasing
 
-Version numbers appear in five places, all of which must match:
+`core/env.py` holds `APP_VERSION`, and five other files must match it:
 
 | File | What |
 |---|---|
-| `app.py` | `APP_VERSION` |
+| `core/env.py` | `APP_VERSION` - the source of truth |
 | `static/sw.js` | `CACHE_NAME` - bump it or browsers serve stale assets |
-| `agent/main.go` | `Version` |
-| `static/openapi.yaml`, `docs/public/openapi.yaml` | `info.version`, and the two files must stay identical |
+| `agent/main.go` | `Version` - baked in at build time, so a stale value makes every agent report as outdated |
+| `static/openapi.yaml` | `info.version` |
+| `docs/public/openapi.yaml` | `info.version`, and byte-identical to the file above |
 | `docs/.vitepress/config.ts` | the release list |
+
+`tests/test_version_sync.py` fails the build when any of them drifts, so you do not have to remember the list.
 
 Releases are cut by merging `dev` into `main`, tagging `vX.Y.Z`, and publishing a GitHub Release. The tag push builds and pushes the Docker images; **publishing** the release builds the agent binaries, so a draft release does not produce them.

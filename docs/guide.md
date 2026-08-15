@@ -125,7 +125,7 @@ Every change writes a timestamped backup first, and any of them can be restored 
 
 ## Visualizations
 
-Optional tabs - toggle on in **Settings - Interface - Tabs** or during the setup wizard. No extra mounts needed.
+Optional tabs. Dashboard, Route Map and TLS Options toggle on in **Settings - Interface - Tabs**; CrowdSec toggles on in **Settings - System Monitoring - Tab Visibility**. The setup wizard offers Dashboard and Route Map, but not TLS Options or CrowdSec. No extra mounts needed. No extra mounts needed.
 
 | Tab                           | Description                                                                    |
 | -------------------------------| --------------------------------------------------------------------------------|
@@ -143,7 +143,7 @@ Optional tabs - each requires a file mounted into the container.
 | Tab | Mount required | Description |
 |-----|----------------|-------------|
 | [Certificates](tab-certs.md) | `acme.json:/app/acme.json:ro` | TLS certificates with expiry tracking. `ACME_JSON_PATH` accepts several files or a directory, for setups with one resolver per storage file |
-| [Plugins](tab-plugins.md) | `traefik.yml:/app/traefik.yml:ro` | Plugins declared in your static config |
+| [Plugins](tab-plugins.md) | `traefik.yml:/app/traefik.yml:ro` plus `STATIC_CONFIG_PATH=/app/traefik.yml` (no default) | Plugins declared in your static config |
 | [Logs](tab-logs.md) | `access.log:/app/logs/access.log:ro` | Access log analytics: status, latency, paths, clients and services as clickable cards over a live tail, with optional auto refresh and a [world map](geoip.md) |
 
 ---
@@ -185,13 +185,19 @@ Read-only tabs that pull live data from the Traefik API. No extra mounts needed 
 
 ## Configuration
 
-| Page                                 | Description                                                                                   |
-| --------------------------------------| -----------------------------------------------------------------------------------------------|
-| [manager.yml](manager-yml.md)        | Full settings file reference - all keys, types, and defaults                                  |
-| [Environment Variables](env-vars.md) | All supported environment variables with override behaviour                                   |
-| [OIDC / SSO Login](oidc.md)          | Supports OpenID Connect (OIDC) as an additional login method alongside the built-in password. |
-| [Notification Webhooks](webhooks.md) | Forward events to Discord, Slack, ntfy or any JSON endpoint |
-| [Git Repository Backup](git-backup.md) | Auto-push, commit history, diff viewer and one-click restore |
+Settings open from the gear in the top bar. Each pane lists its settings as aligned rows carrying the setting name, what it does and its control, in the same visual language as the rest of the app.
+
+The search box above the panes filters by setting name and description, and it searches every pane at once: matches in panes you are not looking at show as a count beside that pane in the sidebar, so you can find a setting without knowing where it lives. Clearing the box restores everything.
+
+A verdict line appears above the search when something needs attention, so a warning like no authentication being active is visible from any pane rather than only from the one that owns it.
+
+| Page                                   | Description                                                                                   |
+| ----------------------------------------| -----------------------------------------------------------------------------------------------|
+| [manager.yml](manager-yml.md)          | Full settings file reference - all keys, types, and defaults                                  |
+| [Environment Variables](env-vars.md)   | All supported environment variables with override behaviour                                   |
+| [OIDC / SSO Login](oidc.md)            | Supports OpenID Connect (OIDC) as an additional login method alongside the built-in password. |
+| [Notification Webhooks](webhooks.md)   | Forward events to Discord, Slack, ntfy or any JSON endpoint                                   |
+| [Git Repository Backup](git-backup.md) | Auto-push, commit history, diff viewer and one-click restore                                  |
 
 ---
 
@@ -328,7 +334,7 @@ accessLog:
 
 A companion Android app for managing Traefik Manager on the go. See the [requirements table](mobile.md#requirements) for which server version each app release needs.
 
-Connect it with an API key: go to **Settings - Authentication - App / Mobile API Keys**, click **Add Key**, enter a device name, and copy the generated key. Each device gets its own key, so one can be revoked without affecting the others.
+Connect it with an API key: go to **Settings - Authentication - API Keys**, click **Add Key**, enter a device name, and copy the generated key. Each device gets its own key, so one can be revoked without affecting the others.
 
 <div class="vp-grid-cards">
 <div class="vp-card">
@@ -351,7 +357,7 @@ Authenticates via the API key from **Settings → Authentication**.
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.11 · Flask 3.1 · Gunicorn |
-| Agent | Go 1.23 · Alpine Linux (TMA - remote agent daemon) |
+| Agent | Go 1.25 · Alpine Linux (TMA - remote agent daemon) |
 | Config | ruamel.yaml (preserves comments and Go templates) |
 | Auth | bcrypt · pyotp (TOTP) · Flask sessions · CSRF · Flask-Limiter · Fernet |
 | Frontend | Vanilla JS · Tailwind CSS 3.4 · Phosphor Icons |

@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -24,8 +26,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
-
-// ---- helpers ----------------------------------------------------------------
 
 func jsonOK(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -50,13 +50,9 @@ func (a *App) applyTraefikAuth(req *http.Request) {
 	}
 }
 
-// ---- health -----------------------------------------------------------------
-
 func (a *App) healthHandler(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"ok": true, "version": Version})
 }
-
-// ---- traefik proxy ----------------------------------------------------------
 
 func (a *App) traefikProxy(w http.ResponseWriter, r *http.Request, traefikPath string) {
 	target := strings.TrimRight(a.cfg.TraefikAPIURL, "/") + traefikPath
@@ -186,8 +182,6 @@ func (a *App) middlewaresHandler(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]json.RawMessage{"http": httpM, "tcp": tcpM})
 }
 
-// ---- config files -----------------------------------------------------------
-
 type fileEntry struct {
 	Name    string `json:"name"`
 	Content string `json:"content"`
@@ -277,8 +271,6 @@ func atomicWrite(path string, data []byte) error {
 	}
 	return nil
 }
-
-// ---- static config ----------------------------------------------------------
 
 func (a *App) staticReadHandler(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.StaticConfigPath == "" {
@@ -429,8 +421,6 @@ func (a *App) dockerRestart(ctx context.Context) error {
 	return nil
 }
 
-// ---- crowdsec proxy ---------------------------------------------------------
-
 var (
 	csJWT       string
 	csJWTExpiry time.Time
@@ -443,18 +433,19 @@ func (a *App) csGetJWT(ctx context.Context) (string, error) {
 	if csJWT != "" && time.Now().Before(csJWTExpiry) {
 		return csJWT, nil
 	}
-	body, _ := json.Marshal(map[string]any{
-		"machine_id": a.cfg.CrowdSecMachineID,
-		"password":   a.cfg.CrowdSecMachinePassword,
-		"scenarios":  []string{},
-	})
+	payload := map[string]any{"scenarios": []string{}}
+	if a.cfg.CrowdSecMachineID != "" && a.cfg.CrowdSecMachinePassword != "" {
+		payload["machine_id"] = a.cfg.CrowdSecMachineID
+		payload["password"] = a.cfg.CrowdSecMachinePassword
+	}
+	body, _ := json.Marshal(payload)
 	target := strings.TrimRight(a.cfg.CrowdSecLAPIURL, "/") + "/v1/watchers/login"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := a.cs().Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -475,8 +466,19 @@ func (a *App) csGetJWT(ctx context.Context) (string, error) {
 	return csJWT, nil
 }
 
+func (a *App) cs() *http.Client {
+	if a.csClient != nil {
+		return a.csClient
+	}
+	return http.DefaultClient
+}
+
+func (a *App) csHasCert() bool {
+	return a.cfg.CrowdSecClientCert != "" && a.cfg.CrowdSecClientKey != ""
+}
+
 func (a *App) csHasMachine() bool {
-	return a.cfg.CrowdSecMachineID != "" && a.cfg.CrowdSecMachinePassword != ""
+	return (a.cfg.CrowdSecMachineID != "" && a.cfg.CrowdSecMachinePassword != "") || a.csHasCert()
 }
 
 func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Reader, useJWT bool) (*http.Response, error) {
@@ -497,7 +499,7 @@ func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Read
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	return http.DefaultClient.Do(req)
+	return a.cs().Do(req)
 }
 
 func (a *App) csPageJSON(ctx context.Context, path string, useJWT bool) ([]json.RawMessage, error) {
@@ -522,9 +524,6 @@ const (
 	csMaxPages = 200
 )
 
-// LAPI supports id_gt cursor pagination on /v1/decisions (undocumented, but present
-// since v1.6.0). Unknown params are silently ignored on this endpoint, which is why
-// the old page= sweep returned the same rows ten times.
 func (a *App) crowdsecDecisionsHandler(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.CrowdSecLAPIURL == "" {
 		jsonError(w, "CROWDSEC_LAPI_URL not configured", http.StatusNotFound)
@@ -533,6 +532,21 @@ func (a *App) crowdsecDecisionsHandler(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	all := []json.RawMessage{}
 	cursor := int64(0)
+
+	if csStreamable {
+		rows, _, err := a.csDecisionsStream(r.Context(), r.URL.Query().Get("full") == "1")
+		if err == nil {
+			a.writeActiveDecisions(w, rows, now)
+			return
+		}
+		if strings.Contains(err.Error(), "LAPI 404") || strings.Contains(err.Error(), "LAPI 405") {
+			log.Printf("crowdsec: LAPI has no /v1/decisions/stream, falling back to the paged walk")
+			csStreamable = false
+		} else {
+			jsonError(w, "crowdsec unavailable: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
 
 	for page := 0; page < csMaxPages; page++ {
 		path := fmt.Sprintf("/v1/decisions?limit=%d&id_gt=%d", csPageSize, cursor)
@@ -580,7 +594,8 @@ func (a *App) crowdsecAlertsHandler(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "CROWDSEC_LAPI_URL not configured", http.StatusNotFound)
 		return
 	}
-	chunk, err := a.csPageJSON(r.Context(), "/v1/alerts?limit=0&with_decisions=false", true)
+	chunk, err := a.csPageJSON(r.Context(),
+		fmt.Sprintf("/v1/alerts?limit=%d&with_decisions=false", a.cfg.CrowdSecAlertLimit), true)
 	if err != nil {
 		jsonError(w, "crowdsec unavailable: "+err.Error(), http.StatusBadGateway)
 		return
@@ -681,8 +696,6 @@ func (a *App) crowdsecProxy(w http.ResponseWriter, r *http.Request, method, csPa
 	io.Copy(w, resp.Body)
 }
 
-// ---- local backups ----------------------------------------------------------
-
 func (a *App) backupDir() string {
 	return filepath.Join(a.cfg.BackupDir, "backups")
 }
@@ -747,6 +760,11 @@ func (a *App) backupsListHandler(w http.ResponseWriter, r *http.Request) {
 		Name string `json:"name"`
 		Size int64  `json:"size"`
 		Date string `json:"date"`
+		Kind string `json:"kind"`
+	}
+	staticBase := ""
+	if a.cfg.StaticConfigPath != "" {
+		staticBase = filepath.Base(a.cfg.StaticConfigPath)
 	}
 	var list []backup
 	for _, e := range entries {
@@ -761,9 +779,13 @@ func (a *App) backupsListHandler(w http.ResponseWriter, r *http.Request) {
 			size = info.Size()
 			date = info.ModTime().UTC().Format(time.RFC3339)
 		}
-		list = append(list, backup{Name: n, Size: size, Date: date})
+		kind := "routes"
+		if staticBase != "" && bakBaseName(n) == staticBase {
+			kind = "static"
+		}
+		list = append(list, backup{Name: n, Size: size, Date: date, Kind: kind})
 	}
-	jsonOK(w, map[string]any{"backups": list})
+	jsonOK(w, map[string]any{"backups": list, "static_configured": a.cfg.StaticConfigPath != ""})
 }
 
 func (a *App) backupCreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -836,13 +858,20 @@ func (a *App) restoreHandler(w http.ResponseWriter, r *http.Request) {
 			origName = candidate
 		}
 	}
-	cfgPath := a.cfg.ConfigPath
-	info, _ := os.Stat(cfgPath)
 	var dest string
-	if info != nil && info.IsDir() {
-		dest = filepath.Join(cfgPath, origName)
+	if a.cfg.StaticConfigPath != "" && origName == filepath.Base(a.cfg.StaticConfigPath) {
+		dest = a.cfg.StaticConfigPath
 	} else {
-		dest = cfgPath
+		cfgPath := a.cfg.ConfigPath
+		info, _ := os.Stat(cfgPath)
+		if info != nil && info.IsDir() {
+			dest = filepath.Join(cfgPath, origName)
+		} else {
+			dest = cfgPath
+		}
+	}
+	if err := a.createFileBak(dest, origName); err != nil {
+		log.Printf("pre-restore backup failed: %v", err)
 	}
 	if err := atomicWrite(dest, data); err != nil {
 		jsonError(w, "restore failed: "+err.Error(), http.StatusInternalServerError)
@@ -864,8 +893,6 @@ func (a *App) backupDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]any{"ok": true})
 }
-
-// ---- git backup -------------------------------------------------------------
 
 func (a *App) gitRepoDir() string {
 	return filepath.Join(a.cfg.BackupDir, "git-repo")
@@ -1250,9 +1277,6 @@ func (a *App) gitRestoreHandler(w http.ResponseWriter, r *http.Request, sha stri
 	jsonOK(w, map[string]any{"ok": true})
 }
 
-// acmeJSONPaths expands ACME_JSON_PATH into the storage files to read.
-// It accepts a comma-separated list, and any entry that is a directory
-// contributes its .json files. Traefik writes one storage file per resolver.
 func acmeJSONPaths(raw string) []string {
 	var out []string
 	seen := map[string]bool{}
@@ -1667,4 +1691,121 @@ func (a *App) gitResetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("git repo directory reset by user")
 	jsonOK(w, map[string]any{"ok": true})
+}
+
+type csStreamCache struct {
+	mu    sync.Mutex
+	items map[int64]json.RawMessage
+	fp    string
+	ready bool
+	sync  time.Time
+}
+
+var csCache = &csStreamCache{items: map[int64]json.RawMessage{}}
+
+const csStreamResync = time.Hour
+
+func (a *App) csFingerprint() string {
+	sum := sha256.Sum256([]byte(a.cfg.CrowdSecLAPIURL + "|" + a.cfg.CrowdSecAPIKey + "|" + a.cfg.CrowdSecClientCert))
+	return hex.EncodeToString(sum[:8])
+}
+
+type csStreamPayload struct {
+	New     []json.RawMessage `json:"new"`
+	Deleted []json.RawMessage `json:"deleted"`
+}
+
+func decID(raw json.RawMessage) int64 {
+	var d struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return 0
+	}
+	return d.ID
+}
+
+func (a *App) csDecisionsStream(ctx context.Context, forceFull bool) ([]json.RawMessage, bool, error) {
+	fp := a.csFingerprint()
+	csCache.mu.Lock()
+	defer csCache.mu.Unlock()
+
+	full := forceFull || !csCache.ready || csCache.fp != fp ||
+		(!csCache.sync.IsZero() && time.Since(csCache.sync) > csStreamResync)
+	path := "/v1/decisions/stream"
+	if full {
+		path += "?startup=true"
+	}
+	resp, err := a.csRequest(ctx, http.MethodGet, path, nil, false)
+	if err != nil {
+		if csCache.ready && csCache.fp == fp {
+			return csCacheItems(), true, nil
+		}
+		return nil, false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		if csCache.ready && csCache.fp == fp && resp.StatusCode >= 500 {
+			return csCacheItems(), true, nil
+		}
+		return nil, false, fmt.Errorf("LAPI %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	var payload csStreamPayload
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, false, fmt.Errorf("LAPI 404: stream payload not understood: %w", err)
+	}
+	if full {
+		csCache.items = map[int64]json.RawMessage{}
+	}
+	for _, raw := range payload.New {
+		if id := decID(raw); id != 0 {
+			csCache.items[id] = raw
+		}
+	}
+	for _, raw := range payload.Deleted {
+		if id := decID(raw); id != 0 {
+			delete(csCache.items, id)
+		}
+	}
+	csCache.fp = fp
+	csCache.ready = true
+	csCache.sync = time.Now()
+	return csCacheItems(), false, nil
+}
+
+func csCacheItems() []json.RawMessage {
+	out := make([]json.RawMessage, 0, len(csCache.items))
+	for _, v := range csCache.items {
+		out = append(out, v)
+	}
+	return out
+}
+
+var csStreamable = true
+
+func (a *App) writeActiveDecisions(w http.ResponseWriter, rows []json.RawMessage, now time.Time) {
+	active := make([]json.RawMessage, 0, len(rows))
+	for _, raw := range rows {
+		var d struct {
+			Until string `json:"until"`
+		}
+		if json.Unmarshal(raw, &d) == nil && d.Until != "" {
+			if exp, err := time.Parse(time.RFC3339, strings.Replace(d.Until, "Z", "+00:00", 1)); err == nil && exp.Before(now) {
+				continue
+			}
+		}
+		active = append(active, raw)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(active)
+}
+
+
+func bakBaseName(n string) string {
+	base := strings.TrimSuffix(n, ".bak")
+	if idx := strings.LastIndex(base, "."); idx >= 0 && len(base)-idx == 16 {
+		return base[:idx]
+	}
+	return base
 }

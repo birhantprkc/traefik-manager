@@ -86,14 +86,14 @@
 <body class="min-h-screen font-sans">
 
 {% if no_auth %}
-<div style="background:var(--red);color:#fff;text-align:center;padding:8px 16px;font-size:13px;font-weight:600;position:sticky;top:0;z-index:99997;">
+<div id="noAuthBanner" style="background:var(--red);color:#fff;text-align:center;padding:8px 16px;font-size:13px;font-weight:600;position:sticky;top:0;z-index:99997;">
     <i class="ph-bold ph-warning" style="margin-right:6px"></i>
     No authentication is active - this interface is publicly accessible. Enable a password or OIDC in Settings - Authentication.
 </div>
 {% endif %}
 
 <div id="customConfirmOverlay" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.5);backdrop-filter:blur(3px);align-items:center;justify-content:center;">
-    <div style="max-width:380px;width:90%;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:0 16px 48px rgba(0,0,0,0.4);">
+    <div style="max-width:380px;width:90%;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:0 16px 48px rgba(0,0,0,0.4);">
         <p class="font-semibold text-sm mb-1" style="color:var(--text)" id="customConfirmTitle"></p>
         <p class="text-sm mb-6" style="color:var(--muted);line-height:1.6" id="customConfirmMsg"></p>
         <div id="customConfirmTypeWrap" style="display:none;margin:-12px 0 18px">
@@ -222,6 +222,23 @@
 
 <div class="side-nav-backdrop" id="sideNavBackdrop" onclick="closeSideNavDrawer()"></div>
 <aside id="sideNav">
+    <div class="side-nav-app" id="sideNavApp">
+        <div class="side-nav-brand-row">
+            <img src="/static/icons/icon.png" alt="logo">
+            <span>Traefik <span style="color:var(--blue)">Manager</span></span>
+        </div>
+        <div id="drawerServerWrap" style="display:none">
+            <button class="drawer-srv-head" id="drawerServerBtn" onclick="toggleDrawerServerList()">
+                <span class="drawer-srv-dot" id="drawerServerDot" style="background:var(--green)"></span>
+                <span class="drawer-srv-t">
+                    <span class="drawer-srv-n" id="drawerServerName">Host</span>
+                    <span class="drawer-srv-s" id="drawerServerSub">This Traefik Manager</span>
+                </span>
+                <i class="ph-bold ph-caret-down" id="drawerServerCaret"></i>
+            </button>
+            <div class="drawer-srv-list" id="drawerServerList" style="display:none"></div>
+        </div>
+    </div>
     <nav id="sideNavItems"></nav>
     <div class="side-nav-foot">
         <button onclick="toggleSideNavCollapse()" id="sideNavCollapseBtn" title="Collapse navigation">
@@ -237,34 +254,34 @@
     <div class="tab-bar mb-6" id="tabBar">
         <button onclick="switchTab('dashboard')" id="btn-dashboard" class="tab-btn tab-optional" data-tab="dashboard">
             <span class="flex items-center gap-2">
-                <i class="ph-bold ph-squares-four"></i>
+                <i class="ph-bold ph-house"></i>
                 Dashboard
             </span>
         </button>
         <button onclick="switchTab('services')" id="btn-services" class="tab-btn active">
             <span class="flex items-center gap-2">
-                <i class="ph-bold ph-arrows-left-right"></i>
+                <i class="ph-bold ph-arrows-split"></i>
                 Routes
                 <span class="badge badge-muted" id="countRoutes">-</span>
             </span>
         </button>
         <button onclick="switchTab('middlewares')" id="btn-middlewares" class="tab-btn">
             <span class="flex items-center gap-2 ">
-                <i class="ph-bold ph-plugs-connected"></i>
+                <i class="ph-bold ph-stack"></i>
                 Middlewares
                 <span class="badge badge-muted" id="countMw">-</span>
             </span>
         </button>
         <button onclick="switchTab('live')" id="btn-live" class="tab-btn">
             <span class="flex items-center gap-2">
-                <i class="ph-bold ph-lightning"></i>
+                <i class="ph-bold ph-hard-drives"></i>
                 Services
                 <span class="badge badge-muted" id="svcTabCount">-</span>
             </span>
         </button>
         <button onclick="switchTab('routemap')" id="btn-routemap" class="tab-btn tab-optional" data-tab="routemap">
             <span class="flex items-center gap-2">
-                <i class="ph-bold ph-graph"></i>
+                <i class="ph-bold ph-tree-structure"></i>
                 Route Map
             </span>
         </button>
@@ -354,26 +371,26 @@
         </button>
         <button onclick="switchTab('tls')" id="btn-tls" class="tab-btn tab-optional" data-tab="tls">
             <span class="flex items-center gap-2">
-                <i class="ph-bold ph-lock-key"></i>
+                <i class="ph-bold ph-lock-laminated"></i>
                 TLS Options
             </span>
         </button>
         <button onclick="switchTab('certs')" id="btn-certs" class="tab-btn tab-optional" data-tab="certs">
             <span class="flex items-center gap-2">
-                <i class="ph-bold ph-certificate"></i>
+                <i class="ph-bold ph-shield-check"></i>
                 Certs
                 <span class="badge badge-muted" id="certsTabCount">-</span>
             </span>
         </button>
         <button onclick="switchTab('logs')" id="btn-logs" class="tab-btn tab-optional" data-tab="logs">
             <span class="flex items-center gap-2">
-                <i class="ph-bold ph-terminal"></i>
+                <i class="ph-bold ph-receipt"></i>
                 Logs
             </span>
         </button>
         <button onclick="switchTab('crowdsec')" id="btn-crowdsec" class="tab-btn tab-optional" data-tab="crowdsec">
             <span class="flex items-center gap-2">
-                <i class="ph-bold ph-shield-slash"></i>
+                <i class="ph-bold ph-shield"></i>
                 CrowdSec
             </span>
         </button>
@@ -386,7 +403,7 @@
         </button>
         <button onclick="switchTab('static')" id="btn-static" class="tab-btn tab-optional" data-tab="static">
             <span class="flex items-center gap-2">
-                <i class="ph-bold ph-sliders"></i>
+                <i class="ph-bold ph-file-code"></i>
                 Static Config
             </span>
         </button>
@@ -505,6 +522,67 @@ async function refreshStaticTabAvailability() {
         if (btn.classList.contains('active')) switchTab('services');
         if (typeof buildSideNav === 'function') buildSideNav();
     }
+    _staticAvailable = available;
+    applyStaticPlacement(getStaticPlacement());
+}
+
+let _staticAvailable = false;
+
+function getStaticPlacement() {
+    const v = tmPref('staticPlacement');
+    if (v === 'off' || v === 'settings' || v === 'tab') return v;
+    const tabs = _activeAgent ? (_activeAgent.visible_tabs || {}) : _localTabsCache;
+    return (tabs || {}).static ? 'tab' : 'off';
+}
+
+function applyStaticPlacement(mode) {
+    const el = document.getElementById('tab-static');
+    const sidebarBtn = document.getElementById('msb-static');
+    const mount = document.getElementById('staticSettingsMount');
+    const home = document.querySelector('main');
+    if (sidebarBtn) sidebarBtn.style.display = (mode === 'settings' && _staticAvailable) ? '' : 'none';
+    document.documentElement.classList.toggle('tm-static-in-settings', mode === 'settings');
+    ['off', 'settings', 'tab'].forEach(m => {
+        document.getElementById('scPlace-' + m)?.classList.toggle('active-http', m === mode);
+    });
+    if (el) {
+        if (mode === 'settings' && mount && el.parentElement !== mount) {
+            el.classList.remove('tab-content');
+            el.classList.remove('active');
+            el.dataset.scMounted = '1';
+            mount.appendChild(el);
+        } else if (mode !== 'settings' && el.dataset.scMounted === '1') {
+            delete el.dataset.scMounted;
+            el.classList.add('tab-content');
+            if (home) home.appendChild(el);
+        }
+    }
+    if (typeof applyTabVisibility === 'function') {
+        const tabs = _activeAgent ? (_activeAgent.visible_tabs || {}) : (_localTabsCache || {});
+        tabs.static = mode === 'tab';
+        applyTabVisibility(tabs);
+    }
+    if (typeof buildSideNav === 'function') buildSideNav();
+    if (mode === 'settings' && _staticAvailable && typeof refreshStaticTab === 'function') {
+        if (typeof _staticLoadedFor !== 'undefined') _staticLoadedFor = null;
+        refreshStaticTab();
+    }
+}
+
+function setStaticPlacement(mode) {
+    tmSetPref('staticPlacement', mode);
+    const tabs = _activeAgent ? (_activeAgent.visible_tabs || {}) : (_localTabsCache || {});
+    tabs.static = mode === 'tab';
+    if (!_activeAgent) {
+        _localTabsCache = tabs;
+        localStorage.setItem('tm_tabs_local', JSON.stringify(tabs));
+        fetch('/api/settings/tabs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
+            body: JSON.stringify({ visible_tabs: tabs }),
+        }).catch(() => {});
+    }
+    applyStaticPlacement(mode);
 }
 
 function _renderServerSwitcherList(runHealthChecks) {
@@ -528,10 +606,67 @@ function _renderServerSwitcherList(runHealthChecks) {
     if (runHealthChecks) {
         agents.forEach(a => fetch('/api/agents/' + a.id + '/health').then(r => r.json()).then(d => {
             _agentHealthCache[a.id] = d.ok ? 'var(--green)' : 'var(--red)';
+            _agentHealthInfo[a.id] = d;
             const dot = document.getElementById('ss-dot-' + a.id);
             if (dot) dot.style.background = _agentHealthCache[a.id];
-        }).catch(() => { _agentHealthCache[a.id] = 'var(--red)'; }));
+            _renderDrawerServerList();
+        }).catch(() => { _agentHealthCache[a.id] = 'var(--red)'; _renderDrawerServerList(); }));
     }
+    _renderDrawerServerList();
+}
+
+const _agentHealthInfo = {};
+
+function _agentSubLine(a) {
+    const d = _agentHealthInfo[a.id];
+    if (!d) return '';
+    if (!d.ok) return 'offline';
+    const v  = d.version ? 'v' + d.version : '';
+    const ms = (typeof d.latency_ms === 'number' && d.latency_ms >= 0) ? d.latency_ms + 'ms' : '';
+    return [v, ms].filter(Boolean).join(' · ');
+}
+
+function _renderDrawerServerList() {
+    const wrap = document.getElementById('drawerServerWrap');
+    const list = document.getElementById('drawerServerList');
+    if (!wrap || !list) return;
+    wrap.style.display = _agentList.length ? '' : 'none';
+    if (!_agentList.length) return;
+    const name = document.getElementById('drawerServerName');
+    const sub  = document.getElementById('drawerServerSub');
+    const dot  = document.getElementById('drawerServerDot');
+    if (name) name.textContent = _activeAgent ? _activeAgent.name : 'Host';
+    if (sub)  sub.textContent  = _activeAgent ? (_agentSubLine(_activeAgent) || 'Agent') : 'This Traefik Manager';
+    if (dot)  dot.style.background = _activeAgent ? (_agentHealthCache[_activeAgent.id] || 'var(--muted)') : 'var(--green)';
+    const item = (id, icon, title, subText, active, dotColor) =>
+        `<button class="drawer-srv-item${active ? ' active' : ''}" onclick="_drawerPickServer(${id ? `'${id}'` : 'null'})">
+            <i class="ph-bold ${icon}"></i>
+            <span class="drawer-srv-t">
+                <span class="drawer-srv-n">${title}</span>
+                ${subText ? `<span class="drawer-srv-s">${subText}</span>` : ''}
+            </span>
+            ${active ? '<i class="ph-bold ph-check drawer-srv-check"></i>' : `<span class="drawer-srv-dot" style="background:${dotColor}"></span>`}
+        </button>`;
+    list.innerHTML =
+        item(null, 'ph-house', 'Host', 'This Traefik Manager', !_activeAgent, 'var(--green)') +
+        _agentList.map(a => item(a.id, 'ph-hard-drives', _esc(a.name), _esc(_agentSubLine(a)), _activeAgent && _activeAgent.id === a.id, _agentHealthCache[a.id] || 'var(--muted)')).join('');
+}
+
+function _drawerPickServer(id) {
+    const list  = document.getElementById('drawerServerList');
+    const caret = document.getElementById('drawerServerCaret');
+    if (list) list.style.display = 'none';
+    if (caret) caret.classList.remove('open');
+    switchServer(id);
+}
+
+function toggleDrawerServerList() {
+    const list  = document.getElementById('drawerServerList');
+    const caret = document.getElementById('drawerServerCaret');
+    if (!list) return;
+    const opening = list.style.display === 'none';
+    list.style.display = opening ? '' : 'none';
+    if (caret) caret.classList.toggle('open', opening);
 }
 
 function _updateServerSwitcherList(agents) {
@@ -583,6 +718,8 @@ function switchServer(agentId) {
     refreshCurrentTab();
     loadOverviewStats();
     if (typeof updateTmVersionBadge === 'function') updateTmVersionBadge();
+    const sm = document.getElementById('settingsModal');
+    if (sm && sm.style.display !== 'none' && typeof _loadAboutAgentInfo === 'function') _loadAboutAgentInfo();
 }
 
 

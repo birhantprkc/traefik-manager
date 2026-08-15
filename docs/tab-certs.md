@@ -10,7 +10,7 @@ The **Certs** tab shows TLS certificates managed by Traefik, read from two sourc
 - Domain (main domain + SANs)
 - ACME resolver name (or `file` for PEM certs)
 - Expiry date (parsed from the certificate)
-- Source file, so you can tell which storage file or PEM a certificate came from
+
 
 In the [Modern layout](guide.md), certificates use the redesigned card shared by the rest of the app: the main domain with its resolver below it, the additional SANs each with a copy button, and the expiry date with the days remaining coloured green, amber under 30 days, and red under 7.
 
@@ -71,7 +71,7 @@ environment:
   - ACME_JSON_PATH=/letsencrypt
 ```
 
-Certificates from every file are listed together, each tagged with the file it came from, so you can tell which resolver issued what. A file that is missing or unreadable is reported without hiding the certificates from the others.
+Certificates from every file are listed together, each showing the resolver that issued it. A file that is missing or unreadable is reported without hiding the certificates from the others. A file that is missing or unreadable is reported without hiding the certificates from the others.
 
 This works the same on the Host and on a [remote agent](agent.md).
 
@@ -106,4 +106,4 @@ On native Linux installs, make sure Traefik Manager has read access to the cert 
 chmod o+r /etc/traefik/certs/chain.pem
 ```
 
-If `acme.json` is not found, the tab shows an error with the path it expected and the env var to set. File-based certs are still shown if available.
+If `acme.json` is not found, the tab shows an "acme.json not mounted" panel with the volume line to add to your compose file. File-based certs are still shown if available. File-based certs are still shown if available.

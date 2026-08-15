@@ -27,17 +27,20 @@ const OPTIONAL_TABS = ['dashboard', 'routemap', 'docker', 'kubernetes', 'swarm',
 let _visibleTabsCache = {};
 let _localTabsCache   = {};
 
-const SIDE_NAV_GROUPS = {
-    providers: { label: 'Providers', tabs: ['docker', 'kubernetes', 'swarm', 'nomad', 'ecs', 'consulcatalog', 'redis', 'etcd', 'consul', 'zookeeper', 'http_provider', 'file_external'] },
-    system:    { label: 'System',    tabs: ['certs', 'tls', 'crowdsec', 'plugins', 'logs', 'static'] },
-};
+const SIDE_NAV_GROUPS = [
+    { label: 'Traffic',        tabs: ['dashboard', 'services', 'middlewares', 'live', 'routemap'] },
+    { label: 'Observability',  tabs: ['logs', 'crowdsec'] },
+    { label: 'Infrastructure', tabs: ['certs', 'tls', 'plugins'] },
+    { label: 'System',         tabs: ['static'] },
+    { label: 'Providers',      tabs: ['docker', 'kubernetes', 'swarm', 'nomad', 'ecs', 'consulcatalog', 'redis', 'etcd', 'consul', 'zookeeper', 'http_provider', 'file_external'] },
+];
 
 function buildSideNav() {
     const nav = document.getElementById('sideNavItems');
     const bar = document.getElementById('tabBar');
     if (!nav || !bar) return;
     nav.innerHTML = '';
-    const buckets = { core: [], providers: [], system: [] };
+    const items = {};
     bar.querySelectorAll('.tab-btn').forEach(btn => {
         const optional = btn.classList.contains('tab-optional');
         if (optional && btn.style.display !== 'block') return;
@@ -55,23 +58,37 @@ function buildSideNav() {
         item.title = (window.innerWidth >= 768 && document.documentElement.classList.contains('tm-nav-collapsed')) ? label : '';
         item.onclick = () => { closeSideNavDrawer(); switchTab(tab); };
         item.innerHTML = `${icon ? `<i class="${icon.className}"></i>` : ''}<span class="side-nav-label">${_esc(label)}</span>${count && count !== '-' ? `<span class="side-nav-count">${_esc(count)}</span>` : ''}`;
-        const group = SIDE_NAV_GROUPS.providers.tabs.includes(tab) ? 'providers'
-                    : SIDE_NAV_GROUPS.system.tabs.includes(tab) ? 'system' : 'core';
-        buckets[group].push(item);
+        items[tab] = item;
     });
-    buckets.core.forEach(i => nav.appendChild(i));
-    for (const key of ['providers', 'system']) {
-        if (!buckets[key].length) continue;
+    const grouped = new Set(SIDE_NAV_GROUPS.flatMap(g => g.tabs));
+    Object.keys(items).filter(t => !grouped.has(t)).forEach(t => nav.appendChild(items[t]));
+    for (const group of SIDE_NAV_GROUPS) {
+        const present = group.tabs.filter(t => items[t]);
+        if (!present.length) continue;
         const head = document.createElement('div');
         head.className = 'side-nav-section';
-        head.textContent = SIDE_NAV_GROUPS[key].label;
+        head.textContent = group.label;
         nav.appendChild(head);
-        buckets[key].forEach(i => nav.appendChild(i));
+        present.forEach(t => nav.appendChild(items[t]));
     }
+}
+
+function _tmMono(name) {
+    const m = String(name || '').replace(/[^A-Za-z0-9]/g, '');
+    return (m.slice(0, 2) || '?').toUpperCase();
+}
+
+function revealBelowFold(el) {
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.height === 0 && r.top === 0) return;
+    if (r.top >= 0 && r.top < window.innerHeight * 0.6) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function _detailDockActive() {
     return document.documentElement.classList.contains('tm-modern')
+        && !document.documentElement.classList.contains('tm-settings-open')
         && window.matchMedia('(min-width: 1440px)').matches;
 }
 
@@ -148,6 +165,18 @@ function applyTabVisibility(map) {
         switchTab('services');
     }
     buildSideNav();
+    applyGeoipRelevance();
+}
+
+// GeoIP only feeds the Logs and CrowdSec tabs, so the setting is pointless with
+// both off. It stays visible while enabled, otherwise turning it back off would
+// mean re-enabling a tab first.
+function applyGeoipRelevance() {
+    const sec = document.getElementById('geoipSection');
+    if (!sec) return;
+    const used = !!(_visibleTabsCache.logs || _visibleTabsCache.crowdsec);
+    const on   = document.getElementById('toggle-geoip')?.classList.contains('on');
+    sec.style.display = (used || on) ? '' : 'none';
 }
 
 let _statsHomeMarker = null;
@@ -169,7 +198,7 @@ function placeStatCards() {
         _statsHomeMarker.style.display = 'none';
         ov.parentElement.insertBefore(_statsHomeMarker, ov);
     }
-    const active = document.querySelector('.tab-content.active');
+    const active = document.querySelector('main .tab-content.active');
     const tab = active ? active.id.replace(/^tab-/, '') : '';
     if (!_statTabSet().has(tab)) { _statsHomeMarker.insertAdjacentElement('afterend', ov); return; }
     const bar = active.querySelector('.filter-bar');
@@ -298,6 +327,29 @@ function toggleLiveDd(id) {
     if (!isOpen) { menu.classList.add('open'); btn.classList.add('open'); }
 }
 
+let _tmAuthLost = false;
+
+function _tmHandleAuthLoss() {
+    if (_tmAuthLost) return;
+    _tmAuthLost = true;
+    const here = window.location.pathname + window.location.search;
+    window.location.href = '/login?next=' + encodeURIComponent(here);
+}
+
+(function () {
+    const orig = window.fetch;
+    window.fetch = function (input, init) {
+        return orig.call(this, input, init).then(res => {
+            if (res.status !== 401) return res;
+            let url = '';
+            try { url = new URL(typeof input === 'string' ? input : input.url, window.location.origin).pathname; }
+            catch (e) { url = String(input || ''); }
+            if (url.startsWith('/api/') && !window.location.pathname.startsWith('/login')) _tmHandleAuthLoss();
+            return res;
+        });
+    };
+})();
+
 let _shortcutsPanelOpen = false;
 
 function toggleShortcutsPanel() {
@@ -308,14 +360,19 @@ function toggleShortcutsPanel() {
     panel.classList.toggle('open', _shortcutsPanelOpen);
     if (btn) btn.style.color = _shortcutsPanelOpen ? 'var(--blue)' : '';
     if (_shortcutsPanelOpen) {
-        const r = btn.getBoundingClientRect();
         const panelW = Math.min(320, window.innerWidth - 16);
-        let left = r.right - panelW;
-        if (left < 8) left = 8;
+        const r = btn && btn.offsetParent ? btn.getBoundingClientRect() : null;
         panel.style.position = 'fixed';
-        panel.style.top  = (r.bottom + 8) + 'px';
-        panel.style.left = left + 'px';
         panel.style.width = panelW + 'px';
+        if (r && r.width) {
+            let left = r.right - panelW;
+            if (left < 8) left = 8;
+            panel.style.top  = (r.bottom + 8) + 'px';
+            panel.style.left = left + 'px';
+        } else {
+            panel.style.top  = Math.max(24, Math.round(window.innerHeight * 0.14)) + 'px';
+            panel.style.left = Math.round((window.innerWidth - panelW) / 2) + 'px';
+        }
     }
 }
 
@@ -328,6 +385,7 @@ function _closeTopModal() {
     const modals = [
         ['tlsOptionsModal', closeTlsOptionModal],
         ['csBanModal', window.closeCsBanModal],
+        ['mwTplPanel', window.closeTemplatesPanel],
         ['pluginForm', window.closePluginForm],
         ['trustedIpsModal', window.closeTrustedIpsModal],
         ['appModal', closeModal],
@@ -583,9 +641,6 @@ async function loadGeoStatus(force) {
 const GEO_LOOKUP_BATCH = 5000;
 const _geoNames = {};
 
-// Aggregate mode: one pass over every IP returning country counts for the map plus a
-// compact ip -> country code map for the country filter. Roughly a quarter the bytes
-// of per-IP results, and exact rather than a sample.
 async function geoAggregate(ips) {
     if (!_geoEnabled || !_geoAvailable) return {};
     const uniq = [...new Set(ips.filter(Boolean))];

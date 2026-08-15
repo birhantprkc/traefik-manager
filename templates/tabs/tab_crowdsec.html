@@ -1,11 +1,18 @@
 <script>window._hostCsEnabled = {{ crowdsec_enabled | tojson }};</script>
 <div id="tab-crowdsec" class="tab-content">
     <div id="csNotConfigured" class="flex flex-col items-center justify-center py-20 gap-4" style="color:var(--muted);display:none!important">
-        <i class="ph-light ph-shield-slash text-5xl opacity-40"></i>
-        <div class="text-center">
+        <i class="ph-light ph-shield text-5xl opacity-40"></i>
+        <div class="text-center" id="csNotCfgHost">
             <p class="font-medium text-sm mb-1" style="color:var(--text)">CrowdSec not configured</p>
-            <p class="text-xs">Add your LAPI URL plus a bouncer API key, machine credentials, or both, in <strong>Settings &rarr; System Monitoring &rarr; CrowdSec</strong>.</p>
-            <p class="text-xs mt-1">The bouncer key reads active decisions, the machine login reads alerts. They are complementary, not tiered.</p>
+            <p class="text-xs">Add your LAPI URL plus a bouncer API key, machine credentials, or a mTLS client certificate in <strong>Settings &rarr; System Monitoring &rarr; CrowdSec</strong>.</p>
+            <p class="text-xs mt-1">The bouncer key reads active decisions, the machine login reads alerts. They are complementary, not tiered. A client certificate covers both.</p>
+        </div>
+        <div class="text-center" id="csNotCfgAgent" style="display:none;max-width:620px">
+            <p class="font-medium text-sm mb-1" style="color:var(--text)">No LAPI configured on <span id="csNotCfgAgentName">this agent</span></p>
+            <p class="text-xs">The agent reads CrowdSec from its <strong>own container environment</strong>, not from Traefik Manager. Set <code class="font-mono">CROWDSEC_LAPI_URL</code> on the agent container and recreate it.</p>
+            <p class="text-xs mt-1">The CrowdSec fields on this server in Settings only build the compose snippet below - they are never pushed to a running agent.</p>
+            <p class="text-xs mt-1">With mTLS, the cert paths are resolved <strong>inside the agent container</strong>, so mount them there too. A client certificate replaces the API key and machine login.</p>
+            <button onclick="openSettingsModal('agent-keys')" class="btn-secondary text-xs mt-3"><i class="ph-bold ph-copy"></i> Get the agent compose</button>
         </div>
     </div>
 

@@ -1,9 +1,9 @@
 # Mobile App
 
-**traefik-manager-mobile** is a React Native companion app for managing Traefik Manager from your phone.
+**traefik-manager-mobile** is a native Android companion app for managing Traefik Manager from your phone. Version 2.0 is a ground-up rewrite in Kotlin and Jetpack Compose.
 
 ::: info Using external auth (Authentik, Authelia, etc.)?
-See [connecting without an API key](#connecting-without-an-api-key) and [external auth providers](#external-auth-providers) below.
+A `forwardAuth` middleware in front of Traefik Manager blocks the app before Traefik Manager ever sees the request, so no API key can help. See [external auth providers](#external-auth-providers) for the route split that fixes it.
 :::
 
 ---
@@ -22,7 +22,7 @@ See [connecting without an API key](#connecting-without-an-api-key) and [externa
 
 ### 1. Generate an API key
 
-In the Traefik Manager web UI go to **Settings → Authentication → App / Mobile API Keys** and click **Add Key**. Enter a device name (e.g. `My Phone`) and click **Generate**. Copy the full key - it is only shown once.
+In the Traefik Manager web UI go to **Settings → Authentication → API Keys** and click **Add Key**. (Apply the same correction at line 62.) Enter a device name (e.g. `My Phone`) and click **Generate**. Copy the full key - it is only shown once.
 
 ::: tip One key per device
 Each device should have its own key. You can have up to 10 keys at once. Keys are identified by their device name in the settings list, so you can revoke a single device without affecting others.
@@ -39,215 +39,169 @@ Open the mobile app and enter:
 
 Tap **Connect** - the app connects immediately.
 
-::: tip API key is optional when built-in auth is disabled
-If you have disabled Traefik Manager's built-in authentication (e.g. you are using an external provider like Authentik), leave the API key field empty. The app will detect that auth is disabled and connect without a key.
+### Do I need an API key?
 
-If built-in auth is enabled, an API key is required.
+The server decides whether a request must be authenticated at all:
+
+| Built-in auth | OIDC | Authentication required |
+|---|---|---|
+| Off | Off | No - every request is accepted |
+| Off | On | Yes |
+| On | Either | Yes |
+
+The app asks a narrower question - *does this server have any API keys* - and makes your entry match:
+
+- **At least one key exists** - enter one, even if built-in auth is off. The app rejects an empty field.
+- **No keys exist** - leave the field empty. Entering a key is rejected with *"API key auth is not enabled on this server"*, because there is nothing to check it against.
+
+In practice: **if you have generated a key, use it.**
+
+::: warning OIDC with no API keys
+This is the one combination the app cannot resolve on its own. The server requires authentication, but no keys exist, so there is nothing to enter - and the connect check itself needs authentication. The app reports **"This server requires an API key"**.
+
+Generate one under **Settings → Authentication → App / Mobile API Keys** and use it. OIDC covers the browser only.
 :::
 
-::: info Using OIDC to log in to the web UI?
-OIDC login applies to the web browser only. The mobile app always authenticates via API key. If you log in to the web UI via OIDC, generate an API key under **Settings → Authentication → App / Mobile API Keys**, then enter it in the mobile app - the process is the same as for password-based users.
+::: info Internal CAs and plain HTTP
+Since v2.0.0 the Android app trusts CA certificates installed on the device, so instances secured by an internal/private CA work: install your root CA on the phone under **Settings → Security → Encryption & credentials → Install a certificate → CA certificate**, then connect with your `https://` URL. Plain `http://` URLs (LAN-only setups) are also supported.
 :::
 
 ---
 
 ## Navigation
 
-The app uses a bottom navigation bar with four tabs: **Home**, **Routes**, **Middleware**, and **Services**. An optional **Logs** tab appears when enabled.
+Navigation adapts to the screen. On a phone the primary destinations sit in a bottom bar; on a tablet or an unfolded device they move to a side rail. Everything else lives in a drawer, opened from the menu icon in the top bar.
 
-### Settings drawer
+Five destinations are primary: **Home**, **Routes**, **Middleware**, **Logs** and **CrowdSec**.
 
-Tap the **hamburger icon** (top-left of any screen) to open the navigation drawer. The drawer provides access to all settings pages:
+### Drawer
 
-| Section | Items |
+The drawer holds every destination, grouped into four sections, plus the server switcher:
+
+| Section | Destinations |
 |---|---|
-| General | Appearance, App Lock, Traefik, Server, Active Server, Client IP |
-| Tabs | Logs, Certificates, Plugins, CrowdSec |
-| Data | Backups |
-| Info | About |
+| Traffic | Home, Routes, Middleware, Services |
+| Observability | Logs, CrowdSec |
+| Infrastructure | Certificates, Plugins |
+| System | Backups, Settings |
+
+::: tip Tabs follow the server
+There is nothing to switch on in the app. Logs, CrowdSec, Certificates and Plugins each map to an optional tab in Traefik Manager, and appear as soon as that tab is enabled on the server you are connected to. Switch to an agent with a different set enabled and the destinations change with it.
+:::
 
 ---
 
 ## Features
 
-### Dashboard (Home)
+### Home
 
-- Summary stat cards for HTTP Routers, TCP Routers, UDP Routers, Services, and Middlewares - each shows a ring chart with success / warning / error counts
-- Tap **Explore →** on any card to jump to the matching tab filtered to that protocol
-- Entrypoints listed at the bottom with name, address, and protocol badges
-- On tablets and larger screens, stat cards display in a 2-column grid
+The overview: router, service and middleware counts with their health, the providers in use, and your entry points. A bell in the top bar carries unread notifications, and pull to refresh reloads.
 
 ### Routes
 
-- List all HTTP, TCP, and UDP routes with status, domain, target, and attached middlewares
-- Filter by protocol using the segmented button bar
-- Enable / disable routes with a toggle - configuration is preserved, Traefik stops routing until re-enabled
-- Add new routes via a form (name, subdomain, one or more domain chips, target IP, port, protocol, cert resolver)
-- Select multiple domains when creating or editing an HTTP route - generates a multi-host rule (`Host(\`sub.d1\`) || Host(\`sub.d2\`)`)
-- Entry points fetched from the Traefik API and shown as selectable chips for HTTP, TCP, and UDP; `websecure` is pre-selected for HTTP; UDP is single-select
-- Middlewares fetched from the Traefik API and shown as selectable chips
-- Toggle **Skip TLS Verification** per route for backends with self-signed certificates (`insecureSkipVerify`)
-- **Wildcard Certificate Domains** - when TLS is enabled, toggle on to specify a main domain and SANs (e.g. `*.example.com`) for wildcard certificate requests via DNS challenge
-- **TLS Options profile** - select any named TLS options profile configured on your Traefik instance to apply it to the route
-- Add and remove **backends** on a route, for both new and existing routes, so traffic is load balanced across several servers. HTTP backends take a per-backend `http`/`https` scheme
-- Sticky sessions, health checks and router priority are read back with the route and preserved when you save. They are configured on the web app; the phone shows them as chips on the route card
-- A route with more than one backend shows a `+N` badge on its card
-- Edit existing routes
-- Delete routes with confirmation
-- Tap a domain to open it in the browser
+- Every HTTP, TCP and UDP route, with status, domain, target and attached middlewares
+- Search, and filter by protocol or provider
+- Tap a route for its detail pane; edit, clone, enable or disable it
+- Disabling preserves the configuration - Traefik simply stops routing until you re-enable
+- Add a route with the form, or drop to raw YAML for anything the form does not cover
+- Multiple backends, sticky sessions, health checks and router priority
+- Per-route certificate resolver, wildcard domains, and **Skip TLS verification** for self-signed backends
 
-### Middlewares
+### Middleware
 
-- List all middlewares with type, protocol, and YAML config preview
-- Filter by protocol
-- Add new middlewares - two-step flow: choose from 23 built-in templates then fill in the wizard form
-
-    | Template | Description |
-    |---|---|
-    | Blank | Start from scratch |
-    | HTTPS Redirect | Redirect HTTP to HTTPS |
-    | Basic Auth | Password protect your service |
-    | Digest Auth | MD5 digest authentication |
-    | Security Headers | HSTS, X-Frame, XSS filter |
-    | Rate Limit | Limit requests per source IP |
-    | Forward Auth | Delegate auth to an external service |
-    | Authentik | Authentik SSO forward auth |
-    | Authelia | Authelia forward auth |
-    | Gatekeeper | Gatekeeper forward auth (with forward Authorization header option) |
-    | OIDC Auth | OpenID Connect auth via traefik-oidc-auth plugin |
-    | IP Allowlist | Restrict access by IP range |
-    | Private IPs | Allow LAN / private IP ranges only |
-    | CORS | Cross-origin resource sharing headers |
-    | Redirect Regex | Redirect using a regex pattern |
-    | Strip Prefix | Remove a URL path prefix |
-    | Add Prefix | Prepend a URL path prefix |
-    | Replace Path | Replace request URL path |
-    | Compress | Enable gzip / brotli compression |
-    | Retry | Retry failed requests |
-    | Circuit Breaker | Stop traffic when error rate is high |
-    | Buffering | Buffer request and response bodies |
-    | In-Flight Req | Limit concurrent requests |
-    | Chain | Combine multiple middlewares |
-
-- Edit existing middlewares (name + YAML)
-- Delete middlewares with confirmation
+- Every middleware with its type, protocol and config
+- Search, and filter by type
+- **24 built-in wizards** covering Basic and Digest Auth, Forward Auth with Authentik, Authelia and Gatekeeper presets, OIDC Auth, IP Allow List, Rate Limit, In-Flight Requests, Secure Headers, CORS, redirects, prefix and path rewriting, Retry, Circuit Breaker, Buffering, Compress, Chain and Encoded Characters - the same set as the web app
+- **Templates** - your saved YAML templates, managed from the middleware screen
+- Raw YAML for anything the wizards do not cover
 
 ### Services
 
-- Live service list with protocol badge, type badge, and status chip (Success / Warning / Error)
-- Server health fraction (e.g. `2/3 active`)
-- Provider and linked router chips
-- Tap the info icon for a full detail sheet
+Every service Traefik knows about, with its backends, health and the routers using it. Search and filter by provider. Tap for the detail pane.
 
 ### Logs
 
-The Logs tab is hidden by default. To enable it, open the drawer and go to **Logs**, then toggle **Show Logs Tab**.
+The access log as analytics rather than a wall of text, mirroring the web app. Seven cards - status codes, response time, methods, domains, paths, clients and services - each with counts you can tap to filter the list. A **where it fails** panel names the worst status-and-path pairs. Tap any entry for its full detail.
 
-::: warning Requires server-side configuration
-The Logs tab requires `ACCESS_LOG_PATH` to be set in your Traefik Manager server configuration pointing to a Traefik access log file.
-:::
-
-- Each entry parsed into a card showing method, status code + description (e.g. `404 Not Found`), path, IP, service name, and duration
-- Tap any card to open a full detail screen with all fields and the raw log line
-- Adjustable line count: 100, 150, or 200 lines
-- Pull to refresh
-- Country flags per request when GeoIP is enabled on the server, with a ranked country strip above the list; tap a country to filter to it
-- Both the CLF and `json` Traefik access-log formats are parsed
+Domains need a JSON access log; on `common` format the card says so.
 
 ### CrowdSec
 
-The CrowdSec tab is hidden by default. To enable it, open the drawer and go to **CrowdSec**, then toggle **Show CrowdSec Tab**. It needs CrowdSec credentials configured in the web app under **Settings -> Security**.
+Built around the attack rather than the ban list, as the web app is. Cards for **attacking sources**, **networks**, **scenarios**, **targeted paths** (or accounts on an SSH host), **tooling** by user agent, and **bans in force**. Colour marks only what is not already handled, so a host being probed but absorbed cleanly reads calm.
 
-- Active decisions listed with the banned address, scenario, type (ban, captcha, bypass), expiry and origin
-- Counts for bans, captchas and bypasses, and filtering by decision type
-- Search by address or scenario
-- Delete a decision to unban an address
-- Country flags on each decision when GeoIP is enabled, with a ranked country strip; tap a country to filter to it
-- Pull to refresh
+- Search by address, scenario, network or path
+- **Add decision** to ban an address, with type, duration and reason
+- Remove a decision to unban
+- Country flags and a ranked country strip when GeoIP is enabled; tap a country to filter
+
+The screen states plainly when the LAPI is unreachable, or when only decisions or only alerts could be read, rather than showing zero as if it were fact.
+
+### Certificates
+
+Every certificate from your resolvers, with domains and expiry. Search, copy the domain list, and pull to refresh.
+
+### Plugins
+
+The plugins declared in your static config, with their module name and version. Search, copy a module name, and see which middlewares reference each plugin - or that none do.
 
 ### Backups
 
-Access via the drawer under **Data → Backups**. Create and restore local `.bak` configuration backups (route config and static config sections).
+Three tabs: **Dynamic config**, **Static config** and **Git**.
 
-**Git Backup** - tap the Git Backup row at the top of the Backups screen to view the git backup status, branch, last push time, and full commit history. Tap **Push Now** to trigger an immediate git push, or tap any commit row to restore the config to that point in time (requires git backup configured in Settings on the web app).
+- Create a backup on demand, restore one, or delete it
+- Restoring asks for confirmation first, and the server takes a backup of the current config before overwriting
+- After restoring a static backup the screen tells you Traefik is still running the old config, and offers **Restart Traefik**
+- The Git tab shows commit history with the changed files, pushes on demand, and restores from a commit
 
-### Multi-Server Agent Mode
+### Servers and agents
 
-When TMA agents are registered in the web app, the **Active Server** row appears in **Settings - General**. Tap it to switch between:
+The server switcher lives in the drawer and under **Settings - Servers**. Switch between the host and any registered TMA agent, each with a live health indicator.
 
-- **Host** - manages the Traefik instance connected to your Traefik Manager server
-- **Remote agents** - any TMA agent registered in the web app, shown with a live health indicator
+When an agent is active, its name appears below the screen title and every screen reflects that agent's Traefik instance. Switching clears the cache so screens reload immediately, and the available destinations change to match that server's enabled tabs.
 
-When an agent is active, the agent name appears as a subtitle below each tab title, and all data (routes, middlewares, services, backups) reflects that agent's Traefik instance. Switching servers clears the query cache so tabs reload immediately.
+Agents can be added, renamed and removed from **Settings - Servers**, which also generates the compose snippet for a new agent.
 
-To rename an agent, tap the pencil icon on its row - the name becomes an editable field. Tap the checkmark or submit to save.
+### Widgets
 
-### Widget (Android)
+Home screen widgets built from the same data as the app. Add one from your launcher's widget picker and the setup screen opens as you place it: choose which server, which cards, and how often it refreshes.
 
-A home screen widget shows the health of every server - the Host and each registered agent - as its own row, with a status dot, service counts, and a green/yellow/red status bar. Add it from your launcher's widget picker after installing the app.
+### Demo mode
 
-The layout adapts to the widget's size:
-
-| Size | Shows |
-|---|---|
-| 2x1 | One aggregate bar and total counts across all servers |
-| 2x2 | A server list with per-server counts |
-| 4x2 and wider | Full rows with a per-server status bar and count chips |
-| Taller sizes | Up to six server rows, then `+N more` |
-
-An unreachable server shows a muted row instead of taking the whole widget down. If the last refresh failed entirely, the widget keeps the last known counts and labels them `offline` with the age of the data. Tapping a server row opens the app on the Servers screen; the title opens the app; the arrow refreshes immediately. The widget follows the phone's system dark/light theme and refreshes every 15 minutes.
-
-The widget connects using the same API key saved when you first connected the app, and reads agent status through the hub, so it works from anywhere the hub is reachable. Multi-server rows need server v1.5.0 or newer; older servers show the connected server only. If the widget stops updating or shows offline, disconnect and reconnect the server in **Settings → Server** - this refreshes the stored credentials.
-
-### Edit Mode
-
-Tap the **pencil icon** in the top bar to enter edit mode. In edit mode, cards reveal:
-
-- **Toggle** (routes only) - enable or disable the route
-- **Edit** - open the edit form
-- **Delete** - remove with confirmation
-
-Buttons are hidden when not in edit mode to keep the list clean.
+**Try the demo** on the connect screen runs the app against built-in sample data, with no server required. Useful for looking around before you point it at anything real.
 
 ---
 
 ## Settings
 
-All settings are accessed from the navigation drawer (hamburger icon in the top bar).
+**Settings** sits in the drawer under System, and opens a list of pages.
 
-### Appearance
+### Servers
 
-Switch between Light, Dark, and System theme. On Android 12+, **Dynamic Color** adapts the app's UI chrome (backgrounds, cards, borders) to your wallpaper palette while keeping status colors (green/yellow/red) semantically distinct.
+Add, edit and remove servers, switch the active one, and generate the compose snippet for a new agent.
 
-### Client IP
+### Traefik connection
 
-A read-only diagnostic showing what the server sees for your request: the trusted client IP that feeds the login rate limiter, audit log, `ipAllowList` and CrowdSec, the raw socket peer before any header is trusted, the trusted proxy hop count (`PROXY_FIX_HOPS`), the `X-Forwarded-For` chain and the forwarding headers as received. Each address is tagged public, private, CGNAT, loopback or link-local, and the screen warns when the trusted IP is not public while forwarding headers are present - the signature of a wrong `trustedIPs` or hop count. Needs server v1.8.0 or newer.
+How this device reaches the server, plus domains, certificate resolvers and the direct Traefik API URL, with a **Test connection** button.
 
-### App Lock
+### Authentication
 
-Require biometric or device PIN authentication when the app opens or returns from background.
+Login status, and the API keys registered on the server.
 
-### Traefik
+### Appearance and security
 
-Configure domains, cert resolvers, and the direct Traefik API URL. Includes a **Test Connection** button to verify connectivity to the Traefik API.
+Light, Dark or System theme. **Dynamic colour** takes the palette from your wallpaper on Android 12+, while status colours stay semantically distinct. **Require unlock** gates the app behind biometrics or your device PIN, so your servers are only shown after you confirm it is you.
 
-### Server
+### Notifications
 
-Change the Traefik Manager server URL and API key, or switch to Demo Mode.
+Webhook delivery, a test send, and the notification history.
 
-### Active Server
+### Diagnostics
 
-Switch between the local Traefik Manager and any registered remote TMA agents. See [Multi-Server Agent Mode](#multi-server-agent-mode) above.
+What the server sees for your request: the trusted client IP that feeds the login rate limiter, audit log, `ipAllowList` and CrowdSec; the raw socket peer before any header is trusted; the trusted proxy hop count (`PROXY_FIX_HOPS`); the `X-Forwarded-For` chain and the forwarding headers as received. Each address is tagged public, private, CGNAT, loopback or link-local, and it warns when the trusted IP is not public while forwarding headers are present - the signature of a wrong `trustedIPs` or hop count.
 
----
+### About
 
-## Connecting without an API key
-
-If Traefik Manager's built-in auth is disabled, leave the **API Key** field empty and tap **Connect**. The app will verify the server is reachable and connect without credentials.
-
-::: danger No auth means no protection
-If you disable built-in auth and expose Traefik Manager without any other protection, **anyone who can reach your instance can use the mobile app with no credentials**. Only disable built-in auth if you have an external auth provider (Authentik, Authelia, etc.) in front - and if so, read the [external auth providers](#external-auth-providers) section to ensure the mobile app still works correctly.
-:::
+Versions, and the open source licences.
 
 ---
 
@@ -292,12 +246,17 @@ When using this split-route pattern, keep Traefik Manager's built-in auth **enab
 
 | | |
 |---|---|
-| Traefik Manager (server) | **v1.8.0 or higher** for mobile v1.6.0; v1.5.0+ for mobile v1.5.0; v0.12.0+ for mobile v0.11.0+; v0.11.0+ for mobile v0.10.0 |
-| Android | 7.0+ (API 24+) |
-| iOS | 16+ (build from source required) |
+| Traefik Manager (server) | **v1.10.1 or higher** |
+| Android | 13+ (API 33) |
 
 ---
 
 ## Tech Stack
 
-Built with [Expo](https://expo.dev) SDK 54 / React Native 0.81, Expo Router, TanStack Query, Zustand, and React Native Paper (Material Design 3).
+Version 2.x is native Android: Kotlin 2.4, Jetpack Compose with Material 3 Expressive, Hilt, Retrofit 3 with kotlinx.serialization, DataStore for storage, and Glance with WorkManager for the widgets. Release builds are minified and resource-shrunk with R8.
+
+Version 1.x was built with Expo SDK 54 / React Native 0.81, and is still available on the `v1` branch.
+
+::: tip Upgrading from 1.x
+The rewrite ships under the same application id and is signed with the same certificate, so it installs straight over 1.x from either channel and keeps your server, API key and placed widgets. iOS is not supported in 2.x.
+:::

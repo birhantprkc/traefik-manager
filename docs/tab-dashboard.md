@@ -118,7 +118,7 @@ To add a group: enter a name. Routes are assigned to it via the pencil on each r
 
 A custom group with no routes assigned yet still renders as an empty pod with a line telling you how to fill it, so a group you just created is never invisible. It is hidden while a search or filter is active.
 
-Custom groups are saved to `/config/dashboard.yml` and persist across restarts.
+Custom groups are saved to `/app/config/dashboard.yml` (next to `manager.yml`) and persist across restarts.
 
 Groups and every per-card override are stored **per server**. A group you create while an agent is selected belongs to that agent alone and does not appear on the Host or on your other agents, and two servers with a route of the same name keep separate icons, names and links.
 

@@ -6,48 +6,44 @@ import mediumZoom from 'medium-zoom'
 import GitHubStars from './components/GitHubStars.vue'
 import MobileRelease from './components/MobileRelease.vue'
 import UnraidCAStatus from './components/UnraidCAStatus.vue'
-import ImageCarousel from './components/ImageCarousel.vue'
-import DesktopScreenshots from './components/DesktopScreenshots.vue'
-import ScreenshotGrid from './components/ScreenshotGrid.vue'
-import MobileScreenshots from './components/MobileScreenshots.vue'
 import ComposeUpgrader from './components/ComposeUpgrader.vue'
 import ShowcaseMockup from './components/ShowcaseMockup.vue'
-import InstallSection from './components/InstallSection.vue'
-import FeaturesSection from './components/FeaturesSection.vue'
+import HomeHero from './components/HomeHero.vue'
+import HomeShowcase from './components/HomeShowcase.vue'
+import HomeCta from './components/HomeCta.vue'
 import KoFiButton from './components/KoFiButton.vue'
 import './style.css'
 
 export default {
   extends: DefaultTheme,
-  Layout() {
+  setup() {
     const route = useRoute()
+    let zoom: ReturnType<typeof mediumZoom> | null = null
 
     const initZoom = () => {
-      mediumZoom('.ui-img-light, .ui-img-dark', {
+      if (zoom) zoom.detach()
+      zoom = mediumZoom('.screenshot', {
+        margin: 32,
         background: 'rgba(0,0,0,0.85)',
       })
     }
 
-    onMounted(() => initZoom())
+    onMounted(() => nextTick(() => initZoom()))
     watch(() => route.path, () => nextTick(() => initZoom()))
-
+  },
+  Layout() {
     return h(DefaultTheme.Layout, null, {
       'nav-bar-content-after': () => [h(KoFiButton), h(GitHubStars)],
-      'home-features-before': () => [h(InstallSection), h(ShowcaseMockup)],
-      'home-features-after': () => h(FeaturesSection),
+      'home-hero-before': () => h(HomeHero),
+      'home-features-before': () => [h(ShowcaseMockup), h(HomeCta)],
+      'home-features-after': () => h(HomeShowcase),
     })
   },
   enhanceApp({ app }: { app: any }) {
     enhanceAppWithTabs(app)
     app.component('MobileRelease', MobileRelease)
     app.component('UnraidCAStatus', UnraidCAStatus)
-    app.component('ImageCarousel', ImageCarousel)
-    app.component('DesktopScreenshots', DesktopScreenshots)
-    app.component('ScreenshotGrid', ScreenshotGrid)
-    app.component('MobileScreenshots', MobileScreenshots)
     app.component('ComposeUpgrader', ComposeUpgrader)
     app.component('ShowcaseMockup', ShowcaseMockup)
-    app.component('InstallSection', InstallSection)
-    app.component('FeaturesSection', FeaturesSection)
   },
 }

@@ -767,7 +767,7 @@ function _tmRouteCard(app, i, opts) {
 
     const iconUrl = (typeof _routeIconUrl === 'function' && window._showRouteIcons) ? _routeIconUrl(app) : '';
     const head = iconUrl
-        ? `<span class="tm-ic"><img src="${iconUrl}" data-slug="${_esc(_routeIconSlug(app))}" onerror="window.rmIconFallback(this)" alt="" class="route-app-icon"><span class="status-dot status-checking" title="Checking..."></span></span>`
+        ? `<span class="tm-ic tm-ic-tile" data-mono="${_esc(_tmMono(app.name))}"><img src="${iconUrl}" data-slug="${_esc(_routeIconSlug(app))}" onerror="window.rmIconFallback(this)" alt="" class="route-app-icon"><span class="status-dot status-checking" title="Checking..."></span></span>`
         : `<span class="tm-ic-bare"><span class="status-dot status-checking" title="Checking..."></span></span>`;
 
     let valRows;
@@ -1188,21 +1188,42 @@ async function _initMiddlewareChips(selectedMiddlewares, proto) {
     const baseToFull = Object.fromEntries(mws.map(mw => [mw.split('@')[0], mw]));
     let selected = new Set([...routeBases].map(b => baseToFull[b]).filter(Boolean));
 
+    const filterId = containerId + 'Filter';
     function render() {
         hidden.value = [...selected].join(', ');
+        const q = (document.getElementById(filterId)?.value || '').trim().toLowerCase();
         const sel   = [...selected];
-        const unsel = mws.filter(mw => !selected.has(mw));
+        const all   = mws.filter(mw => !selected.has(mw));
+        const unsel = q ? all.filter(mw => mw.toLowerCase().includes(q)) : all;
+        const hiddenCount = all.length - unsel.length;
         const chip = (mw, i, on) => {
             const label = mw.split('@')[0];
-            return `<button type="button" onclick="_toggleMwChip('${_esc(mw)}','${proto}')" style="padding:3px 10px;border-radius:9999px;border:1px solid ${on ? 'var(--purple)' : 'var(--border)'};background:${on ? 'rgba(163,113,247,0.15)' : 'transparent'};color:${on ? 'var(--purple)' : 'var(--muted)'};font-size:12px;font-family:monospace;cursor:pointer" title="${_esc(mw)}">${on ? (i + 1) + '. ' : ''}${_esc(label)}</button>`;
+            return `<button type="button" onclick="_toggleMwChip('${_esc(mw)}','${proto}')" class="mw-chip${on ? ' on' : ''}" title="${_esc(mw)}">${on ? (i + 1) + '. ' : ''}${_esc(label)}</button>`;
         };
         const divider = sel.length > 0 && unsel.length > 0
             ? `<span style="align-self:center;width:1px;height:18px;background:var(--border);margin:0 2px;flex-shrink:0"></span>`
             : '';
+        const note = hiddenCount
+            ? `<span class="d-n" style="align-self:center">${hiddenCount} hidden</span>`
+            : (q && !unsel.length && !sel.length ? '<span class="d-n" style="align-self:center">no matches</span>' : '');
         container.innerHTML = sel.map((mw, i) => chip(mw, i, true)).join('')
             + divider
-            + unsel.map(mw => chip(mw, 0, false)).join('');
+            + unsel.map(mw => chip(mw, 0, false)).join('')
+            + note;
         if (proto !== 'tcp') _streamingBufWarn();
+    }
+
+    function paintFilter() {
+        const wrap = document.getElementById(filterId + 'Wrap');
+        if (!wrap) return;
+        wrap.style.display = mws.length >= 12 ? '' : 'none';
+    }
+    window['_mwChipFilter_' + proto] = render;
+    const fwrap = document.getElementById(containerId + 'FilterWrap');
+    if (fwrap) {
+        fwrap.style.display = mws.length >= 12 ? '' : 'none';
+        const fin = document.getElementById(containerId + 'Filter');
+        if (fin) fin.value = '';
     }
     render();
     if (!window._mwChipState || typeof window._mwChipState.render === 'function') window._mwChipState = {};

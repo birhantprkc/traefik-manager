@@ -108,7 +108,7 @@ def login_required(f):
             return f(*args, **kwargs)
         _check_inactivity()
         if not _is_authenticated():
-            if request.headers.get('X-Api-Key'):
+            if request.headers.get('X-Api-Key') or request.path.startswith('/api/'):
                 abort(401)
             return redirect(url_for('login', next=request.path))
         return f(*args, **kwargs)
