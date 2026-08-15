@@ -714,7 +714,11 @@ function switchServer(agentId) {
     _renderServerSwitcherList(false);
     if (typeof _staticLoadedFor !== 'undefined') _staticLoadedFor = null;
     refreshStaticTabAvailability();
-    loadOverviewStats();
+    // The route and middleware grids are shared by two tabs and are not rebuilt unless one of
+    // them is on screen, so switching server while on any other tab used to leave the previous
+    // server's rows in place. Boot already refetches them unconditionally; do the same here.
+    const _cur = document.querySelector('.tab-btn.active')?.id.replace('btn-', '');
+    if (_cur !== 'services' && _cur !== 'middlewares') refreshRoutes();
     refreshCurrentTab();
     loadOverviewStats();
     if (typeof updateTmVersionBadge === 'function') updateTmVersionBadge();
