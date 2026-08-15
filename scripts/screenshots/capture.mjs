@@ -62,11 +62,11 @@ async function capture(theme) {
 
     await tab('services', 600);
     await js(`openSettingsModal('ui')`); await sleep(1400); await shot('settings-interface');
-    await js(`switchSettingsPanel('auth')`); await sleep(900); await shot('settings-auth-password');
-    await js(`switchAuthTab('apikeys', document.getElementById('auth-tab-apikeys'))`); await sleep(700); await shot('settings-auth-apikeys');
-    await js(`switchAuthTab('oidc', document.getElementById('auth-tab-oidc'))`); await sleep(700); await shot('settings-auth-oidc');
-    await js(`switchSettingsPanel('backups'); loadBackups()`); await sleep(1200); await shot('settings-backups');
-    await js(`switchSettingsPanel('system')`); await sleep(900); await shot('settings-system');
+    await js(`openSettingsChild('auth','password')`); await sleep(1000); await shot('settings-auth-password');
+    await js(`openSettingsChild('auth','apikeys')`); await sleep(900); await shot('settings-auth-apikeys');
+    await js(`openSettingsChild('auth','oidc')`); await sleep(900); await shot('settings-auth-oidc');
+    await js(`openSettingsChild('backups','routes'); loadBackups()`); await sleep(1300); await shot('settings-backups');
+    await js(`openSettingsChild('system','tabs')`); await sleep(1000); await shot('settings-system');
     await js(`switchSettingsPanel('routes')`); await sleep(900); await shot('settings-routes');
     await js(`switchSettingsPanel('connection')`); await sleep(900); await shot('settings-connection');
     await js(`switchSettingsPanel('notifications')`); await sleep(900); await shot('settings-notifications');

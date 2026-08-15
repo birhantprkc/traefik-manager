@@ -7,7 +7,9 @@ const page = await browser.newPage();
 await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForFunction('typeof _csrfHeaders === "function"', { timeout: 30000 });
 
-const key = await page.evaluate(async () => {
+page.on('pageerror', e => console.log('PAGE ERROR:', e.message));
+
+const out = await page.evaluate(async () => {
     const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' },
@@ -18,11 +20,18 @@ const key = await page.evaluate(async () => {
             static_config_path: '/app/config/traefik-static.yml',
         }),
     });
-    const d = await res.json();
-    return d.agent?.api_key_raw || '';
+    const text = await res.text();
+    let d = null;
+    try { d = JSON.parse(text); } catch {}
+    return { status: res.status, key: d?.agent?.api_key_raw || '', body: text.slice(0, 400) };
 });
 
-if (!key) throw new Error('manager did not mint an agent key');
+const key = out.key;
+if (!key) {
+    console.log('HTTP', out.status);
+    console.log('BODY', out.body);
+    throw new Error('manager did not mint an agent key');
+}
 fs.writeFileSync('/out/agent-key', key);
 console.log('agent registered');
 await browser.close();
