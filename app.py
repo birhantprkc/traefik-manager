@@ -5003,26 +5003,45 @@ def oidc_callback():
         # A retry with the other method re-sends a spent code and the provider answers "authorization
         # code has already been used", which hides the real error. Pick the method and commit to it.
         supported = cfg.get('token_endpoint_auth_methods_supported') or []
-        if not client_secret:
-            # Public client: no secret exists, so send none. PKCE is what proves the caller.
-            # Sending an empty Basic header here is what makes providers answer invalid_client.
-            token_resp = requests.post(
-                cfg['token_endpoint'], data=dict(payload, client_id=client_id), timeout=8)
-        elif 'client_secret_basic' in supported or not supported:
+
+        def _post_basic():
             # RFC 6749 section 2.3.1 requires the id and secret to be form-encoded BEFORE they are
             # base64'd into the Basic header. requests does not do that, and providers that follow
-            # the RFC percent-decode what they receive - so a secret containing % or + arrives
-            # corrupted and the exchange fails with invalid_client.
+            # the RFC percent-decode what they receive, so a secret containing % or + would arrive
+            # corrupted.
             basic = base64.b64encode(
                 f"{quote(client_id, safe='')}:{quote(client_secret, safe='')}".encode()
             ).decode()
-            token_resp = requests.post(
-                cfg['token_endpoint'], data=payload,
-                headers={'Authorization': f'Basic {basic}'}, timeout=8)
-        else:
-            token_resp = requests.post(
+            return requests.post(cfg['token_endpoint'], data=payload,
+                                 headers={'Authorization': f'Basic {basic}'}, timeout=8)
+
+        def _post_body():
+            return requests.post(
                 cfg['token_endpoint'],
                 data=dict(payload, client_id=client_id, client_secret=client_secret), timeout=8)
+
+        if not client_secret:
+            # Public client: no secret exists, so send none. PKCE is what proves the caller.
+            # An empty Basic header is what makes providers answer invalid_client.
+            token_resp = requests.post(
+                cfg['token_endpoint'], data=dict(payload, client_id=client_id), timeout=8)
+        else:
+            # Try the advertised method first, then the other one. This is safe because a provider
+            # rejects the client before it looks at the code, so a failed attempt does not consume
+            # it - the retry is only ever taken on invalid_client, never on invalid_grant.
+            order = ([_post_body, _post_basic]
+                     if 'client_secret_post' in supported and 'client_secret_basic' not in supported
+                     else [_post_basic, _post_body])
+            token_resp = order[0]()
+            if token_resp.status_code >= 400:
+                try:
+                    first_err = (token_resp.json() or {}).get('error', '')
+                except Exception:
+                    first_err = ''
+                if first_err == 'invalid_client':
+                    logger.info(
+                        "OIDC client authentication rejected, retrying with the other method")
+                    token_resp = order[1]()
         if token_resp.status_code >= 400:
             # The provider says exactly what is wrong in the body. Without this you get a bare
             # "400 Bad Request" and no way to tell a wrong secret from a PKCE requirement.
