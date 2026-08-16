@@ -1,6 +1,8 @@
 import os
 import re
 import time
+import base64
+import hashlib
 import shutil
 import secrets
 import threading
@@ -4935,13 +4937,21 @@ def oidc_login():
     groups_claim = s.get('oidc_groups_claim', '').strip()
     if s.get('oidc_allowed_groups', '').strip() and groups_claim and groups_claim not in scopes:
         scopes.append(groups_claim)
+    # PKCE (RFC 7636). Public clients require it - Authentik rejects the exchange without it -
+    # and it is harmless for confidential clients, so it is always sent.
+    verifier  = secrets.token_urlsafe(64)
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode('ascii')).digest()).decode('ascii').rstrip('=')
+    session['oidc_verifier'] = verifier
     auth_params = {
-        'response_type': 'code',
-        'client_id':     s.get('oidc_client_id', ''),
-        'redirect_uri':  redirect_uri,
-        'scope':         ' '.join(scopes),
-        'state':         state,
-        'nonce':         nonce,
+        'response_type':         'code',
+        'client_id':             s.get('oidc_client_id', ''),
+        'redirect_uri':          redirect_uri,
+        'scope':                 ' '.join(scopes),
+        'state':                 state,
+        'nonce':                 nonce,
+        'code_challenge':        challenge,
+        'code_challenge_method': 'S256',
     }
     if silent:
         auth_params['prompt'] = 'none'
@@ -4976,14 +4986,53 @@ def oidc_callback():
         flash("OIDC provider unavailable.", "error")
         return redirect(url_for('login'))
     try:
-        token_resp = requests.post(cfg['token_endpoint'], data={
+        client_id     = s.get('oidc_client_id', '')
+        client_secret = s.get('oidc_client_secret', '')
+        payload = {
             'grant_type':   'authorization_code',
             'code':         code,
             'redirect_uri': url_for('oidc_callback', _external=True),
-            'client_id':    s.get('oidc_client_id', ''),
-            'client_secret': s.get('oidc_client_secret', ''),
-        }, timeout=10)
-        token_resp.raise_for_status()
+            'code_verifier': session.pop('oidc_verifier', ''),
+        }
+        # OIDC Core makes client_secret_basic the default when a client registers no method, and
+        # Authelia and Authentik follow it. Sending the secret in the body against a Basic client
+        # gets a bare 400 invalid_client, so honour what the provider advertises and retry with
+        # the other method rather than leaving the user to guess.
+        supported = cfg.get('token_endpoint_auth_methods_supported') or ['client_secret_basic']
+        order = (['basic', 'post'] if 'client_secret_basic' in supported
+                 else ['post', 'basic'])
+        token_resp = None
+        for method in order:
+            if method == 'basic':
+                # Basic only - Authelia rejects a request that carries two auth methods, so the
+                # credentials must not also appear in the body.
+                token_resp = requests.post(
+                    cfg['token_endpoint'], data=payload,
+                    auth=(client_id, client_secret), timeout=10)
+            else:
+                token_resp = requests.post(
+                    cfg['token_endpoint'],
+                    data=dict(payload, client_id=client_id, client_secret=client_secret),
+                    timeout=10)
+            if token_resp.status_code not in (400, 401):
+                break
+            logger.info("OIDC token exchange rejected with client_secret_%s, trying the other method", method)
+        if token_resp.status_code >= 400:
+            # The provider says exactly what is wrong in the body. Without this you get a bare
+            # "400 Bad Request" and no way to tell a wrong secret from a PKCE requirement.
+            detail = ''
+            try:
+                body = token_resp.json()
+                detail = str(body.get('error_description') or body.get('error') or '')
+            except Exception:
+                detail = (token_resp.text or '')[:300]
+            logger.error(
+                "OIDC token exchange rejected by the provider (HTTP %s): %s",
+                token_resp.status_code, detail or '(empty response body)')
+            flash(f"OIDC login failed - the provider rejected the token request: {detail}"
+                  if detail else "OIDC login failed - the provider rejected the token request.",
+                  "error")
+            return redirect(url_for('login'))
         tokens = token_resp.json()
     except Exception:
         logger.exception("OIDC token exchange failed")
@@ -5119,7 +5168,14 @@ def api_test_oidc():
         resp = requests.get(f"{url}/.well-known/openid-configuration", timeout=5)
         resp.raise_for_status()
         cfg = resp.json()
-        return jsonify({'ok': True, 'issuer': cfg.get('issuer', url)})
+        # This only proves the provider is reachable and advertises OIDC. The client ID and
+        # secret are never exercised here, so say so rather than implying a working login.
+        return jsonify({
+            'ok': True,
+            'issuer': cfg.get('issuer', url),
+            'checked': 'discovery only',
+            'note': 'Provider reachable. Credentials are not verified until you sign in.',
+        })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 
