@@ -58,9 +58,9 @@ function upgrade() {
 
     const svc = doc.services[tmKey]
 
-    // Update image tag
-    svc.image = svc.image.replace(/:(latest|\d+\.\d+\.\d+[\w.-]*)$/, ':beta')
-    if (!svc.image.endsWith(':beta')) svc.image += ':beta'
+    // Leave the image tag alone. Enabling the static config editor is a volume and env
+    // change, not a channel change - rewriting :latest to :beta here would move people onto
+    // the dev branch without asking.
 
     // Normalize environment to object
     if (!svc.environment) {

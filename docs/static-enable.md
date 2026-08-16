@@ -6,6 +6,23 @@ How to enable the static config editor for an existing Traefik Manager install w
 
 ---
 
+## Generate it
+
+Paste your compose file, pick a restart method, and copy the result. This does Steps 1 to 3 for you.
+
+<ComposeUpgrader />
+
+Then apply it:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Prefer to do it by hand, or not using Compose? The steps below cover Docker, Podman and systemd.
+
+---
+
 ## Step 1 - Mount traefik.yml into TM
 
 Add the volume to your Traefik Manager service. The mount must be **read-write** (no `:ro`).
