@@ -4998,25 +4998,18 @@ def oidc_callback():
         # Authelia and Authentik follow it. Sending the secret in the body against a Basic client
         # gets a bare 400 invalid_client, so honour what the provider advertises and retry with
         # the other method rather than leaving the user to guess.
-        supported = cfg.get('token_endpoint_auth_methods_supported') or ['client_secret_basic']
-        order = (['basic', 'post'] if 'client_secret_basic' in supported
-                 else ['post', 'basic'])
-        token_resp = None
-        for method in order:
-            if method == 'basic':
-                # Basic only - Authelia rejects a request that carries two auth methods, so the
-                # credentials must not also appear in the body.
-                token_resp = requests.post(
-                    cfg['token_endpoint'], data=payload,
-                    auth=(client_id, client_secret), timeout=10)
-            else:
-                token_resp = requests.post(
-                    cfg['token_endpoint'],
-                    data=dict(payload, client_id=client_id, client_secret=client_secret),
-                    timeout=10)
-            if token_resp.status_code not in (400, 401):
-                break
-            logger.info("OIDC token exchange rejected with client_secret_%s, trying the other method", method)
+        # The authorization code is single-use (RFC 6749 4.1.2), so there is exactly one attempt.
+        # A retry with the other method re-sends a spent code and the provider answers "authorization
+        # code has already been used", which hides the real error. Pick the method and commit to it.
+        supported = cfg.get('token_endpoint_auth_methods_supported') or []
+        use_basic = 'client_secret_basic' in supported or not supported
+        if use_basic:
+            token_resp = requests.post(cfg['token_endpoint'], data=payload,
+                                       auth=(client_id, client_secret), timeout=8)
+        else:
+            token_resp = requests.post(
+                cfg['token_endpoint'],
+                data=dict(payload, client_id=client_id, client_secret=client_secret), timeout=8)
         if token_resp.status_code >= 400:
             # The provider says exactly what is wrong in the body. Without this you get a bare
             # "400 Bad Request" and no way to tell a wrong secret from a PKCE requirement.
@@ -5040,12 +5033,17 @@ def oidc_callback():
         return redirect(url_for('login'))
     id_token = tokens.get('id_token', '')
     expected_nonce = session.pop('oidc_nonce', '')
-    if id_token and expected_nonce:
+    id_claims = {}
+    if id_token:
         try:
             import base64, json as _json
             payload_b64 = id_token.split('.')[1]
             payload_b64 += '=' * (-len(payload_b64) % 4)
             id_claims = _json.loads(base64.urlsafe_b64decode(payload_b64))
+        except Exception:
+            logger.warning("OIDC could not decode the id_token payload")
+    if id_token and expected_nonce:
+        try:
             if not secrets.compare_digest(str(id_claims.get('nonce', '')), expected_nonce):
                 logger.warning(f"OIDC nonce mismatch from {request.remote_addr}")
                 flash("OIDC login failed - nonce mismatch.", "error")
@@ -5053,14 +5051,23 @@ def oidc_callback():
         except Exception:
             logger.warning("OIDC id_token nonce verification skipped - could not decode token")
     access_token = tokens.get('access_token', '')
-    try:
-        userinfo_resp = requests.get(cfg['userinfo_endpoint'],
-                                     headers={'Authorization': f'Bearer {access_token}'}, timeout=10)
-        userinfo_resp.raise_for_status()
-        userinfo = userinfo_resp.json()
-    except Exception:
-        logger.exception("OIDC userinfo fetch failed")
-        flash("OIDC login failed - could not fetch user info.", "error")
+    # Best effort. Providers put the same claims in the id_token, so an unreachable or slow
+    # userinfo endpoint must not cost the user their login - and must not burn the request
+    # budget, since gunicorn kills the worker at 30s and takes the whole callback with it.
+    userinfo = {}
+    if access_token and cfg.get('userinfo_endpoint'):
+        try:
+            userinfo_resp = requests.get(cfg['userinfo_endpoint'],
+                                         headers={'Authorization': f'Bearer {access_token}'}, timeout=6)
+            userinfo_resp.raise_for_status()
+            userinfo = userinfo_resp.json()
+        except Exception as e:
+            logger.warning("OIDC userinfo fetch failed (%s) - falling back to the id_token claims", e)
+    if not userinfo:
+        userinfo = id_claims
+    if not userinfo:
+        logger.error("OIDC login failed - no claims from userinfo or the id_token")
+        flash("OIDC login failed - the provider returned no account details.", "error")
         return redirect(url_for('login'))
     email  = str(userinfo.get('email', '')).strip().lower()
     name   = str(userinfo.get('name', userinfo.get('preferred_username', email))).strip()
