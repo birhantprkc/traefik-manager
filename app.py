@@ -3,6 +3,7 @@ import re
 import time
 import base64
 import hashlib
+from urllib.parse import quote
 import shutil
 import secrets
 import threading
@@ -5006,10 +5007,22 @@ def oidc_callback():
         # A retry with the other method re-sends a spent code and the provider answers "authorization
         # code has already been used", which hides the real error. Pick the method and commit to it.
         supported = cfg.get('token_endpoint_auth_methods_supported') or []
-        use_basic = 'client_secret_basic' in supported or not supported
-        if use_basic:
-            token_resp = requests.post(cfg['token_endpoint'], data=payload,
-                                       auth=(client_id, client_secret), timeout=8)
+        if not client_secret:
+            # Public client: no secret exists, so send none. PKCE is what proves the caller.
+            # Sending an empty Basic header here is what makes providers answer invalid_client.
+            token_resp = requests.post(
+                cfg['token_endpoint'], data=dict(payload, client_id=client_id), timeout=8)
+        elif 'client_secret_basic' in supported or not supported:
+            # RFC 6749 section 2.3.1 requires the id and secret to be form-encoded BEFORE they are
+            # base64'd into the Basic header. requests does not do that, and providers that follow
+            # the RFC percent-decode what they receive - so a secret containing % or + arrives
+            # corrupted and the exchange fails with invalid_client.
+            basic = base64.b64encode(
+                f"{quote(client_id, safe='')}:{quote(client_secret, safe='')}".encode()
+            ).decode()
+            token_resp = requests.post(
+                cfg['token_endpoint'], data=payload,
+                headers={'Authorization': f'Basic {basic}'}, timeout=8)
         else:
             token_resp = requests.post(
                 cfg['token_endpoint'],
@@ -5040,7 +5053,7 @@ def oidc_callback():
     id_claims = {}
     if id_token:
         try:
-            import base64, json as _json
+            import json as _json
             payload_b64 = id_token.split('.')[1]
             payload_b64 += '=' * (-len(payload_b64) % 4)
             id_claims = _json.loads(base64.urlsafe_b64decode(payload_b64))
@@ -5058,17 +5071,25 @@ def oidc_callback():
     # Best effort. Providers put the same claims in the id_token, so an unreachable or slow
     # userinfo endpoint must not cost the user their login - and must not burn the request
     # budget, since gunicorn kills the worker at 30s and takes the whole callback with it.
+    # Only call userinfo when the id_token is actually missing something. requests applies its
+    # timeout PER ADDRESS from getaddrinfo, not per call, so a host resolving to several
+    # unreachable addresses burns timeout x N and gunicorn kills the worker at 30s - taking the
+    # whole login with it. Skipping the call when the claims are already in hand removes that
+    # risk entirely for providers that populate the id_token, which is most of them.
+    groups_claim = str(s.get('oidc_groups_claim', '') or 'groups').strip()
+    need_email  = not str(id_claims.get('email', '')).strip()
+    need_groups = bool(str(s.get('oidc_allowed_groups', '')).strip()) and not id_claims.get(groups_claim)
     userinfo = {}
-    if access_token and cfg.get('userinfo_endpoint'):
+    if access_token and cfg.get('userinfo_endpoint') and (need_email or need_groups):
         try:
             userinfo_resp = requests.get(cfg['userinfo_endpoint'],
-                                         headers={'Authorization': f'Bearer {access_token}'}, timeout=6)
+                                         headers={'Authorization': f'Bearer {access_token}'},
+                                         timeout=(3, 5))
             userinfo_resp.raise_for_status()
             userinfo = userinfo_resp.json()
         except Exception as e:
             logger.warning("OIDC userinfo fetch failed (%s) - falling back to the id_token claims", e)
-    if not userinfo:
-        userinfo = id_claims
+    userinfo = {**id_claims, **userinfo} if (userinfo or id_claims) else {}
     if not userinfo:
         logger.error("OIDC login failed - no claims from userinfo or the id_token")
         flash("OIDC login failed - the provider returned no account details.", "error")
