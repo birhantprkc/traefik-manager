@@ -29,40 +29,24 @@ function renderCertCards() {
         const expiryBadge = daysLeft !== null
             ? `<span class="badge" style="background:${daysLeft<7?'rgba(248,81,73,0.15)':daysLeft<30?'rgba(210,153,34,0.15)':'rgba(63,185,80,0.15)'};color:${expiryColor};border-color:${expiryColor}40">${daysLeft}d left</span>`
             : '';
-        if (_tmModern()) {
-            const extra = sans.filter(d => d !== main);
-            const vals = extra.slice(0, 2).map(d =>
-                `<div class="tm-val tm-val-host"><i class="ph-bold ph-globe-simple"></i><span class="tm-v">${_esc(d)}</span>${_tmCopy(d)}</div>`).join('')
-                + (extra.length > 2 ? `<div class="tm-val"><i class="ph-bold ph-dot" style="opacity:0"></i><span class="tm-more" title="${_esc(extra.join(', '))}">+${extra.length - 2} more</span></div>` : '');
-            return `<div class="tm-card tm-card-flat"${daysLeft !== null && daysLeft < 7 ? ' data-health="down"' : ''} style="--tm-accent:${expiryColor}">
-                <div class="tm-head">
-                    <span class="tm-ic tm-ic-tile"><i class="ph-bold ph-shield-check"></i></span>
-                    <div class="tm-head-txt">
-                        <div class="tm-title"><span class="tm-name">${_esc(main)}</span></div>
-                        <div class="tm-sub">${_esc(resolver)}</div>
-                    </div>
+        const extra = sans.filter(d => d !== main);
+        const vals = extra.slice(0, 2).map(d =>
+            `<div class="tm-val tm-val-host"><i class="ph-bold ph-globe-simple"></i><span class="tm-v">${_esc(d)}</span>${_tmCopy(d)}</div>`).join('')
+            + (extra.length > 2 ? `<div class="tm-val"><i class="ph-bold ph-dot" style="opacity:0"></i><span class="tm-more" title="${_esc(extra.join(', '))}">+${extra.length - 2} more</span></div>` : '');
+        return `<div class="tm-card tm-card-flat"${daysLeft !== null && daysLeft < 7 ? ' data-health="down"' : ''} style="--tm-accent:${expiryColor}">
+            <div class="tm-head">
+                <span class="tm-ic tm-ic-tile"><i class="ph-bold ph-shield-check"></i></span>
+                <div class="tm-head-txt">
+                    <div class="tm-title"><span class="tm-name">${_esc(main)}</span></div>
+                    <div class="tm-sub">${_esc(resolver)}</div>
                 </div>
-                ${vals ? `<div class="tm-vals">${vals}</div>` : ''}
-                <div class="tm-foot"><span class="tm-meta">expires ${_esc(expiryStr)}${extra.length ? ` · ${extra.length + 1} domains` : ''}</span>${daysLeft !== null ? `<span class="tm-cf" style="color:${expiryColor}">${daysLeft}d left</span>` : ''}</div>
-            </div>`;
-        }
-        return `<div class="card p-4">
-            <div class="flex items-start justify-between mb-3">
-                <div class="flex items-center gap-2 min-w-0">
-                    <i class="ph-bold ph-shield-check text-sm shrink-0" style="color:var(--green)"></i>
-                    <span class="font-bold text-sm truncate" style="color:var(--text)" title="${_esc(main)}">${_esc(main)}</span>
-                </div>
-                ${expiryBadge}
             </div>
-            ${sans.length ? `<div class="flex flex-wrap gap-1 mb-3">${sans.map(d=>`<span class="badge badge-muted" style="font-size:9px">${_esc(d)}</span>`).join('')}</div>` : ''}
-            <div class="grid grid-cols-2 gap-2 text-xs">
-                <div><span style="color:var(--muted)">Resolver</span><div class="font-mono mt-0.5" style="color:var(--text)">${_esc(resolver)}</div></div>
-                <div><span style="color:var(--muted)">Expires</span><div class="font-mono mt-0.5" style="color:${expiryColor}">${expiryStr}</div></div>
-            </div>
+            ${vals ? `<div class="tm-vals">${vals}</div>` : ''}
+            <div class="tm-foot"><span class="tm-meta">expires ${_esc(expiryStr)}${extra.length ? ` · ${extra.length + 1} domains` : ''}</span>${daysLeft !== null ? `<span class="tm-cf" style="color:${expiryColor}">${daysLeft}d left</span>` : ''}</div>
         </div>`;
     }).join('');
     document.getElementById('certsContent').innerHTML =
-        `<div class="${_tmModern() ? 'tm-card-grid' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}">${cards}</div>`;
+        `<div class="tm-card-grid">${cards}</div>`;
 }
 
 async function refreshCertsTab() {
@@ -190,47 +174,9 @@ function renderTlsOptions(opts) {
     }
     const cards = opts.map(o => {
         const i = _tlsOptions.indexOf(o);
-        if (_tmModern()) return _tmTlsOptCard(o, i);
-        const cfBadge = o.configFile ? `<span class="badge badge-muted" style="font-size:9px">${_esc(o.configFile)}</span>` : '';
-        const verBadge = o.minVersion ? `<span class="badge badge-green" style="font-size:9px"><i class="ph-bold ph-lock"></i> ${_esc(_tlsVer(o.minVersion))}+</span>` : '';
-        const sniBadge = o.sniStrict ? `<span class="badge" style="font-size:9px;background:rgba(36,161,222,0.12);color:var(--blue);border:1px solid rgba(36,161,222,0.35)">SNI Strict</span>` : '';
-        const mtlsBadge = (o.clientAuthType && o.clientAuthType !== 'NoClientCert') ? `<span class="badge badge-muted" style="font-size:9px">mTLS</span>` : '';
-
-        const mkRow = (label, val) => `
-            <div class="rounded-md p-2.5" style="background:var(--input-bg);border:1px solid var(--border)">
-                <div class="text-xs font-semibold uppercase tracking-wider mb-1" style="color:var(--muted)">${label}</div>
-                <div class="text-xs font-mono" style="color:var(--text)">${val}</div>
-            </div>`;
-        const mkListRow = (label, items) => items?.length ? `
-            <div class="rounded-md p-2.5" style="background:var(--input-bg);border:1px solid var(--border)">
-                <div class="text-xs font-semibold uppercase tracking-wider mb-1.5" style="color:var(--muted)">${label}</div>
-                <pre class="font-mono leading-relaxed" style="color:var(--green);font-size:11px">${items.map(v => _esc(v)).join('\n')}</pre>
-            </div>` : '';
-
-        const rows = [];
-        if (o.cipherSuites?.length) rows.push(mkListRow('Cipher Suites', o.cipherSuites));
-        if (o.curvePreferences?.length) rows.push(mkRow('Curves', _esc(o.curvePreferences.join(', '))));
-        if (o.alpnProtocols?.length) rows.push(mkRow('ALPN', _esc(o.alpnProtocols.join(', '))));
-        if (o.clientAuthType && o.clientAuthType !== 'NoClientCert') rows.push(mkRow('Client Auth', _esc(o.clientAuthType)));
-
-        return `<div class="card route-card tls-opt-card" data-name="${_esc(o.name.toLowerCase())}" data-idx="${i}">
-            <div class="route-card-inner p-4 pb-2">
-                <div class="flex justify-between items-start mb-3">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-1.5 mb-1.5">${verBadge}${sniBadge}${mtlsBadge}${cfBadge}</div>
-                        <h3 class="font-bold text-sm font-mono truncate" style="color:var(--text)" title="${_esc(o.name)}">${_esc(o.name)}</h3>
-                    </div>
-                    <div class="flex items-center gap-1.5 ml-2 flex-shrink-0">
-                        <button type="button" data-idx="${i}" onclick="_tlsOptInfo(this)" class="pill-btn pill-btn-blue" title="View details"><i class="ph-bold ph-info text-xs"></i></button>
-                        <button type="button" onclick="deleteTlsOption('${_esc(o.name)}','${_esc(o.configFile || '')}')" class="pill-btn pill-btn-red" title="Delete"><i class="ph-bold ph-trash text-xs"></i></button>
-                        <button type="button" data-idx="${i}" onclick="_tlsOptEdit(this)" class="pill-btn pill-btn-blue" title="Edit"><i class="ph-bold ph-pencil-simple text-xs"></i></button>
-                    </div>
-                </div>
-                <div class="space-y-2">${rows.join('')}</div>
-            </div>
-        </div>`;
+        return _tmTlsOptCard(o, i);
     }).join('');
-    el.innerHTML = `<div class="${_tmModern() ? 'tm-card-grid' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'}">${cards}</div>`;
+    el.innerHTML = `<div class="tm-card-grid">${cards}</div>`;
 }
 
 function _tlsOptEdit(btn) {

@@ -496,7 +496,7 @@ function renderMwGrid(middlewares) {
     if (!grid) return;
     const staticEmpty = document.getElementById('mwStaticEmpty');
     if (staticEmpty) staticEmpty.style.display = 'none';
-    const _tmOn = _tmModern() && _mwViewMode !== 'list';
+    const _tmOn = _mwViewMode !== 'list';
     const _tmCfShow = _tmOn && new Set(middlewares.map(m => m.configFile).filter(Boolean)).size > 1;
     grid.innerHTML = middlewares.map(mw => {
         if (_tmOn) return _tmMwCard(mw, _tmCfShow);
@@ -964,52 +964,29 @@ function renderPluginCards() {
         const mgmtBtns   = _pluginCanManage ? `
             <button onclick="openPluginForm(${idx})" class="btn-icon" title="Edit" style="padding:4px 6px"><i class="ph-bold ph-pencil text-sm"></i></button>
             <button onclick="deletePlugin('${_esc(name)}')" class="btn-icon" title="Remove" style="padding:4px 6px;color:var(--red)"><i class="ph-bold ph-trash text-sm"></i></button>` : '';
-        if (_tmModern()) {
-            const pluginUse = _tmPluginUsage(name);
-            const rail = `<span class="tm-rail" onclick="event.stopPropagation()">` +
-                (repoUrl ? `<a href="${_esc(repoUrl)}" target="_blank" rel="noopener" class="tm-btn" title="View on GitHub" onclick="event.stopPropagation()"><i class="ph-bold ph-github-logo"></i></a>` : '') +
-                `<button type="button" class="tm-btn" title="Details" onclick="event.stopPropagation();openPluginDetail(${idx})"><i class="ph-bold ph-info"></i></button>` +
-                (_pluginCanManage
-                    ? `<button type="button" class="tm-btn" title="Edit" onclick="event.stopPropagation();openPluginForm(${idx})"><i class="ph-bold ph-pencil-simple"></i></button>` +
-                      `<button type="button" class="tm-btn" title="Remove" onclick="event.stopPropagation();deletePlugin('${_esc(name)}')"><i class="ph-bold ph-trash"></i></button>`
-                    : '') +
-                '</span>';
-            return `<div class="tm-card" style="--tm-accent:var(--blue)" onclick="openPluginDetail(${idx})">
-                <div class="tm-head">
-                    <span class="tm-ic tm-ic-tile"><i class="ph-bold ph-puzzle-piece"></i></span>
-                    <div class="tm-head-txt">
-                        <div class="tm-title"><span class="tm-name">${_esc(name)}</span></div>
-                        <div class="tm-sub">${_esc(version.startsWith('v') ? version : 'v' + version)}</div>
-                    </div>${rail}
-                </div>
-                ${moduleName ? `<div class="tm-vals"><div class="tm-val"><i class="ph-bold ph-package"></i><span class="tm-v" title="${_esc(moduleName)}">${_esc(moduleName)}</span>${_tmCopy(moduleName)}</div></div>` : ''}
-                <div class="tm-foot"><span class="tm-meta ${pluginUse ? '' : 'tm-warn'}">${pluginUse ? `used by ${pluginUse} middleware${pluginUse > 1 ? 's' : ''}` : 'not referenced'}</span></div>
-            </div>`;
-        }
-        return `
-        <div class="card p-4 hover:border-blue-500/40 transition-all">
-            <div class="flex items-start justify-between gap-3 mb-3">
-                <div class="flex items-center gap-2 min-w-0">
-                    <i class="ph-bold ph-puzzle-piece text-sm shrink-0" style="color:var(--blue)"></i>
-                    <span class="font-bold text-sm truncate" style="color:var(--text)" title="${_esc(name)}">${_esc(name)}</span>
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                    ${repoUrl ? `<a href="${_esc(repoUrl)}" target="_blank" class="btn-icon" title="View on GitHub" style="padding:4px 6px;text-decoration:none"><i class="ph-bold ph-arrow-square-out text-sm"></i></a>` : ''}
-                    <button onclick="openPluginDetail(${idx})" class="btn-icon" title="View details" style="padding:4px 6px"><i class="ph-bold ph-info text-sm"></i></button>
-                    ${mgmtBtns}
-                </div>
+        const pluginUse = _tmPluginUsage(name);
+        const rail = `<span class="tm-rail" onclick="event.stopPropagation()">` +
+            (repoUrl ? `<a href="${_esc(repoUrl)}" target="_blank" rel="noopener" class="tm-btn" title="View on GitHub" onclick="event.stopPropagation()"><i class="ph-bold ph-github-logo"></i></a>` : '') +
+            `<button type="button" class="tm-btn" title="Details" onclick="event.stopPropagation();openPluginDetail(${idx})"><i class="ph-bold ph-info"></i></button>` +
+            (_pluginCanManage
+                ? `<button type="button" class="tm-btn" title="Edit" onclick="event.stopPropagation();openPluginForm(${idx})"><i class="ph-bold ph-pencil-simple"></i></button>` +
+                  `<button type="button" class="tm-btn" title="Remove" onclick="event.stopPropagation();deletePlugin('${_esc(name)}')"><i class="ph-bold ph-trash"></i></button>`
+                : '') +
+            '</span>';
+        return `<div class="tm-card" style="--tm-accent:var(--blue)" onclick="openPluginDetail(${idx})">
+            <div class="tm-head">
+                <span class="tm-ic tm-ic-tile"><i class="ph-bold ph-puzzle-piece"></i></span>
+                <div class="tm-head-txt">
+                    <div class="tm-title"><span class="tm-name">${_esc(name)}</span></div>
+                    <div class="tm-sub">${_esc(version.startsWith('v') ? version : 'v' + version)}</div>
+                </div>${rail}
             </div>
-            <div class="space-y-2 text-xs">
-                <div class="font-mono truncate" style="color:var(--muted)" title="${_esc(moduleName)}">${_esc(moduleName)}</div>
-                <div class="flex items-center justify-between pt-1">
-                    <span class="badge badge-muted" style="font-size:9px">${_esc(version.startsWith('v') ? version : 'v' + version)}</span>
-                    <span class="badge badge-muted" style="font-size:9px">plugin</span>
-                </div>
-            </div>
+            ${moduleName ? `<div class="tm-vals"><div class="tm-val"><i class="ph-bold ph-package"></i><span class="tm-v" title="${_esc(moduleName)}">${_esc(moduleName)}</span>${_tmCopy(moduleName)}</div></div>` : ''}
+            <div class="tm-foot"><span class="tm-meta ${pluginUse ? '' : 'tm-warn'}">${pluginUse ? `used by ${pluginUse} middleware${pluginUse > 1 ? 's' : ''}` : 'not referenced'}</span></div>
         </div>`;
     }).join('');
     document.getElementById('pluginsContent').innerHTML =
-        `<div class="${_tmModern() ? 'tm-card-grid' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}">${cards}</div>`;
+        `<div class="tm-card-grid">${cards}</div>`;
 }
 
 function openPluginDetail(idx) {

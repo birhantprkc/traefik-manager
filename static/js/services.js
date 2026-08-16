@@ -176,7 +176,7 @@ function renderServicesTable() {
                 ${usedBy.length > 3 ? `<span class="svc-used-chip">+${usedBy.length - 3}</span>` : ''}
             </div>` : '';
 
-        if (_tmModern() && _svcViewMode !== 'list') {
+        if (_svcViewMode !== 'list') {
             const anyDown = serverEntries.length > 0 && activeCount < serverEntries.length;
             const dotCls = st === 'error' || (anyDown && activeCount === 0) ? 'status-offline'
                          : anyDown || st !== 'success' ? 'status-checking' : 'status-online';
@@ -287,7 +287,7 @@ function renderServicesTable() {
         </div>`;
         document.getElementById('liveContent').innerHTML = `<div class="svc-list">${header}${rows}${empty}</div>`;
     } else {
-        const cls = _tmModern() ? 'tm-card-grid' : 'svc-card-grid';
+        const cls = 'tm-card-grid';
         document.getElementById('liveContent').innerHTML = `<div class="${cls}">${cards}${empty}</div>`;
     }
 

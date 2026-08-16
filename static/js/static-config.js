@@ -481,30 +481,8 @@ function _scrollStaticTabs(dir) {
 
 function switchStaticSection(section) {
     _staticActiveSection = section;
-    if (_tmModern()) {
-        const head = document.getElementById('scHead-' + section);
-        if (head) head.scrollIntoView({ block: 'start', behavior: 'smooth' });
-        return;
-    }
-    const sectionColors  = { entrypoints: 'var(--blue)', resolvers: 'var(--green)', plugins: 'var(--purple)', providers: 'var(--teal)' };
-    const sectionLabels  = { entrypoints: 'Entrypoint', resolvers: 'Resolver', plugins: 'Plugin', providers: 'Provider' };
-    const hdrIcon   = document.getElementById('staticHdrAddIcon');
-    const hdrLabel  = document.getElementById('staticHdrAddLabel');
-    const hdrAddBtn = document.getElementById('staticHdrAddBtn');
-    if (hdrIcon)  hdrIcon.style.color = sectionColors[section] || 'var(--blue)';
-    if (hdrLabel) hdrLabel.textContent = sectionLabels[section] || 'Add';
-    const isSingleBlock = ['api','log','observability','system'].includes(section);
-    if (hdrAddBtn) hdrAddBtn.style.display = isSingleBlock ? 'none' : '';
-    ['entrypoints','resolvers','plugins','api','log','observability','system','providers'].forEach(s => {
-        const panel = document.getElementById('staticPanel-' + s);
-        const btn   = document.getElementById('ssnBtn-' + s);
-        if (panel) panel.style.display = s === section ? '' : 'none';
-        if (btn) {
-            btn.classList.toggle('active', s === section);
-            if (s === section) btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-        }
-    });
-    requestAnimationFrame(_updateStaticTabArrows);
+    const head = document.getElementById('scHead-' + section);
+    if (head) head.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 function _semverParts(v) {
@@ -929,38 +907,7 @@ function _renderStaticEntrypoints(eps) {
         el.innerHTML = _scEmpty('No entrypoints configured');
         return;
     }
-    if (_tmModern()) {
-        el.innerHTML = _scRows(keys.map(name => _scEpRow(name, eps[name] || {})));
-        return;
-    }
-    const rows = keys.map((name, i) => {
-        const ep    = eps[name] || {};
-        const addr  = ep.address || '';
-        const redir = ep.http?.redirections?.entryPoint?.to || '';
-        const uhs   = ep.http?.underscoreHeadersStrategy || '';
-        const http3 = !!ep.http3;
-        const tips  = Array.isArray(ep.forwardedHeaders?.trustedIPs) ? ep.forwardedHeaders.trustedIPs.length : 0;
-        const port  = addr.replace(/^.*:/, '');
-        const proto = port === '443' ? 'HTTPS' : port === '80' ? 'HTTP' : port ? port : '';
-        const nd    = JSON.stringify(name);
-        const sep   = i < keys.length - 1 ? `border-bottom:1px solid var(--border);` : '';
-        return `<div class="flex items-center gap-4 px-4 py-3" style="${sep}">
-            <div class="flex-1 flex items-center gap-2 min-w-0 flex-wrap">
-                <span class="text-sm font-mono font-semibold" style="color:var(--text)">${_esc(name)}</span>
-                <span class="text-xs font-mono px-2 py-0.5 rounded-md flex-shrink-0" style="background:rgba(36,161,222,0.1);color:var(--blue)">${_esc(addr)}</span>
-                ${proto ? `<span class="text-xs px-1.5 py-0.5 rounded font-semibold flex-shrink-0" style="background:rgba(36,161,222,0.07);color:var(--blue)">${proto}</span>` : ''}
-                ${redir ? `<span class="text-xs flex-shrink-0" style="color:var(--muted)">→ <span class="font-mono" style="color:var(--text)">${_esc(redir)}</span></span>` : ''}
-                ${http3 ? `<span class="text-xs px-1.5 py-0.5 rounded font-semibold flex-shrink-0" style="background:rgba(163,113,247,0.1);color:var(--purple)">HTTP/3</span>` : ''}
-                ${uhs ? `<span class="text-xs px-1.5 py-0.5 rounded font-semibold flex-shrink-0" style="background:rgba(63,185,80,0.12);color:var(--green)" title="underscoreHeadersStrategy: ${_esc(uhs)}"><i class="ph-bold ph-shield-check" style="font-size:10px"></i> ${_esc(uhs)}</span>` : ''}
-                ${tips ? `<span class="text-xs px-1.5 py-0.5 rounded font-semibold flex-shrink-0" style="background:rgba(36,161,222,0.1);color:var(--blue)" title="forwardedHeaders.trustedIPs: ${tips} range(s)"><i class="ph-bold ph-shield" style="font-size:10px"></i> ${tips} trusted</span>` : ''}
-            </div>
-            <div class="flex gap-1 flex-shrink-0">
-                <button onclick='openStaticEditForm("entrypoints",${nd})' class="btn-icon text-xs" title="Edit"><i class="ph-bold ph-pencil-simple"></i></button>
-                <button onclick='removeStaticItem("entrypoints",${nd})' class="btn-icon text-xs" title="Delete" style="color:var(--red)"><i class="ph-bold ph-trash"></i></button>
-            </div>
-        </div>`;
-    }).join('');
-    el.innerHTML = `<div style="margin:12px 16px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;">${rows}</div>`;
+    el.innerHTML = _scRows(keys.map(name => _scEpRow(name, eps[name] || {})));
 }
 
 function _renderStaticResolvers(resolvers) {
@@ -973,35 +920,7 @@ function _renderStaticResolvers(resolvers) {
         el.innerHTML = _scEmpty('No certificate resolvers configured');
         return;
     }
-    if (_tmModern()) {
-        el.innerHTML = _scRows(keys.map(name => _scResolverRow(name, resolvers[name])));
-        return;
-    }
-    const rows = keys.map((name, i) => {
-        const acme  = (resolvers[name] || {}).acme || {};
-        const email = acme.email || '';
-        const isDns  = !!acme.dnsChallenge;
-        const isHttp = !!acme.httpChallenge;
-        const chLabel = isDns  ? `DNS · ${acme.dnsChallenge.provider || '?'}`
-                      : isHttp ? 'HTTP'
-                      : 'TLS';
-        const chColor = isDns  ? 'var(--blue)' : isHttp ? '#f59e0b' : 'var(--green)';
-        const chBg    = isDns  ? 'rgba(36,161,222,0.1)' : isHttp ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)';
-        const nd  = JSON.stringify(name);
-        const sep = i < keys.length - 1 ? `border-bottom:1px solid var(--border);` : '';
-        return `<div class="flex items-center gap-4 px-4 py-3" style="${sep}">
-            <div class="flex-1 flex items-center gap-2 min-w-0 flex-wrap">
-                <span class="text-sm font-mono font-semibold" style="color:var(--text)">${_esc(name)}</span>
-                <span class="text-xs font-mono px-2 py-0.5 rounded-md flex-shrink-0" style="background:${chBg};color:${chColor}">${_esc(chLabel)}</span>
-                ${email ? `<span class="text-xs truncate" style="color:var(--muted)">${_esc(email)}</span>` : ''}
-            </div>
-            <div class="flex gap-1 flex-shrink-0">
-                <button onclick='openStaticEditForm("resolvers",${nd})' class="btn-icon text-xs" title="Edit"><i class="ph-bold ph-pencil-simple"></i></button>
-                <button onclick='removeStaticItem("resolvers",${nd})' class="btn-icon text-xs" title="Delete" style="color:var(--red)"><i class="ph-bold ph-trash"></i></button>
-            </div>
-        </div>`;
-    }).join('');
-    el.innerHTML = `<div style="margin:12px 16px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;">${rows}</div>`;
+    el.innerHTML = _scRows(keys.map(name => _scResolverRow(name, resolvers[name])));
 }
 
 function _renderStaticPlugins(plugins, localPlugins) {
@@ -1017,28 +936,7 @@ function _renderStaticPlugins(plugins, localPlugins) {
         el.innerHTML = _scEmpty('No plugins installed');
         return;
     }
-    if (_tmModern()) {
-        el.innerHTML = _scRows(keys.map(name => _scPluginRow(name, all[name])));
-        return;
-    }
-    const rows = keys.map((name, i) => {
-        const p   = all[name];
-        const nd  = JSON.stringify(name);
-        const sep = i < keys.length - 1 ? `border-bottom:1px solid var(--border);` : '';
-        return `<div class="flex items-center gap-4 px-4 py-3" style="${sep}">
-            <div class="flex-1 flex items-center gap-2 min-w-0">
-                <span class="text-sm font-mono font-semibold flex-shrink-0" style="color:var(--text)">${_esc(name)}</span>
-                ${p.moduleName ? `<span class="text-xs font-mono truncate" style="color:var(--muted)">${_esc(p.moduleName)}</span>` : ''}
-                ${p.version    ? `<span class="text-xs font-mono px-2 py-0.5 rounded-md flex-shrink-0" style="background:rgba(168,85,247,0.1);color:var(--purple)">${_esc(p.version)}</span>` : ''}
-                ${p._local     ? `<span class="text-xs font-mono px-2 py-0.5 rounded-md flex-shrink-0" style="background:rgba(45,186,169,0.1);color:var(--teal)">local</span>` : ''}
-            </div>
-            <div class="flex gap-1 flex-shrink-0">
-                <button onclick='openStaticEditForm("plugins",${nd})' class="btn-icon text-xs" title="Edit"><i class="ph-bold ph-pencil-simple"></i></button>
-                <button onclick='removeStaticItem("plugins",${nd})' class="btn-icon text-xs" title="Delete" style="color:var(--red)"><i class="ph-bold ph-trash"></i></button>
-            </div>
-        </div>`;
-    }).join('');
-    el.innerHTML = `<div style="margin:12px 16px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;">${rows}</div>`;
+    el.innerHTML = _scRows(keys.map(name => _scPluginRow(name, all[name])));
 }
 
 let _scCounts = null;
@@ -1239,14 +1137,10 @@ function _renderStaticSections(parsed) {
     _renderStaticObservability(_staticParsedData.metrics, _staticParsedData.tracing, _staticParsedData.ping);
     _renderStaticSystem(_staticParsedData['global'], _staticParsedData.core, _staticParsedData.serversTransport);
     _renderStaticProviders(_staticParsedData.providers);
-    if (_tmModern()) {
-        _renderStaticVerdict(_staticParsedData);
-        _renderStaticFoldStates(_staticParsedData);
-    }
+    _renderStaticVerdict(_staticParsedData);
+    _renderStaticFoldStates(_staticParsedData);
     _renderStaticPluginNotice();
-    if (_tmModern()) {
-        _scApplyNoteState();
-    }
+    _scApplyNoteState();
 }
 
 function onPromToggle() {
@@ -1439,12 +1333,10 @@ function _scRenderProviderRows(prov) {
 
 function _renderStaticProviders(providersData) {
     const prov = providersData || {};
-    if (_tmModern()) {
-        _scRenderProviderRows(prov);
-        document.querySelectorAll('#staticProviderCards > [id^="scProvCard-"]').forEach(c => {
-            if (c.dataset.scOpen !== '1') c.style.display = 'none';
-        });
-    }
+    _scRenderProviderRows(prov);
+    document.querySelectorAll('#staticProviderCards > [id^="scProvCard-"]').forEach(c => {
+        if (c.dataset.scOpen !== '1') c.style.display = 'none';
+    });
     const hasDocker = prov.docker !== undefined && prov.docker !== null;
     _setStaticToggle('dockerEnabled', hasDocker);
     const dockerFields = document.getElementById('dockerProviderFields');
@@ -1622,9 +1514,7 @@ async function saveStaticSingleSection(section) {
 }
 
 function _buildStaticTabHTML() {
-    return _tmModern()
-        ? '<div class="sig-root sc-root">' + _buildStaticOnePage() + '</div>'
-        : _buildStaticClassicHTML();
+    return '<div class="sig-root sc-root">' + _buildStaticOnePage() + '</div>';
 }
 
 function _scSectionHead(key, label, icon, color, countId, addLabel) {
@@ -2356,12 +2246,11 @@ async function _loadStaticFromDisk() {
         const hdrAddBtn = document.getElementById('staticHdrAddBtn');
         if (hdrAddBtn) hdrAddBtn.style.display = '';
         window._staticConfigPath = data.path || '';
-        _scCounts = _tmModern() ? await _scLoadCounts() : null;
+        _scCounts = await _scLoadCounts();
         wrapper.innerHTML = _buildStaticTabHTML();
         initStaticDirtyTracking();
         _renderStaticSections(data.parsed || {});
         _renderEpRuntimeWarning();
-        if (!_tmModern()) switchStaticSection(_staticActiveSection);
         requestAnimationFrame(_updateStaticTabArrows);
     } catch(e) {
         wrapper.innerHTML = `<div class="text-center py-16" style="color:var(--muted)">
@@ -2406,29 +2295,8 @@ function rerenderStaticBody() {
     initStaticDirtyTracking();
     _renderStaticSections(_staticParsedData);
     _renderEpRuntimeWarning();
-    if (!_tmModern()) switchStaticSection(_staticActiveSection);
     _renderStaticStateBar();
     filterStatic();
-}
-
-function _filterStaticClassic(q) {
-    let shown = 0;
-    document.querySelectorAll('#staticSettingsContent .sc-sec').forEach(sec => {
-        const cards = sec.querySelectorAll('.tm-card');
-        if (!cards.length) {
-            sec.style.display = q ? 'none' : '';
-            return;
-        }
-        let hits = 0;
-        cards.forEach(card => {
-            const match = !q || card.textContent.toLowerCase().includes(q);
-            card.style.display = match ? '' : 'none';
-            if (match) hits++;
-        });
-        sec.style.display = hits ? '' : 'none';
-        shown += hits;
-    });
-    return shown;
 }
 
 function _filterStaticModern(q) {
@@ -2474,7 +2342,7 @@ function _filterStaticModern(q) {
 
 function filterStatic() {
     const q = (document.getElementById('staticSearch')?.value || '').trim().toLowerCase();
-    const shown = _tmModern() ? _filterStaticModern(q) : _filterStaticClassic(q);
+    const shown = _filterStaticModern(q);
     const empty = document.getElementById('staticNoMatch');
     if (empty) empty.style.display = (q && shown === 0) ? '' : 'none';
 }

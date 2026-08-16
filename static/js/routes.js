@@ -723,10 +723,6 @@ function _routeIconHtml(app) {
     return `<img src="${url}" data-slug="${slug}" onerror="window.rmIconFallback(this)" alt="" class="route-app-icon" style="width:18px;height:18px;border-radius:4px;object-fit:contain;flex-shrink:0">`;
 }
 
-function _tmModern() {
-    return true;
-}
-
 function _tmFolderMode(apps) {
     const d = new Set((apps || []).filter(a => !a.provider || a.provider === 'file')
                                   .map(a => a.configFile).filter(Boolean));
@@ -858,7 +854,7 @@ function renderRouteGrid(apps) {
     }
     if (emptyEl) emptyEl.style.display = 'none';
     const _allAppsForRender = apps;
-    const _tmOn = _tmModern() && _routeViewMode !== 'list';
+    const _tmOn = _routeViewMode !== 'list';
     const _tmCfShow = _tmOn ? _tmFolderMode(apps) : false;
     grid.innerHTML = apps.map((app, i) => {
         if (_tmOn) return _tmRouteCard(app, i, { showCf: _tmCfShow });
