@@ -14,12 +14,6 @@ image: ghcr.io/chr0nzz/traefik-manager:beta
 docker compose pull traefik-manager && docker compose up -d traefik-manager
 ```
 
-Or install fresh:
-
-```bash
-curl -fsSL https://get-traefik.xyzlab.dev/beta | bash
-```
-
 Agents have a `:beta` tag too. Keep the Host and its agents on the same channel.
 
 ---
