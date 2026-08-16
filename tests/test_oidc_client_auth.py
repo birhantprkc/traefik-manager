@@ -50,14 +50,18 @@ def test_basic_is_tried_first_when_discovery_is_silent(client, monkeypatch):
     state = _start(client, monkeypatch, methods=None)
     calls = []
 
-    def _post(url, data=None, auth=None, **k):
-        calls.append({'auth': auth, 'body_secret': (data or {}).get('client_secret')})
+    def _post(url, data=None, auth=None, headers=None, **k):
+        calls.append({'auth': auth, 'headers': headers or {},
+                      'body_secret': (data or {}).get('client_secret')})
         return _Resp({'id_token': '', 'access_token': 'x'})
 
     monkeypatch.setattr('app.requests.post', _post)
     client.get(f'/auth/oidc/callback?code=abc&state={state}')
     assert len(calls) == 1
-    assert calls[0]['auth'] == ('tm-client', 'tm-secret'), 'should authenticate with HTTP Basic'
+    hdr = calls[0]['headers'].get('Authorization', '')
+    assert hdr.startswith('Basic '), 'should authenticate with HTTP Basic'
+    import base64 as _b64
+    assert _b64.b64decode(hdr.split()[1]).decode() == 'tm-client:tm-secret'
     assert calls[0]['body_secret'] is None, 'the secret must not also be in the body'
 
 
@@ -87,7 +91,7 @@ def test_the_code_is_never_sent_twice(client, monkeypatch):
 
     monkeypatch.setattr('app.requests.post', _post)
     client.get(f'/auth/oidc/callback?code=abc&state={state}')
-    assert calls == ['basic'], f'the token endpoint must be called once, got {calls}'
+    assert len(calls) == 1, f'the token endpoint must be called once, got {calls}'
 
 
 def test_userinfo_failure_falls_back_to_the_id_token(client, monkeypatch):
