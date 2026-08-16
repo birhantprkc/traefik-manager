@@ -92,6 +92,7 @@ In Keycloak: create a client with **Standard Flow** enabled, set the redirect UR
 | Allowed Groups | Your Authentik group name |
 
 In Authentik: create an OAuth2/OpenID Provider and a corresponding Application. Use **Authorization Code** flow.
+Either client type works - Traefik Manager sends a PKCE challenge, which public clients require.
 
 ---
 
