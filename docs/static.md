@@ -2,7 +2,7 @@
 
 The **Static Config** tab lets you view and edit Traefik's static configuration (`traefik.yml`) directly from the Traefik Manager UI. It is an optional tab, off by default - enable it under **Settings → Interface** once the file is available. Changes are staged and backed up before saving; a banner then prompts you to restart Traefik with one click, using whichever restart method you configure.
 
-The tab toggle only appears once a static config path is configured and the file exists. The path comes from the `static_config_path` field in `manager.yml` (Settings) if set, otherwise from the `STATIC_CONFIG_PATH` environment variable - the manager.yml value wins when both are present. In the Modern layout the sections tile into responsive columns; in Classic they appear as sub-tabs.
+The tab toggle only appears once a static config path is configured and the file exists. The path comes from the `static_config_path` field in `manager.yml` (Settings) if set, otherwise from the `STATIC_CONFIG_PATH` environment variable - the manager.yml value wins when both are present. The sections tile into responsive columns.
 
 Everything on this page also works for [remote agents](agent.md#static-config-editing): with an agent selected in the server switcher, the same section editors read and write the agent's own `traefik.yml`, with the agent's backup and restart flow.
 

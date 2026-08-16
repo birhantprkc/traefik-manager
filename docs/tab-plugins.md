@@ -9,7 +9,7 @@ The **Plugins** tab shows Traefik plugins declared in the static `traefik.yml` c
 - Version
 - Settings (if any are configured)
 
-In the [Modern layout](guide.md), this tab uses the redesigned card shared by the rest of the app, with the GitHub link, details, edit and remove actions in a hover rail, and a footer showing how many middlewares reference the plugin.
+Each card has the GitHub link, details, edit and remove actions in a hover rail, and a footer showing how many middlewares reference the plugin.
 
 When a static config path is configured and the file is readable (`STATIC_CONFIG_PATH` or Settings → System Monitoring → File Paths), the Plugins tab gains **Add**, **Edit**, and **Delete** actions. Mount the file read-write for those writes to succeed; with a read-only mount the buttons appear but saving fails. Without it, plugins are read-only and must be managed by hand in `traefik.yml`.
 

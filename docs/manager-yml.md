@@ -401,7 +401,7 @@ Display preferences, stored here rather than in the browser so they follow you a
 | Key | Values | Default |
 |---|---|---|
 | `showStatCards`, `compactStatCards`, `showEntrypoints` | boolean | `true`, `false`, `true` |
-| `layoutMode` | `classic` \| `modern` | Classic top tab row, or the Modern collapsible sidebar with full-width content |
+| `layoutMode` | `fluid` \| `fixed` | Full width, or capped width. Pre-1.11 `modern`/`classic` still map |
 | `dashPodDensity` | `list` \| `icons` | Dashboard categories as rows with domains, or a compact grid of app icons |
 | `statBarScope` | `all` \| `dashboard` | Which tabs show the stat cards and entry points. `all` (default) means Dashboard, Routes, Middlewares and Services; `dashboard` limits them to the Dashboard tab. Only these two values are stored - any other value (including `none` or a comma-separated list) is discarded when the file is loaded. |
 | `logsAutoRefresh` | boolean | `false` - poll the access log while the Logs tab is open and visible |

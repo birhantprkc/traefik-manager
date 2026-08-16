@@ -70,6 +70,15 @@ These tabs are always visible. They let you read and write your Traefik dynamic 
 
 ---
 
+## Layout
+
+Set under **Settings - Interface - Layout**, instance-wide.
+
+- **Fluid** (default) - full width, detail panel pushes the page
+- **Fixed** - capped width, detail panel slides over
+
+---
+
 ## Stat panel
 
 Above the content on the Dashboard, Routes, Middlewares and Services tabs sits a panel that answers one question: is anything wrong right now.
