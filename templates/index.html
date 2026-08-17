@@ -550,7 +550,8 @@ function toggleDrawerServerList() {
     const opening = list.style.display === 'none';
     list.style.display = opening ? '' : 'none';
     if (caret) caret.classList.toggle('open', opening);
-    if (opening && btn && document.documentElement.classList.contains('tm-nav-collapsed')) {
+    const railed = document.documentElement.classList.contains('tm-nav-collapsed') && window.innerWidth >= 768;
+    if (opening && btn && railed) {
         const r = btn.getBoundingClientRect();
         list.style.left = (r.right + 8) + 'px';
         list.style.top  = Math.min(r.top, window.innerHeight - list.offsetHeight - 12) + 'px';

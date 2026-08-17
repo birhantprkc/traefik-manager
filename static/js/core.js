@@ -68,8 +68,7 @@ function setTabCount(tab, n) {
 const SIDE_NAV_GROUPS = [
     { label: 'Traffic',        tabs: ['dashboard', 'services', 'middlewares', 'live', 'routemap'] },
     { label: 'Observability',  tabs: ['logs', 'crowdsec'] },
-    { label: 'Infrastructure', tabs: ['certs', 'tls', 'plugins'] },
-    { label: 'System',         tabs: ['static'] },
+    { label: 'Infrastructure', tabs: ['certs', 'tls', 'plugins', 'static'] },
     { label: 'Providers',      tabs: ['docker', 'kubernetes', 'swarm', 'nomad', 'ecs', 'consulcatalog', 'redis', 'etcd', 'consul', 'zookeeper', 'http_provider', 'file_external'] },
 ];
 
@@ -1126,7 +1125,11 @@ function _navVisible(el) {
     return getComputedStyle(el).display !== 'none';
 }
 
-const NAV_COLLAPSE_ALL_BELOW = 1024;
+const NAV_CAP_BELOW = 1440;
+
+const NAV_PINNED = ['navAddRouteBtn', 'navAddMwBtn', 'themeToggleBtn'];
+
+const NAV_NARROW_MAX = 5;
 
 function reflowNav() {
     const bar = document.getElementById('navActions');
@@ -1135,14 +1138,25 @@ function reflowNav() {
     if (!bar || !wrap || !menu || getComputedStyle(bar).display === 'none') return;
 
     const items = _navItems(bar, menu);
-    const collapseAll = window.innerWidth < NAV_COLLAPSE_ALL_BELOW;
+    const phone  = window.innerWidth < NAV_PHONE_BELOW;
+    const narrow = !phone && window.innerWidth < NAV_CAP_BELOW;
 
     _navRestore(bar, menu, wrap);
 
-    if (collapseAll) {
+    if (phone) {
         wrap.style.display = '';
         for (const { el } of items) {
             if (_navMovable(el)) menu.appendChild(el);
+        }
+    } else if (narrow) {
+        wrap.style.display = '';
+        const pinnedCount = items.filter(({ el }) => NAV_PINNED.includes(el.id) && _navVisible(el)).length;
+        let slots = Math.max(0, NAV_NARROW_MAX - 1 - pinnedCount);
+        for (const { el } of [...items].reverse()) {
+            if (NAV_PINNED.includes(el.id)) continue;
+            if (!_navMovable(el)) continue;
+            if (_navVisible(el) && slots > 0) { slots--; continue; }
+            menu.appendChild(el);
         }
     } else {
         wrap.style.display = 'none';
