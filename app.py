@@ -5042,6 +5042,12 @@ def oidc_callback():
                     logger.info(
                         "OIDC client authentication rejected, retrying with the other method")
                     token_resp = order[1]()
+                    if token_resp.status_code >= 400:
+                        logger.error(
+                            "OIDC rejected both client authentication methods. "
+                            "TM sent client_id=%r, a secret of %d characters, to %s. "
+                            "Compare that client_id and secret length against the provider.",
+                            client_id, len(client_secret), cfg['token_endpoint'])
         if token_resp.status_code >= 400:
             # The provider says exactly what is wrong in the body. Without this you get a bare
             # "400 Bad Request" and no way to tell a wrong secret from a PKCE requirement.
