@@ -532,7 +532,10 @@ def save_settings(domains, cert_resolver, traefik_api_url,
 
 def _get_acme_json_path() -> str:
     s = load_settings()
-    return s.get('acme_json_path', '').strip() or os.environ.get('ACME_JSON_PATH', '/app/acme.json')
+    path = s.get('acme_json_path', '').strip() or os.environ.get('ACME_JSON_PATH', '/app/acme.json')
+    if path:
+        env.register_read_path(path)
+    return path
 
 
 def get_acme_json_paths() -> list:
@@ -556,13 +559,17 @@ def get_acme_json_paths() -> list:
 
 def _get_access_log_path() -> str:
     s = load_settings()
-    return s.get('access_log_path', '').strip() or os.environ.get('ACCESS_LOG_PATH', '/app/logs/access.log')
+    path = s.get('access_log_path', '').strip() or os.environ.get('ACCESS_LOG_PATH', '/app/logs/access.log')
+    if path:
+        env.register_read_path(path)
+    return path
 
 def _get_static_config_path() -> str:
     s = load_settings()
     path = s.get('static_config_path', '').strip() or os.environ.get('STATIC_CONFIG_PATH', '')
     if path:
         env.register_static_path(path)
+        env.register_read_path(path)
     return path
 
 def _get_restart_method() -> str:

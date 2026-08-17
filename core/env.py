@@ -80,6 +80,17 @@ def register_static_path(path: str):
         ALLOWED_FILE_PREFIXES = allowed_file_prefixes()
 
 
+READ_PATHS = []
+
+
+def register_read_path(path: str):
+    global READ_PATHS
+    for part in str(path or '').split(','):
+        part = part.strip()
+        if part and part not in READ_PATHS:
+            READ_PATHS = sorted(READ_PATHS + [part])
+
+
 def register_config_path(path: str):
     global CONFIG_PATHS, CONFIG_PATH, MULTI_CONFIG, ALLOWED_FILE_PREFIXES
     if path and path not in CONFIG_PATHS:
