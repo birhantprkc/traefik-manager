@@ -559,7 +559,10 @@ def _get_access_log_path() -> str:
 
 def _get_static_config_path() -> str:
     s = load_settings()
-    return s.get('static_config_path', '').strip() or os.environ.get('STATIC_CONFIG_PATH', '')
+    path = s.get('static_config_path', '').strip() or os.environ.get('STATIC_CONFIG_PATH', '')
+    if path:
+        env.register_static_path(path)
+    return path
 
 def _get_restart_method() -> str:
     return os.environ.get('RESTART_METHOD', 'proxy').lower()
