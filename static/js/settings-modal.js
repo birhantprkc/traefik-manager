@@ -2375,7 +2375,26 @@ function _setUnitText(el) {
     let out = '';
     el.querySelectorAll(SETTINGS_SEARCH_FIELDS).forEach(f => { out += ' ' + f.textContent; });
     if (!out.trim()) out = el.textContent;
+    el.querySelectorAll('[data-tip]').forEach(t => { out += ' ' + t.getAttribute('data-tip'); });
+    out += ' ' + _setSectionText(el);
     return out.toLowerCase();
+}
+
+function _setSectionText(el) {
+    let node = el;
+    while (node && !node.classList.contains('modal-panel')) {
+        let sib = node.previousElementSibling;
+        while (sib) {
+            const head = sib.classList.contains('sc-sec-head') ? sib : sib.querySelector?.('.sc-sec-head');
+            if (head) {
+                const tip = head.querySelector('[data-tip]')?.getAttribute('data-tip') || '';
+                return (head.textContent || '') + ' ' + tip;
+            }
+            sib = sib.previousElementSibling;
+        }
+        node = node.parentElement;
+    }
+    return '';
 }
 
 function _settingsUnits(pane) {
@@ -2458,8 +2477,24 @@ function filterSettings() {
         if (pane.classList.contains('active')) activeHits = hits;
     });
 
+    const elsewhere = [];
+    document.querySelectorAll('.modal-sidebar-btn .settings-hit').forEach(t => {
+        const btn = t.closest('.modal-sidebar-btn');
+        if (btn.classList.contains('active')) return;
+        const label = (btn.textContent || '').replace(t.textContent, '').trim();
+        elsewhere.push({ id: btn.id.replace('msb-', ''), label, hits: t.textContent });
+    });
+
     const empty = document.getElementById('settingsNoMatch');
-    if (empty) empty.style.display = (q && activeHits === 0) ? '' : 'none';
+    if (!empty) return;
+    if (!q || activeHits) { empty.style.display = 'none'; return; }
+    empty.style.display = '';
+    empty.innerHTML = elsewhere.length
+        ? 'No matches here. Found in '
+          + elsewhere.map(e =>
+              `<button type="button" class="settings-jump" onclick="switchSettingsPanel('${e.id}')">`
+              + `${_esc(e.label)} <span>${_esc(e.hits)}</span></button>`).join(' ')
+        : 'No settings match your search';
 }
 
 function clearSettingsSearch() {

@@ -1713,6 +1713,9 @@ html.tm-nav-collapsed .drawer-srv-head:hover .drawer-srv-mark { color: var(--tex
 .auth-sub-panel.sc-root .auth-sub-tab { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: -.01em; }
 
 .sc-filtered-out { display: none !important; }
+.settings-jump { display: inline-flex; align-items: center; gap: 5px; margin: 3px 3px 0 0; padding: 4px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--card); color: var(--text); font-size: 12px; cursor: pointer; }
+.settings-jump:hover { border-color: color-mix(in srgb, var(--blue) 45%, var(--border)); color: var(--blue); }
+.settings-jump span { font: 600 10px 'JetBrains Mono', monospace; color: var(--blue); }
 
 .sc-root .sc-set-stack { display: block; }
 .sc-root .sc-set-stack > .flex { gap: 12px; }
