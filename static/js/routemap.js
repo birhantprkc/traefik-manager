@@ -17,8 +17,9 @@ window.rmGetCustomGroups = function() { return _rmConfig.custom_groups || []; };
 window.rmIconFallback = function(img) {
     const slug = img.dataset.slug;
     if (!slug) { img.style.display = 'none'; return; }
-    const shorter = slug.split('-')[0];
-    if (shorter !== slug) {
+    const parts = slug.split('-');
+    const shorter = parts.length > 2 ? parts.slice(0, -1).join('-') : parts[0];
+    if (shorter && shorter !== slug) {
         img.dataset.slug = shorter;
         img.src = `${RM_ICON_CDN}/${shorter}.png`;
     } else {

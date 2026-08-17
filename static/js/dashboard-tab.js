@@ -200,21 +200,36 @@ window.rmEditSetIconType = function(type) {
 window.rmEditPreviewIcon = function() {
     const prev  = document.getElementById('rmEditIconPreview');
     const label = document.getElementById('rmEditIconPreviewLabel');
-    let url = '';
+    let url = '', autoSlug = '';
     if (_rmEditIconType === 'slug') {
         const slug = document.getElementById('rmEditIconSlug').value.trim();
         if (slug) url = `${RM_ICON_CDN}/${slug}.png`;
     } else if (_rmEditIconType === 'url') {
         url = document.getElementById('rmEditIconUrl').value.trim();
     } else if (_rmEditRouteId) {
-        let s = _rmEditRouteId.split('@')[0].replace(/:\d+$/, '').replace(/[-_](?:service|svc|router|app|container|pod)s?$/i, '');
-        url = `${RM_ICON_CDN}/${s.toLowerCase().replace(/[^a-z0-9-]/g, '')}.png`;
+        const route = (typeof _rmAllRoutes !== 'undefined' ? _rmAllRoutes : [])
+            .find(r => r.id === _rmEditRouteId);
+        autoSlug = route
+            ? rmIconSlug(route)
+            : _rmEditRouteId.split('@')[0].replace(/:\d+$/, '')
+                .replace(/[-_](?:service|svc|router|app|container|pod)s?$/i, '')
+                .toLowerCase().replace(/[^a-z0-9-]/g, '');
+        url = `${RM_ICON_CDN}/${autoSlug}.png`;
     }
     if (url) {
+        prev.dataset.slug = autoSlug;
         prev.src = url;
         prev.style.display = 'block';
         label.textContent  = _rmEditIconType === 'auto' ? 'Auto-detected' : '';
-        prev.onerror = () => { prev.style.display = 'none'; label.textContent = 'No icon found'; };
+        prev.onerror = () => {
+            const before = prev.dataset.slug;
+            if (autoSlug && before) {
+                window.rmIconFallback(prev);
+                if (prev.dataset.slug !== before && prev.style.display !== 'none') return;
+            }
+            prev.style.display = 'none';
+            label.textContent = 'No icon found';
+        };
     } else {
         prev.style.display = 'none';
         label.textContent  = '';
