@@ -174,7 +174,11 @@ def save_config(data, path=None):
     try:
         with open(tmp, 'w') as f:
             f.write(content)
-        shutil.copyfile(tmp, path)
+            f.flush()
+            os.fsync(f.fileno())
+        if os.path.exists(path):
+            shutil.copystat(path, tmp)
+        os.replace(tmp, path)
     finally:
         try:
             os.unlink(tmp)

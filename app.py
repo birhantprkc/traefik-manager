@@ -4162,7 +4162,11 @@ def api_route_raw_save(route_id):
         try:
             with open(tmp, 'w') as f:
                 f.write(yaml_content)
-            shutil.copyfile(tmp, target_path)
+                f.flush()
+                os.fsync(f.fileno())
+            if os.path.exists(target_path):
+                shutil.copystat(target_path, tmp)
+            os.replace(tmp, target_path)
         finally:
             try:
                 os.unlink(tmp)
