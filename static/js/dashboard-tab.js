@@ -210,7 +210,7 @@ window.rmEditPreviewIcon = function() {
         const route = (typeof _rmAllRoutes !== 'undefined' ? _rmAllRoutes : [])
             .find(r => r.id === _rmEditRouteId);
         autoSlug = route
-            ? rmIconSlug(route)
+            ? window.rmIconSlug(route)
             : _rmEditRouteId.split('@')[0].replace(/:\d+$/, '')
                 .replace(/[-_](?:service|svc|router|app|container|pod)s?$/i, '')
                 .toLowerCase().replace(/[^a-z0-9-]/g, '');
@@ -275,12 +275,12 @@ const DASH_POD_LIMIT  = 6;
 const DASH_ICON_LIMIT = 24;
 const _dskColl = new Intl.Collator(undefined, { sensitivity: 'base' });
 
-function rmIconSlug(route) {
+window.rmIconSlug = function(route) {
     let s = (route.service_name || route.name || '').split('@')[0];
     s = s.replace(/:\d+$/, '');
     s = s.replace(/[-_](?:service|svc|router|app|container|pod)s?$/i, '');
     return s.toLowerCase().replace(/[^a-z0-9-]/g, '');
-}
+};
 
 function rmGetIconUrl(route) {
     const ov = (_rmConfig.route_overrides || {})[route.id] || {};
@@ -288,7 +288,7 @@ function rmGetIconUrl(route) {
     if (ov.icon_type === 'slug' && ov.icon_slug) return `${RM_ICON_CDN}/${ov.icon_slug}.png`;
     const tmName = (_rmConfig.tm_route_name || 'traefik-manager').toLowerCase();
     if ((route.name || '').toLowerCase() === tmName) return '/static/icons/icon.png';
-    return `${RM_ICON_CDN}/${rmIconSlug(route)}.png`;
+    return `${RM_ICON_CDN}/${window.rmIconSlug(route)}.png`;
 }
 
 function rmGetPod(route) {
@@ -544,7 +544,7 @@ function _dskRowTitle(r, s, name) {
 
 function _dskPlate(r, name, s) {
     return '<span class="dsk-ic" data-mono="' + _esc(_dskMono(name)) + '">'
-        + '<img class="dsk-ic-img" src="' + _esc(rmGetIconUrl(r)) + '" data-slug="' + _esc(rmIconSlug(r)) + '"'
+        + '<img class="dsk-ic-img" src="' + _esc(rmGetIconUrl(r)) + '" data-slug="' + _esc(window.rmIconSlug(r)) + '"'
         + ' alt="" loading="lazy" decoding="async" onerror="window.rmIconFallback(this)">'
         + '<span class="sig-cell dsk-dot ' + s.dot + '" title="' + _esc(s.dotTip) + '"></span>'
         + '</span>';
