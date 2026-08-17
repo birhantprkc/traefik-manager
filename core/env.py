@@ -55,16 +55,29 @@ MULTI_CONFIG = len(CONFIG_PATHS) > 1
 ALLOWED_API_SCHEMES = ('http://', 'https://')
 
 
+STATIC_CONFIG_DIRS = []
+if os.environ.get('STATIC_CONFIG_PATH', '').strip():
+    STATIC_CONFIG_DIRS.append(os.environ['STATIC_CONFIG_PATH'].strip())
+
+
 def allowed_file_prefixes() -> tuple:
     return tuple(sorted(set(
         ['/app/',
          os.path.abspath(BACKUP_DIR) + '/',
          os.path.dirname(os.path.abspath(SETTINGS_PATH)) + '/'] +
-        [os.path.dirname(os.path.abspath(p)) + '/' for p in CONFIG_PATHS]
+        [os.path.dirname(os.path.abspath(p)) + '/' for p in CONFIG_PATHS] +
+        [os.path.dirname(os.path.abspath(p)) + '/' for p in STATIC_CONFIG_DIRS]
     )))
 
 
 ALLOWED_FILE_PREFIXES = allowed_file_prefixes()
+
+
+def register_static_path(path: str):
+    global STATIC_CONFIG_DIRS, ALLOWED_FILE_PREFIXES
+    if path and path not in STATIC_CONFIG_DIRS:
+        STATIC_CONFIG_DIRS = sorted(STATIC_CONFIG_DIRS + [path])
+        ALLOWED_FILE_PREFIXES = allowed_file_prefixes()
 
 
 def register_config_path(path: str):
