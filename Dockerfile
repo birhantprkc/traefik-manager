@@ -39,7 +39,7 @@ RUN curl -sLo /app/static/vendor/qrcode.min.js \
     "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
 
 RUN curl -sLo /app/static/vendor/dagre.min.js \
-    "https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"
+    "https://cdn.jsdelivr.net/npm/@dagrejs/dagre@3.1.1/dist/dagre.min.js"
 
 RUN curl -sL "https://registry.npmjs.org/monaco-editor/-/monaco-editor-0.52.0.tgz" \
     | tar -xz -C /tmp \
