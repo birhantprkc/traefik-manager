@@ -29,7 +29,6 @@ def _discovery(methods=None):
         'authorization_endpoint': 'https://idp.example.com/authorize',
         'token_endpoint': 'https://idp.example.com/token',
         'userinfo_endpoint': 'https://idp.example.com/userinfo',
-        # the stubbed GET serves this for userinfo too, so the callback can run to completion
         'email': 'someone@example.com',
     }
     if methods is not None:
@@ -46,7 +45,6 @@ def _start(client, monkeypatch, methods=None):
 
 
 def test_basic_is_tried_first_when_discovery_is_silent(client, monkeypatch):
-    """OIDC Core: an unregistered method defaults to client_secret_basic."""
     state = _start(client, monkeypatch, methods=None)
     calls = []
 
@@ -80,8 +78,6 @@ def test_post_is_used_when_basic_is_not_advertised(client, monkeypatch):
 
 
 def test_invalid_grant_is_not_retried(client, monkeypatch):
-    """invalid_grant means the code is bad or already spent. Re-sending it would replace the real
-    error with 'authorization code has already been used'."""
     state = _start(client, monkeypatch, methods=None)
     calls = []
 
@@ -96,8 +92,6 @@ def test_invalid_grant_is_not_retried(client, monkeypatch):
 
 
 def test_invalid_client_retries_with_the_other_method(client, monkeypatch):
-    """A provider authenticates the client before it looks at the code, so the code survives an
-    invalid_client rejection and the other auth method is worth trying."""
     state = _start(client, monkeypatch, methods=['client_secret_post', 'client_secret_basic'])
     attempts = []
 

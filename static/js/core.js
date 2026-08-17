@@ -27,8 +27,6 @@ const OPTIONAL_TABS = ['dashboard', 'routemap', 'docker', 'kubernetes', 'swarm',
 let _visibleTabsCache = {};
 let _localTabsCache   = {};
 
-// The navigation is defined here rather than scraped out of markup, so counts can live in
-// state and the nav can be rebuilt at any time without a DOM read.
 const TAB_DEFS = [
     { id: 'dashboard',     label: 'Dashboard',       icon: 'ph-house' },
     { id: 'services',      label: 'Routes',          icon: 'ph-arrows-split' },
@@ -204,9 +202,6 @@ function applyTabVisibility(map) {
     applyGeoipRelevance();
 }
 
-// GeoIP only feeds the Logs and CrowdSec tabs, so the setting is pointless with
-// both off. It stays visible while enabled, otherwise turning it back off would
-// mean re-enabling a tab first.
 function applyGeoipRelevance() {
     const sec = document.getElementById('geoipSection');
     if (!sec) return;

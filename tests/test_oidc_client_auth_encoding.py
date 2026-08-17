@@ -72,7 +72,6 @@ def test_basic_credentials_are_form_encoded(client, monkeypatch):
     assert hdr.startswith('Basic '), 'confidential client must authenticate'
     decoded = base64.b64decode(hdr.split()[1]).decode()
     cid, _, csec = decoded.partition(':')
-    # what a spec-following provider recovers must equal what we configured
     assert unquote(cid) == 'tm-client'
     assert unquote(csec) == 'se%2Fcret+w'
 

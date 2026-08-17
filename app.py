@@ -620,8 +620,6 @@ def setup():
 
     current = load_settings()
 
-    # A password reset skips the wizard entirely: only the password step is shown, and the flag
-    # clears itself once a new password is set. Everything else in manager.yml is left alone.
     reset_mode = bool(current.get('setup_password_reset', False))
 
     if not reset_mode:
@@ -2683,9 +2681,6 @@ def api_logs():
             f.seek(0, 2)
             remaining = f.tell()
             partial = b''
-            # Count only non-blank lines: a log ending in a newline yields a trailing empty
-            # element, which would otherwise consume one of the requested slots and return
-            # lines_req - 1 rows.
             while remaining > 0 and sum(1 for ln in lines if ln.strip()) < lines_req:
                 chunk = min(buf_size, remaining)
                 remaining -= chunk
@@ -4942,8 +4937,6 @@ def oidc_login():
     groups_claim = s.get('oidc_groups_claim', '').strip()
     if s.get('oidc_allowed_groups', '').strip() and groups_claim and groups_claim not in scopes:
         scopes.append(groups_claim)
-    # PKCE (RFC 7636). Public clients require it - Authentik rejects the exchange without it -
-    # and it is harmless for confidential clients, so it is always sent.
     verifier  = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(
         hashlib.sha256(verifier.encode('ascii')).digest()).decode('ascii').rstrip('=')
@@ -4999,20 +4992,9 @@ def oidc_callback():
             'redirect_uri': url_for('oidc_callback', _external=True),
             'code_verifier': session.pop('oidc_verifier', ''),
         }
-        # OIDC Core makes client_secret_basic the default when a client registers no method, and
-        # Authelia and Authentik follow it. Sending the secret in the body against a Basic client
-        # gets a bare 400 invalid_client, so honour what the provider advertises and retry with
-        # the other method rather than leaving the user to guess.
-        # The authorization code is single-use (RFC 6749 4.1.2), so there is exactly one attempt.
-        # A retry with the other method re-sends a spent code and the provider answers "authorization
-        # code has already been used", which hides the real error. Pick the method and commit to it.
         supported = cfg.get('token_endpoint_auth_methods_supported') or []
 
         def _post_basic():
-            # RFC 6749 section 2.3.1 requires the id and secret to be form-encoded BEFORE they are
-            # base64'd into the Basic header. requests does not do that, and providers that follow
-            # the RFC percent-decode what they receive, so a secret containing % or + would arrive
-            # corrupted.
             basic = base64.b64encode(
                 f"{quote(client_id, safe='')}:{quote(client_secret, safe='')}".encode()
             ).decode()
@@ -5025,14 +5007,9 @@ def oidc_callback():
                 data=dict(payload, client_id=client_id, client_secret=client_secret), timeout=8)
 
         if not client_secret:
-            # Public client: no secret exists, so send none. PKCE is what proves the caller.
-            # An empty Basic header is what makes providers answer invalid_client.
             token_resp = requests.post(
                 cfg['token_endpoint'], data=dict(payload, client_id=client_id), timeout=8)
         else:
-            # Try the advertised method first, then the other one. This is safe because a provider
-            # rejects the client before it looks at the code, so a failed attempt does not consume
-            # it - the retry is only ever taken on invalid_client, never on invalid_grant.
             order = ([_post_body, _post_basic]
                      if 'client_secret_post' in supported and 'client_secret_basic' not in supported
                      else [_post_basic, _post_body])
@@ -5047,8 +5024,6 @@ def oidc_callback():
                         "OIDC client authentication rejected, retrying with the other method")
                     token_resp = order[1]()
         if token_resp.status_code >= 400:
-            # The provider says exactly what is wrong in the body. Without this you get a bare
-            # "400 Bad Request" and no way to tell a wrong secret from a PKCE requirement.
             detail = ''
             try:
                 body = token_resp.json()
@@ -5087,14 +5062,6 @@ def oidc_callback():
         except Exception:
             logger.warning("OIDC id_token nonce verification skipped - could not decode token")
     access_token = tokens.get('access_token', '')
-    # Best effort. Providers put the same claims in the id_token, so an unreachable or slow
-    # userinfo endpoint must not cost the user their login - and must not burn the request
-    # budget, since gunicorn kills the worker at 30s and takes the whole callback with it.
-    # Only call userinfo when the id_token is actually missing something. requests applies its
-    # timeout PER ADDRESS from getaddrinfo, not per call, so a host resolving to several
-    # unreachable addresses burns timeout x N and gunicorn kills the worker at 30s - taking the
-    # whole login with it. Skipping the call when the claims are already in hand removes that
-    # risk entirely for providers that populate the id_token, which is most of them.
     groups_claim = str(s.get('oidc_groups_claim', '') or 'groups').strip()
     need_email  = not str(id_claims.get('email', '')).strip()
     need_groups = bool(str(s.get('oidc_allowed_groups', '')).strip()) and not id_claims.get(groups_claim)
@@ -5219,8 +5186,6 @@ def api_test_oidc():
         resp = requests.get(f"{url}/.well-known/openid-configuration", timeout=5)
         resp.raise_for_status()
         cfg = resp.json()
-        # This only proves the provider is reachable and advertises OIDC. The client ID and
-        # secret are never exercised here, so say so rather than implying a working login.
         return jsonify({
             'ok': True,
             'issuer': cfg.get('issuer', url),

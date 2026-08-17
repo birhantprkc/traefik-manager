@@ -10,11 +10,6 @@ for theme in ("dark", "light"):
         im.save(f"/img/{theme}-{f[:-4]}.png", optimize=True)
         copied += 1
 
-# Every screen, in the order a new user meets them: the feature tabs, then every
-# settings pane, then the setup wizard. Provider tabs are left out - they repeat the
-# routes view per provider and add nothing but length. The login page is left out too:
-# a password box is not a feature. Agent API Keys is captured for the docs but kept out of
-# the carousel: it is a drill-down inside Agents, and it shows an empty state here.
 CAROUSEL = (
     "dashboard", "dashboard-icons", "dashboard-hover",
     "routes-cards", "routes-list", "routes-add-http", "routes-add-tcp", "routes-add-udp",

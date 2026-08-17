@@ -59,11 +59,11 @@
                 <button onclick="openIpDiagModal()" class="nav-btn nav-ipdiag-btn" data-navprio="20" title="Client IP diagnostic">
                     <i class="ph-bold ph-network"></i>
                 </button>
-                <button onclick="openSettingsModal()" class="nav-btn" data-navprio="80" title="Settings">
+                <button onclick="openSettingsModal()" class="nav-btn nav-dup-sidenav" data-navprio="80" title="Settings">
                     <i class="ph-bold ph-gear"></i>
                 </button>
                 {% if auth_enabled %}
-                <form method="POST" action="{{ url_for('logout') }}" style="display:inline" data-navprio="40">
+                <form method="POST" action="{{ url_for('logout') }}" class="nav-dup-sidenav" style="display:inline" data-navprio="40">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="nav-btn" title="Sign out" style="color:var(--muted)">
                         <i class="ph-bold ph-sign-out"></i>

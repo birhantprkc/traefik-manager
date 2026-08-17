@@ -155,7 +155,6 @@ def test_layout_mode_round_trips_and_rejects_junk(client):
 
 
 def test_pre_1_11_layout_names_migrate(client):
-    # classic was the capped-width look, modern was full bleed
     _put_layout(client, 'classic')
     assert _get_layout(client) == 'fixed'
 

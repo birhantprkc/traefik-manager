@@ -58,11 +58,7 @@ function upgrade() {
 
     const svc = doc.services[tmKey]
 
-    // Leave the image tag alone. Enabling the static config editor is a volume and env
-    // change, not a channel change - rewriting :latest to :beta here would move people onto
-    // the dev branch without asking.
 
-    // Normalize environment to object
     if (!svc.environment) {
       svc.environment = {}
     } else if (Array.isArray(svc.environment)) {
@@ -142,7 +138,6 @@ function upgrade() {
       }
     }
 
-    // Static config
     if (enableStatic.value) {
       svc.environment['STATIC_CONFIG_PATH'] = '/app/traefik.yml'
 

@@ -37,7 +37,6 @@
             if (!pref('showApiLink', false))     d.add('tm-hide-api');
             if (!pref('showShortcutsBtn', true)) d.add('tm-hide-shortcuts');
             if (!pref('showIpDiagBtn', true))    d.add('tm-hide-ipdiag');
-            // classic was the capped-width look, modern was full bleed
             var _lm = pref('layoutMode', 'fluid');
             if (_lm === 'classic') _lm = 'fixed';
             if (_lm === 'fixed') d.add('tm-fixed');
@@ -231,11 +230,26 @@
             <span>Traefik <span style="color:var(--blue)">Manager</span></span>
         </div>
         <div id="drawerServerWrap" style="display:none">
-            <button class="drawer-srv-head" id="drawerServerBtn" onclick="toggleDrawerServerList()">
+            <button class="drawer-srv-head" id="drawerServerBtn" onclick="toggleDrawerServerList()" title="Switch server">
+                <span class="drawer-srv-mark" id="drawerServerMark">
+                    <svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <rect x="206" y="206" width="100" height="100" rx="20" stroke="currentColor" stroke-width="34"/>
+                        <line x1="256" y1="206" x2="256" y2="80" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+                        <line x1="256" y1="306" x2="256" y2="432" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+                        <line x1="206" y1="256" x2="80" y2="256" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+                        <line x1="306" y1="256" x2="432" y2="256" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+                        <circle cx="256" cy="60" r="26" fill="currentColor"/>
+                        <circle cx="256" cy="452" r="26" fill="currentColor"/>
+                        <circle cx="60" cy="256" r="26" fill="currentColor"/>
+                        <circle cx="452" cy="256" r="26" fill="currentColor"/>
+                    </svg>
+                    <i class="ph-bold ph-hard-drives" id="drawerServerAgentIcon"></i>
+                    <span class="drawer-srv-badge" id="drawerServerBadge" style="background:var(--green)"></span>
+                </span>
                 <span class="drawer-srv-dot" id="drawerServerDot" style="background:var(--green)"></span>
                 <span class="drawer-srv-t">
                     <span class="drawer-srv-n" id="drawerServerName">Host</span>
-                    <span class="drawer-srv-s" id="drawerServerSub">This Traefik Manager</span>
+                    <span class="drawer-srv-s" id="drawerServerSub">Traefik Manager</span>
                 </span>
                 <i class="ph-bold ph-caret-down" id="drawerServerCaret"></i>
             </button>
@@ -246,6 +260,17 @@
     <div class="side-nav-foot">
         <button onclick="toggleSideNavCollapse()" id="sideNavCollapseBtn" title="Collapse navigation">
             <i class="ph-bold ph-caret-double-left" id="sideNavCollapseIcon"></i><span class="side-nav-toggle-label">Collapse</span>
+        </button>
+        {% if auth_enabled %}
+        <form method="POST" action="{{ url_for('logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" id="sideNavLogoutBtn" title="Sign out">
+                <i class="ph-bold ph-sign-out"></i><span class="side-nav-toggle-label">Sign out</span>
+            </button>
+        </form>
+        {% endif %}
+        <button onclick="closeSideNavDrawer(); openSettingsModal()" id="sideNavSettingsBtn" title="Settings">
+            <i class="ph-bold ph-gear"></i><span class="side-nav-toggle-label">Settings</span>
         </button>
     </div>
 </aside>
@@ -477,11 +502,26 @@ function _renderDrawerServerList() {
     const sub  = document.getElementById('drawerServerSub');
     const dot  = document.getElementById('drawerServerDot');
     if (name) name.textContent = _activeAgent ? _activeAgent.name : 'Host';
-    if (sub)  sub.textContent  = _activeAgent ? (_agentSubLine(_activeAgent) || 'Agent') : 'This Traefik Manager';
+    if (sub)  sub.textContent  = _activeAgent ? (_agentSubLine(_activeAgent) || 'Agent') : 'Traefik Manager';
     if (dot)  dot.style.background = _activeAgent ? (_agentHealthCache[_activeAgent.id] || 'var(--muted)') : 'var(--green)';
+    const mark  = document.getElementById('drawerServerMark');
+    const badge = document.getElementById('drawerServerBadge');
+    if (mark)  mark.classList.toggle('is-agent', !!_activeAgent);
+    if (badge) badge.style.background = _activeAgent ? (_agentHealthCache[_activeAgent.id] || 'var(--muted)') : 'var(--green)';
+    const TM_MARK = `<span class="drawer-srv-glyph"><svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="206" y="206" width="100" height="100" rx="20" stroke="currentColor" stroke-width="34"/>
+            <line x1="256" y1="206" x2="256" y2="80" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+            <line x1="256" y1="306" x2="256" y2="432" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+            <line x1="206" y1="256" x2="80" y2="256" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+            <line x1="306" y1="256" x2="432" y2="256" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+            <circle cx="256" cy="60" r="26" fill="currentColor"/>
+            <circle cx="256" cy="452" r="26" fill="currentColor"/>
+            <circle cx="60" cy="256" r="26" fill="currentColor"/>
+            <circle cx="452" cy="256" r="26" fill="currentColor"/>
+        </svg></span>`;
     const item = (id, icon, title, subText, active, dotColor) =>
         `<button class="drawer-srv-item${active ? ' active' : ''}" onclick="_drawerPickServer(${id ? `'${id}'` : 'null'})">
-            <i class="ph-bold ${icon}"></i>
+            ${icon ? `<i class="ph-bold ${icon}"></i>` : TM_MARK}
             <span class="drawer-srv-t">
                 <span class="drawer-srv-n">${title}</span>
                 ${subText ? `<span class="drawer-srv-s">${subText}</span>` : ''}
@@ -489,7 +529,8 @@ function _renderDrawerServerList() {
             ${active ? '<i class="ph-bold ph-check drawer-srv-check"></i>' : `<span class="drawer-srv-dot" style="background:${dotColor}"></span>`}
         </button>`;
     list.innerHTML =
-        item(null, 'ph-house', 'Host', 'This Traefik Manager', !_activeAgent, 'var(--green)') +
+        '<div class="drawer-srv-title">Switch server</div>' +
+        item(null, null, 'Host', 'Traefik Manager', !_activeAgent, 'var(--green)') +
         _agentList.map(a => item(a.id, 'ph-hard-drives', _esc(a.name), _esc(_agentSubLine(a)), _activeAgent && _activeAgent.id === a.id, _agentHealthCache[a.id] || 'var(--muted)')).join('');
 }
 
@@ -504,10 +545,19 @@ function _drawerPickServer(id) {
 function toggleDrawerServerList() {
     const list  = document.getElementById('drawerServerList');
     const caret = document.getElementById('drawerServerCaret');
+    const btn   = document.getElementById('drawerServerBtn');
     if (!list) return;
     const opening = list.style.display === 'none';
     list.style.display = opening ? '' : 'none';
     if (caret) caret.classList.toggle('open', opening);
+    if (opening && btn && document.documentElement.classList.contains('tm-nav-collapsed')) {
+        const r = btn.getBoundingClientRect();
+        list.style.left = (r.right + 8) + 'px';
+        list.style.top  = Math.min(r.top, window.innerHeight - list.offsetHeight - 12) + 'px';
+    } else {
+        list.style.left = '';
+        list.style.top  = '';
+    }
 }
 
 function _updateServerSwitcherList(agents) {
@@ -555,9 +605,6 @@ function switchServer(agentId) {
     _renderServerSwitcherList(false);
     if (typeof _staticLoadedFor !== 'undefined') _staticLoadedFor = null;
     refreshStaticTabAvailability();
-    // The route and middleware grids are shared by two tabs and are not rebuilt unless one of
-    // them is on screen, so switching server while on any other tab used to leave the previous
-    // server's rows in place. Boot already refetches them unconditionally; do the same here.
     const _cur = _activeTab;
     if (_cur !== 'services' && _cur !== 'middlewares') refreshRoutes();
     refreshCurrentTab();

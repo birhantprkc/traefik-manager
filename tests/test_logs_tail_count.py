@@ -12,7 +12,6 @@ def _write_log(tmp_path, n, trailing_newline=True, blank_between=False):
 
 
 def _use(monkeypatch, path):
-    # ACCESS_LOG_PATH both selects the file and whitelists its directory for reads
     monkeypatch.setenv('ACCESS_LOG_PATH', path)
 
 

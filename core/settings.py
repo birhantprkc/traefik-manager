@@ -55,7 +55,6 @@ def sanitize_ui_prefs(prefs) -> dict:
     for k in UI_PREF_LAYOUTS:
         if k in prefs:
             v = str(prefs[k]).strip().lower()
-            # pre-1.11 names: classic was the capped width, modern was full bleed
             v = {'classic': 'fixed', 'modern': 'fluid'}.get(v, v)
             if v in ('fluid', 'fixed'):
                 out[k] = v
