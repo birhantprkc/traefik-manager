@@ -1884,13 +1884,18 @@ function closeRouteDetail() {
 function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) {
     const status = liveRouter ? liveRouter.status : null;
     const routerError = liveRouter ? (liveRouter.error || null) : null;
-    const statusBadge = _dState(status === 'enabled' ? 'Enabled' : status);
+    const isDisabled = app.enabled === false;
+    const statusBadge = isDisabled
+        ? _dState('Disabled')
+        : _dState(status === 'enabled' ? 'Enabled' : status);
     const errorBanner = routerError
         ? `<div class="mt-4 p-3 rounded-lg text-xs font-mono leading-relaxed" style="color:var(--red);background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.25);word-break:break-word"><i class="ph-bold ph-warning-circle" style="margin-right:6px"></i>${_esc(routerError)}</div>`
         : '';
 
     const apiNote = liveRouter
         ? `<div class="flex items-center gap-1.5 text-xs mb-5" style="color:var(--muted)"><div style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></div> Live data from Traefik API</div>`
+        : isDisabled
+        ? `<div class="flex items-center gap-1.5 text-xs mb-5 p-2 rounded" style="color:var(--muted);background:var(--input-bg);border:1px solid var(--border)"><i class="ph-bold ph-pause-circle text-sm"></i> Not served by Traefik while disabled - showing your saved configuration</div>`
         : `<div class="flex items-center gap-1.5 text-xs mb-5 p-2 rounded" style="color:var(--yellow);background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.2)"><i class="ph-bold ph-warning text-sm"></i> Traefik API unavailable - showing config file data only</div>`;
 
     
