@@ -505,20 +505,20 @@ select.input-field:disabled { opacity: 0.6; cursor: not-allowed; }
 }
 
 .btn-primary {
-    background: var(--blue);
-    color: #fff;
-    border: none;
+    background: color-mix(in srgb, var(--blue) 14%, transparent);
+    color: var(--blue);
+    border: 1px solid color-mix(in srgb, var(--blue) 30%, transparent);
     border-radius: 6px;
     padding: 8px 16px;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
     display: inline-flex;
     align-items: center;
     gap: 6px;
 }
-.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:hover { background: color-mix(in srgb, var(--blue) 22%, transparent); border-color: color-mix(in srgb, var(--blue) 45%, transparent); }
 .btn-primary:active { transform: scale(0.97); }
 
 .btn-secondary {
