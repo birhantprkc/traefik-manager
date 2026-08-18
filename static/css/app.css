@@ -755,6 +755,14 @@ pre { white-space: pre-wrap; word-break: break-all; }
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 .toggle-switch.on .toggle-knob { transform: translateX(14px); }
+.toggle-sm { width: 24px; height: 14px; cursor: pointer; }
+.toggle-sm .toggle-knob { width: 10px; height: 10px; top: 2px; left: 2px; }
+.toggle-sm.on .toggle-knob { transform: translateX(10px); }
+.toggle-sm.on { background: var(--green); }
+.tm-rail .toggle-sm { opacity: 0; transition: opacity .12s, background .2s; }
+.tm-card:hover .tm-rail .toggle-sm,
+.tm-card:focus-within .tm-rail .toggle-sm { opacity: 1; }
+.tm-rail .toggle-sm:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 18%, transparent); }
 
 .protocol-section { display: none; }
 .protocol-section.active { display: block; }

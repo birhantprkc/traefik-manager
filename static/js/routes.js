@@ -802,7 +802,7 @@ function _tmRouteCard(app, i, opts) {
         (openUrl ? '<i class="ph-bold ph-arrow-up-right tm-hint"></i>' : '') +
         `<button type="button" class="tm-btn" title="More" data-app='${appJson}' data-openurl="${openUrl}" onclick="event.stopPropagation();_openRouteMenu(event,this)"><i class="ph-bold ph-dots-three"></i></button>` +
         `<button type="button" class="tm-btn" title="Edit" data-app='${appJson}' onclick="event.stopPropagation();handleEdit(this)"><i class="ph-bold ph-pencil-simple"></i></button>` +
-        (isFile ? `<button type="button" class="tm-btn tm-btn-tog" title="${enabled ? 'Disable route' : 'Enable route'}" onclick="event.stopPropagation();toggleRoute('${_esc(app.id)}',${enabled})"><i class="ph-bold ${enabled ? 'ph-toggle-right' : 'ph-toggle-left'}"></i></button>` : '') +
+        (isFile ? `<span role="switch" tabindex="0" aria-checked="${enabled}" class="toggle-switch toggle-sm${enabled ? ' on' : ''}" title="${enabled ? 'Disable route' : 'Enable route'}" onclick="event.stopPropagation();toggleRoute('${_esc(app.id)}',${enabled})" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();event.stopPropagation();toggleRoute('${_esc(app.id)}',${enabled});}"><span class="toggle-knob"></span></span>` : '') +
         '</span>';
 
     const bulkCheckbox = _bulkMode
