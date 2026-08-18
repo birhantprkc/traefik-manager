@@ -710,8 +710,12 @@ function rmOpenPopup(type, nodeId, allRoutes, preFiltered) {
     if (!popup) return;
 
     const typeLabels = { ep: 'Entry Point', mw: 'Middleware', svc: 'Service', route: 'Route', group: 'Group' };
+    const typeIcons  = { ep: 'ph-arrows-in', mw: 'ph-shield-check', svc: 'ph-hard-drives',
+                         route: 'ph-arrows-split', group: 'ph-stack' };
     document.getElementById('rmPopupTypeBadge').textContent = typeLabels[type] || type;
     document.getElementById('rmPopupTitle').textContent     = nodeId.split('@')[0];
+    const popIcon = document.getElementById('rmPopupIcon');
+    if (popIcon) popIcon.className = 'ph-fill ' + (typeIcons[type] || 'ph-graph');
 
     const chip = (icon, label, val, color) => {
         if (!val) return '';

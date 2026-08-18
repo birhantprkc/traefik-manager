@@ -219,7 +219,7 @@ function renderServicesTable() {
                     <span class="badge badge-${proto.toLowerCase()}" style="font-size:9px">${proto}</span>
                     ${type ? `<span class="svc-type-badge">${type}</span>` : ''}
                 </div>
-                <span class="svc-status-chip" style="color:${stColor};background:color-mix(in srgb,${stColor} 12%,transparent);border-color:color-mix(in srgb,${stColor} 35%,transparent)">
+                <span class="svc-status-chip" style="color:${stColor};background:color-mix(in srgb,${stColor} 14%,transparent)">
                     <span class="svc-status-dot" style="background:${stColor}"></span>${stLabel}
                 </span>
             </div>
