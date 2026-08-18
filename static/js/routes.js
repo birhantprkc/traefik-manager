@@ -440,6 +440,7 @@ function _applyStreamingPreset(on) {
 }
 
 async function openModal() {
+    closeOtherPanels('appModal');
     document.getElementById('isEdit').value = 'false';
     document.getElementById('modalTitle').innerText = 'Add Route';
     _applyServiceTypeNotice('loadBalancer');
@@ -1790,6 +1791,7 @@ let _liveEntrypointsCache = null;
 let _currentDetailApp = null;
 
 async function openRouteDetail(name, protocol, appData) {
+    closeOtherPanels('detailPanel');
     _currentDetailApp = appData;
     const panel = document.getElementById('detailPanel');
     const backdrop = document.getElementById('detailBackdrop');

@@ -18,6 +18,7 @@ function setMwProtocol(proto) {
 }
 
 function openMwModal() {
+    closeOtherPanels('mwModal');
     const nameEl = document.getElementById('middlewareName');
     const contentEl = document.getElementById('middlewareContent');
     const editEl = document.getElementById('isMwEdit');

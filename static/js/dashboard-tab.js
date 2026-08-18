@@ -34,6 +34,7 @@ function rmRenderGroupsList() {
 }
 
 window.rmOpenGroupsModal = function() {
+    closeOtherPanels('rmGroupsModal');
     _rmEditingGroupIdx = -1;
     rmRenderGroupsList();
     rmRenderHiddenList();
@@ -145,6 +146,7 @@ let _rmEditRouteId   = null;
 let _rmEditIconType  = 'auto';
 
 window.rmOpenEditModal = function(routeId) {
+    closeOtherPanels('rmEditModal');
     _rmEditRouteId = routeId;
     const ov = (_rmConfig.route_overrides || {})[routeId] || {};
 

@@ -241,6 +241,7 @@ function toggleTlsClientAuthCAs(val) {
 }
 
 function openTlsOptionModal(opt) {
+    closeOtherPanels('tlsOptionsModal');
     const modal = document.getElementById('tlsOptionsModal');
     const isEdit = !!opt;
     document.getElementById('tlsOptionsModalTitle').textContent = isEdit ? 'Edit TLS Profile' : 'Add TLS Profile';

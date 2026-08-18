@@ -467,6 +467,7 @@ function settingsMobileBack() {
 }
 
 async function openSettingsModal(panel) {
+    closeOtherPanels('settingsModal');
     document.documentElement.classList.add('tm-settings-open');
     document.getElementById('settingsSavedNotice').classList.add('hidden');
     document.getElementById('apiTestResult').textContent = '';

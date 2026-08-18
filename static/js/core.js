@@ -128,6 +128,33 @@ function revealBelowFold(el) {
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+const MODAL_CLOSERS = {
+    appModal:        'closeModal',
+    mwModal:         'closeMwModal',
+    detailPanel:     'closeRouteDetail',
+    settingsModal:   'closeSettingsModal',
+    tlsOptionsModal: 'closeTlsOptionModal',
+    ipDiagModal:     'closeIpDiagModal',
+    csBanModal:      'closeCsBanModal',
+    trustedIpsModal: 'closeTrustedIpsModal',
+    rmEditModal:     'rmCloseEditModal',
+    rmGroupsModal:   'rmCloseGroupsModal',
+};
+
+function closeOtherPanels(keepId) {
+    const open = new Set(
+        [...document.querySelectorAll('.detail-panel.open, .modal-overlay.open')].map(el => el.id));
+    document.querySelectorAll('.modal-overlay, .detail-panel').forEach(el => {
+        if (el.id && el.style.display && el.style.display !== 'none') open.add(el.id);
+    });
+    open.forEach(id => {
+        if (!id || id === keepId) return;
+        const fn = window[MODAL_CLOSERS[id]];
+        if (typeof fn === 'function') fn();
+        else document.getElementById(id)?.classList.remove('open');
+    });
+}
+
 function _detailDockActive() {
     return !document.documentElement.classList.contains('tm-fixed')
         && !document.documentElement.classList.contains('tm-settings-open')
@@ -874,6 +901,7 @@ function ipClassBadge(cls) {
 }
 
 function openIpDiagModal() {
+    closeOtherPanels('ipDiagModal');
     const m = document.getElementById('ipDiagModal');
     if (!m) return;
     m.classList.add('open');

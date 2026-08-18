@@ -1518,6 +1518,7 @@ function _csRender() {
 }
 
 function openCsBanModal(prefill) {
+    closeOtherPanels('csBanModal');
     document.getElementById('csBanIp').value       = typeof prefill === 'string' ? prefill : '';
     document.getElementById('csBanReason').value   = '';
     document.getElementById('csBanDuration').value = '24h';
