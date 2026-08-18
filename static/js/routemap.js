@@ -990,17 +990,11 @@ function rmDrawCurves(routes, forceHighlight) {
     const activeMws  = new Set(routes.flatMap(r => r.middlewares||[]));
     const activeSvcs = new Set(routes.filter(r => r.service_name).map(r => r.service_name));
 
-    const protoColor = proto => {
-        if (proto === 'tcp') return 'var(--green)';
-        if (proto === 'udp') return 'rgba(226,192,65,1)';
-        return 'var(--blue)';
-    };
-    const routeById = new Map((_rmDagreRoutes || []).map(r => [r.id, r]));
     const edgeColor = {
         'ep-route':  'var(--teal)',
         'route-mw':  'var(--purple)',
-        'mw-svc':    'var(--green)',
-        'route-svc': 'var(--green)',
+        'mw-svc':    'var(--orange)',
+        'route-svc': 'var(--orange)',
     };
 
     const getEl = rmid => {
@@ -1036,18 +1030,7 @@ function rmDrawCurves(routes, forceHighlight) {
         if (drawn.has(key)) return;
         drawn.add(key);
 
-        let activeColor = edgeColor[type];
-        if (type === 'route-svc') {
-            const r = routeById.get(e.v.slice(6));
-            if (r) activeColor = protoColor(r.protocol);
-        } else if (type === 'route-mw') {
-            const r = routeById.get(e.v.slice(6));
-            if (r) activeColor = protoColor(r.protocol);
-        } else if (type === 'mw-svc') {
-            const mwName = e.v.slice(3);
-            const r = (_rmDagreRoutes || []).find(r => (r.middlewares||[]).includes(mwName));
-            if (r) activeColor = protoColor(r.protocol);
-        }
+        const activeColor = edgeColor[type];
 
         const fp = getNodePos(fromEl);
         const tp = getNodePos(toEl);
