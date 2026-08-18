@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version }}">
     <script>
         (function() {
-            var t = localStorage.getItem('tm-theme') || '{{ default_theme }}' || 'dark';
+            var t = '{{ default_theme }}' || localStorage.getItem('tm-theme') || 'dark';
             var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             var isDark = t === 'dark' || (t === 'system' && prefersDark);
             document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -202,13 +202,6 @@
 {% if force_change_mode %}
 
 <div style="width:100%;max-width:380px">
-    <div class="topbar">
-        <button class="theme-toggle" onclick="cycleTheme()" title="Toggle theme">
-            <i class="ph-bold ph-moon tm-theme-icon" data-pref="dark"></i>
-            <i class="ph-bold ph-sun tm-theme-icon" data-pref="light"></i>
-            <i class="ph-bold ph-desktop tm-theme-icon" data-pref="system"></i>
-        </button>
-    </div>
     <div class="card card-login">
         <div class="logo">
             <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
@@ -254,13 +247,6 @@
 {% elif otp_mode %}
 
 <div style="width:100%;max-width:380px">
-    <div class="topbar">
-        <button class="theme-toggle" onclick="cycleTheme()" title="Toggle theme">
-            <i class="ph-bold ph-moon tm-theme-icon" data-pref="dark"></i>
-            <i class="ph-bold ph-sun tm-theme-icon" data-pref="light"></i>
-            <i class="ph-bold ph-desktop tm-theme-icon" data-pref="system"></i>
-        </button>
-    </div>
     <div class="card card-login">
         <div class="logo">
             <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
@@ -307,13 +293,6 @@
 {% elif not setup_mode %}
 
 <div style="width:100%;max-width:380px">
-    <div class="topbar">
-        <button class="theme-toggle" onclick="cycleTheme()" title="Toggle theme">
-            <i class="ph-bold ph-moon tm-theme-icon" data-pref="dark"></i>
-            <i class="ph-bold ph-sun tm-theme-icon" data-pref="light"></i>
-            <i class="ph-bold ph-desktop tm-theme-icon" data-pref="system"></i>
-        </button>
-    </div>
     <div class="card card-login">
         <div class="logo">
             <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
@@ -390,13 +369,6 @@
 
 {% if reset_mode %}
 <div style="width:100%;max-width:380px">
-    <div class="topbar">
-        <button class="theme-toggle" onclick="cycleTheme()" title="Toggle theme">
-            <i class="ph-bold ph-moon tm-theme-icon" data-pref="dark"></i>
-            <i class="ph-bold ph-sun tm-theme-icon" data-pref="light"></i>
-            <i class="ph-bold ph-desktop tm-theme-icon" data-pref="system"></i>
-        </button>
-    </div>
     <div class="card card-login">
         <div class="logo">
             <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
@@ -934,12 +906,12 @@ function applyTheme(t) {
     document.documentElement.setAttribute('data-tm-pref', t);
 }
 function cycleTheme() {
-    const cur  = localStorage.getItem(THEME_KEY) || 'dark';
+    const cur  = document.documentElement.getAttribute('data-tm-pref') || 'dark';
     const next = cur === 'dark' ? 'light' : cur === 'light' ? 'system' : 'dark';
     localStorage.setItem(THEME_KEY, next);
     applyTheme(next);
 }
-applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+applyTheme('{{ default_theme }}' || localStorage.getItem(THEME_KEY) || 'dark');
 
 {% if setup_mode and not reset_mode %}
 
