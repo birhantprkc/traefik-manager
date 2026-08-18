@@ -802,24 +802,18 @@ function rmRenderPopupTopology(focusedRoutes, activeType, activeNodeId, allRoute
 
         const isActive = activeType === nd.type && activeNodeId === nd.id;
         const poprmid  = `${nd.type}:${nd.id}`;
-        let typeClass = nd.type, inner = '';
 
-        if (nd.type === 'ep') {
-            inner = `<i class="ph-bold ph-arrows-in" style="font-size:10px;margin-right:6px;opacity:0.7"></i><span class="rm-node-label">${_esc(nd.id)}</span>`;
-        } else if (nd.type === 'route') {
-            const proto = (nd.route.protocol||'http').toLowerCase();
-            typeClass = `route ${proto}`;
-            inner = `<span class="rm-proto-badge rm-proto-${_esc(proto)}">${proto.toUpperCase()}</span><span class="rm-node-label">${_esc(nd.route.name)}</span>`;
-        } else if (nd.type === 'mw') {
-            const badge = (mwUsage[nd.id]||0) > 1 ? `<span class="rm-mw-count">${mwUsage[nd.id]}×</span>` : '';
-            inner = `<i class="ph-bold ph-shield-check" style="font-size:10px;margin-right:6px;opacity:0.7"></i><span class="rm-node-label">${_esc(nd.id.split('@')[0])}</span>${badge}`;
-        } else if (nd.type === 'svc') {
-            inner = `<i class="ph-bold ph-cube" style="font-size:10px;margin-right:6px;opacity:0.7"></i><span class="rm-node-label">${_esc(nd.id.split('@')[0])}</span>`;
+        wrap.innerHTML = _rmNodeHtml(nd.type, nd.id, {
+            mwUsage,
+            route:  nd.route || nd.owner,
+            target: nd.target,
+        });
+        const nodeEl = wrap.firstElementChild;
+        if (nodeEl) {
+            nodeEl.dataset.poprmid = poprmid;
+            nodeEl.style.cursor = 'pointer';
+            if (isActive) nodeEl.classList.add('rm-node-active');
         }
-
-        const classes = ['rm-node', ...typeClass.split(' ').map(p => 'rm-node-' + p), isActive ? 'rm-node-active' : ''].filter(Boolean).join(' ');
-        const rid = nd.type === 'route' ? ` data-routeid="${_esc(nd.route.id)}"` : '';
-        wrap.innerHTML = `<div class="${classes}" data-poprmid="${_esc(poprmid)}"${rid} style="cursor:pointer" title="${_esc(nd.id)}">${inner}</div>`;
         cols.appendChild(wrap);
     });
 
