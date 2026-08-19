@@ -875,7 +875,9 @@ async function testTraefikApi() {
             result.textContent = `✓ Connected - Traefik v${d.version}`;
             result.style.color = 'var(--green)';
         } else {
-            result.textContent = `✗ ${d.error || 'No response from API'}`;
+            const err = String(d.error || 'No response from API');
+            result.textContent = `✗ ${err.length > 120 ? err.slice(0, 120) + '…' : err}`;
+            result.title = err;
             result.style.color = 'var(--red)';
         }
     } catch(e) {
