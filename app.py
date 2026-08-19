@@ -4164,9 +4164,7 @@ def api_route_raw_save(route_id):
                 f.write(yaml_content)
                 f.flush()
                 os.fsync(f.fileno())
-            if os.path.exists(target_path):
-                shutil.copystat(target_path, tmp)
-            os.replace(tmp, target_path)
+            _cfg._replace_or_copy(tmp, target_path)
         finally:
             try:
                 os.unlink(tmp)
