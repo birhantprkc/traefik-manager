@@ -2477,6 +2477,34 @@ def api_plugins():
         logger.exception("Error reading static config")
         return jsonify({'plugins': [], 'error': str(e)})
 
+_PLUGIN_CATALOG = {'ts': 0.0, 'map': {}}
+
+
+@app.route('/api/plugins/catalog')
+@login_required
+def api_plugin_catalog():
+    now = time.time()
+    if now - _PLUGIN_CATALOG['ts'] > 86400:
+        try:
+            r = requests.get('https://plugins.traefik.io/api/services/plugins', timeout=8)
+            r.raise_for_status()
+            items = r.json()
+            catalog = {}
+            for item in items if isinstance(items, list) else []:
+                mod = str(item.get('import') or '').strip().lower()
+                ver = str(item.get('latestVersion') or '').strip()
+                if mod and ver:
+                    catalog[mod] = ver
+            if catalog:
+                _PLUGIN_CATALOG['map'] = catalog
+                _PLUGIN_CATALOG['ts'] = now
+            else:
+                _PLUGIN_CATALOG['ts'] = now - 86400 + 900
+        except Exception:
+            _PLUGIN_CATALOG['ts'] = now - 86400 + 900
+    return jsonify({'plugins': _PLUGIN_CATALOG['map']})
+
+
 @app.route('/api/plugins/install', methods=['POST'])
 @csrf_protect
 @login_required

@@ -32,6 +32,7 @@ async function refreshNomadTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return mwProv === 'nomad'; });
+        renderProviderVerdict('nomad', _allNomadRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'nomadMiddlewares');
         setTabCount('nomad', _allNomadRoutes.length);
         renderNomadRoutes();

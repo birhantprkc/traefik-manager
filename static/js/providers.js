@@ -1,3 +1,50 @@
+function _tvFlag(f) {
+    return '<span class="sig-flag ' + f.cls + ' lg-static" title="' + _esc(f.tip || (f.n + ' ' + f.label)) + '">'
+        + '<i class="' + f.ic + '"></i>'
+        + (f.n === '' ? '' : '<b>' + _sdNum(f.n) + '</b>')
+        + (f.label ? '<span class="sig-fl">' + _esc(f.label) + '</span>' : '')
+        + '</span>';
+}
+
+function _tvStrip(mountId, v) {
+    const el = document.getElementById(mountId);
+    if (!el) return;
+    if (v === null) { el.innerHTML = ''; return; }
+    const note = el.dataset.note || v.note || '';
+    const tip = note
+        ? '<span class="tm-info-btn" data-tip="' + _esc(note) + '"><i class="ph-bold ph-info"></i></span>'
+        : '';
+    el.innerHTML = '<div class="sig-verdict" data-health="' + (v.health || 'up') + '">'
+        + '<i class="' + v.ic + ' sig-verdict-ic"></i>'
+        + '<span class="sig-verdict-txt">' + _esc(v.txt) + '</span>'
+        + '<span class="sig-verdict-items">' + (v.flags || []).map(_tvFlag).join('') + '</span>'
+        + '<span class="sig-verdict-meta">' + (v.meta || '') + tip + '</span></div>';
+}
+
+function renderProviderVerdict(prefix, routes, mws) {
+    const mountId = prefix + 'Verdict';
+    if (!document.getElementById(mountId)) return;
+    if (!routes || !routes.length) { _tvStrip(mountId, null); return; }
+    const err = routes.filter(r => r.status && r.status !== 'enabled').length;
+    const by = p => routes.filter(r => r._proto === p).length;
+    const flags = [];
+    const h = by('HTTP'), t = by('TCP'), u = by('UDP');
+    if (h) flags.push({ cls: 'd-off', ic: 'ph-bold ph-globe', n: h, label: 'HTTP' });
+    if (t) flags.push({ cls: 'd-off', ic: 'ph-bold ph-arrows-left-right', n: t, label: 'TCP' });
+    if (u) flags.push({ cls: 'd-off', ic: 'ph-bold ph-broadcast', n: u, label: 'UDP' });
+    if (err) flags.push({ cls: 'd-bad', ic: 'ph-fill ph-warning-octagon', n: err, label: 'not serving' });
+    if (mws && mws.length) flags.push({ cls: 'd-off', ic: 'ph-bold ph-stack', n: mws.length,
+        label: mws.length === 1 ? 'middleware' : 'middlewares' });
+    _tvStrip(mountId, {
+        health: err ? 'down' : 'up',
+        ic: err ? 'ph-fill ph-warning-octagon' : 'ph-fill ph-check-circle',
+        txt: err ? _sdNum(err) + (err === 1 ? ' route' : ' routes') + ' not serving'
+                 : _sdNum(routes.length) + (routes.length === 1 ? ' route' : ' routes') + ' live',
+        flags,
+        meta: '<b>read-only</b>',
+    });
+}
+
 function renderProviderMiddlewareSection(middlewares, containerId) {
     const el = document.getElementById(containerId);
     if (!el) return;

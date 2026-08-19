@@ -32,6 +32,7 @@ async function refreshHttpProviderTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return mwProv === 'http'; });
+        renderProviderVerdict('httpProvider', _allHttpProviderRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'httpProviderMiddlewares');
         setTabCount('http_provider', _allHttpProviderRoutes.length);
         renderHttpProviderRoutes();

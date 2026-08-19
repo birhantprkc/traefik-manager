@@ -32,6 +32,7 @@ async function refreshZookeeperTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return mwProv === 'zookeeper'; });
+        renderProviderVerdict('zookeeper', _allZookeeperRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'zookeeperMiddlewares');
         setTabCount('zookeeper', _allZookeeperRoutes.length);
         renderZookeeperRoutes();

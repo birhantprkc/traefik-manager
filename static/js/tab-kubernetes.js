@@ -34,6 +34,7 @@ async function refreshKubernetesTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return new Set(['kubernetescrd','kubernetes','kubernetesgateway']).has(mwProv); });
+        renderProviderVerdict('kubernetes', _allKubernetesRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'kubernetesMiddlewares');
         setTabCount('kubernetes', _allKubernetesRoutes.length);
         renderKubernetesRoutes();

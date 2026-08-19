@@ -336,6 +336,12 @@ List plugins defined under `experimental.plugins` in the static config. Requires
 
 ---
 
+### `GET /api/plugins/catalog`
+
+Latest known version per plugin module, as `{ "plugins": { "github.com/org/repo": "vX.Y.Z" } }`. Fetched from the Traefik plugin catalog and cached for 24 hours; returns an empty map when the catalog is unreachable.
+
+---
+
 ### `GET /api/traefik/certs`
 
 List TLS certificates from ACME (`acme.json`) and file-based (`tls.yml`) sources. Requires `ACME_JSON_PATH`.

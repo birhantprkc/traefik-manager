@@ -36,6 +36,7 @@ async function refreshFileExternalTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return mwProv === 'file'; });
+        renderProviderVerdict('fileExternal', _allFileExternalRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'fileExternalMiddlewares');
         setTabCount('file_external', _allFileExternalRoutes.length);
         renderFileExternalRoutes();

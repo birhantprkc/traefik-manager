@@ -32,6 +32,7 @@ async function refreshEcsTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return mwProv === 'ecs'; });
+        renderProviderVerdict('ecs', _allEcsRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'ecsMiddlewares');
         setTabCount('ecs', _allEcsRoutes.length);
         renderEcsRoutes();

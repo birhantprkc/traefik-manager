@@ -2,6 +2,39 @@ let _allCerts   = [];
 
 function filterCerts() { renderCertCards(); }
 
+
+function renderCertsVerdict() {
+    if (!document.getElementById('certsVerdict')) return;
+    if (!_allCerts.length) { _tvStrip('certsVerdict', null); return; }
+    const now = Date.now();
+    let critical = 0, expiring = 0, next = null;
+    _allCerts.forEach(c => {
+        if (!c.not_after) return;
+        const exp = new Date(c.not_after);
+        if (isNaN(exp)) return;
+        const d = Math.ceil((exp - now) / 86400000);
+        if (d < 7) critical++;
+        else if (d < 30) expiring++;
+        if (next === null || d < next) next = d;
+    });
+    const resolvers = new Set(_allCerts.map(c => c.resolver).filter(Boolean)).size;
+    const flags = [{ cls: 'd-off', ic: 'ph-bold ph-shield-check', n: _allCerts.length,
+                     label: _allCerts.length === 1 ? 'certificate' : 'certificates' }];
+    if (critical) flags.push({ cls: 'd-bad', ic: 'ph-fill ph-warning-octagon', n: critical, label: 'under 7d' });
+    if (expiring) flags.push({ cls: 'd-warn', ic: 'ph-fill ph-hourglass-high', n: expiring, label: 'under 30d' });
+    if (!critical && !expiring) flags.push({ cls: 'd-on', ic: 'ph-bold ph-check', n: '', label: 'none expiring soon' });
+    if (resolvers > 1) flags.push({ cls: 'd-off', ic: 'ph-bold ph-certificate', n: resolvers, label: 'resolvers' });
+    _tvStrip('certsVerdict', {
+        health: critical ? 'down' : expiring ? 'warn' : 'up',
+        ic: critical ? 'ph-fill ph-warning-octagon' : expiring ? 'ph-fill ph-hourglass-high' : 'ph-fill ph-check-circle',
+        txt: critical ? _sdNum(critical) + ' expiring within 7 days'
+           : expiring ? _sdNum(expiring) + ' expiring within 30 days'
+           : 'All certificates healthy',
+        flags,
+        meta: next !== null ? 'next expiry in <b>' + _sdNum(next) + 'd</b>' : '',
+    });
+}
+
 function renderCertCards() {
     const q   = (document.getElementById('certsSearch')?.value || '').toLowerCase();
     const now = Date.now();
@@ -83,6 +116,7 @@ async function refreshCertsTab() {
 
         _allCerts = certs;
         setTabCount('certs', certs.length);
+        renderCertsVerdict();
         renderCertCards();
     } catch(e) {
         container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>Could not load certificate data</p></div>`;

@@ -54,6 +54,7 @@ async function refreshDockerTab() {
 
         setTabCount('docker', _allDockerRoutes.length);
         const dockerMws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => (m.provider || (m.name||'').split('@')[1]) === 'docker');
+        renderProviderVerdict('docker', _allDockerRoutes, dockerMws);
         renderProviderMiddlewareSection(dockerMws, 'dockerMiddlewares');
         renderDockerRoutes();
     } catch(e) {

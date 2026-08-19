@@ -32,6 +32,7 @@ async function refreshRedisTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return mwProv === 'redis'; });
+        renderProviderVerdict('redis', _allRedisRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'redisMiddlewares');
         setTabCount('redis', _allRedisRoutes.length);
         renderRedisRoutes();

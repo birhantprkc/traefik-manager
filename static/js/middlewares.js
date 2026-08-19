@@ -743,7 +743,14 @@ async function refreshPluginsTab() {
 
         _allPlugins = plugins;
         setTabCount('plugins', plugins.length);
+        _pluginCatalog = {};
+        renderPluginsVerdict();
         renderPluginCards();
+        fetch('/api/plugins/catalog').then(r => r.json()).then(d => {
+            _pluginCatalog = d.plugins || {};
+            renderPluginsVerdict();
+            renderPluginCards();
+        }).catch(() => {});
     } catch(e) {
         container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>Could not load plugin data</p></div>`;
     }
@@ -946,6 +953,43 @@ function _tmPluginUsage(name) {
     return (_allMiddlewares || []).filter(m => /(^|\n)\s*plugin\s*:/.test(m.yaml || '') && re.test(m.yaml || '')).length;
 }
 
+
+let _pluginCatalog = {};
+
+function _pluginLatest(p) {
+    const mod = (p.moduleName || '').trim().toLowerCase();
+    const latest = mod && _pluginCatalog[mod];
+    if (!latest || !p.version) return null;
+    const norm = v => String(v).replace(/^v/, '');
+    if (typeof compareVersions === 'function' && compareVersions(norm(latest), norm(p.version)) > 0) return latest;
+    return null;
+}
+
+function renderPluginsVerdict() {
+    if (!document.getElementById('pluginsVerdict')) return;
+    if (!_allPlugins.length) { _tvStrip('pluginsVerdict', null); return; }
+    const updates = _allPlugins.filter(p => _pluginLatest(p)).length;
+    const used = _allPlugins.filter(p => (_tmPluginUsage(p.name || '') || []).length).length;
+    const unused = _allPlugins.length - used;
+    const known = Object.keys(_pluginCatalog).length > 0;
+    const flags = [{ cls: 'd-off', ic: 'ph-bold ph-puzzle-piece', n: _allPlugins.length,
+                     label: _allPlugins.length === 1 ? 'plugin' : 'plugins' }];
+    if (used) flags.push({ cls: 'd-on', ic: 'ph-bold ph-plugs-connected', n: used, label: 'in use' });
+    if (unused) flags.push({ cls: 'd-off', ic: 'ph-bold ph-plugs', n: unused, label: 'unused' });
+    if (updates) flags.push({ cls: 'd-warn', ic: 'ph-fill ph-arrow-circle-up', n: updates,
+                              label: updates === 1 ? 'update available' : 'updates available' });
+    else if (known) flags.push({ cls: 'd-on', ic: 'ph-bold ph-check', n: '', label: 'all current' });
+    _tvStrip('pluginsVerdict', {
+        health: updates ? 'warn' : 'up',
+        ic: updates ? 'ph-fill ph-arrow-circle-up' : 'ph-fill ph-check-circle',
+        txt: updates ? _sdNum(updates) + (updates === 1 ? ' update available' : ' updates available')
+           : known ? 'All plugins current'
+           : _sdNum(_allPlugins.length) + (_allPlugins.length === 1 ? ' plugin' : ' plugins'),
+        flags,
+        meta: known ? 'catalog checked <b>daily</b>' : '',
+    });
+}
+
 function renderPluginCards() {
     const q = (document.getElementById('pluginsSearch')?.value || '').toLowerCase();
     const items = _allPlugins.filter(p =>
@@ -960,6 +1004,7 @@ function renderPluginCards() {
         const idx        = _allPlugins.indexOf(p);
         const name       = p.name || 'Unknown';
         const version    = p.version || '-';
+        const latest     = _pluginLatest(p);
         const moduleName = p.moduleName || '';
         const repoUrl    = moduleName.startsWith('github.com/') ? 'https://' + moduleName : '';
         const mgmtBtns   = _pluginCanManage ? `
@@ -979,7 +1024,7 @@ function renderPluginCards() {
                 <span class="tm-ic tm-ic-tile"><i class="ph-bold ph-puzzle-piece"></i></span>
                 <div class="tm-head-txt">
                     <div class="tm-title"><span class="tm-name">${_esc(name)}</span></div>
-                    <div class="tm-sub">${_esc(version.startsWith('v') ? version : 'v' + version)}</div>
+                    <div class="tm-sub">${_esc(version.startsWith('v') ? version : 'v' + version)}${latest ? ` <span class="sig-flag d-warn lg-static" style="margin-left:4px" title="Update available: change the version in traefik.yml and restart Traefik"><i class="ph-fill ph-arrow-circle-up"></i><b>${_esc(latest)}</b></span>` : ''}</div>
                 </div>${rail}
             </div>
             ${moduleName ? `<div class="tm-vals"><div class="tm-val"><i class="ph-bold ph-package"></i><span class="tm-v" title="${_esc(moduleName)}">${_esc(moduleName)}</span>${_tmCopy(moduleName)}</div></div>` : ''}

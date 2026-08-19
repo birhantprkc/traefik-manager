@@ -32,6 +32,7 @@ async function refreshSwarmTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return mwProv === 'swarm'; });
+        renderProviderVerdict('swarm', _allSwarmRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'swarmMiddlewares');
         setTabCount('swarm', _allSwarmRoutes.length);
         renderSwarmRoutes();

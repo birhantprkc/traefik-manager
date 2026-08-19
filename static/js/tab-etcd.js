@@ -32,6 +32,7 @@ async function refreshEtcdTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return mwProv === 'etcd'; });
+        renderProviderVerdict('etcd', _allEtcdRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'etcdMiddlewares');
         setTabCount('etcd', _allEtcdRoutes.length);
         renderEtcdRoutes();

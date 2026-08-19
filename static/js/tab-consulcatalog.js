@@ -32,6 +32,7 @@ async function refreshConsulCatalogTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return mwProv === 'consulcatalog'; });
+        renderProviderVerdict('consulcatalog', _allConsulCatalogRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'consulcatalogMiddlewares');
         setTabCount('consulcatalog', _allConsulCatalogRoutes.length);
         renderConsulCatalogRoutes();
