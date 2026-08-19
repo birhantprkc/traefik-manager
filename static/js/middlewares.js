@@ -969,7 +969,7 @@ function renderPluginsVerdict() {
     if (!document.getElementById('pluginsVerdict')) return;
     if (!_allPlugins.length) { _tvStrip('pluginsVerdict', null); return; }
     const updates = _allPlugins.filter(p => _pluginLatest(p)).length;
-    const used = _allPlugins.filter(p => (_tmPluginUsage(p.name || '') || []).length).length;
+    const used = _allPlugins.filter(p => _tmPluginUsage(p.name || '') > 0).length;
     const unused = _allPlugins.length - used;
     const known = Object.keys(_pluginCatalog).length > 0;
     const flags = [{ cls: 'd-off', ic: 'ph-bold ph-puzzle-piece', n: _allPlugins.length,
