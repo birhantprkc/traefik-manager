@@ -57,7 +57,8 @@ def test_basic_credentials_are_form_encoded(client, monkeypatch):
     """RFC 6749 2.3.1: form-encode before base64. Authentik percent-decodes what it receives,
     so a raw secret containing % arrives corrupted and the exchange fails."""
     _enable(secret='se%2Fcret+w')
-    state, nonce = _start(client, monkeypatch)
+    state, nonce = _start(client, monkeypatch,
+                          disc=_discovery(token_endpoint_auth_methods_supported=['client_secret_basic']))
 
     seen = {}
 
