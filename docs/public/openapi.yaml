@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Traefik Manager API
-  version: 1.10.2
+  version: 1.10.3
   description: |
     REST API powering the Traefik Manager web UI and official mobile app.
 
@@ -2712,7 +2712,7 @@ paths:
             schema:
               type: object
               properties:
-                version: { type: string, example: "1.10.2" }
+                version: { type: string, example: "1.10.3" }
                 product: { type: string, enum: [manager, traefik] }
       responses:
         "401": { $ref: '#/components/responses/Unauthorized' }
