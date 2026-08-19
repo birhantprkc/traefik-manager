@@ -48,6 +48,44 @@
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
                 </button>
                 <div class="settings-mobile-section">Infrastructure</div>
+                <div id="staticMobileGroup" style="display:none">
+                    <button class="settings-mobile-row" onclick="switchSettingsPanel('static')">
+                        <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-file-code" style="color:var(--muted)"></i>Static Config</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'entrypoints')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-door-open" style="color:var(--muted)"></i>Entrypoints</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'providers')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-cloud" style="color:var(--muted)"></i>Providers</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'resolvers')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-certificate" style="color:var(--muted)"></i>Cert Resolvers</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'api')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-gauge" style="color:var(--muted)"></i>API &amp; Dashboard</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'log')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-scroll" style="color:var(--muted)"></i>Logging</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'observability')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-heartbeat" style="color:var(--muted)"></i>Observability</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'system')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-gear-six" style="color:var(--muted)"></i>System</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'plugins')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-plug" style="color:var(--muted)"></i>Plugins</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                </div>
                 <button class="settings-mobile-row" id="msb-backups-mobile" onclick="switchSettingsPanel('backups'); loadBackups()">
                     <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-archive-box" style="color:var(--muted)"></i>Backups</span>
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
@@ -124,6 +162,16 @@
                 <button class="modal-sidebar-btn" id="msb-static" onclick="switchSettingsPanel('static', this)" style="display:none">
                     <i class="ph-bold ph-file-code"></i> Static Config
                 </button>
+                <div class="modal-sidebar-sub" id="mss-static">
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-entrypoints" onclick="openSettingsChild('static', 'entrypoints')"><i class="ph-bold ph-door-open"></i> Entrypoints</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-providers" onclick="openSettingsChild('static', 'providers')"><i class="ph-bold ph-cloud"></i> Providers</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-resolvers" onclick="openSettingsChild('static', 'resolvers')"><i class="ph-bold ph-certificate"></i> Cert Resolvers</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-api" onclick="openSettingsChild('static', 'api')"><i class="ph-bold ph-gauge"></i> API &amp; Dashboard</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-log" onclick="openSettingsChild('static', 'log')"><i class="ph-bold ph-scroll"></i> Logging</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-observability" onclick="openSettingsChild('static', 'observability')"><i class="ph-bold ph-heartbeat"></i> Observability</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-system" onclick="openSettingsChild('static', 'system')"><i class="ph-bold ph-gear-six"></i> System</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-plugins" onclick="openSettingsChild('static', 'plugins')"><i class="ph-bold ph-plug"></i> Plugins</button>
+                </div>
                 <button class="modal-sidebar-btn" id="msb-backups" onclick="switchSettingsPanel('backups', this); loadBackups()">
                     <i class="ph-bold ph-archive-box"></i> Backups
                 </button>

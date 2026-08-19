@@ -394,9 +394,10 @@ async function _loadAboutAgentInfo() {
 }
 
 const SETTINGS_CHILDREN = {
-    system:  { first: 'tabs',     switch: (k) => switchSystemTab(k) },
-    auth:    { first: 'password', switch: (k) => switchAuthTab(k) },
-    backups: { first: 'routes',   switch: (k) => switchBackupTab(k) },
+    system:  { first: 'tabs',        switch: (k) => switchSystemTab(k) },
+    auth:    { first: 'password',    switch: (k) => switchAuthTab(k) },
+    backups: { first: 'routes',      switch: (k) => switchBackupTab(k) },
+    static:  { first: 'entrypoints', switch: (k) => switchStaticSettingsSection(k) },
 };
 
 function openSettingsChild(parent, child) {

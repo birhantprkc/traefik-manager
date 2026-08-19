@@ -407,6 +407,8 @@ function applyStaticPlacement(mode) {
     const mount = document.getElementById('staticSettingsMount');
     const home = document.querySelector('main');
     if (sidebarBtn) sidebarBtn.style.display = (mode === 'settings' && _staticAvailable) ? '' : 'none';
+    const mobileGroup = document.getElementById('staticMobileGroup');
+    if (mobileGroup) mobileGroup.style.display = (mode === 'settings' && _staticAvailable) ? '' : 'none';
     document.documentElement.classList.toggle('tm-static-in-settings', mode === 'settings');
     ['off', 'settings', 'tab'].forEach(m => {
         document.getElementById('scPlace-' + m)?.classList.toggle('active-http', m === mode);

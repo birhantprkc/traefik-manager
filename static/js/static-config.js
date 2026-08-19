@@ -2251,6 +2251,7 @@ async function _loadStaticFromDisk() {
         initStaticDirtyTracking();
         _renderStaticSections(data.parsed || {});
         _renderEpRuntimeWarning();
+        _applyStaticSettingsView();
         requestAnimationFrame(_updateStaticTabArrows);
     } catch(e) {
         wrapper.innerHTML = `<div class="text-center py-16" style="color:var(--muted)">
@@ -2260,6 +2261,38 @@ async function _loadStaticFromDisk() {
 }
 
 let _staticLoadedFor = null;
+
+let _staticSettingsChild = 'entrypoints';
+
+function _staticInSettings() {
+    return document.documentElement.classList.contains('tm-static-in-settings');
+}
+
+function switchStaticSettingsSection(key) {
+    _staticSettingsChild = key;
+    _staticActiveSection = key;
+    _applyStaticSettingsView();
+    const panel = document.getElementById('mpanel-static');
+    if (panel) panel.scrollTop = 0;
+}
+
+function _applyStaticSettingsView() {
+    const q = (document.getElementById('staticSearch')?.value || '').trim();
+    if (q) return;
+    const inSettings = _staticInSettings();
+    const key = _staticSettingsChild;
+    document.querySelectorAll('#staticSettingsContent .sc-grp').forEach(g => {
+        g.style.display = inSettings ? 'none' : '';
+    });
+    document.querySelectorAll('#staticSettingsContent [data-sc-sec]').forEach(el => {
+        const on = !inSettings || el.dataset.scSec === key;
+        el.style.display = on ? '' : 'none';
+        if (el.classList.contains('sc-fold')) {
+            el.classList.toggle('open',
+                (inSettings && el.dataset.scSec === key) || _scFoldOpen(el.dataset.scSec));
+        }
+    });
+}
 
 function _scMarkSectionDirty(el) {
     const sec = el.closest ? el.closest('.sc-sec, [id^="staticPanel-"]') : null;
@@ -2297,6 +2330,7 @@ function rerenderStaticBody() {
     _renderEpRuntimeWarning();
     _renderStaticStateBar();
     filterStatic();
+    _applyStaticSettingsView();
 }
 
 function _filterStaticModern(q) {
@@ -2337,6 +2371,7 @@ function _filterStaticModern(q) {
     });
     const verdict = document.getElementById('staticVerdict');
     if (verdict) verdict.style.display = q ? 'none' : '';
+    if (!q) _applyStaticSettingsView();
     return shown;
 }
 
@@ -2368,6 +2403,7 @@ function openStaticTab() {
     }
     const tip = document.getElementById('staticTrustedIpsWrap');
     if (tip) tip.style.display = '';
+    _applyStaticSettingsView();
 }
 
 async function refreshStaticTab() {
