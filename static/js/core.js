@@ -365,6 +365,34 @@ function _dState(state) {
     return `<span class="d-state d-flat ${cls}"><span class="status-dot ${dot}"></span>${_esc(state || 'Unknown')}</span>`;
 }
 
+function renderSection(title, icon, rows) {
+    const rowsHtml = rows.map(([key, val, isHtml]) => {
+        const displayVal = isHtml ? val
+            : `<span class="font-mono" style="color:var(--text)">${String(val).replace(/</g, '&lt;')}</span>`;
+        return `<div class="detail-key">${key}</div><div class="detail-val">${displayVal}</div>`;
+    }).join('');
+    return `<div class="detail-section">
+        <div class="detail-section-header">
+            <i class="ph-bold ${icon} sc-sec-icon" style="color:var(--blue)"></i>
+            <span class="sc-sec-label">${_esc(title)}</span>
+            <span class="sc-sec-rule"></span>
+        </div>
+        <div class="detail-kv">${rowsHtml}</div>
+    </div>`;
+}
+
+function renderDetailBlock(title, icon, bodyHtml, badgeHtml) {
+    return `<div class="detail-section">
+        <div class="detail-section-header">
+            <i class="ph-bold ${icon} sc-sec-icon" style="color:var(--blue)"></i>
+            <span class="sc-sec-label">${_esc(title)}</span>
+            ${badgeHtml || ''}
+            <span class="sc-sec-rule"></span>
+        </div>
+        <div class="detail-body">${bodyHtml}</div>
+    </div>`;
+}
+
 function _dCount(n) {
     return `<span class="d-n">${n}</span>`;
 }

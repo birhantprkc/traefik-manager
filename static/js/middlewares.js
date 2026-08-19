@@ -678,6 +678,15 @@ function _mwOpenSibling(name) {
     openMwDetail(fakeBtn);
 }
 
+function _openMwByName(name) {
+    const bare = String(name).split('@')[0];
+    const hit = (_allMiddlewares || []).find(m => String(m.name).split('@')[0] === bare);
+    if (!hit) return;
+    const fakeBtn = document.createElement('button');
+    fakeBtn.setAttribute('data-mw', JSON.stringify(hit));
+    openMwDetail(fakeBtn);
+}
+
 function _mwRoutesUsing(mw) {
     const pool = window._lastRenderedApps || (typeof APP_DATA !== 'undefined' ? APP_DATA : []) || [];
     const bare = String(mw.name).split('@')[0];
@@ -696,24 +705,22 @@ function _mwChainsUsing(mw) {
 function renderMwDetailPanel(mw) {
     const rows = [];
 
-    const row = (label, val) => val ? `<div class="flex gap-3 py-2.5" style="border-bottom:1px solid var(--border)"><div class="text-xs font-semibold uppercase tracking-wider w-28 flex-shrink-0 pt-0.5" style="color:var(--muted)">${label}</div><div class="text-sm font-mono break-all" style="color:var(--text)">${val}</div></div>` : '';
-
     const kind = ((mw.yaml || '').match(/^([\w-]+)\s*:/m) || [])[1] || '';
     const pluginName = kind === 'plugin'
         ? (((mw.yaml || '').match(/^\s+([\w-]+)\s*:/m) || [])[1] || '')
         : '';
 
-    rows.push(row('Name', _esc(mw.name)));
-    if (kind) rows.push(row('Type', _esc(kind) + (pluginName ? ` <span style="color:var(--muted)">(${_esc(pluginName)})</span>` : '')));
-    if (mw.type) rows.push(row('Protocol', (mw.type || '').toUpperCase()));
-    if (mw.provider && mw.provider !== 'file') rows.push(row('Provider', _esc(mw.provider)));
-    if (mw.status && mw.status !== 'enabled') rows.push(row('Status', `<span style="color:var(--red)">${_esc(mw.status)}</span>`));
-    if (mw.error) rows.push(row('Error', `<span style="color:var(--red)">${_esc(Array.isArray(mw.error) ? mw.error.join(', ') : mw.error)}</span>`));
-    if (mw.configFile) rows.push(row('Config File', _esc(mw.configFile)));
+    rows.push(['Name', _dText(mw.name), true]);
+    if (kind) rows.push(['Type', _dText(kind) + (pluginName ? ` <span class="d-flat d-off">(${_esc(pluginName)})</span>` : ''), true]);
+    if (mw.type) rows.push(['Protocol', _dText((mw.type || '').toUpperCase()), true]);
+    if (mw.provider && mw.provider !== 'file') rows.push(['Provider', _dText(mw.provider, 'd-off'), true]);
+    if (mw.status && mw.status !== 'enabled') rows.push(['Status', `<span class="d-flat" style="color:var(--red)">${_esc(mw.status)}</span>`, true]);
+    if (mw.error) rows.push(['Error', `<span class="d-flat" style="color:var(--red)">${_esc(Array.isArray(mw.error) ? mw.error.join(', ') : mw.error)}</span>`, true]);
+    if (mw.configFile) rows.push(['Config File', _dText(mw.configFile, 'd-off'), true]);
 
     const routes = _mwRoutesUsing(mw);
     const chains = _mwChainsUsing(mw);
-    let usedHtml = '<div class="mt-4"><div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--muted)">Used by</div>';
+    let usedHtml = '';
     if (!routes.length && !chains.length) {
         usedHtml += '<div class="text-xs" style="color:var(--yellow)">Not referenced by any route</div>';
     } else {
@@ -726,14 +733,15 @@ function renderMwDetailPanel(mw) {
                 + `<i class="ph-bold ph-stack"></i>${_esc(c.name.split('@')[0])}</button>`).join('')
             + '</div>';
     }
-    usedHtml += '</div>';
+    usedHtml = renderDetailBlock('Used by', 'ph-stack', usedHtml);
 
     let yamlHtml = '';
     if (mw.yaml) {
-        yamlHtml = `<div class="mt-4"><div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--muted)">Configuration</div><div class="rounded-lg p-4 overflow-x-auto" style="background:var(--input-bg);border:1px solid var(--border)"><pre class="text-xs font-mono leading-relaxed whitespace-pre-wrap" style="color:var(--green)">${_esc(mw.yaml)}</pre></div></div>`;
+        yamlHtml = renderDetailBlock('Configuration', 'ph-code',
+            `<div class="rounded-lg p-3 overflow-x-auto" style="background:var(--input-bg);border:1px solid var(--border)"><pre class="text-xs font-mono leading-relaxed whitespace-pre-wrap" style="color:var(--green);margin:0">${_esc(mw.yaml)}</pre></div>`);
     }
 
-    return `<div>${rows.join('')}</div>${usedHtml}${yamlHtml}`;
+    return `${renderSection('Details', 'ph-info', rows)}${usedHtml}${yamlHtml}`;
 }
 
 let _allPlugins = [];
@@ -1128,40 +1136,22 @@ function openPluginDetail(idx) {
         ...(repoUrl ? [['Repository', `<a href="${_esc(repoUrl)}" target="_blank" style="color:var(--blue)">${_esc(repoUrl)} <i class="ph-bold ph-arrow-square-out text-sm"></i></a>`]] : []),
     ];
 
-    const rowsHtml = rows.map(([k, v]) =>
-        `<div class="detail-key">${_esc(k)}</div><div class="detail-val"><span class="font-mono" style="color:var(--text)">${v}</span></div>`
-    ).join('');
+    const infoRows = rows.map(([k, v]) =>
+        [_esc(k), `<span class="font-mono" style="color:var(--text)">${v}</span>`, true]);
 
     const settingsSection = p.settings ? `
-        <div class="detail-section mb-4 mt-4">
-            <div class="flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-                <i class="ph-bold ph-sliders text-sm" style="color:var(--blue)"></i>
-                <span class="font-bold text-sm" style="color:var(--text)">Configuration Schema</span>
-            </div>
-            <pre class="text-xs font-mono p-4 leading-relaxed overflow-x-auto" style="color:var(--muted);max-height:300px">${JSON.stringify(p.settings, null, 2).replace(/</g,'&lt;')}</pre>
-        </div>` : '';
+        ${renderDetailBlock('Configuration Schema', 'ph-sliders',
+            `<pre class="text-xs font-mono leading-relaxed overflow-x-auto" style="color:var(--muted);max-height:300px;margin:0">${JSON.stringify(p.settings, null, 2).replace(/</g,'&lt;')}</pre>`)}` : '';
 
     const mws = _pluginMwsUsing(name);
     const usedSection = `
-        <div class="detail-section mb-4 mt-4">
-            <div class="flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-                <i class="ph-bold ph-stack text-sm" style="color:var(--blue)"></i>
-                <span class="font-bold text-sm" style="color:var(--text)">Used by</span>
-            </div>
-            <div class="p-4">${mws.length
-                ? '<div class="flex flex-wrap gap-1.5">' + mws.map(m =>
-                    `<button type="button" class="route-deep-chip" onclick="_pluginOpenMw('${_esc(m.name)}')" title="Open middleware"><i class="ph-bold ph-stack"></i>${_esc(m.name.split('@')[0])}</button>`).join('') + '</div>'
-                : '<span class="text-xs" style="color:var(--yellow)">No middleware references this plugin</span>'}</div>
-        </div>`;
+        ${renderDetailBlock('Used by', 'ph-stack', mws.length
+            ? '<div class="flex flex-wrap gap-1.5">' + mws.map(m =>
+                `<button type="button" class="route-deep-chip" onclick="_pluginOpenMw('${_esc(m.name)}')" title="Open middleware"><i class="ph-bold ph-stack"></i>${_esc(m.name.split('@')[0])}</button>`).join('') + '</div>'
+            : '<span class="text-xs" style="color:var(--yellow)">No middleware references this plugin</span>')}`;
 
     document.getElementById('pluginDetailBody').innerHTML = `
-        <div class="detail-section mb-4">
-            <div class="flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-                <i class="ph-bold ph-info text-sm" style="color:var(--blue)"></i>
-                <span class="font-bold text-sm" style="color:var(--text)">Plugin Info</span>
-            </div>
-            <div class="detail-kv">${rowsHtml}</div>
-        </div>
+        ${renderSection('Plugin Info', 'ph-info', infoRows)}
         ${usedSection}
         ${settingsSection}`;
 

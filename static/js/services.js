@@ -344,50 +344,19 @@ function openSvcDetail(idx) {
     
     const usedBy = s.usedBy || [];
     const usedByHtml = usedBy.length > 0
-        ? _dList(usedBy, 'd-blue')
+        ? `<div class="flex flex-wrap gap-1.5">${usedBy.map(r =>
+            `<button type="button" class="route-deep-chip" onclick="_openRouteByName('${_esc(String(r))}')" title="Open route"><i class="ph-bold ph-arrows-split"></i>${_esc(String(r).split('@')[0])}</button>`).join('')}</div>`
         : `<span class="text-xs" style="color:var(--muted)">-</span>`;
 
-    const kv = (label, val, isHtml = false) => `
-        <div class="flex items-start py-2.5" style="border-bottom:1px solid var(--border)">
-            <div class="text-xs font-semibold uppercase tracking-wider w-40 shrink-0 pt-0.5" style="color:var(--muted)">${label}</div>
-            <div class="text-sm ${isHtml ? '' : 'font-mono'} flex-1" style="color:var(--text)">${isHtml ? val : val}</div>
-        </div>`;
-
-    body.innerHTML = `
-        
-        <div class="mb-5">
-            <div class="flex items-center gap-2 mb-3">
-                <i class="ph-bold ph-info" style="color:var(--blue)"></i>
-                <span class="text-xs font-bold uppercase tracking-wider" style="color:var(--muted)">Service Details</span>
-            </div>
-            <div class="card p-0 overflow-hidden">
-                <div class="px-4">
-                    ${kv('Type', type)}
-                    ${kv('Provider', _dText(provider, 'd-off'), true)}
-                    ${kv('Status', statusBadge, true)}
-                    ${kv('Pass Host Header', passHostHeader === '-' ? '-' : _dBool(passHostHeader === 'true'), true)}
-                </div>
-            </div>
-        </div>
-
-        
-        <div class="mb-5">
-            <div class="flex items-center gap-2 mb-3">
-                <i class="ph-bold ph-globe" style="color:var(--green)"></i>
-                <span class="text-xs font-bold uppercase tracking-wider" style="color:var(--muted)">Servers</span>
-                ${_dCount(servers.length)}
-            </div>
-            <div class="card p-0 overflow-hidden">${serversHtml}</div>
-        </div>
-
-        
-        <div class="mb-5">
-            <div class="flex items-center gap-2 mb-3">
-                <i class="ph-bold ph-git-branch" style="color:var(--purple)"></i>
-                <span class="text-xs font-bold uppercase tracking-wider" style="color:var(--muted)">Used by Routers</span>
-            </div>
-            <div class="card px-4 py-3">${usedByHtml}</div>
-        </div>`;
+    body.innerHTML =
+        renderSection('Service Details', 'ph-info', [
+            ['Type', type, false],
+            ['Provider', _dText(provider, 'd-off'), true],
+            ['Status', statusBadge, true],
+            ['Pass Host Header', passHostHeader === '-' ? '-' : _dBool(passHostHeader === 'true'), true],
+        ])
+        + renderDetailBlock('Servers', 'ph-globe', serversHtml, _dCount(servers.length))
+        + renderDetailBlock('Used by Routers', 'ph-git-branch', usedByHtml);
 
     backdrop.classList.add('open');
     panel.classList.add('open');

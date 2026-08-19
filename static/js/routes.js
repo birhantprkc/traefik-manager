@@ -1785,6 +1785,15 @@ function openRouteDetailFromCard(card) {
     if (!appData) return;
     openRouteDetail(appData.name, appData.protocol, appData);
 }
+function _openRouteByName(name) {
+    const bare = String(name).split('@')[0];
+    const pool = window._lastRenderedApps || APP_DATA || [];
+    const a = pool.find(x => x.name === name)
+        || pool.find(x => String(x.name).split('@')[0] === bare);
+    if (!a) return;
+    openRouteDetail(a.name, (a.protocol || 'http').toLowerCase(), a);
+}
+
 let _liveRoutersCache = null;
 let _liveServicesCache = null;
 let _liveEntrypointsCache = null;
@@ -1920,9 +1929,7 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
         ? serversList.map(s => `<div class="font-mono text-xs break-all mt-1 px-2 py-1 rounded" style="color:var(--green);background:var(--input-bg);word-break:break-all">${_esc(s.url || s.address || '-')}</div>`).join('')
         : `<div class="font-mono text-xs break-all mt-1 px-2 py-1 rounded" style="color:var(--green);background:var(--input-bg);word-break:break-all">${_esc(app.target)}</div>`;
 
-    const flowHtml = `
-    <div class="mb-5">
-        <div class="text-xs font-bold uppercase tracking-wider mb-3" style="color:var(--muted)">Traffic Flow</div>
+    const flowHtml = renderDetailBlock('Traffic Flow', 'ph-flow-arrow', `
         <div class="flex items-stretch gap-2 flow-diagram-row">
             <div class="flex flex-col gap-2 flex-1">${epBoxes}</div>
             <div class="flow-arrow">→</div>
@@ -1938,8 +1945,7 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
                 <div class="font-bold text-sm truncate" style="color:var(--text)">${_esc(app.service_name)}</div>
                 <div class="mt-2">${serversHtml}</div>
             </div>
-        </div>
-    </div>`;
+        </div>`);
 
     
     const rule = liveRouter ? liveRouter.rule : app.rule;
@@ -1973,26 +1979,15 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
     const mws = (liveRouter ? liveRouter.middlewares : app.middlewares) || [];
     let mwSection = '';
     if (protocol !== 'udp') {
-        if (mws.length > 0) {
-            const mwHtml = `<div class="p-4">${_dList(mws, 'd-mw')}</div>`;
-            mwSection = `<div class="detail-section mb-4">
-                <div class="detail-section-header flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-                    <i class="ph-bold ph-plugs-connected text-sm" style="color:var(--purple)"></i>
-                    <span class="font-bold text-sm" style="color:var(--text)">Middlewares</span>
-                    ${_dCount(mws.length)}
-                </div>${mwHtml}</div>`;
-        } else {
-            mwSection = `<div class="detail-section mb-4">
-                <div class="detail-section-header flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-                    <i class="ph-bold ph-plugs-connected text-sm" style="color:var(--purple)"></i>
-                    <span class="font-bold text-sm" style="color:var(--text)">Middlewares</span>
-                </div>
-                <div class="p-6 text-center" style="color:var(--muted)">
+        const mwBody = mws.length > 0
+            ? `<div class="flex flex-wrap gap-1.5">${mws.map(m =>
+                `<button type="button" class="route-deep-chip" onclick="_openMwByName('${_esc(String(m))}')" title="Open middleware"><i class="ph-bold ph-plugs-connected"></i>${_esc(String(m).split('@')[0])}</button>`).join('')}</div>`
+            : `<div class="text-center py-3" style="color:var(--muted)">
                     <i class="ph-light ph-stack text-2xl block mb-1 opacity-30"></i>
                     <p class="text-xs">No middlewares configured</p>
-                </div>
-            </div>`;
-        }
+                </div>`;
+        mwSection = renderDetailBlock('Middlewares', 'ph-plugs-connected', mwBody,
+            mws.length > 0 ? _dCount(mws.length) : '');
     }
 
     
@@ -2028,14 +2023,8 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
                     <span style="color:var(--text);text-align:right;word-break:break-all">${String(v).replace(/</g,'&lt;')}</span>
                 </div>`
             ).join('');
-            labelsSection = `<div class="detail-section mb-4">
-                <div class="flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-                    <i class="ph-bold ph-tag text-sm" style="color:var(--blue)"></i>
-                    <span class="font-bold text-sm" style="color:var(--text)">Docker Labels</span>
-                    <span class="d-n ml-auto">${labelEntries.length}</span>
-                </div>
-                <div class="px-4 py-2">${labelRows}</div>
-            </div>`;
+            labelsSection = renderDetailBlock('Docker Labels', 'ph-tag', labelRows,
+                _dCount(labelEntries.length));
         }
     }
 
@@ -2051,17 +2040,4 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
     `;
 }
 
-function renderSection(title, icon, rows) {
-    const rowsHtml = rows.map(([key, val, isHtml]) => {
-        const displayVal = isHtml ? val : `<span class="font-mono" style="color:var(--text)">${String(val).replace(/</g,'&lt;')}</span>`;
-        return `<div class="detail-key">${key}</div><div class="detail-val">${displayVal}</div>`;
-    }).join('');
 
-    return `<div class="detail-section mb-4">
-        <div class="flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-            <i class="ph-bold ${icon} text-sm" style="color:var(--blue)"></i>
-            <span class="font-bold text-sm" style="color:var(--text)">${title}</span>
-        </div>
-        <div class="detail-kv">${rowsHtml}</div>
-    </div>`;
-}

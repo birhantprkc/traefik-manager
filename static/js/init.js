@@ -159,6 +159,9 @@ buildSideNav();
 _initDetailPanelSizers();
 
 (() => {
-    const nav = document.querySelector('nav');
-    if (nav) document.documentElement.style.setProperty('--tm-nav-h', nav.offsetHeight + 'px');
+    const nav = document.querySelector('nav.sticky') || document.querySelector('nav');
+    if (!nav) return;
+    const banner = document.getElementById('noAuthBanner');
+    const h = nav.offsetHeight + (banner ? banner.offsetHeight : 0);
+    document.documentElement.style.setProperty('--tm-nav-h', h + 'px');
 })();

@@ -227,31 +227,29 @@ function openTlsOptDetail(o) {
     closeOtherPanels('tlsOptDetailPanel');
     document.getElementById('tlsOptDetailTitle').textContent = o.name;
     document.getElementById('tlsOptDetailEditBtn').onclick = () => { closeTlsOptDetail(); openTlsOptionModal(o); };
-    const row = (label, val) => val ? `<div class="flex gap-3 py-2.5" style="border-bottom:1px solid var(--border)"><div class="text-xs font-semibold uppercase tracking-wider w-36 flex-shrink-0 pt-0.5" style="color:var(--muted)">${label}</div><div class="text-sm font-mono break-all" style="color:var(--text)">${val}</div></div>` : '';
-    const listRow = (label, items) => items?.length ? `<div class="py-2.5" style="border-bottom:1px solid var(--border)"><div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--muted)">${label}</div><div class="space-y-1">${items.map(v => `<div class="text-xs font-mono px-2 py-1 rounded" style="background:var(--input-bg);color:var(--green)">${_esc(v)}</div>`).join('')}</div></div>` : '';
     const rows = [
-        row('Config File',   _esc(o.configFile || '')),
-        row('Min Version',   o.minVersion ? _esc(o.minVersion) : ''),
-        row('Max Version',   o.maxVersion ? _esc(o.maxVersion) : ''),
-        row('SNI Strict',    o.sniStrict ? 'Yes' : ''),
-        listRow('Cipher Suites',    o.cipherSuites),
-        listRow('Curve Preferences', o.curvePreferences),
-        listRow('ALPN Protocols',   o.alpnProtocols),
-        row('Client Auth Type', o.clientAuthType && o.clientAuthType !== 'NoClientCert' ? _esc(o.clientAuthType) : ''),
-        listRow('CA Files', o.clientAuthCAs),
-    ].filter(Boolean).join('');
+        o.configFile && ['Config File', _dText(o.configFile, 'd-off'), true],
+        o.minVersion && ['Min Version', _dText(o.minVersion), true],
+        o.maxVersion && ['Max Version', _dText(o.maxVersion), true],
+        o.sniStrict && ['SNI Strict', _dBool(true), true],
+        o.cipherSuites?.length && ['Cipher Suites', _dList(o.cipherSuites, 'd-on'), true],
+        o.curvePreferences?.length && ['Curve Preferences', _dList(o.curvePreferences, 'd-on'), true],
+        o.alpnProtocols?.length && ['ALPN Protocols', _dList(o.alpnProtocols, 'd-on'), true],
+        (o.clientAuthType && o.clientAuthType !== 'NoClientCert') && ['Client Auth Type', _dText(o.clientAuthType), true],
+        o.clientAuthCAs?.length && ['CA Files', _dList(o.clientAuthCAs, 'd-on'), true],
+    ].filter(Boolean);
     const allRoutes = window._lastRenderedApps || APP_DATA || [];
     const usedBy = allRoutes.filter(r => r.tlsOptionsProfile === o.name);
-    const usedByHtml = `<div class="mt-5">
-        <div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--muted)">Used By</div>
-        ${usedBy.length ? usedBy.map(r => `<div class="flex items-center gap-2 py-2" style="border-bottom:1px solid var(--border)">
-            <span class="d-flat d-off">HTTP</span>
-            <span class="text-sm font-mono truncate" style="color:var(--text)">${_esc(r.name)}</span>
-            ${r.configFile ? `<span class="d-flat d-off ml-auto" style="flex-shrink:0">${_esc(r.configFile)}</span>` : ''}
-        </div>`).join('') : `<div class="text-xs py-2" style="color:var(--muted)">No routes using this profile.</div>`}
-    </div>`;
-    const yamlHtml = o.yaml ? `<div class="mt-5"><button onclick="const b=this.nextElementSibling;const open=b.style.display!=='none';b.style.display=open?'none':'block';this.querySelector('i').className='ph-bold '+(open?'ph-caret-right':'ph-caret-down')+' text-xs mr-1'" class="flex items-center text-xs mb-2" style="color:var(--muted);background:none;border:none;cursor:pointer;padding:0"><i class="ph-bold ph-caret-right text-xs mr-1"></i><span class="font-semibold uppercase tracking-wider">Raw YAML</span></button><div style="display:none"><div class="rounded-lg p-4 overflow-x-auto" style="background:var(--input-bg);border:1px solid var(--border)"><pre class="text-xs font-mono leading-relaxed" style="color:var(--green)">${_esc(o.yaml)}</pre></div></div></div>` : '';
-    document.getElementById('tlsOptDetailContent').innerHTML = `<div>${rows}</div>${usedByHtml}${yamlHtml}`;
+    const usedByHtml = renderDetailBlock('Used by', 'ph-arrows-split',
+        usedBy.length
+            ? `<div class="flex flex-wrap gap-1.5">${usedBy.map(r =>
+                `<button type="button" class="route-deep-chip" onclick="_openRouteByName('${_esc(String(r.name))}')" title="Open route"><i class="ph-bold ph-arrows-split"></i>${_esc(String(r.name).split('@')[0])}</button>`).join('')}</div>`
+            : `<div class="text-xs" style="color:var(--muted)">No routes using this profile.</div>`,
+        _dCount(usedBy.length));
+    const yamlHtml = o.yaml ? renderDetailBlock('Raw YAML', 'ph-code',
+        `<div class="rounded-lg p-3 overflow-x-auto" style="background:var(--input-bg);border:1px solid var(--border)"><pre class="text-xs font-mono leading-relaxed" style="color:var(--green);margin:0">${_esc(o.yaml)}</pre></div>`) : '';
+    document.getElementById('tlsOptDetailContent').innerHTML =
+        `${renderSection('Profile', 'ph-lock-laminated', rows)}${usedByHtml}${yamlHtml}`;
     document.getElementById('tlsOptDetailPanel').classList.add('open');
     setDetailDockOpen(true);
     document.getElementById('tlsOptDetailBackdrop').classList.add('open');
