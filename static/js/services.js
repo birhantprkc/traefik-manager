@@ -295,6 +295,7 @@ function renderServicesTable() {
 }
 
 function openSvcDetail(idx) {
+    closeOtherPanels('svcDetailPanel');
     const s = _allServices[idx];
     if (!s) return;
 

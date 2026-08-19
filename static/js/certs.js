@@ -224,6 +224,7 @@ function _tlsOptInfo(btn) {
 }
 
 function openTlsOptDetail(o) {
+    closeOtherPanels('tlsOptDetailPanel');
     document.getElementById('tlsOptDetailTitle').textContent = o.name;
     document.getElementById('tlsOptDetailEditBtn').onclick = () => { closeTlsOptDetail(); openTlsOptionModal(o); };
     const row = (label, val) => val ? `<div class="flex gap-3 py-2.5" style="border-bottom:1px solid var(--border)"><div class="text-xs font-semibold uppercase tracking-wider w-36 flex-shrink-0 pt-0.5" style="color:var(--muted)">${label}</div><div class="text-sm font-mono break-all" style="color:var(--text)">${val}</div></div>` : '';

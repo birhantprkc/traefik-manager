@@ -2246,6 +2246,7 @@ function updateServerSwitcher(agents) {
 let _editingTemplateId = null;
 
 function openTemplatesPanel() {
+    closeOtherPanels('mwTplPanel');
     const panel = document.getElementById('mwTplPanel');
     const back  = document.getElementById('mwTplBackdrop');
     if (!panel) return;

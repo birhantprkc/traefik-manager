@@ -624,6 +624,7 @@ function toggleMwView() {
 }
 
 function openMwDetail(btn) {
+    closeOtherPanels('mwDetailPanel');
     const mw = JSON.parse(btn.getAttribute('data-mw'));
     const panel = document.getElementById('mwDetailPanel');
     const backdrop = document.getElementById('mwDetailBackdrop');
@@ -1102,6 +1103,7 @@ function renderPluginCards() {
 }
 
 function openPluginDetail(idx) {
+    closeOtherPanels('pluginDetailPanel');
     const p = _allPlugins[idx];
     if (!p) return;
 

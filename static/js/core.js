@@ -139,6 +139,12 @@ const MODAL_CLOSERS = {
     trustedIpsModal: 'closeTrustedIpsModal',
     rmEditModal:     'rmCloseEditModal',
     rmGroupsModal:   'rmCloseGroupsModal',
+    mwDetailPanel:     'closeMwDetail',
+    svcDetailPanel:    'closeSvcDetail',
+    pluginDetailPanel: 'closePluginDetail',
+    logDetailPanel:    'closeLogDetail',
+    tlsOptDetailPanel: 'closeTlsOptDetail',
+    mwTplPanel:        'closeTemplatesPanel',
 };
 
 function closeOtherPanels(keepId) {
