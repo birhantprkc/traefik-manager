@@ -22,8 +22,9 @@ Routes, middlewares, certificates and logs, without editing YAML by hand.
 <sub>Built for homelabbers who love Traefik but hate editing YAML at 2am.</sub>
 
 <a href="https://traefik-manager.xyzlab.dev/ui-examples.html"><picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/public/images/readme-carousel-dark.gif">
-  <img src="docs/public/images/readme-carousel-light.gif" width="85%" alt="Traefik Manager">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/chr0nzz/traefik-manager/main/docs/public/images/readme-carousel-dark.gif">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/chr0nzz/traefik-manager/main/docs/public/images/readme-carousel-light.gif">
+  <img src="https://raw.githubusercontent.com/chr0nzz/traefik-manager/main/docs/public/images/readme-carousel-light.gif" width="85%" alt="Traefik Manager">
 </picture></a>
 
 </div>
