@@ -1004,10 +1004,19 @@ async function deletePlugin(name) {
     refreshPluginsTab();
 }
 
-function _tmPluginUsage(name) {
+function _pluginMwsUsing(name) {
     const esc = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const re = new RegExp('^\\s*' + esc + '\\s*:', 'm');
-    return (_allMiddlewares || []).filter(m => /(^|\n)\s*plugin\s*:/.test(m.yaml || '') && re.test(m.yaml || '')).length;
+    return (_allMiddlewares || []).filter(m => /(^|\n)\s*plugin\s*:/.test(m.yaml || '') && re.test(m.yaml || ''));
+}
+
+function _tmPluginUsage(name) {
+    return _pluginMwsUsing(name).length;
+}
+
+function _pluginOpenMw(name) {
+    if (typeof closePluginDetail === 'function') closePluginDetail();
+    _mwOpenSibling(name);
 }
 
 
@@ -1103,9 +1112,16 @@ function openPluginDetail(idx) {
 
     document.getElementById('pluginDetailTitle').textContent = name;
 
+    const latest = _pluginLatest(p);
+    const known = Object.keys(_pluginCatalog).length > 0;
+    const versionVal = latest
+        ? `${_esc(version)} <span class="sig-flag d-warn lg-static" style="margin-left:6px"><i class="ph-fill ph-arrow-circle-up"></i><b>${_esc(latest)} available</b></span>`
+        : known && _pluginCatalog[(moduleName || '').trim().toLowerCase()]
+        ? `${_esc(version)} <span style="color:var(--green)"><i class="ph-bold ph-check"></i> latest</span>`
+        : _esc(version);
     const rows = [
         ['Name',        _esc(name)],
-        ['Version',     _esc(version)],
+        ['Version',     versionVal],
         ['Module',      _esc(moduleName || '-')],
         ...(repoUrl ? [['Repository', `<a href="${_esc(repoUrl)}" target="_blank" style="color:var(--blue)">${_esc(repoUrl)} <i class="ph-bold ph-arrow-square-out text-sm"></i></a>`]] : []),
     ];
@@ -1123,6 +1139,19 @@ function openPluginDetail(idx) {
             <pre class="text-xs font-mono p-4 leading-relaxed overflow-x-auto" style="color:var(--muted);max-height:300px">${JSON.stringify(p.settings, null, 2).replace(/</g,'&lt;')}</pre>
         </div>` : '';
 
+    const mws = _pluginMwsUsing(name);
+    const usedSection = `
+        <div class="detail-section mb-4 mt-4">
+            <div class="flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
+                <i class="ph-bold ph-stack text-sm" style="color:var(--blue)"></i>
+                <span class="font-bold text-sm" style="color:var(--text)">Used by</span>
+            </div>
+            <div class="p-4">${mws.length
+                ? '<div class="flex flex-wrap gap-1.5">' + mws.map(m =>
+                    `<button type="button" class="route-deep-chip" onclick="_pluginOpenMw('${_esc(m.name)}')" title="Open middleware"><i class="ph-bold ph-stack"></i>${_esc(m.name.split('@')[0])}</button>`).join('') + '</div>'
+                : '<span class="text-xs" style="color:var(--yellow)">No middleware references this plugin</span>'}</div>
+        </div>`;
+
     document.getElementById('pluginDetailBody').innerHTML = `
         <div class="detail-section mb-4">
             <div class="flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
@@ -1131,6 +1160,7 @@ function openPluginDetail(idx) {
             </div>
             <div class="detail-kv">${rowsHtml}</div>
         </div>
+        ${usedSection}
         ${settingsSection}`;
 
     document.getElementById('pluginDetailPanel').classList.add('open');
