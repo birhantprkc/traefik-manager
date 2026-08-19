@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if setup_mode %}Set Up Traefik Manager{% elif force_change_mode %}Change Password - Traefik Manager{% else %}Sign In - Traefik Manager{% endif %}</title>
+    <title>{% if reset_mode %}Set a New Password - Traefik Manager{% elif setup_mode %}Set Up Traefik Manager{% elif force_change_mode %}Change Password - Traefik Manager{% else %}Sign In - Traefik Manager{% endif %}</title>
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon.png">
     <link rel="preload" href="/static/vendor/phosphor/Phosphor-Bold.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/static/vendor/phosphor/Phosphor-Fill.woff2" as="font" type="font/woff2" crossorigin>
@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version }}">
     <script>
         (function() {
-            var t = localStorage.getItem('tm-theme') || '{{ default_theme }}' || 'dark';
+            var t = '{{ default_theme }}' || localStorage.getItem('tm-theme') || 'dark';
             var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             var isDark = t === 'dark' || (t === 'system' && prefersDark);
             document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -202,13 +202,6 @@
 {% if force_change_mode %}
 
 <div style="width:100%;max-width:380px">
-    <div class="topbar">
-        <button class="theme-toggle" onclick="cycleTheme()" title="Toggle theme">
-            <i class="ph-bold ph-moon tm-theme-icon" data-pref="dark"></i>
-            <i class="ph-bold ph-sun tm-theme-icon" data-pref="light"></i>
-            <i class="ph-bold ph-desktop tm-theme-icon" data-pref="system"></i>
-        </button>
-    </div>
     <div class="card card-login">
         <div class="logo">
             <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
@@ -254,13 +247,6 @@
 {% elif otp_mode %}
 
 <div style="width:100%;max-width:380px">
-    <div class="topbar">
-        <button class="theme-toggle" onclick="cycleTheme()" title="Toggle theme">
-            <i class="ph-bold ph-moon tm-theme-icon" data-pref="dark"></i>
-            <i class="ph-bold ph-sun tm-theme-icon" data-pref="light"></i>
-            <i class="ph-bold ph-desktop tm-theme-icon" data-pref="system"></i>
-        </button>
-    </div>
     <div class="card card-login">
         <div class="logo">
             <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
@@ -307,13 +293,6 @@
 {% elif not setup_mode %}
 
 <div style="width:100%;max-width:380px">
-    <div class="topbar">
-        <button class="theme-toggle" onclick="cycleTheme()" title="Toggle theme">
-            <i class="ph-bold ph-moon tm-theme-icon" data-pref="dark"></i>
-            <i class="ph-bold ph-sun tm-theme-icon" data-pref="light"></i>
-            <i class="ph-bold ph-desktop tm-theme-icon" data-pref="system"></i>
-        </button>
-    </div>
     <div class="card card-login">
         <div class="logo">
             <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
@@ -388,6 +367,48 @@
 
 {% else %}
 
+{% if reset_mode %}
+<div style="width:100%;max-width:380px">
+    <div class="card card-login">
+        <div class="logo">
+            <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
+            <span class="logo-text">Traefik <span>Manager</span></span>
+        </div>
+        <div class="step-title">Set a new password</div>
+        <p class="step-subtitle">Your password was reset. Choose a new one to get back in - nothing else about your
+        configuration has changed.</p>
+
+        {% if error %}
+        <div class="banner banner-error">
+            <i class="ph-bold ph-warning-circle" style="flex-shrink:0;margin-top:1px"></i>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('setup') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="field">
+                <label for="password">New password</label>
+                <input type="password" id="password" name="password" class="input-field"
+                       placeholder="At least 8 characters" autocomplete="new-password" required autofocus>
+            </div>
+            <div class="field">
+                <label for="confirm">Confirm password</label>
+                <input type="password" id="confirm" name="confirm" class="input-field"
+                       placeholder="Repeat your password" autocomplete="new-password" required>
+            </div>
+            <button type="submit" class="btn-primary" style="width:100%;margin-top:4px">
+                <i class="ph-bold ph-check"></i> Set password
+            </button>
+        </form>
+    </div>
+    <div class="footer">
+        <a href="https://github.com/traefik/traefik" target="_blank">Traefik</a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://github.com/chr0nzz/traefik-manager" target="_blank">Traefik Manager</a>
+    </div>
+</div>
+{% else %}
 <div class="wz-page">
     <div class="card wz-shell">
 
@@ -873,6 +894,7 @@
     </div>
 </div>
 {% endif %}
+{% endif %}
 
 <script>
 
@@ -884,14 +906,14 @@ function applyTheme(t) {
     document.documentElement.setAttribute('data-tm-pref', t);
 }
 function cycleTheme() {
-    const cur  = localStorage.getItem(THEME_KEY) || 'dark';
+    const cur  = document.documentElement.getAttribute('data-tm-pref') || 'dark';
     const next = cur === 'dark' ? 'light' : cur === 'light' ? 'system' : 'dark';
     localStorage.setItem(THEME_KEY, next);
     applyTheme(next);
 }
-applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+applyTheme('{{ default_theme }}' || localStorage.getItem(THEME_KEY) || 'dark');
 
-{% if setup_mode %}
+{% if setup_mode and not reset_mode %}
 
 const TEMP_PW_MODE = {{ 'true' if temp_password_mode else 'false' }};
 let currentStep = 0;

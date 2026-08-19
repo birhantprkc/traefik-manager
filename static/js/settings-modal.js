@@ -467,6 +467,7 @@ function settingsMobileBack() {
 }
 
 async function openSettingsModal(panel) {
+    closeOtherPanels('settingsModal');
     document.documentElement.classList.add('tm-settings-open');
     document.getElementById('settingsSavedNotice').classList.add('hidden');
     document.getElementById('apiTestResult').textContent = '';
@@ -1542,7 +1543,9 @@ async function testOidcProvider() {
         });
         const data = await res.json();
         if (result) {
-            result.textContent = data.ok ? `Connected - issuer: ${data.issuer}` : `Error: ${data.error}`;
+            result.textContent = data.ok
+                ? `Provider reachable - issuer: ${data.issuer}. Credentials are not checked until you sign in.`
+                : `Error: ${data.error}`;
             result.style.color = data.ok ? 'var(--green)' : 'var(--red)';
         }
     } catch(e) {

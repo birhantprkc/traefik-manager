@@ -34,6 +34,7 @@ function rmRenderGroupsList() {
 }
 
 window.rmOpenGroupsModal = function() {
+    closeOtherPanels('rmGroupsModal');
     _rmEditingGroupIdx = -1;
     rmRenderGroupsList();
     rmRenderHiddenList();
@@ -65,7 +66,7 @@ window.rmRenderHiddenList = function() {
         el.innerHTML = '<div class="lg-note">Nothing is hidden. Use the pencil on a card to hide it.</div>';
         return;
     }
-    const all = window._rmAllRoutes || [];
+    const all = (typeof _rmAllRoutes !== 'undefined' ? _rmAllRoutes : []);
     const plain = v => String(v).includes('::') ? String(v).split('::').slice(1).join('::') : String(v);
     el.innerHTML = ids.map(id => {
         const r = all.find(x => x.id === id);
@@ -145,8 +146,19 @@ let _rmEditRouteId   = null;
 let _rmEditIconType  = 'auto';
 
 window.rmOpenEditModal = function(routeId) {
+    closeOtherPanels('rmEditModal');
     _rmEditRouteId = routeId;
     const ov = (_rmConfig.route_overrides || {})[routeId] || {};
+
+    const route = (typeof _rmAllRoutes !== 'undefined' ? _rmAllRoutes : [])
+        .find(r => r.id === routeId);
+    const title = document.getElementById('rmEditModalTitle');
+    if (title) {
+        const shown = ov.display_name || (route && route.name)
+            || (String(routeId).includes('::') ? String(routeId).split('::').slice(1).join('::') : routeId);
+        title.textContent = shown || 'Card settings';
+        title.title = routeId;
+    }
 
     document.getElementById('rmEditDisplayName').value = ov.display_name || '';
     document.getElementById('rmEditUrl').value = ov.url || '';
@@ -888,8 +900,8 @@ function _dskBind() {
         if (!e.target || typeof e.target.closest !== 'function') return;
         const t = e.target.closest('[data-dsk]');
         if (!t || t.hasAttribute('disabled')) return;
-        const root = document.getElementById('tab-dashboard');
-        if (!root || !root.contains(t)) return;
+        const scopes = ['tab-dashboard', 'rmGroupsModal', 'rmEditModal'];
+        if (!scopes.some(id => document.getElementById(id)?.contains(t))) return;
         e.preventDefault();
         e.stopPropagation();
         _dskGo(_dskParse(t.getAttribute('data-dsk')));

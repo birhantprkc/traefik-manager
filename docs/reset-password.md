@@ -90,62 +90,25 @@ Use this if you cannot exec into the container (e.g. the container won't start).
 nano /path/to/traefik-manager/config/manager.yml
 ```
 
-**2. Remove or blank the password hash and mark setup incomplete:**
+**2. Add the reset flag:**
 
 ```yaml
-password_hash: ""
-setup_complete: false
+setup_password_reset: true
 ```
 
 **3. Restart:**
 
-:::tabs
-== Docker
 ```bash
-docker restart traefik-manager
+docker compose restart traefik-manager
 ```
 
-== Podman
-```bash
-podman restart traefik-manager
-```
-
-== Unraid
-Docker tab → click the Traefik Manager toggle to stop, then start it again.
-
-== Linux (native)
-```bash
-systemctl restart traefik-manager
-```
-:::
-
-A new temporary password is auto-generated and printed to the logs:
-
-:::tabs
-== Docker
-```bash
-docker compose logs traefik-manager | grep -A3 "AUTO-GENERATED"
-```
-
-== Podman
-```bash
-podman logs traefik-manager | grep -A3 "AUTO-GENERATED"
-```
-
-== Unraid
-Docker tab → click the Traefik Manager icon → **Log** to view the container output.
-
-== Linux (native)
-```bash
-journalctl -u traefik-manager | grep -A3 "AUTO-GENERATED"
-```
-:::
+**4. Open Traefik Manager.** You are asked for a new password and nothing else. The flag clears itself
+once the password is set.
 
 ::: warning
-Setting `setup_complete: false` will re-run the setup wizard after login. Your existing routes and settings are not affected - just complete the wizard again.
+While the flag is set, anyone who can reach Traefik Manager can set the password. Restart, set the new
+password, and confirm you are signed in.
 :::
-
----
 
 ## Method 3 - Pre-set a known password
 

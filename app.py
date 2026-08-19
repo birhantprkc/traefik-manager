@@ -1,6 +1,9 @@
 import os
 import re
 import time
+import base64
+import hashlib
+from urllib.parse import quote
 import shutil
 import secrets
 import threading
@@ -617,13 +620,52 @@ def setup():
 
     current = load_settings()
 
-    if current.get('setup_complete', False):
-        if current.get('must_change_password', False):
-            return redirect(url_for('force_change_password'))
-        return redirect(url_for('index'))
+    # A password reset skips the wizard entirely: only the password step is shown, and the flag
+    # clears itself once a new password is set. Everything else in manager.yml is left alone.
+    reset_mode = bool(current.get('setup_password_reset', False))
 
-    if _has_password_set() and not session.get('authenticated'):
-        return redirect(url_for('login'))
+    if not reset_mode:
+        if current.get('setup_complete', False):
+            if current.get('must_change_password', False):
+                return redirect(url_for('force_change_password'))
+            return redirect(url_for('index'))
+
+        if _has_password_set() and not session.get('authenticated'):
+            return redirect(url_for('login'))
+
+    if reset_mode and request.method == 'POST':
+        _check_csrf()
+        new_pw  = request.form.get('password', '')
+        confirm = request.form.get('confirm', '')
+        err = None
+        if len(new_pw) < 8:
+            err = 'Password must be at least 8 characters.'
+        elif new_pw != confirm:
+            err = 'Passwords do not match.'
+        if err:
+            return render_template('login.html', setup_mode=True, reset_mode=True,
+                                   error=err, csrf_token=_get_csrf_token(),
+                                   defaults={'domains': current['domains'],
+                                             'cert_resolver': current['cert_resolver'],
+                                             'traefik_api_url': current['traefik_api_url']},
+                                   temp_password_mode=False,
+                                   detected_self_domain='', detected_self_svc='',
+                                   detected_self_entry_point='')
+        save_settings(
+            domains=current['domains'],
+            cert_resolver=current['cert_resolver'],
+            traefik_api_url=current['traefik_api_url'],
+            auth_enabled=current.get('auth_enabled', True),
+            password_hash=_hash_password(new_pw),
+            visible_tabs=current['visible_tabs'],
+            must_change_password=False,
+            setup_password_reset=False,
+        )
+        session.clear()
+        session['authenticated'] = True
+        session['login_time'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')
+        logger.warning(f"Password reset completed from {request.remote_addr}")
+        return redirect(url_for('index'))
 
     temp_password_mode = current.get('must_change_password', False) and bool(current.get('password_hash', ''))
 
@@ -734,6 +776,7 @@ def setup():
     detected_domain, detected_svc = _detect_setup_self_route()
     detected_entry_point = load_settings().get('self_route', {}).get('entry_point', '') or _best_entrypoint()
     return render_template('login.html', setup_mode=True, error=error,
+                           reset_mode=reset_mode,
                            defaults=defaults, csrf_token=_get_csrf_token(),
                            temp_password_mode=temp_password_mode,
                            detected_self_domain=detected_domain,
@@ -851,6 +894,7 @@ def reset_password_cli(disable_otp):
         password_hash=_hash_password(password),
         visible_tabs=settings['visible_tabs'],
         must_change_password=True,
+        setup_password_reset=True,
         setup_complete=settings.get('setup_complete', True),
         otp_secret='' if disable_otp else None,
         otp_enabled=False if disable_otp else None,
@@ -4118,7 +4162,11 @@ def api_route_raw_save(route_id):
         try:
             with open(tmp, 'w') as f:
                 f.write(yaml_content)
-            shutil.copyfile(tmp, target_path)
+                f.flush()
+                os.fsync(f.fileno())
+            if os.path.exists(target_path):
+                shutil.copystat(target_path, tmp)
+            os.replace(tmp, target_path)
         finally:
             try:
                 os.unlink(tmp)
@@ -4894,13 +4942,21 @@ def oidc_login():
     groups_claim = s.get('oidc_groups_claim', '').strip()
     if s.get('oidc_allowed_groups', '').strip() and groups_claim and groups_claim not in scopes:
         scopes.append(groups_claim)
+    # PKCE (RFC 7636). Public clients require it - Authentik rejects the exchange without it -
+    # and it is harmless for confidential clients, so it is always sent.
+    verifier  = secrets.token_urlsafe(64)
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode('ascii')).digest()).decode('ascii').rstrip('=')
+    session['oidc_verifier'] = verifier
     auth_params = {
-        'response_type': 'code',
-        'client_id':     s.get('oidc_client_id', ''),
-        'redirect_uri':  redirect_uri,
-        'scope':         ' '.join(scopes),
-        'state':         state,
-        'nonce':         nonce,
+        'response_type':         'code',
+        'client_id':             s.get('oidc_client_id', ''),
+        'redirect_uri':          redirect_uri,
+        'scope':                 ' '.join(scopes),
+        'state':                 state,
+        'nonce':                 nonce,
+        'code_challenge':        challenge,
+        'code_challenge_method': 'S256',
     }
     if silent:
         auth_params['prompt'] = 'none'
@@ -4935,14 +4991,83 @@ def oidc_callback():
         flash("OIDC provider unavailable.", "error")
         return redirect(url_for('login'))
     try:
-        token_resp = requests.post(cfg['token_endpoint'], data={
+        client_id     = s.get('oidc_client_id', '')
+        client_secret = s.get('oidc_client_secret', '')
+        payload = {
             'grant_type':   'authorization_code',
             'code':         code,
             'redirect_uri': url_for('oidc_callback', _external=True),
-            'client_id':    s.get('oidc_client_id', ''),
-            'client_secret': s.get('oidc_client_secret', ''),
-        }, timeout=10)
-        token_resp.raise_for_status()
+            'code_verifier': session.pop('oidc_verifier', ''),
+        }
+        # OIDC Core makes client_secret_basic the default when a client registers no method, and
+        # Authelia and Authentik follow it. Sending the secret in the body against a Basic client
+        # gets a bare 400 invalid_client, so honour what the provider advertises and retry with
+        # the other method rather than leaving the user to guess.
+        # The authorization code is single-use (RFC 6749 4.1.2), so there is exactly one attempt.
+        # A retry with the other method re-sends a spent code and the provider answers "authorization
+        # code has already been used", which hides the real error. Pick the method and commit to it.
+        supported = cfg.get('token_endpoint_auth_methods_supported') or []
+
+        def _post_basic():
+            # RFC 6749 section 2.3.1 requires the id and secret to be form-encoded BEFORE they are
+            # base64'd into the Basic header. requests does not do that, and providers that follow
+            # the RFC percent-decode what they receive, so a secret containing % or + would arrive
+            # corrupted.
+            basic = base64.b64encode(
+                f"{quote(client_id, safe='')}:{quote(client_secret, safe='')}".encode()
+            ).decode()
+            return requests.post(cfg['token_endpoint'], data=payload,
+                                 headers={'Authorization': f'Basic {basic}'}, timeout=8)
+
+        def _post_body():
+            return requests.post(
+                cfg['token_endpoint'],
+                data=dict(payload, client_id=client_id, client_secret=client_secret), timeout=8)
+
+        if not client_secret:
+            # Public client: no secret exists, so send none. PKCE is what proves the caller.
+            # An empty Basic header is what makes providers answer invalid_client.
+            token_resp = requests.post(
+                cfg['token_endpoint'], data=dict(payload, client_id=client_id), timeout=8)
+        else:
+            # Try the advertised method first, then the other one. This is safe because a provider
+            # rejects the client before it looks at the code, so a failed attempt does not consume
+            # it - the retry is only ever taken on invalid_client, never on invalid_grant.
+            order = ([_post_body, _post_basic]
+                     if 'client_secret_post' in supported and 'client_secret_basic' not in supported
+                     else [_post_basic, _post_body])
+            token_resp = order[0]()
+            if token_resp.status_code >= 400:
+                try:
+                    first_err = (token_resp.json() or {}).get('error', '')
+                except Exception:
+                    first_err = ''
+                if first_err == 'invalid_client':
+                    logger.info(
+                        "OIDC client authentication rejected, retrying with the other method")
+                    token_resp = order[1]()
+                    if token_resp.status_code >= 400:
+                        logger.error(
+                            "OIDC rejected both client authentication methods. "
+                            "TM sent client_id=%r, a secret of %d characters, to %s. "
+                            "Compare that client_id and secret length against the provider.",
+                            client_id, len(client_secret), cfg['token_endpoint'])
+        if token_resp.status_code >= 400:
+            # The provider says exactly what is wrong in the body. Without this you get a bare
+            # "400 Bad Request" and no way to tell a wrong secret from a PKCE requirement.
+            detail = ''
+            try:
+                body = token_resp.json()
+                detail = str(body.get('error_description') or body.get('error') or '')
+            except Exception:
+                detail = (token_resp.text or '')[:300]
+            logger.error(
+                "OIDC token exchange rejected by the provider (HTTP %s): %s",
+                token_resp.status_code, detail or '(empty response body)')
+            flash(f"OIDC login failed - the provider rejected the token request: {detail}"
+                  if detail else "OIDC login failed - the provider rejected the token request.",
+                  "error")
+            return redirect(url_for('login'))
         tokens = token_resp.json()
     except Exception:
         logger.exception("OIDC token exchange failed")
@@ -4950,12 +5075,17 @@ def oidc_callback():
         return redirect(url_for('login'))
     id_token = tokens.get('id_token', '')
     expected_nonce = session.pop('oidc_nonce', '')
-    if id_token and expected_nonce:
+    id_claims = {}
+    if id_token:
         try:
-            import base64, json as _json
+            import json as _json
             payload_b64 = id_token.split('.')[1]
             payload_b64 += '=' * (-len(payload_b64) % 4)
             id_claims = _json.loads(base64.urlsafe_b64decode(payload_b64))
+        except Exception:
+            logger.warning("OIDC could not decode the id_token payload")
+    if id_token and expected_nonce:
+        try:
             if not secrets.compare_digest(str(id_claims.get('nonce', '')), expected_nonce):
                 logger.warning(f"OIDC nonce mismatch from {request.remote_addr}")
                 flash("OIDC login failed - nonce mismatch.", "error")
@@ -4963,14 +5093,31 @@ def oidc_callback():
         except Exception:
             logger.warning("OIDC id_token nonce verification skipped - could not decode token")
     access_token = tokens.get('access_token', '')
-    try:
-        userinfo_resp = requests.get(cfg['userinfo_endpoint'],
-                                     headers={'Authorization': f'Bearer {access_token}'}, timeout=10)
-        userinfo_resp.raise_for_status()
-        userinfo = userinfo_resp.json()
-    except Exception:
-        logger.exception("OIDC userinfo fetch failed")
-        flash("OIDC login failed - could not fetch user info.", "error")
+    # Best effort. Providers put the same claims in the id_token, so an unreachable or slow
+    # userinfo endpoint must not cost the user their login - and must not burn the request
+    # budget, since gunicorn kills the worker at 30s and takes the whole callback with it.
+    # Only call userinfo when the id_token is actually missing something. requests applies its
+    # timeout PER ADDRESS from getaddrinfo, not per call, so a host resolving to several
+    # unreachable addresses burns timeout x N and gunicorn kills the worker at 30s - taking the
+    # whole login with it. Skipping the call when the claims are already in hand removes that
+    # risk entirely for providers that populate the id_token, which is most of them.
+    groups_claim = str(s.get('oidc_groups_claim', '') or 'groups').strip()
+    need_email  = not str(id_claims.get('email', '')).strip()
+    need_groups = bool(str(s.get('oidc_allowed_groups', '')).strip()) and not id_claims.get(groups_claim)
+    userinfo = {}
+    if access_token and cfg.get('userinfo_endpoint') and (need_email or need_groups):
+        try:
+            userinfo_resp = requests.get(cfg['userinfo_endpoint'],
+                                         headers={'Authorization': f'Bearer {access_token}'},
+                                         timeout=(3, 5))
+            userinfo_resp.raise_for_status()
+            userinfo = userinfo_resp.json()
+        except Exception as e:
+            logger.warning("OIDC userinfo fetch failed (%s) - falling back to the id_token claims", e)
+    userinfo = {**id_claims, **userinfo} if (userinfo or id_claims) else {}
+    if not userinfo:
+        logger.error("OIDC login failed - no claims from userinfo or the id_token")
+        flash("OIDC login failed - the provider returned no account details.", "error")
         return redirect(url_for('login'))
     email  = str(userinfo.get('email', '')).strip().lower()
     name   = str(userinfo.get('name', userinfo.get('preferred_username', email))).strip()
@@ -5078,7 +5225,14 @@ def api_test_oidc():
         resp = requests.get(f"{url}/.well-known/openid-configuration", timeout=5)
         resp.raise_for_status()
         cfg = resp.json()
-        return jsonify({'ok': True, 'issuer': cfg.get('issuer', url)})
+        # This only proves the provider is reachable and advertises OIDC. The client ID and
+        # secret are never exercised here, so say so rather than implying a working login.
+        return jsonify({
+            'ok': True,
+            'issuer': cfg.get('issuer', url),
+            'checked': 'discovery only',
+            'note': 'Provider reachable. Credentials are not verified until you sign in.',
+        })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 

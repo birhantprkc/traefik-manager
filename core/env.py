@@ -2,7 +2,7 @@ import logging
 import os
 
 GITHUB_REPO = "chr0nzz/traefik-manager"
-APP_VERSION = "1.10.1"
+APP_VERSION = "1.10.2"
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
@@ -55,16 +55,40 @@ MULTI_CONFIG = len(CONFIG_PATHS) > 1
 ALLOWED_API_SCHEMES = ('http://', 'https://')
 
 
+STATIC_CONFIG_DIRS = []
+if os.environ.get('STATIC_CONFIG_PATH', '').strip():
+    STATIC_CONFIG_DIRS.append(os.environ['STATIC_CONFIG_PATH'].strip())
+
+
 def allowed_file_prefixes() -> tuple:
     return tuple(sorted(set(
         ['/app/',
          os.path.abspath(BACKUP_DIR) + '/',
          os.path.dirname(os.path.abspath(SETTINGS_PATH)) + '/'] +
-        [os.path.dirname(os.path.abspath(p)) + '/' for p in CONFIG_PATHS]
+        [os.path.dirname(os.path.abspath(p)) + '/' for p in CONFIG_PATHS] +
+        [os.path.dirname(os.path.abspath(p)) + '/' for p in STATIC_CONFIG_DIRS]
     )))
 
 
 ALLOWED_FILE_PREFIXES = allowed_file_prefixes()
+
+
+def register_static_path(path: str):
+    global STATIC_CONFIG_DIRS, ALLOWED_FILE_PREFIXES
+    if path and path not in STATIC_CONFIG_DIRS:
+        STATIC_CONFIG_DIRS = sorted(STATIC_CONFIG_DIRS + [path])
+        ALLOWED_FILE_PREFIXES = allowed_file_prefixes()
+
+
+READ_PATHS = []
+
+
+def register_read_path(path: str):
+    global READ_PATHS
+    for part in str(path or '').split(','):
+        part = part.strip()
+        if part and part not in READ_PATHS:
+            READ_PATHS = sorted(READ_PATHS + [part])
 
 
 def register_config_path(path: str):
