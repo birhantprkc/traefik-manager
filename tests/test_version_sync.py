@@ -29,6 +29,7 @@ def test_every_version_string_matches_app_version():
         'static/openapi.yaml': _find('openapi', r'^  version:\s*(\S+)', 'static', 'openapi.yaml'),
         'docs/public/openapi.yaml': _find('docs openapi', r'^  version:\s*(\S+)', 'docs', 'public', 'openapi.yaml'),
         'docs/.vitepress/config.ts': _find('docs nav', r"^\s+text: 'v(\d+\.\d+\.\d+)',", 'docs', '.vitepress', 'config.ts'),
+        'docs nav release link': _find('docs nav link', r"releases/tag/v(\d+\.\d+\.\d+)", 'docs', '.vitepress', 'config.ts'),
     }
     stale = {k: v for k, v in found.items() if v != want}
     assert not stale, (
