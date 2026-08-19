@@ -105,3 +105,40 @@ def test_invalid_client_retries_with_the_other_method(client, monkeypatch):
     monkeypatch.setattr('app.requests.post', _post)
     client.get(f'/auth/oidc/callback?code=abc&state={state}')
     assert attempts == ['body', 'basic'], attempts
+
+
+def test_invalid_grant_is_never_retried(client, monkeypatch):
+    state = _start(client, monkeypatch, methods=None)
+    calls = []
+
+    def _post(url, data=None, headers=None, **k):
+        calls.append(1)
+        return _Resp({'error': 'invalid_grant',
+                      'error_description': 'The authorization code has already been used.'},
+                     status=400)
+
+    monkeypatch.setattr('app.requests.post', _post)
+    client.get(f'/auth/oidc/callback?code=abc&state={state}')
+    assert len(calls) == 1, f'a spent code must not be re-sent, got {len(calls)}'
+
+
+def test_a_failed_retry_keeps_the_first_error(client, monkeypatch, caplog):
+    state = _start(client, monkeypatch, methods=None)
+    calls = []
+
+    def _post(url, data=None, headers=None, **k):
+        calls.append(1)
+        if len(calls) == 1:
+            return _Resp({'error': 'invalid_client',
+                          'error_description': 'wrong secret'}, status=401)
+        return _Resp({'error': 'invalid_grant',
+                      'error_description': 'The authorization code has already been used.'},
+                     status=400)
+
+    monkeypatch.setattr('app.requests.post', _post)
+    with caplog.at_level('ERROR'):
+        client.get(f'/auth/oidc/callback?code=abc&state={state}')
+    assert len(calls) == 2
+    assert 'wrong secret' in caplog.text, 'the first, truthful error must survive'
+    assert 'already been used' not in caplog.text, \
+        'the retry consuming the code must not replace the real error'

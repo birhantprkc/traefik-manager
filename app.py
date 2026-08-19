@@ -5018,7 +5018,16 @@ def oidc_callback():
                           and 'client_secret_post' not in supported)
             order = [_post_basic, _post_body] if basic_only else [_post_body, _post_basic]
             token_resp = order[0]()
-            if 400 <= token_resp.status_code < 500 and token_resp.status_code != 429:
+            first_err = ''
+            if token_resp.status_code >= 400:
+                try:
+                    first_err = (token_resp.json() or {}).get('error', '')
+                except Exception:
+                    first_err = ''
+            retryable = (400 <= token_resp.status_code < 500
+                         and token_resp.status_code != 429
+                         and first_err != 'invalid_grant')
+            if retryable:
                 logger.info(
                     "OIDC token exchange rejected with %s (HTTP %s), retrying with the other method",
                     'client_secret_basic' if basic_only else 'client_secret_post',
@@ -5026,8 +5035,6 @@ def oidc_callback():
                 retry = order[1]()
                 if retry.status_code < 400:
                     logger.info("OIDC token exchange succeeded on the second method")
-                    token_resp = retry
-                elif retry.status_code != token_resp.status_code:
                     token_resp = retry
                     if token_resp.status_code >= 400:
                         logger.error(
