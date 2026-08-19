@@ -1393,7 +1393,7 @@ html.tm-nav-collapsed .drawer-srv-head:hover .drawer-srv-mark { color: var(--tex
 }
 
 @media (min-width: 768px) {
-    nav.sticky { position: sticky !important; top: 0; z-index: 45; }
+    nav.sticky { position: sticky !important; top: 0; z-index: 70; }
     html .max-w-7xl { max-width: none; }
     main.max-w-7xl { margin-left: var(--side-nav-w, 232px); margin-right: 0; width: auto; align-self: stretch; transition: margin-left 0.15s ease, margin-right 0.3s cubic-bezier(0.4,0,0.2,1); }
     @media (min-width: 1440px) {
