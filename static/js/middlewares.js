@@ -661,21 +661,78 @@ function closeMwDetail() {
     document.body.style.overflow = '';
 }
 
+function _mwOpenRoute(id) {
+    const pool = window._lastRenderedApps || [];
+    const a = pool.find(x => String(x.id) === id);
+    if (!a) return;
+    closeMwDetail();
+    openRouteDetail(a.name, (a.protocol || 'http').toLowerCase(), a);
+}
+
+function _mwOpenSibling(name) {
+    const sib = (_allMiddlewares || []).find(m => m.name === name);
+    if (!sib) return;
+    const fakeBtn = document.createElement('button');
+    fakeBtn.setAttribute('data-mw', JSON.stringify(sib));
+    openMwDetail(fakeBtn);
+}
+
+function _mwRoutesUsing(mw) {
+    const pool = window._lastRenderedApps || (typeof APP_DATA !== 'undefined' ? APP_DATA : []) || [];
+    const bare = String(mw.name).split('@')[0];
+    const hit = x => String(x).split('@')[0] === bare;
+    return pool.filter(a => (a.middlewares || []).some(hit) || (a.entrypointMiddlewares || []).some(hit))
+        .map(a => ({ a, viaEp: !(a.middlewares || []).some(hit) }));
+}
+
+function _mwChainsUsing(mw) {
+    const bare = String(mw.name).split('@')[0];
+    const esc = bare.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('(^|[\\s\\[,\'"])' + esc + '(@[\\w.-]+)?([\\s\\],\'"]|$)', 'm');
+    return (_allMiddlewares || []).filter(o => o.name !== mw.name && re.test(o.yaml || ''));
+}
+
 function renderMwDetailPanel(mw) {
     const rows = [];
 
     const row = (label, val) => val ? `<div class="flex gap-3 py-2.5" style="border-bottom:1px solid var(--border)"><div class="text-xs font-semibold uppercase tracking-wider w-28 flex-shrink-0 pt-0.5" style="color:var(--muted)">${label}</div><div class="text-sm font-mono break-all" style="color:var(--text)">${val}</div></div>` : '';
 
+    const kind = ((mw.yaml || '').match(/^([\w-]+)\s*:/m) || [])[1] || '';
+    const pluginName = kind === 'plugin'
+        ? (((mw.yaml || '').match(/^\s+([\w-]+)\s*:/m) || [])[1] || '')
+        : '';
+
     rows.push(row('Name', _esc(mw.name)));
+    if (kind) rows.push(row('Type', _esc(kind) + (pluginName ? ` <span style="color:var(--muted)">(${_esc(pluginName)})</span>` : '')));
     if (mw.type) rows.push(row('Protocol', (mw.type || '').toUpperCase()));
+    if (mw.provider && mw.provider !== 'file') rows.push(row('Provider', _esc(mw.provider)));
+    if (mw.status && mw.status !== 'enabled') rows.push(row('Status', `<span style="color:var(--red)">${_esc(mw.status)}</span>`));
+    if (mw.error) rows.push(row('Error', `<span style="color:var(--red)">${_esc(Array.isArray(mw.error) ? mw.error.join(', ') : mw.error)}</span>`));
     if (mw.configFile) rows.push(row('Config File', _esc(mw.configFile)));
+
+    const routes = _mwRoutesUsing(mw);
+    const chains = _mwChainsUsing(mw);
+    let usedHtml = '<div class="mt-4"><div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--muted)">Used by</div>';
+    if (!routes.length && !chains.length) {
+        usedHtml += '<div class="text-xs" style="color:var(--yellow)">Not referenced by any route</div>';
+    } else {
+        usedHtml += '<div class="flex flex-wrap gap-1.5">'
+            + routes.map(({ a, viaEp }) =>
+                `<button type="button" class="route-deep-chip" onclick="_mwOpenRoute('${_esc(String(a.id))}')" title="${viaEp ? 'Attached via entry point' : 'Open route'}">`
+                + `<i class="ph-bold ${viaEp ? 'ph-arrows-in' : 'ph-arrows-split'}"></i>${_esc(a.name)}</button>`).join('')
+            + chains.map(c =>
+                `<button type="button" class="route-deep-chip" onclick="_mwOpenSibling('${_esc(c.name)}')" title="Referenced by this middleware">`
+                + `<i class="ph-bold ph-stack"></i>${_esc(c.name.split('@')[0])}</button>`).join('')
+            + '</div>';
+    }
+    usedHtml += '</div>';
 
     let yamlHtml = '';
     if (mw.yaml) {
         yamlHtml = `<div class="mt-4"><div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--muted)">Configuration</div><div class="rounded-lg p-4 overflow-x-auto" style="background:var(--input-bg);border:1px solid var(--border)"><pre class="text-xs font-mono leading-relaxed whitespace-pre-wrap" style="color:var(--green)">${_esc(mw.yaml)}</pre></div></div>`;
     }
 
-    return `<div>${rows.join('')}</div>${yamlHtml}`;
+    return `<div>${rows.join('')}</div>${usedHtml}${yamlHtml}`;
 }
 
 let _allPlugins = [];
