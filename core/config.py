@@ -1,3 +1,4 @@
+import errno
 import os
 import re
 import shutil
@@ -37,6 +38,23 @@ class ThreadLocalYAML:
 
 yaml = ThreadLocalYAML()
 yaml_safe = ThreadLocalYAML(typ='safe')
+
+
+_INPLACE_PATHS = set()
+
+
+def _replace_or_copy(tmp: str, path: str):
+    if os.path.exists(path):
+        shutil.copystat(path, tmp)
+    try:
+        os.replace(tmp, path)
+    except OSError as e:
+        if e.errno not in (errno.EBUSY, errno.EXDEV):
+            raise
+        if path not in _INPLACE_PATHS:
+            _INPLACE_PATHS.add(path)
+            logger.info(f"{path} is a bind-mounted file, writing through it in place")
+        shutil.copyfile(tmp, path)
 
 
 def safe_file_path(path: str) -> str:
@@ -176,9 +194,7 @@ def save_config(data, path=None):
             f.write(content)
             f.flush()
             os.fsync(f.fileno())
-        if os.path.exists(path):
-            shutil.copystat(path, tmp)
-        os.replace(tmp, path)
+        _replace_or_copy(tmp, path)
     finally:
         try:
             os.unlink(tmp)
