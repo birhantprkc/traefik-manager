@@ -1845,13 +1845,17 @@ async function openRouteDetail(name, protocol, appData) {
         ]);
 
         let liveRouter = null, liveService = null, entrypoints = [];
+        const apiState = { reachable: false, fileRouters: 0 };
 
-        if (routersRes.status === 'fulfilled') {
+        if (routersRes.status === 'fulfilled' && routersRes.value
+                && !routersRes.value.error && routersRes.value.reachable !== false) {
+            apiState.reachable = true;
             const allRouters = [
                 ...(routersRes.value.http || []),
                 ...(routersRes.value.tcp  || []),
                 ...(routersRes.value.udp  || []),
             ];
+            apiState.fileRouters = allRouters.filter(r => (r.provider || '') === 'file' || String(r.name || '').endsWith('@file')).length;
             liveRouter = allRouters.find(r => r.name && r.name.split('@')[0] === name);
         }
 
@@ -1869,10 +1873,10 @@ async function openRouteDetail(name, protocol, appData) {
             entrypoints = entrypointsRes.value || [];
         }
 
-        content.innerHTML = renderDetailPanel(appData, protocol, liveRouter, liveService, entrypoints);
+        content.innerHTML = renderDetailPanel(appData, protocol, liveRouter, liveService, entrypoints, apiState);
 
     } catch(e) {
-        content.innerHTML = renderDetailPanel(appData, protocol, null, null, []);
+        content.innerHTML = renderDetailPanel(appData, protocol, null, null, [], { reachable: false, fileRouters: 0 });
     }
 }
 
@@ -1887,7 +1891,7 @@ function closeRouteDetail() {
     document.body.style.overflow = '';
 }
 
-function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) {
+function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints, apiState) {
     const status = liveRouter ? liveRouter.status : null;
     const routerError = liveRouter ? (liveRouter.error || null) : null;
     const isDisabled = app.enabled === false;
@@ -1898,11 +1902,19 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
         ? `<div class="mt-4 p-3 rounded-lg text-xs font-mono leading-relaxed" style="color:var(--red);background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.25);word-break:break-word"><i class="ph-bold ph-warning-circle" style="margin-right:6px"></i>${_esc(routerError)}</div>`
         : '';
 
+    const isFileRoute = !app.provider || app.provider === 'file';
+    const _warnNote = html => `<div class="text-xs mb-5 p-2.5 rounded" style="color:var(--yellow);background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.2);line-height:1.6"><i class="ph-bold ph-warning text-sm" style="margin-right:5px"></i>${html}</div>`;
     const apiNote = liveRouter
         ? `<div class="flex items-center gap-1.5 text-xs mb-5" style="color:var(--muted)"><div style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></div> Live data from Traefik API</div>`
         : isDisabled
         ? `<div class="flex items-center gap-1.5 text-xs mb-5 p-2 rounded" style="color:var(--muted);background:var(--input-bg);border:1px solid var(--border)"><i class="ph-bold ph-pause-circle text-sm"></i> Not served by Traefik while disabled - showing your saved configuration</div>`
-        : `<div class="flex items-center gap-1.5 text-xs mb-5 p-2 rounded" style="color:var(--yellow);background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.2)"><i class="ph-bold ph-warning text-sm"></i> Traefik API unavailable - showing config file data only</div>`;
+        : !(apiState && apiState.reachable)
+        ? _warnNote(`<b>Traefik API unreachable</b> - showing your saved configuration. Check the API URL under Settings &gt; Connection, and that Traefik has <span class="font-mono">api: {}</span> enabled.`)
+        : isFileRoute && apiState.fileRouters === 0
+        ? _warnNote(`<b>Traefik is running but has loaded nothing from the file provider</b>, so this route is not being served. Traefik is most likely not watching the file Traefik Manager writes to - check that both containers mount the same config path and that <span class="font-mono">providers.file</span> points at it with <span class="font-mono">watch: true</span>. Showing your saved configuration.`)
+        : isFileRoute
+        ? _warnNote(`<b>Traefik has not loaded this route</b>, although other file-provider routes are live. If you saved it seconds ago, close and reopen. Otherwise check the Traefik logs for a config error${app.configFile ? `, and that <span class="font-mono">${_esc(app.configFile)}</span> is inside the watched path` : ''}. Showing your saved configuration.`)
+        : _warnNote(`<b>Traefik does not report this route</b> - showing your saved configuration.`);
 
     
     const routerEPs = (liveRouter ? liveRouter.entryPoints : app.entryPoints) || [];
