@@ -1762,7 +1762,12 @@ html.tm-nav-collapsed .drawer-srv-head:hover .drawer-srv-mark { color: var(--tex
 .sc-root .sc-set-stack #layoutSunsetNote { margin-top: 10px; }
 .sc-root .sc-panel + .text-xs:not(.hidden) { display: block; margin: 8px 2px 0; font: 400 10.5px/1.55 'JetBrains Mono', monospace; color: var(--muted); max-width: 76ch; }
 
-html.tm-static-in-settings #mpanel-static #staticFilterBar { padding: 0 0 10px; }
+html.tm-static-in-settings #mpanel-static #staticFilterBar { display: none; }
+.sc-root .sc-head-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sc-root .sc-head-row > .sc-sec-head { flex: 1; min-width: 0; margin-bottom: 0; }
+.sc-root .sc-head-row > .sc-fold-head { flex: 1; min-width: 0; }
+.sc-root .sc-head-actions { display: none; flex-shrink: 0; align-items: center; gap: 8px; }
+html.tm-static-in-settings .sc-root .sc-head-actions { display: flex; }
 html.tm-static-in-settings .sc-root .sc-fold-body { display: block; }
 html.tm-static-in-settings .sc-root .sc-fold-caret,
 html.tm-static-in-settings .sc-root .sc-fold-state { display: none; }

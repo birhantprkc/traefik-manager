@@ -1525,6 +1525,18 @@ function _scSectionHead(key, label, icon, color, countId, addLabel) {
     return `<div class="sc-sec-head" id="scHead-${key}"><i class="ph-bold ${icon} sc-sec-icon" style="color:${color}"></i><span class="sc-sec-label">${label}</span>${count}<span class="sc-sec-rule"></span>${add}</div>`;
 }
 
+function _scHeadActions() {
+    const grp = (fn, icon, title) =>
+        `<div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)">`
+        + `<button type="button" onclick="${fn}" class="proto-btn text-xs px-3 py-1.5" title="${title}">`
+        + `<i class="ph-bold ${icon}"></i></button></div>`;
+    return '<div class="sc-head-actions">'
+        + grp('openTrustedIpsHelper()', 'ph-shield-check', 'Add trusted proxy IPs to an entrypoint')
+        + grp('openStaticYamlPopout()', 'ph-code', 'Raw YAML editor')
+        + grp('refreshStaticTab()', 'ph-arrows-clockwise', 'Reload from disk')
+        + '</div>';
+}
+
 const SC_SECTIONS = [
     ['entrypoints',   'Entrypoints',           'ph-door-open',   'var(--blue)',   'staticEpCount',       'Entrypoint'],
     ['resolvers',     'Certificate resolvers', 'ph-certificate', 'var(--green)',  'staticResolverCount', 'Resolver'],
@@ -1589,10 +1601,14 @@ function _buildStaticOnePage() {
         if (warn && form) form.insertBefore(warn, form.firstChild);
         byKey[key] = _scIsList(key)
             ? `<section class="sc-sec" data-sc-sec="${key}">`
+                + '<div class="sc-head-row">'
                 + _scSectionHead(key, label, icon, color, countId, addLabel)
+                + _scHeadActions() + '</div>'
                 + panel.outerHTML + '</section>'
             : `<div class="sc-fold${_scFoldOpen(key) ? ' open' : ''}" id="scFold-${key}" data-sc-sec="${key}">`
+                + '<div class="sc-head-row">'
                 + _scFoldHead(key, label, icon, color, countId)
+                + _scHeadActions() + '</div>'
                 + '<div class="sc-fold-body">' + panel.outerHTML + '</div></div>';
     });
     return '<div id="staticVerdict"></div>'
