@@ -196,11 +196,12 @@ Copy the key that is printed - it is only shown once.
 ### Generating machine credentials (for alerts and unban)
 
 ```bash
-cscli machines add traefik-manager --auto
-cat /etc/crowdsec/local_api_credentials.yaml
+cscli machines add traefik-manager --auto -f-
 ```
 
-Copy the `login` and `password` from that file into the Machine Credentials fields (or the `CROWDSEC_MACHINE_ID` / `CROWDSEC_MACHINE_PASSWORD` env vars). If the machine shows as unvalidated, run `cscli machines validate traefik-manager`.
+Copy the `login` and `password` from the output into the Machine Credentials fields (or the `CROWDSEC_MACHINE_ID` / `CROWDSEC_MACHINE_PASSWORD` env vars). If the machine shows as unvalidated, run `cscli machines validate traefik-manager`.
+
+> `-f-` prints the credentials. Without it `cscli` overwrites `/etc/crowdsec/local_api_credentials.yaml`, which is what CrowdSec's own log processor logs in with.
 
 > **Compose gotcha**: if the machine password contains a `$`, escape it as `$$` in `docker-compose.yml` - Docker Compose treats a single `$` as a variable reference. No escaping is needed in the Settings UI.
 

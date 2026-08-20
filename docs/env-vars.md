@@ -652,7 +652,7 @@ Environment=CROWDSEC_API_KEY=your-bouncer-key
 **Default:** _(unset)_  
 **Fallback for:** `crowdsec_machine_id` / `crowdsec_machine_password` in `manager.yml` - the Settings values win while they have a value; clear those fields and these variables take over.
 
-CrowdSec machine credentials. Required to read **alerts** and to **unban** (delete decisions) from the CrowdSec tab - bouncer keys get `403 access forbidden` on those endpoints. Alerts are where every attack card on that tab comes from, so without these the tab can only show the bans already in force. The two credentials are complementary rather than tiered: CrowdSec refuses the machine token on `/v1/decisions`, so `CROWDSEC_API_KEY` is still needed alongside these. Create a machine with `cscli machines add traefik-manager --auto` and copy the `login` / `password` from `local_api_credentials.yaml`. The settings field values take priority over these env vars.
+CrowdSec machine credentials. Required to read **alerts** and to **unban** (delete decisions) from the CrowdSec tab - bouncer keys get `403 access forbidden` on those endpoints. Alerts are where every attack card on that tab comes from, so without these the tab can only show the bans already in force. The two credentials are complementary rather than tiered: CrowdSec refuses the machine token on `/v1/decisions`, so `CROWDSEC_API_KEY` is still needed alongside these. Create a machine with `cscli machines add traefik-manager --auto -f-` and copy the `login` / `password` from the output. The settings field values take priority over these env vars.
 
 :::tabs
 == Docker / Podman

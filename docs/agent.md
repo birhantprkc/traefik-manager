@@ -156,11 +156,12 @@ Run both on the machine hosting CrowdSec. In Docker, prefix with `docker exec <c
 
 ```bash
 cscli bouncers add traefik-manager
-cscli machines add traefik-manager --auto
-cat /etc/crowdsec/local_api_credentials.yaml
+cscli machines add traefik-manager --auto -f-
 ```
 
-The bouncer key is printed once - copy it immediately into `CROWDSEC_API_KEY`. The machine's `login` and `password` come from that credentials file and go into `CROWDSEC_MACHINE_ID` and `CROWDSEC_MACHINE_PASSWORD`. If the machine shows as unvalidated, run `cscli machines validate traefik-manager`.
+Both are printed once - copy the bouncer key into `CROWDSEC_API_KEY`, and the machine's `login` and `password` into `CROWDSEC_MACHINE_ID` and `CROWDSEC_MACHINE_PASSWORD`. If the machine shows as unvalidated, run `cscli machines validate traefik-manager`.
+
+> `-f-` prints the credentials. Without it `cscli` overwrites `/etc/crowdsec/local_api_credentials.yaml`, which is what CrowdSec's own log processor logs in with.
 
 ### What each credential gets you
 
@@ -289,11 +290,10 @@ Set both for the full CrowdSec tab. They are complementary, not tiered: the mach
 On the CrowdSec host, register a machine and let CrowdSec generate the credentials:
 
 ```bash
-sudo cscli machines add traefik-manager --auto
-sudo cat /etc/crowdsec/local_api_credentials.yaml
+sudo cscli machines add traefik-manager --auto -f-
 ```
 
-Copy the `login` and `password` from that file into `CROWDSEC_MACHINE_ID` and `CROWDSEC_MACHINE_PASSWORD`. If the machine shows as unvalidated, run `sudo cscli machines validate traefik-manager`.
+Copy the `login` and `password` from the output into `CROWDSEC_MACHINE_ID` and `CROWDSEC_MACHINE_PASSWORD`. If the machine shows as unvalidated, run `sudo cscli machines validate traefik-manager`.
 
 > **Compose gotcha**: if the generated password contains a `$`, escape it as `$$` in `docker-compose.yml` (Docker Compose treats a single `$` as a variable reference). No escaping is needed for a Docker `run` command or a systemd unit.
 
