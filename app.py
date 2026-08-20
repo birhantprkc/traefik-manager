@@ -4836,12 +4836,31 @@ def save_middleware():
                 return jsonify({'ok': False, 'message': 'Middleware content is empty or invalid'}), 400
             flash("Middleware content is empty or invalid", "error")
             return redirect(url_for('index'))
-        if any(k in parsed_mw for k in ('http', 'tcp', 'udp')):
-            msg = 'Paste only the middleware configuration body (e.g. ipAllowList: ...), not a full http:/tcp: config block'
-            if fetch:
-                return jsonify({'ok': False, 'message': msg}), 400
-            flash(msg, "error")
-            return redirect(url_for('index'))
+        wrapper = next((k for k in ('http', 'tcp', 'udp') if k in parsed_mw), None)
+        if wrapper:
+            section = parsed_mw.get(wrapper)
+            inner = section.get('middlewares') if isinstance(section, dict) else None
+            if wrapper == 'udp' or len(parsed_mw) != 1 or not isinstance(inner, dict) or not inner:
+                msg = 'Paste the middleware body, or a full http:/tcp: block holding a single middleware'
+                if fetch:
+                    return jsonify({'ok': False, 'message': msg}), 400
+                flash(msg, "error")
+                return redirect(url_for('index'))
+            if len(inner) > 1:
+                msg = 'That block defines several middlewares - paste one at a time'
+                if fetch:
+                    return jsonify({'ok': False, 'message': msg}), 400
+                flash(msg, "error")
+                return redirect(url_for('index'))
+            body = next(iter(inner.values()))
+            if not isinstance(body, dict) or not body:
+                msg = 'The middleware in that block has no configuration'
+                if fetch:
+                    return jsonify({'ok': False, 'message': msg}), 400
+                flash(msg, "error")
+                return redirect(url_for('index'))
+            parsed_mw = body
+            mw_protocol = wrapper
         if mw_protocol == 'tcp' and not set(parsed_mw.keys()) <= {'ipAllowList', 'ipWhiteList', 'inFlightConn'}:
             msg = 'TCP middlewares support only ipAllowList and inFlightConn'
             if fetch:
