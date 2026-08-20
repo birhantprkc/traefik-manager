@@ -26,32 +26,12 @@ export default defineConfig({
     siteTitle: 'Traefik Manager',
 
     nav: [
-      { text: 'Home', link: '/' },
-      { text: 'Guide', link: '/guide' },
-      { text: 'Security', link: '/security' },
-      { text: 'Hardening', link: '/hardening' },
-      { text: 'API', link: '/api' },
+      { text: 'Overview', link: '/guide' },
+      { text: 'FAQ', link: '/faq' },
       {
-        text: 'v1.11.0',
+        text: 'Install',
         items: [
-          { text: 'v1.11.0', link: 'https://github.com/chr0nzz/traefik-manager/releases/tag/v1.11.0' },
-           { text: 'All releases', link: 'https://github.com/chr0nzz/traefik-manager/releases' },
-        ],
-      },
-    ],
-
-    sidebar: [
-      { text: 'Home', link: '/' },
-      { text: 'Guide', link: '/guide' },
-      { text: 'Mobile App', link: '/mobile' },
-      { text: 'Security', link: '/security' },
-      { text: 'Traefik Hardening', link: '/hardening' },
-      { text: 'API', link: '/api' },
-      { text: 'UI Examples', link: '/ui-examples' },
-      {
-        text: 'Getting Started',
-        items: [
-          { text: 'Traefik Stack', link: '/traefik-stack' },
+          { text: 'Traefik Stack (installer)', link: '/traefik-stack' },
           { text: 'Docker', link: '/docker' },
           { text: 'Podman', link: '/podman' },
           { text: 'Linux (native)', link: '/linux' },
@@ -59,61 +39,76 @@ export default defineConfig({
         ],
       },
       {
-        text: 'Development',
+        text: 'Reference',
         items: [
-          { text: 'Development Guide', link: '/development' },
-        ],
-      },
-      {
-        text: 'Configuration',
-        items: [
-          { text: 'Static Config Editor', link: '/static' },
-          { text: 'manager.yml', link: '/manager-yml' },
           { text: 'Environment Variables', link: '/env-vars' },
-          { text: 'OIDC / SSO Login', link: '/oidc' },
-          { text: 'Notification Webhooks', link: '/webhooks' },
-          { text: 'Git Repository Backup', link: '/git-backup' },
-          { text: 'Reset Password', link: '/reset-password' },
+          { text: 'manager.yml', link: '/manager-yml' },
+          { text: 'REST API', link: '/api' },
+          { text: 'Agent API', link: '/api-agent' },
+        ],
+      },
+      { text: 'Security', link: '/security' },
+      {
+        text: 'v1.11.0',
+        items: [
+          { text: 'v1.11.0', link: 'https://github.com/chr0nzz/traefik-manager/releases/tag/v1.11.0' },
+          { text: 'All releases', link: 'https://github.com/chr0nzz/traefik-manager/releases' },
+        ],
+      },
+    ],
+
+    sidebar: [
+      {
+        text: 'Start here',
+        items: [
+          { text: 'Home', link: '/' },
+          { text: 'Overview', link: '/guide' },
+          { text: 'FAQ', link: '/faq' },
+          { text: 'UI Examples', link: '/ui-examples' },
         ],
       },
       {
-        text: 'Multi-Server (Agent)',
+        text: 'Install',
         items: [
-          { text: 'Traefik Manager Agent', link: '/agent' },
-          { text: 'Agent API Reference', link: '/api-agent' },
+          { text: 'Traefik Stack (installer)', link: '/traefik-stack' },
+          { text: 'Docker', link: '/docker' },
+          { text: 'Podman', link: '/podman' },
+          { text: 'Linux (native)', link: '/linux' },
+          { text: 'Unraid', link: '/unraid' },
+          { text: 'Beta Channel', link: '/beta' },
         ],
       },
       {
-        text: 'Management',
-        collapsed: false,
+        text: 'Traffic',
         items: [
+          { text: 'Dashboard', link: '/tab-dashboard' },
           { text: 'Routes', link: '/tab-routes' },
           { text: 'Middlewares', link: '/tab-middlewares' },
           { text: 'Services', link: '/tab-services' },
-        ],
-      },
-      {
-        text: 'Visualizations',
-        collapsed: false,
-        items: [
-          { text: 'Dashboard', link: '/tab-dashboard' },
           { text: 'Route Map', link: '/tab-routemap' },
         ],
       },
       {
-        text: 'Monitoring',
-        collapsed: false,
+        text: 'Observability',
         items: [
-          { text: 'Certificates', link: '/tab-certs' },
-          { text: 'Plugins', link: '/tab-plugins' },
           { text: 'Logs', link: '/tab-logs' },
           { text: 'CrowdSec', link: '/tab-crowdsec' },
           { text: 'IP Geolocation', link: '/geoip' },
         ],
       },
       {
+        text: 'Infrastructure',
+        items: [
+          { text: 'Certificates', link: '/tab-certs' },
+          { text: 'TLS Options', link: '/tab-tls-options' },
+          { text: 'Plugins', link: '/tab-plugins' },
+          { text: 'Static Config Editor', link: '/static' },
+          { text: 'Enabling Static Config', link: '/static-enable' },
+        ],
+      },
+      {
         text: 'Providers',
-        collapsed: false,
+        collapsed: true,
         items: [
           { text: 'Docker', link: '/tab-docker' },
           { text: 'Kubernetes', link: '/tab-kubernetes' },
@@ -127,6 +122,39 @@ export default defineConfig({
           { text: 'ZooKeeper', link: '/tab-zookeeper' },
           { text: 'HTTP Provider', link: '/tab-http_provider' },
           { text: 'File (External)', link: '/tab-file_external' },
+        ],
+      },
+      {
+        text: 'Multi-Server',
+        items: [
+          { text: 'Agent', link: '/agent' },
+          { text: 'Agent API Reference', link: '/api-agent' },
+        ],
+      },
+      {
+        text: 'Configuration',
+        items: [
+          { text: 'Environment Variables', link: '/env-vars' },
+          { text: 'manager.yml', link: '/manager-yml' },
+          { text: 'OIDC / SSO Login', link: '/oidc' },
+          { text: 'Notification Webhooks', link: '/webhooks' },
+          { text: 'Git Repository Backup', link: '/git-backup' },
+        ],
+      },
+      {
+        text: 'Security',
+        items: [
+          { text: 'Security', link: '/security' },
+          { text: 'Traefik Hardening', link: '/hardening' },
+          { text: 'Reset Password', link: '/reset-password' },
+        ],
+      },
+      {
+        text: 'Reference',
+        items: [
+          { text: 'REST API', link: '/api' },
+          { text: 'Mobile App', link: '/mobile' },
+          { text: 'Development', link: '/development' },
         ],
       },
     ],

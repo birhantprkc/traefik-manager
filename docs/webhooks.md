@@ -4,7 +4,7 @@ Traefik Manager can fire an HTTP POST to a webhook URL on every notification eve
 
 Configure webhooks in **Settings - Notifications**.
 
-Every message the UI shows as a toast is also kept in the notification drawer behind the bell, so a message that disappears before you read it can still be found. Messages raised in the browser (validation errors, failed requests) are recorded there but are not sent to webhooks. The exceptions are the **Ping all** summary and Traefik version-update notices, which are raised by the UI and do fire a webhook. Repeats of the same message within a few seconds are recorded once.
+Every message the UI shows as a toast is also kept in the notification drawer behind the bell, so a message that disappears before you read it can still be found. Messages raised in the browser (validation errors, failed requests) are recorded there but are not sent to webhooks. The exceptions are the **Ping all** summary and version-update notices, which are raised by the UI and do fire a webhook. Repeats of the same message within 8 seconds are recorded once.
 
 ---
 
@@ -29,7 +29,7 @@ Payload format:
 ```json
 {
   "embeds": [{
-    "title": "Route my-app saved",
+    "title": "Route my-app updated",
     "color": 4176208,
     "footer": { "text": "Traefik Manager - 2026-05-18 12:00:00" }
   }]
@@ -46,7 +46,7 @@ Select **Slack** and paste an incoming webhook URL (`https://hooks.slack.com/...
 
 Payload format:
 ```json
-{ "text": ":white_check_mark: *Traefik Manager* - Route my-app saved" }
+{ "text": ":white_check_mark: *Traefik Manager* - Route my-app updated" }
 ```
 
 ---
@@ -62,7 +62,7 @@ https://ntfy.yourdomain.com/your-topic
 
 If your ntfy instance requires authentication, fill in **Username** and **Password**.
 
-Headers sent:
+The message is sent as the plain-text body, with these headers:
 
 | Header | Value |
 |---|---|
@@ -79,11 +79,13 @@ Sends a plain JSON body to any HTTP endpoint. Optionally set **Username** and **
 Payload format:
 ```json
 {
-  "event": "route_saved",
-  "message": "Route my-app saved",
+  "event": "success",
+  "message": "Route my-app updated",
   "timestamp": "2026-05-18 12:00:00"
 }
 ```
+
+`event` is the event type, not the specific action - see the table below.
 
 ---
 
@@ -91,7 +93,7 @@ Payload format:
 
 | Type | When |
 |---|---|
-| `success` | Route saved, middleware saved, backup created |
-| `warning` | Route deleted, backup restored, ping failures |
-| `error` | Git push failures, git backup failures, git restore errors |
+| `success` | Route or middleware saved, TLS profile saved, static config saved, backup created, plugin installed, git push succeeded |
+| `warning` | Route or middleware deleted, backup restored or deleted, git restore, Traefik restarted, ping failures |
+| `error` | Git push, backup or restore failures |
 | `info` | Login events, ping all results, version updates |

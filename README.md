@@ -114,7 +114,7 @@ Full [documentation](https://traefik-manager.xyzlab.dev/).
 
 **[traefik-manager.xyzlab.dev](https://traefik-manager.xyzlab.dev/)**
 
-[Get started](https://traefik-manager.xyzlab.dev/guide.html) ·
+[Overview](https://traefik-manager.xyzlab.dev/guide.html) ·
 [Configuration](https://traefik-manager.xyzlab.dev/manager-yml.html) ·
 [Environment variables](https://traefik-manager.xyzlab.dev/env-vars.html) ·
 [Security](https://traefik-manager.xyzlab.dev/security.html) ·

@@ -1,30 +1,28 @@
 # File (external) Tab
 
-The **File (external)** tab shows routes from Traefik's file provider that are **not** managed by traefik-manager. Routes that traefik-manager manages (stored in `dynamic.yml`) are shown in the main Routes tab instead.
+The **File (external)** tab lists routes from Traefik's file provider that traefik-manager does **not** manage. Routes it does manage (stored in `dynamic.yml`) appear in the Routes tab instead.
 
 ## What it shows
 
-- Route name, rule, status (enabled/disabled/error)
-- Protocol (HTTP / TCP / UDP)
-- TLS indicator
-- Service name
-- Entry points
-- Full detail view via the info button
+- One card per route: status, name, rule, protocol, TLS state, service, entry points, middlewares
+- Summary strip: route counts per protocol, plus any route not serving
+- Middlewares from the file provider, listed under the routes
+- Search, protocol filter, refresh
 
+Click a card for its detail panel.
 
-Routes are **read-only** - edit them directly in the relevant file provider configuration.
+Routes are **read-only** - edit them in the file provider configuration they come from.
 
 ## Enabling the tab
 
-### During setup wizard
-Toggle **File (external)** on in the "Optional monitoring" step.
-
-### After setup
-Go to **Settings → Route Monitoring** and enable File (external).
+| Where | Path |
+|---|---|
+| Setup wizard | Monitoring step → Provider tabs → File (external) |
+| Later | Settings → Route Monitoring → File (external) |
 
 ## Requirements
 
-Traefik must be configured with the file provider pointing to one or more external configuration files in your `traefik.yml`:
+Traefik must be configured with the file provider, pointing at a directory or a single file in your `traefik.yml`:
 
 ```yaml
 providers:
@@ -41,6 +39,6 @@ providers:
     filename: "/etc/traefik/extra-routes.yml"
 ```
 
-No extra file mounts into the traefik-manager container are needed - data is pulled live from the Traefik API.
+No mounts into traefik-manager needed - data comes live from the Traefik API.
 
-> **Note:** traefik-manager's own `dynamic.yml` also uses the file provider. Routes from that file are shown in the main Routes tab and are excluded from this tab to avoid duplication. The exclusion currently covers routers in the first config file only, so with several config files mounted (`CONFIG_DIR` / `CONFIG_PATHS`) managed routes from the additional files can still appear here.
+> **Note:** traefik-manager's own `dynamic.yml` also uses the file provider, so its routers are excluded here to avoid duplication. The exclusion reads the first config file only, so with several files mounted (`CONFIG_DIR` / `CONFIG_PATHS`) managed routes from the additional files can still appear in this tab.

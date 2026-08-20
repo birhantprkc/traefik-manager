@@ -1,6 +1,6 @@
 # Running with Podman
 
-Traefik Manager works with Podman. This page covers the key differences from Docker and shows the common deployment patterns.
+Traefik Manager runs on Podman. This page covers the differences from Docker and the common deployment patterns.
 
 ---
 
@@ -8,18 +8,18 @@ Traefik Manager works with Podman. This page covers the key differences from Doc
 
 |                     | Docker                   | Podman                                                                          |
 | ---------------------| --------------------------| ---------------------------------------------------------------------------------|
-| Compose command     | `docker compose`         | `podman compose` (Podman 4.7+) or `podman-compose`                              |
+| Compose command     | `docker compose`         | `podman compose` (4.7+, wraps an installed compose provider) or `podman-compose` |
 | Exec into container | `docker exec`            | `podman exec`                                                                   |
 | SELinux hosts       | No label needed          | Add `:z` (shared) or `:Z` (private) to volume mounts                            |
 | Rootless ports      | Ports < 1024 need root   | Same - use port ≥ 1024 or configure `net.ipv4.ip_unprivileged_port_start`       |
-| Restart policy      | `unless-stopped`         | Use `always` with podman-compose, or use a Quadlet unit for systemd integration |
+| Restart policy      | `unless-stopped`         | Use `always` with podman-compose, or a Quadlet unit for systemd integration     |
 | Network aliases     | Docker Compose sets them | Must create a named network and join both containers to it                      |
 
 ---
 
 ## podman compose
 
-Podman 4.7+ ships `podman compose` as a built-in subcommand. For older versions install `podman-compose`:
+Podman 4.7+ ships the `podman compose` subcommand. On older versions install `podman-compose`:
 
 ```bash
 pip install podman-compose
@@ -43,7 +43,7 @@ services:
       - /path/to/traefik-manager/backups:/app/backups:z
 ```
 
-> The `:z` label tells the container runtime to relabel the volume for SELinux. Use `:Z` if you want the label to be private to this container. On non-SELinux hosts (most Debian/Ubuntu setups) these labels are harmless and can be omitted.
+> `:z` relabels the volume for SELinux, `:Z` labels it private to this container. On non-SELinux hosts (most Debian/Ubuntu setups) the labels are harmless and can be omitted.
 
 Start:
 
@@ -53,9 +53,9 @@ podman compose up -d
 
 ---
 
-## Connecting to Traefik on the same host 
+## Connecting to Traefik on the same host
 
-Traefik Manager needs to reach the Traefik API URL you configure in settings (e.g. `http://traefik:8080`). When both containers run on the same Podman network they can reach each other by container name.
+On a shared Podman network both containers reach each other by container name.
 
 ### Create a shared network
 
@@ -65,7 +65,7 @@ podman network create traefik
 
 ### Join both containers to it
 
-In your compose file, add a `networks` block:
+Add a `networks` block to your compose file:
 
 ```yaml
 services:
@@ -95,25 +95,23 @@ Then in the setup wizard, set the Traefik API URL to `http://traefik:8080`.
 
 ## Rootless Podman
 
-Rootless Podman runs containers as your regular user with no daemon. No extra config is needed for Traefik Manager - just run the compose commands as your regular user.
+Rootless Podman runs containers as your regular user with no daemon. Traefik Manager needs no extra config - run the compose commands as that user.
 
 ```bash
 # Start
 podman compose up -d
 
-# Check logs for the auto-generated password on first run
-podman logs traefik-manager | grep -A3 "AUTO-GENERATED"
+# First run: read the auto-generated password from the log
+podman logs traefik-manager | grep -A3 AUTO-GENERATED
 ```
 
-If you're running rootless and need a port below 1024, either:
-- Map to a high port: `-p 8080:5000` and use a reverse proxy in front
-- Lower the unprivileged port start: `sysctl -w net.ipv4.ip_unprivileged_port_start=80`
+For a port below 1024, either map to a high port (`-p 8080:5000`) and put a reverse proxy in front, or lower the threshold: `sysctl -w net.ipv4.ip_unprivileged_port_start=80`.
 
 ---
 
 ## Systemd integration with Quadlet
 
-Quadlet is the recommended way to run Podman containers as systemd services. It replaces `podman generate systemd`.
+Quadlet is the recommended way to run Podman containers as systemd services; it replaces `podman generate systemd`.
 
 Create `/etc/containers/systemd/traefik-manager.container` (system) or `~/.config/containers/systemd/traefik-manager.container` (rootless):
 
@@ -130,7 +128,7 @@ Environment=COOKIE_SECURE=false
 Volume=/path/to/traefik/dynamic.yml:/app/config/dynamic.yml:z
 Volume=/path/to/traefik-manager/config:/app/config:z
 Volume=/path/to/traefik-manager/backups:/app/backups:z
-Network=traefik.network
+Network=traefik
 
 [Service]
 Restart=always
@@ -138,6 +136,8 @@ Restart=always
 [Install]
 WantedBy=default.target
 ```
+
+`Network=traefik` joins the network you created with `podman network create`. A name ending in `.network` refers to a Quadlet `.network` unit instead.
 
 Reload and start:
 
@@ -156,38 +156,40 @@ For system-level (root) units, drop `--user` from the systemctl commands.
 podman exec traefik-manager flask reset-password
 ```
 
-This generates a new temporary password, prints it to the terminal, and requires you to change it on next login. Identical to the Docker workflow - just `podman exec` instead of `docker exec`.
+Prints a new temporary password and forces a change at next login. Two-factor authentication is preserved - add `--disable-otp` if you have also lost your TOTP app. Other recovery methods: [Reset Password](reset-password.md).
 
 ---
 
 ## Optional monitoring mounts
 
-Add `:z` to every optional volume mount on SELinux hosts:
+Add `:z` to every optional mount on SELinux hosts:
 
 ```yaml
 volumes:
-  - /path/to/traefik/acme.json:/app/acme.json:ro,z
-  - /path/to/traefik/traefik.yml:/app/traefik.yml:z          # read-write for Static Config editor
-  - /path/to/traefik/logs/access.log:/app/logs/access.log:ro,z
+  - /path/to/traefik/acme.json:/app/acme.json:ro,z              # Certs tab
+  - /path/to/traefik/traefik.yml:/app/traefik.yml:z             # Plugins + Static Config
+  - /path/to/traefik/logs/access.log:/app/logs/access.log:ro,z  # Logs tab
 ```
 
-> Mount `traefik.yml` without `:ro` if you want to use the Static Config editor. Read-only still shows the Static Config tab, but saving fails with a write error.
+Switch Certs, Plugins and Logs on in **Settings -> System Monitoring**; mounting the file alone does not reveal them. `traefik.yml` also needs `STATIC_CONFIG_PATH=/app/traefik.yml` - that path has no default.
+
+> Mount `traefik.yml` without `:ro`. Read-only still lists plugins, but saving the static config or installing a plugin fails with a write error.
 
 ---
 
 ## Static config editor
 
-The Static Config tab lets you edit `traefik.yml` directly from the UI. After saving, click **Restart Traefik** to apply the changes via your configured restart method.
+Edit `traefik.yml` from the UI. After saving, click **Restart Traefik** to apply the change with your configured restart method.
 
 ### Requirements
 
-Mount `traefik.yml` read-write (no `:ro`) and set `RESTART_METHOD`.
+Mount `traefik.yml` read-write (no `:ro`), set `STATIC_CONFIG_PATH`, and set `RESTART_METHOD`. Choose where the editor appears in **Settings -> Interface -> Tabs -> Static Config**: `Off`, `Settings` (inside the settings window) or `Tab` (its own side-nav entry).
 
 ### Method 1: Poison pill (recommended for Podman)
 
-No socket access needed for Traefik Manager. Instead, Traefik Manager writes a signal file to a shared named volume. Traefik's own healthcheck detects the file, removes it, and kills itself (`kill -TERM 1`). Podman's `restart: always` policy immediately starts a fresh Traefik instance. No extra container needed.
+No socket access needed. Traefik Manager writes a signal file to a shared named volume; Traefik's own healthcheck finds it, removes it and kills itself (`kill -TERM 1`), and `restart: always` starts it again.
 
-Add a `healthcheck` to your Traefik service and mount the shared volume on both containers:
+Add the healthcheck to your Traefik service and mount the shared volume on both containers:
 
 ```yaml
 services:
@@ -232,7 +234,7 @@ volumes:
 
 ### Method 2: Direct socket
 
-Mount the Podman socket directly. The socket path depends on whether Podman runs as root or rootless.
+Enable the Podman API socket first - `systemctl --user enable --now podman.socket`, without `--user` for root - then mount it:
 
 ```yaml
 services:
@@ -262,10 +264,10 @@ services:
 
 | Variable | Values | Default | Description |
 |---|---|---|---|
-| `STATIC_CONFIG_PATH` | path | - | Path to `traefik.yml` inside the container. Must be set for the Static Config and Plugins tabs to work. |
-| `RESTART_METHOD` | `proxy`, `socket`, `poison-pill` | `proxy` | How to restart Traefik after a static config change. When unset the app behaves as `proxy` and tries a socket-based container restart. |
-| `TRAEFIK_CONTAINER` | container name | `traefik` | Name of the Traefik container to restart |
-| `SIGNAL_FILE_PATH` | path | `/signals/restart.sig` | Signal file path for the `poison-pill` method |
+| `STATIC_CONFIG_PATH` | path | - | Path to `traefik.yml` inside the container. Required for the Static Config and Plugins tabs. |
+| `RESTART_METHOD` | `proxy`, `socket`, `poison-pill` | `proxy` | How to restart Traefik after a static config change. `proxy` and `socket` both restart the container over the socket. |
+| `TRAEFIK_CONTAINER` | container name | `traefik` | Container to restart |
+| `SIGNAL_FILE_PATH` | path | `/signals/restart.sig` | Signal file for the `poison-pill` method |
 
 ---
 
@@ -273,7 +275,7 @@ services:
 
 ### Single config file (default)
 
-The default setup. Mount one dynamic config file and set `CONFIG_PATH` to point at it:
+Mount one dynamic config file and point `CONFIG_PATH` at it:
 
 ```yaml
 environment:
@@ -284,15 +286,15 @@ volumes:
   - /path/to/traefik-manager/backups:/app/backups:z
 ```
 
-If you mount your file to `/app/config/dynamic.yml` and do not set `CONFIG_PATH`, that path is used automatically as the default.
+`/app/config/dynamic.yml` is the default, so mounting your file there needs no `CONFIG_PATH` at all.
 
 ### Multiple config files
 
-Mount more than one Traefik dynamic config and manage them all from one UI. A **Config File** picker appears automatically in the route and middleware forms when more than one file is loaded.
+Mount several Traefik dynamic configs and manage them from one UI. A **Config File** picker appears in the route, middleware and TLS option forms once more than one file is loaded.
 
 :::tabs
 == CONFIG_PATHS (explicit list)
-Comma-separated list of config file paths inside the container. Use this when you want to name exactly which files are managed.
+Comma-separated list of config file paths inside the container. Use it to name exactly which files are managed.
 
 ```yaml
 environment:
@@ -308,7 +310,7 @@ volumes:
 ```
 
 == CONFIG_DIR (auto-discover from directory)
-Point at a directory and every `.yml` file inside it is picked up automatically. Useful when the number of config files changes over time.
+Point at a directory and every `.yml` and `.yaml` file inside it, subdirectories included, is picked up. Useful when the number of config files changes over time.
 
 ```yaml
 environment:
@@ -323,7 +325,7 @@ volumes:
 ```
 :::
 
-**Quadlet units:** set the environment variable in the `[Container]` section:
+**Quadlet units:** set the variable in the `[Container]` section:
 
 ```ini
 # Single config file (default):
@@ -338,7 +340,7 @@ See the [Environment Variables](env-vars.md) reference for the full priority ord
 
 ## Behind Traefik (expose via subdomain)
 
-Works the same as with Docker. Remove `ports`, add labels, and make sure both containers share the same Podman network:
+Same as Docker. Remove `ports`, add labels, and put both containers on the same Podman network:
 
 ```yaml
 services:

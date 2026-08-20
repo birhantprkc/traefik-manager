@@ -1,26 +1,24 @@
 # Redis Tab
 
-The **Redis** tab shows all routes stored in Traefik's Redis KV provider in read-only mode.
+The **Redis** tab lists the routes Traefik reads from its Redis KV provider.
 
 ## What it shows
 
-- Route name, rule, status (enabled/disabled/error)
-- Protocol (HTTP / TCP / UDP)
-- TLS indicator
-- Service name
-- Entry points
-- Full detail view via the info button
+- One card per route: status, name, rule, protocol, TLS state, service, entry points, middlewares
+- Summary strip: route counts per protocol, plus any route not serving
+- Middlewares from the Redis provider, listed under the routes
+- Search, protocol filter, refresh
 
+Click a card for its detail panel.
 
 Routes are **read-only** - edit them directly in your Redis KV store.
 
 ## Enabling the tab
 
-### During setup wizard
-Toggle **Redis** on in the "Optional monitoring" step.
-
-### After setup
-Go to **Settings → Route Monitoring** and enable Redis.
+| Where | Path |
+|---|---|
+| Setup wizard | Monitoring step → Provider tabs → Redis |
+| Later | Settings → Route Monitoring → Redis |
 
 ## Requirements
 
@@ -33,4 +31,4 @@ providers:
       - "redis:6379"
 ```
 
-No extra file mounts into the traefik-manager container are needed - data is pulled live from the Traefik API.
+No mounts into traefik-manager needed - data comes live from the Traefik API.

@@ -1,26 +1,24 @@
 # Nomad Tab
 
-The **Nomad** tab shows all routes discovered by Traefik's HashiCorp Nomad provider in read-only mode.
+The **Nomad** tab lists the routes Traefik discovered through its HashiCorp Nomad provider.
 
 ## What it shows
 
-- Route name, rule, status (enabled/disabled/error)
-- Protocol (HTTP / TCP / UDP)
-- TLS indicator
-- Service name
-- Entry points
-- Full detail view via the info button
+- One card per route: status, name, rule, protocol, TLS state, service, entry points, middlewares
+- Summary strip: route counts per protocol, plus any route not serving
+- Middlewares from the Nomad provider, listed under the routes
+- Search, protocol filter, refresh
 
+Click a card for its detail panel.
 
 Routes are **read-only** - edit them via your Nomad job definitions.
 
 ## Enabling the tab
 
-### During setup wizard
-Toggle **Nomad** on in the "Optional monitoring" step.
-
-### After setup
-Go to **Settings → Route Monitoring** and enable Nomad.
+| Where | Path |
+|---|---|
+| Setup wizard | Monitoring step → Provider tabs → Nomad |
+| Later | Settings → Route Monitoring → Nomad |
 
 ## Requirements
 
@@ -33,4 +31,4 @@ providers:
       address: "http://localhost:4646"
 ```
 
-No extra file mounts into the traefik-manager container are needed - data is pulled live from the Traefik API.
+No mounts into traefik-manager needed - data comes live from the Traefik API.

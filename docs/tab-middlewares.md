@@ -1,21 +1,23 @@
 # Middlewares Tab
 
-The **Middlewares** tab manages all middleware definitions stored in `dynamic.yml`. Middlewares can be attached to HTTP routes to add auth, rate limiting, redirects, header injection, and more.
+The **Middlewares** tab manages the middleware definitions in your dynamic config files. Middlewares attach to routes to add auth, rate limiting, redirects, header injection, and more.
 
 ## What it shows
 
-- Middleware name and type
-- Live status from the Traefik API (enabled / warning / error)
+- Middleware name and Traefik type
 - Protocol badge (HTTP / TCP)
+- How many routes reference it
 - Edit and delete controls
 
-## Views
+## Filtering and views
 
-Toggle between **grid** (default) and **list** view using the button in the filter bar. List view shows Protocol, Name, Config File, and action buttons in a compact table.
+The filter bar has a name search, an All / HTTP / TCP protocol filter, the templates panel, and the view toggle.
 
-Grid view shows a type glyph, the middleware name with its Traefik type below it, the first few lines of its YAML, and a footer showing how many routes reference it (`unused` in amber when nothing does). Edit and delete sit in a hover rail in the card's top right; clicking anywhere else opens the detail panel. The config file name appears as a chip in the footer only when your middlewares are actually spread across more than one file, so single-file users never see it.
+**Grid** view (default) shows a type glyph, the middleware name with its Traefik type below it, the first lines of its YAML, and a footer reading `used by N routes`, `used in a chain`, or `unused` in amber. Edit and delete sit in a hover rail in the card's top right; clicking anywhere else opens the detail panel. The config file chip appears only when your middlewares span more than one file.
 
-## Creating a middleware 
+**List** view is a compact table: Protocol, Name, Config File, Actions.
+
+## Creating a middleware
 
 Click **Add Middleware** in the top bar.
 
@@ -26,7 +28,7 @@ Click **Add Middleware** in the top bar.
 | Template | Pick a preset or choose Custom to write raw YAML |
 | Config File | Shown when multiple config files are mounted (`CONFIG_DIR` / `CONFIG_PATHS`). Select an existing file or choose **+ New file...** to type a filename - the file is created automatically in `CONFIG_DIR`. Auto-suggests `middlewares-<name>.yml`. |
 
-Paste only the middleware configuration body (e.g. `ipAllowList: ...`) - a full `http:`/`tcp:` config block is rejected with an error.
+Paste the middleware body (e.g. `ipAllowList: ...`). A full `http:` or `tcp:` block wrapping a single middleware is also accepted and unwrapped for you; a block holding several middlewares, or a `udp:` block, is rejected.
 
 ### Wizard mode
 
@@ -47,28 +49,28 @@ The **IP Allow List** wizard includes a **Client IP source** (`ipStrategy`) sele
 
 ### Custom templates
 
-The built-in list covers the common cases. For YAML you reuse across servers, save it as a custom template: click the templates icon in the middlewares toolbar to open the **Middleware Templates** panel, then **Add Template**. Give it a name and the middleware body, without the name line above it.
+For YAML you reuse across servers, save it as a custom template: click the templates icon in the filter bar to open the **Middleware Templates** panel, then **Add Template**. Give it a name and the middleware body, without the name line above it.
 
-Saved templates appear in the **Template** dropdown of the middleware form under a **My Templates** group, below the built-ins. Selecting one loads its YAML into the editor, which you can then edit before saving - the template is a starting point, not a link, so changing a template later does not alter middlewares already created from it.
+Saved templates appear in the form's **Template** dropdown under **My Templates**, below the built-ins. Selecting one loads its YAML into the editor, ready to edit - a template is a starting point, not a link, so changing it later does not alter middlewares already created from it.
 
 Templates are stored in `templates.yml` and are shared across every server. They are not per-agent, so one saved on the Host is available when an agent is selected too.
 
 ### Middleware ordering in routes
 
-When attaching middlewares to a route, order matters - Traefik processes them left to right. The middleware chip selector in the route form shows selected middlewares first (numbered by position) with a divider before unselected ones, so you can see the processing order at a glance.
+Order matters - Traefik processes middlewares left to right. The chip selector in the route form shows selected middlewares first, numbered by position, with a divider before the unselected ones.
 
-Once an instance has a dozen or more middlewares the selector gains a filter box. Typing narrows the unselected pool and reports how many are hidden; already-selected middlewares always stay visible, so the form never hides what is actually attached to the route.
+At twelve middlewares or more the selector gains a filter box. Typing narrows the unselected pool and reports how many are hidden; already-selected middlewares always stay visible, so the form never hides what is actually attached to the route.
 
 ## Editing a middleware
 
-Click the pencil icon on any middleware card.
+Click the pencil icon on any middleware card. Editing always opens the YAML editor, even for a middleware you created through a wizard.
 
 ## Attaching a middleware to a route
 
-When creating or editing a route, pick middlewares from the **Middlewares** chip selector - click a chip to attach or detach it. Selected chips are numbered by processing order. (The form falls back to a plain text field, comma-separated, only when the Traefik API returns no middlewares.) The `@file` suffix tells Traefik the middleware is defined in the file provider.
+In the route form, click a chip in the **Middlewares** selector to attach or detach it. The form falls back to a comma-separated text field only when the Traefik API returns no middlewares. The `@file` suffix tells Traefik the middleware is defined in the file provider.
 
 TCP routes have their own **Middlewares** chip selector in the route form, offering the TCP middlewares defined in your config; HTTP routes only offer HTTP middlewares.
 
 ## How it works
 
-Middleware definitions are written to the dynamic config under `http.middlewares`. When multiple config files are mounted, each middleware card shows a small badge with its source file. traefik-manager reads the live status for each from the Traefik API (`/api/http/middlewares`).
+Middleware definitions are written to the dynamic config under `http.middlewares` or `tcp.middlewares`, in the config file you choose. Every save backs the file up first. The tab lists what is in those files; middlewares that Traefik discovers from other providers appear on that provider's own tab instead.

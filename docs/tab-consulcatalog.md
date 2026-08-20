@@ -1,28 +1,26 @@
 # Consul Catalog Tab
 
-The **Consul Catalog** tab shows all routes discovered by Traefik's Consul Catalog provider in read-only mode.
+The **Consul Catalog** tab lists the routes Traefik discovered from services registered in Consul.
 
-> **Note:** This tab covers the Consul *service catalog* provider (`consulcatalog`), which discovers services registered in Consul. This is different from the Consul KV provider which stores configuration in Consul's key-value store.
+> **Note:** This is the Consul *service catalog* provider (`consulcatalog`). Configuration stored in Consul's key-value store appears in the [Consul KV](tab-consul.md) tab instead.
 
 ## What it shows
 
-- Route name, rule, status (enabled/disabled/error)
-- Protocol (HTTP / TCP / UDP)
-- TLS indicator
-- Service name
-- Entry points
-- Full detail view via the info button
+- One card per route: status, name, rule, protocol, TLS state, service, entry points, middlewares
+- Summary strip: route counts per protocol, plus any route not serving
+- Middlewares from the Consul Catalog provider, listed under the routes
+- Search, protocol filter, refresh
 
+Click a card for its detail panel.
 
 Routes are **read-only** - edit them via your Consul service registrations and Traefik tags.
 
 ## Enabling the tab
 
-### During setup wizard
-Toggle **Consul Catalog** on in the "Optional monitoring" step.
-
-### After setup
-Go to **Settings → Route Monitoring** and enable Consul Catalog.
+| Where | Path |
+|---|---|
+| Setup wizard | Monitoring step → Provider tabs → Consul Catalog |
+| Later | Settings → Route Monitoring → Consul Catalog |
 
 ## Requirements
 
@@ -35,4 +33,4 @@ providers:
       address: "http://localhost:8500"
 ```
 
-No extra file mounts into the traefik-manager container are needed - data is pulled live from the Traefik API.
+No mounts into traefik-manager needed - data comes live from the Traefik API.

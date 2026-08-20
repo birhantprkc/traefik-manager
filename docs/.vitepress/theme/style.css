@@ -26,12 +26,69 @@
   --vp-c-text-2: #8b949e;
 }
 
-.VPDoc.has-aside .content-container {
-  max-width: 920px !important;
+@media (min-width: 768px) and (max-width: 959px) {
+  .VPNavBarMenu.menu { display: none !important; }
 }
 
-.VPDoc:not(.has-sidebar) .content {
-  max-width: 920px !important;
+@media (min-width: 960px) {
+  :root {
+    --vp-layout-max-width: 100%;
+    --tm-doc-gutter: 48px;
+  }
+
+  .VPNav .container,
+  .VPNavBar .container,
+  .VPLocalNav .container,
+  .VPFooter .container {
+    max-width: 100% !important;
+  }
+
+  .VPNavBar .content-body {
+    padding-right: var(--tm-doc-gutter);
+  }
+
+  .VPSidebar {
+    width: 288px !important;
+    padding-left: var(--tm-doc-gutter) !important;
+  }
+
+  .VPContent.has-sidebar {
+    padding-left: 288px !important;
+    padding-right: 0 !important;
+  }
+
+  .VPDoc {
+    padding-left: var(--tm-doc-gutter) !important;
+    padding-right: var(--tm-doc-gutter) !important;
+  }
+
+  .VPDoc .container {
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .VPDoc .content {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .VPDoc.has-aside .content-container {
+    max-width: 100% !important;
+  }
+
+  .VPDoc.has-aside .aside {
+    padding-left: 40px;
+  }
+
+  .VPDoc:not(.has-sidebar) .content {
+    max-width: 1152px !important;
+    margin: 0 auto;
+  }
+
+  .vp-doc table {
+    display: table;
+    width: 100%;
+  }
 }
 
 * {

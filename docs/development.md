@@ -12,14 +12,16 @@ core/                   Shared logic, one module per concern
 agent/                  TMA - the Go agent for remote servers
 tests/                  pytest suite
 templates/
-    index.html          SPA shell, plus the theme/pref bootstrap and the agent-switcher JS
-    sections/           Navbar, stats bar
+    index.html          SPA shell and side nav, plus the theme/pref bootstrap and the agent-switcher JS
+    sections/           Top bar, stats bar
     tabs/               One file per tab
     modals/             Route, middleware, settings and other modals
 static/
     css/app.css         Custom styles for the app shell (login.html and index.html each carry their own inline <style> block)
+    css/tailwind.css    Generated from tailwind.input.css at image build - never edit it
     js/                 Application JS, one file per area
     vendor/             Third-party JS/CSS, bundled at image build
+    sw.js               Service worker; openapi.yaml sits alongside it
 docs/                   This VitePress site
 ```
 
@@ -28,11 +30,12 @@ docs/                   This VitePress site
 Shared logic lives here so it can be tested directly and imported without pulling in the Flask app. The modules form an acyclic graph, and it is worth keeping it that way:
 
 ```
-env, crypto -> config -> agents_store -> settings -> backups, notifications,
-                                                     traefik, agents_http, git,
-                                                     geoip, crowdsec, self_route,
-                                                     certs, routes_build, auth
+env -> crypto, config -> agents_store -> settings -> auth, backups, notifications,
+                                                     traefik, agents_http, geoip,
+                                                     crowdsec, routes_build, git
 ```
+
+`certs` and `self_route` stop at `config` and never reach `settings`. `git` also pulls `agents_http` and `notifications`; `routes_build` also pulls `traefik`.
 
 | Module | Owns |
 |---|---|
@@ -67,8 +70,11 @@ Classic scripts, loaded in order, no bundler and no ES modules. Over 200 functio
 
 ```bash
 pip install -r requirements.txt
+./scripts/setup-assets.sh
 TRAEFIK_API_URL=http://your-traefik:8080 CONFIG_PATH=config/dynamic.yml python3 app.py
 ```
+
+`static/vendor/` and `static/css/tailwind.css` are git-ignored and built at image build, so run `setup-assets.sh` once or the UI comes up unstyled. Re-run it after adding utility classes in a file Tailwind had not seen.
 
 The UI is at `http://localhost:5000`. See [Environment Variables](env-vars.md) for the full list, and [CONTRIBUTING.md](https://github.com/chr0nzz/traefik-manager/blob/main/CONTRIBUTING.md) for the Docker build.
 
@@ -76,13 +82,14 @@ The UI is at `http://localhost:5000`. See [Environment Variables](env-vars.md) f
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                    # Python suite
-make lint                 # ruff, undefined names are a hard failure
-make coverage             # pytest with a coverage report
-cd agent && go test ./... # agent suite
+pytest              # Python suite
+make lint           # ruff, undefined names are a hard failure
+make coverage       # pytest with a coverage report
+make agent-test     # go build, vet and test
+make docs-dev       # this site, live
 ```
 
-The suite runs against a temporary config directory and never touches a real Traefik or your own config. It runs on every pull request, along with ruff and a build, vet and test of the Go agent; the coverage table lands in the workflow's job summary.
+The suite runs against a temporary config directory and never touches a real Traefik or your own config. It runs on every pull request, along with ruff and the Go agent's build, vet and test; the coverage table lands in the workflow's job summary.
 
 ### What is covered
 
@@ -113,11 +120,7 @@ The table is not exhaustive - `tests/` holds more than this. Run `pytest --colle
 
 ### Screenshots
 
-`scripts/screenshots/run.sh` recaptures every desktop screenshot for the docs
-and README from a seeded demo environment - both themes, all tabs and modals,
-installed straight into `docs/public/images/`. Run it against the beta image
-after visual changes and review the git diff. Details in
-[scripts/screenshots/README.md](https://github.com/chr0nzz/traefik-manager/tree/main/scripts/screenshots).
+`scripts/screenshots/run.sh` recaptures every desktop screenshot for the docs and README from a seeded demo environment - both themes, all tabs and modals - straight into `docs/public/images/`. Run it against the beta image after visual changes and review the git diff. Details in [scripts/screenshots/README.md](https://github.com/chr0nzz/traefik-manager/tree/main/scripts/screenshots).
 
 ### Conventions
 
@@ -151,7 +154,7 @@ after visual changes and review the git diff. Details in
 | `agent/main.go` | `Version` - baked in at build time, so a stale value makes every agent report as outdated |
 | `static/openapi.yaml` | `info.version` |
 | `docs/public/openapi.yaml` | `info.version`, and byte-identical to the file above |
-| `docs/.vitepress/config.ts` | the release list |
+| `docs/.vitepress/config.ts` | the nav version label and its `releases/tag/` link |
 
 `tests/test_version_sync.py` fails the build when any of them drifts, so you do not have to remember the list.
 

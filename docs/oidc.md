@@ -1,7 +1,6 @@
 # OIDC / SSO Login
 
-Traefik Manager supports **OpenID Connect (OIDC)** as an additional login method alongside the built-in password. When enabled, a "Sign in with ..." button appears on the login page. Password login continues to work - OIDC is additive, not a replacement.
-
+Traefik Manager supports **OpenID Connect (OIDC)**, either alongside the built-in password or as the sole login method. When enabled, a "Sign in with ..." button appears on the login page. Disable built-in authentication to make OIDC mandatory - see [Authentication modes](security.md#authentication-modes).
 
 ---
 
@@ -11,7 +10,7 @@ Traefik Manager supports **OpenID Connect (OIDC)** as an additional login method
 2. Traefik Manager fetches the provider's discovery document (`/.well-known/openid-configuration`) and redirects to the authorization endpoint
 3. User authenticates at the provider
 4. Provider redirects back to `/auth/oidc/callback` with an authorization code
-5. Traefik Manager exchanges the code for tokens, fetches user info, checks access control, and establishes a session
+5. Traefik Manager exchanges the code for tokens, reads the claims (fetching userinfo when the id_token lacks them), checks access control, and establishes a session
 
 OIDC login creates the same session as password login - the user lands on the dashboard with full access.
 
@@ -29,7 +28,7 @@ https://your-traefik-manager.example.com/auth/oidc/callback
 
 ### 2. Configure OIDC in Traefik Manager
 
-Go to **Settings → Authentication → OIDC / SSO Login** and fill in:
+Go to **Settings → Authentication → OIDC / SSO** and fill in:
 
 | Field | Description |
 |-------|-------------|
@@ -49,7 +48,7 @@ Click **Test** next to the Provider URL to verify the discovery document is reac
 
 ## Automatic sign-in
 
-With **Automatic sign-in** enabled, opening the login page redirects straight to your provider with `prompt=none` - the OIDC-standard silent flow. If the provider already has a session for you, it bounces back immediately with a code and you land on the dashboard without clicking anything. If it does not (`login_required`), you land back on the normal login page with the password form and the OIDC button, and no further silent attempts are made until your next browser session.
+With **Automatic sign-in** enabled, opening the login page redirects straight to your provider with `prompt=none` - the OIDC-standard silent flow. If the provider already has a session for you, you land on the dashboard without clicking anything. If it does not (`login_required`), you get the normal login page, and no further silent attempts are made until your next browser session.
 
 Notes:
 
@@ -91,8 +90,7 @@ In Keycloak: create a client with **Standard Flow** enabled, set the redirect UR
 | Groups Claim Key | `groups` |
 | Allowed Groups | Your Authentik group name |
 
-In Authentik: create an OAuth2/OpenID Provider and a corresponding Application. Use **Authorization Code** flow.
-Either client type works - Traefik Manager sends a PKCE challenge, which public clients require.
+In Authentik: create an OAuth2/OpenID Provider and a corresponding Application. Use **Authorization Code** flow. Either client type works - Traefik Manager sends a PKCE challenge, which public clients require.
 
 ---
 
@@ -100,12 +98,12 @@ Either client type works - Traefik Manager sends a PKCE challenge, which public 
 
 Both filters are optional and independent:
 
-- **Allowed Emails** - if set, the user's `email` claim must be in this list. Useful when you want to allow specific people from a shared provider (e.g. a Google Workspace domain).
-- **Allowed Groups** - if set, at least one of the user's groups must match. Useful when you use Keycloak or Authentik and want to restrict by role.
+- **Allowed Emails** - if set, the user's `email` claim must be in this list, and the provider must report it as verified. Useful for allowing specific people from a shared provider (e.g. a Google Workspace domain).
+- **Allowed Groups** - if set, at least one of the user's groups must match. Useful for restricting by Keycloak or Authentik role.
 
 If both are set, **both** conditions must pass.
 
-If you leave both empty, access is **denied by default** - a successful login at your provider is not enough on its own. To intentionally allow any account your provider authenticates, enable **Allow any authenticated user**. This prevents an unrestricted OIDC configuration from silently admitting every account in a shared identity provider.
+If you leave both empty, access is **denied by default** - a successful login at your provider is not enough on its own. To intentionally allow every account your provider authenticates, enable **Allow any authenticated account**.
 
 ---
 
@@ -113,19 +111,20 @@ If you leave both empty, access is **denied by default** - a successful login at
 
 OIDC login applies to the **web UI only**. The mobile app authenticates via API key (`X-Api-Key` header) regardless of which login method is configured on the web.
 
-If you use OIDC to log in to the web UI, generate an API key via **Settings → Authentication → App / Mobile API Keys**, then enter that key in the mobile app's Server settings. The process is identical to password-based login.
+If you use OIDC to log in to the web UI, generate an API key via **Settings → Authentication → API Keys**, then enter that key in the mobile app's Server settings. The process is identical to password-based login.
 
 ---
 
 ## Rate limiting
 
-`/auth/oidc/login` is rate-limited to **10 requests per minute per IP** to prevent abuse.
+`/auth/oidc/login` is rate-limited to **10 requests per minute per IP**.
 
 ---
 
 ## Security notes
 
 - The OIDC client secret is **encrypted at rest** using Fernet symmetric encryption (the same key used for TOTP secrets).
+- The authorization request uses **PKCE** (`S256`).
 - The `state` parameter is validated on callback to prevent CSRF attacks.
-- A `nonce` is sent in the authorization request and stored in the session.
+- A `nonce` is sent in the authorization request and checked against the id_token on return.
 - Token exchange and userinfo fetch happen server-side - no tokens are exposed to the browser.

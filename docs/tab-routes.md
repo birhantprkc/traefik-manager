@@ -1,74 +1,86 @@
 # Routes Tab
 
-The **Routes** tab (also called Services) is the main management interface. It displays all routes defined in `dynamic.yml` and lets you create, edit, and delete them.
+The **Routes** tab is the main management interface. It lists every route defined in your dynamic config files and lets you create, edit, and delete them.
 
 ## What it shows
 
 - Route name, rule, target host:port, protocol
 - TLS / cert resolver status
 - Entry points and attached middlewares
-- Status badge from the Traefik API (enabled / warning / error)
-- Multi-domain routes show each domain as a separate pill badge; clicking a domain or target copies it to the clipboard
-- Full detail view via the info button - shows live Traefik status, service health, and raw config
+- A status dot fed by the Traefik API (enabled / warning / error)
+- Hosts and targets, each with a copy button
+- A detail panel with the traffic flow, router, TLS, middleware and service data
 
 ## Empty state
 
-When no routes exist yet - such as on a fresh install - the tab shows a prompt with an **Add Route** button instead of a blank grid. When a search or filter matches nothing, it shows a "No routes match your filters" message instead.
+With no routes yet the tab shows an **Add Route** prompt instead of a blank grid. When a search or filter matches nothing, it shows "No routes match your filters".
 
 ## Filtering
 
-The filter bar above the grid lets you narrow routes by:
+| Filter | Values |
+|---|---|
+| Search | Route name |
+| Domain | Every domain found in your route rules |
+| Status | All / Active / Inactive |
+| Protocol | All / HTTP / TCP / UDP |
 
-- **Search** - matches against route name
-- **Domain** - dropdown of all unique domains extracted from route rules
-- **Status** - All / Active / Inactive. Inactive routes are disabled (greyed out) and can be shown or hidden independently of other filters
-- **Protocol** - All / HTTP / TCP / UDP
+The heartbeat button pings every enabled HTTP route that has a concrete host and sets each card's status dot from the result.
 
 ## Views
 
-Toggle between **grid** (default) and **list** view using the button in the filter bar. List view shows a compact table with Status, Protocol, Name, Service, Domain / Rule, Target, Entry Points, Middlewares, and action buttons.
+Toggle between **grid** (default) and **list** view with the button in the filter bar. List view is a compact table: Status, Protocol, Name, Service, Domain / Rule, Target, Entry Points, Middlewares, Actions.
 
-The name sits on the top line with small glyphs for anything worth flagging - a padlock for TLS, an open amber padlock without it, a cube for provider-managed routes, a pause for disabled ones, and a warning shield for `insecureSkipVerify`. Below it are the route's hosts and its backend target, each with a copy button; a route matching several hosts shows the first two and a `+N` you can hover for the rest, and a load-balanced route marks its target with the extra backend count. Entry points, middlewares, and the service name run along the footer. **More**, **Edit**, and an enable/disable toggle appear as a rail in the top right on hover, and clicking anywhere else on the card opens the detail panel.
+In grid view the name sits on the top line with small glyphs for anything worth flagging - a padlock for TLS, an open amber padlock without it, a cube for provider-managed routes, a pause for disabled ones, and a warning shield for `insecureSkipVerify`. Below it are the route's hosts and its backend target, each with a copy button; a route matching several hosts shows the first two and a `+N` you can hover for the rest, and a load-balanced route marks its target with the extra backend count. Entry points, middlewares, and the service name run along the footer. **More**, **Edit**, and an enable/disable toggle appear as a rail in the top right on hover, and clicking anywhere else on the card opens the detail panel.
 
-The config file name appears as a chip in the footer only when your routes are genuinely spread across more than one file - single-file users never see it.
+The config file chip appears in the footer only when your routes span more than one file.
+
+## Detail panel
+
+Click a card, or **More - View Details**. The panel shows a traffic flow diagram (entry points, router, service), then Router Details, TLS, Middlewares and Service sections, filled from the Traefik API where it is reachable. Middleware chips open the middleware they name.
+
+When Traefik is not serving the route, a banner says why: the API is unreachable, Traefik has loaded nothing at all from the file provider (usually the two containers do not share the config path, or `providers.file` is not watching it), or Traefik is serving other file routes but not this one.
+
+**More** also offers **Open** (for a simple `Host()` route), **Clone**, **Raw YAML**, and **Delete**.
 
 ## App icons
 
-Enable **Settings - Interface - Routes - Show app icons** to display an app icon next to each route name, in both grid and list view. The toggle is **off by default**. It is stored server-side in `manager.yml` under `ui_prefs`, so it applies to every browser and session (and to both the Host and remote agents).
+Enable **Settings - Interface - Routes - Show app icons** to put an app icon next to each route name, in grid and list view. It is **off by default** and stored server-side in `manager.yml` under `ui_prefs`, so it applies to every browser and session, on the Host and on agents.
 
-Icons use the same source and per-route overrides as the [Dashboard](tab-dashboard.md#icon): the slug is auto-detected from the route or service name via the selfh.st CDN. Any custom icon you set on a Dashboard card (a selfh.st slug or a Custom URL, for apps the name match does not recognize) is read from the dashboard config and shown on the Routes tab too. If an icon cannot be resolved it is hidden - no broken-image placeholder.
+Icons use the same source and per-route overrides as the [Dashboard](tab-dashboard.md#icon): the slug is auto-detected from the route or service name and served from the selfh.st CDN, and any custom icon you set on a Dashboard card (a slug or a Custom URL) is used here too. An icon that cannot be resolved is hidden - no broken-image placeholder.
 
-## Creating a route 
+## Creating a route
 
-Click **Add Route** in the top bar. Fill in:
+Click **Add Route** in the top bar. Fields marked with a protocol apply to that protocol only.
 
-| Field                        | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |     |                                                                                                                                                                                                                                                  |
-| ------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| -----| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Protocol                     | HTTP, TCP, or UDP                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |     |                                                                                                                                                                                                                                                  |
-| Name                         | Unique identifier (used as the router and service key in `dynamic.yml`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |     |                                                                                                                                                                                                                                                  |
-| Rule Mode                    | **Simple** (default) - use the Subdomain + Domain chip builder to generate a `Host()` rule. **Advanced rule** - type any valid Traefik rule directly (`PathPrefix`, `HostRegexp`, compound rules with `&&` / `\                                                                                                                                                                                                                                                                                                                                                                                            | \   | `, etc.). Switch modes with the Simple / Advanced rule toggle at the top of the HTTP section. When editing a route with a complex rule, the form automatically opens in Advanced mode.                                                           |
-| Subdomain + Domain(s)        | *(Simple mode only)* Subdomain field plus one or more domain chips. The chip list combines the Domains from Settings - Connection with domains **auto-detected from your existing routes**, and a **+** chip lets you type any other domain on the spot - no Settings trip required. With multiple domains selected, generates a multi-host rule: `Host(\`sub.d1.com\`) \                                                                                                                                                                                                                                  | \   | Host(\`sub.d2.com\`)`. Entering a full hostname (with dots) in the Subdomain field uses it as-is. The domain list is a form convenience only - it never affects your Traefik configuration. Long domain names are truncated in the chip display. |
-| Backend                      | **Manual** (default) - enter a Target IP / Port for a service this route owns. **Existing service** - reference a service already defined in your config instead; see [Shared services](#shared-services)                                                                                                                                                                                                                                                                                                                                                                                                  |     |                                                                                                                                                                                                                                                  |
-| Target IP / Port             | *(Manual mode)* Backend server to forward to                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |     |                                                                                                                                                                                                                                                  |
-| Entry Points                 | Selectable chips fetched from the Traefik API - click to toggle. `websecure` is pre-selected for HTTP routes. UDP entry points are single-select. Falls back to a text input if the API returns no entry points.                                                                                                                                                                                                                                                                                                                                                                                           |     |                                                                                                                                                                                                                                                  |
-| Middlewares                  | Selectable chips fetched from the Traefik API - click to toggle. Falls back to a text input if the API returns no middlewares. HTTP routes offer HTTP middlewares; the TCP form has its own Middlewares chips offering TCP middlewares (`ipAllowList`, `inFlightConn`).                                                                                                                                                                                                                                                                                                                                    |     |                                                                                                                                                                                                                                                  |
-| Backend Scheme               | `HTTP` or `HTTPS` - the scheme Traefik uses to connect to your backend. Use `HTTPS` when the backend serves TLS internally.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |     |                                                                                                                                                                                                                                                  |
-| Pass Host Header             | Enabled by default. Disable if the backend needs to see its own hostname instead of the original request `Host` header. Writes `passHostHeader: false` to the service in `dynamic.yml`.                                                                                                                                                                                                                                                                                                                                                                                                                    |     |                                                                                                                                                                                                                                                  |
-| Cert Resolver                | Shown for HTTP and TCP routes. Three options: **No TLS** (default) - omits the `tls` key entirely; **named resolver** - uses ACME to issue a certificate; **None (external / custom cert)** - writes `tls: {}` without a resolver, for certificates managed via `tls.yml` or another external source. Named resolvers are detected automatically from your static config's `certificatesResolvers` (and from the Cert Resolver field in Settings), so a custom resolver shows up in the dropdown without re-typing it. When a remote agent is active, the agent's static config is read for its resolvers. |     |                                                                                                                                                                                                                                                  |
-| Request wildcard certificate | Appears when a cert resolver is selected. Check this to add a `tls.domains` block with `main: yourdomain.com` and `sans: *.yourdomain.com` auto-filled from the selected domain. Use with DNS challenge resolvers (Cloudflare, Route 53, etc.) to request a wildcard certificate that covers all subdomains.                                                                                                                                                                                                                                                                                               |     |                                                                                                                                                                                                                                                  |
-| TLS Options Profile          | Appears when a cert resolver is selected. Select a named `tls.options` profile from the TLS Options tab to assign it to this router (e.g. `modern`, `strict`). Leave blank to use Traefik's default TLS settings.                                                                                                                                                                                                                                                                                                                                                                                          |     |                                                                                                                                                                                                                                                  |
-| Skip TLS Verification        | Adds `insecureSkipVerify: true` via a named `serversTransport` entry. Use for backends with self-signed certificates (e.g. Proxmox, Kasm). A yellow **TLS skip** badge appears on the route card.                                                                                                                                                                                                                                                                                                                                                                                                          |     |                                                                                                                                                                                                                                                  |
-| Security headers preset      | *(HTTP only)* Generates a tool-managed `<route>-headers` middleware with a `Permissions-Policy` and common security headers, and attaches it to the router. See [Security headers preset](#security-headers-preset) below.                                                                                                                                                                                                                                                                                                                                                                                 |     |                                                                                                                                                                                                                                                  |
-| Optimize for streaming       | *(HTTP only)* Sets long `forwardingTimeouts` on the service's `serversTransport` and forces `passHostHeader`, for media servers (Jellyfin/Emby/Plex). See [Streaming preset](#streaming-preset) below.                                                                                                                                                                                                                                                                                                                                                                                                     |     |                                                                                                                                                                                                                                                  |
-| Config File                  | Shown when multiple config files are mounted (`CONFIG_DIR` / `CONFIG_PATHS`). Select an existing file or choose **+ New file...** to type a filename - the file is created automatically in `CONFIG_DIR`. The `.yml` extension is added automatically if omitted.                                                                                                                                                                                                                                                                                                                                          |     |                                                                                                                                                                                                                                                  |
+| Field | Description |
+|---|---|
+| Protocol | HTTP, TCP, or UDP |
+| Route / Service Name | Unique identifier, used as the router and service key in the config file |
+| Rule Mode | *(HTTP)* **Simple** (default) builds a `Host()` rule from the Subdomain + Domain chips. **Advanced rule** takes any valid Traefik rule (`PathPrefix`, `HostRegexp`, compound rules with `&&` / `\|\|`). A route with a complex rule opens in Advanced automatically. |
+| Subdomain + Domain(s) | *(HTTP, Simple mode)* The chip list combines the Domains from Settings - Connection with domains auto-detected from your existing routes, and a **+** chip takes any other domain on the spot. Several domains generate a multi-host rule: ``Host(`sub.d1.com`) \|\| Host(`sub.d2.com`)``. A Subdomain containing a dot is used as the full hostname. The domain list is a form convenience - it never affects your Traefik configuration. |
+| Rule (SNI) | *(TCP)* A raw SNI rule, e.g. ``HostSNI(`db.example.com`)``. Use ``HostSNI(`*`)`` to match all TLS, or leave it empty for passthrough. |
+| Backend | **Manual** (default) - a Target IP / Port for a service this route owns. **Existing service** - reference a service already defined in your config; see [Shared services](#shared-services) |
+| Target IP / Port | *(Manual mode)* Backend server to forward to |
+| Entry Points | Chips fetched from the Traefik API - click to toggle. `websecure` (or `https`) is pre-selected for HTTP. UDP is single-select. Falls back to a text input if the API returns no entry points. |
+| Middlewares | Chips fetched from the Traefik API - click to toggle. HTTP routes offer HTTP middlewares; TCP routes offer TCP middlewares (`ipAllowList`, `inFlightConn`). Falls back to a text input if the API returns none. |
+| Backend Scheme | *(HTTP)* `HTTP` or `HTTPS` - the scheme Traefik uses to reach your backend. Use `HTTPS` when the backend serves TLS itself. |
+| Pass Host Header | *(HTTP)* Enabled by default. Disable if the backend needs to see its own hostname instead of the original `Host` header; writes `passHostHeader: false` on the service. |
+| TLS Mode | *(TCP)* **No TLS**, **TLS** (reveals Cert Resolver), or **Passthrough**, which writes `tls.passthrough: true` |
+| Cert Resolver | *(HTTP, TCP)* **No TLS** (default, HTTP) omits the `tls` key; a **named resolver** issues a certificate via ACME; **None (external / custom cert)** writes `tls: {}` for certificates managed in `tls.yml` or elsewhere. Named resolvers come from the Cert Resolver field in Settings plus your static config's `certificatesResolvers`, so a custom resolver needs no re-typing. A remote agent contributes its own resolvers. |
+| Request wildcard certificate | Appears once TLS is on. Adds a `tls.domains` block with `main: yourdomain.com` and `sans: *.yourdomain.com` from the selected domain. Use with DNS challenge resolvers (Cloudflare, Route 53, etc.). |
+| TLS Options Profile | Appears once TLS is on. Assigns a named `tls.options` profile from the [TLS Options tab](tab-tls-options.md) to this router. Leave blank for Traefik's defaults. |
+| Skip TLS Verification | *(HTTP)* Adds `insecureSkipVerify: true` on a `<service>-transport` serversTransport, for backends with self-signed certificates (Proxmox, Kasm). Flags the card with a warning shield. |
+| Security headers preset | *(HTTP)* Generates a tool-managed `<route>-headers` middleware and attaches it. See [Security headers preset](#security-headers-preset). |
+| Optimize for streaming | *(HTTP)* Sets long `forwardingTimeouts` and forces `passHostHeader`, for media servers. See [Streaming preset](#streaming-preset). |
+| Config File | Shown when multiple config files are mounted (`CONFIG_DIR` / `CONFIG_PATHS`). Pick an existing file, or **+ New file...** to name one - it is created in `CONFIG_DIR`, with `.yml` added if you omit it. |
 
-For TCP routes, the Subdomain field builds a `HostSNI` rule. A bare label like `db` becomes ``HostSNI(`db.example.com`)`` using the selected domain, while a value that already contains a dot, like `db.other.tld`, is used as the complete hostname - the same way HTTP routes behave. You can also enter a raw SNI rule directly (``HostSNI(`*`)`` for passthrough). UDP routes route by entry point only - no rule needed.
+UDP routers have no rule: they route by entry point only.
 
 ## Editing a route
 
 Click the pencil icon on any route card, or open the detail panel and click **Edit**.
 
-Saving only rewrites the parts of the route the form owns: the rule, entry points, service reference, middlewares and TLS on the router, and the backends, `passHostHeader` and the insecure-TLS transport on the service. When the form manages them, backends, sticky sessions, health checks and router `priority` are written too - see [Multiple backends and load balancing](#multiple-backends-and-load-balancing). Anything else you have written by hand is preserved, including your own `serversTransport`. An existing route also keeps the service name it already points at, rather than being renamed to `<name>-service`.
+Saving rewrites only the parts the form owns: the rule, entry points, service reference, middlewares and TLS on the router, and the backends, `passHostHeader` and the insecure-TLS transport on the service. Sticky sessions, health checks and router `priority` are written when the form manages them - see [Multiple backends and load balancing](#multiple-backends-and-load-balancing). Anything else you wrote by hand is preserved, including your own `serversTransport`, and an existing route keeps the service name it already points at rather than being renamed to `<name>-service`.
 
 ::: warning Advanced service types
 If a router points at a `weighted`, `mirroring` or `failover` service instead of a `loadBalancer`, that service is left untouched, so editing the target field in the route form has no effect on it. Edit those services directly in the config file.
@@ -87,7 +99,7 @@ The generated middleware is a **normal, visible, editable file middleware** - it
 
 - **Permissions-Policy** - each browser feature (`geolocation`, `camera`, `microphone`, `fullscreen`, `autoplay`, `payment`, `usb`, `display-capture`, `accelerometer`, `gyroscope`, `magnetometer`) can be set to **self** (only your site), **all** (any site), or **block**. The default allows `self` for the first five and blocks the rest, written via `customResponseHeaders` so it stays version-independent.
 - **HSTS** - `stsSeconds: 31536000` + `stsIncludeSubdomains` (force HTTPS for a year).
-- **Content-Type nosniff**, **Frame deny** (anti-clickjacking), and a **Referrer-Policy** selector.
+- **Content-Type nosniff**, **Frame deny** (anti-clickjacking), and a **Referrer-Policy** selector, defaulting to `strict-origin-when-cross-origin`.
 
 **Round-trip and safety:**
 
@@ -96,7 +108,7 @@ The generated middleware is a **normal, visible, editable file middleware** - it
 - If a middleware named `<route>-headers` already exists and was **not** created by the preset, the save is refused with a clear message so a hand-authored middleware is never overwritten. Rename or remove it first.
 - Renaming a route moves its `<route>-headers` middleware to match the new name.
 
-The preset is available for local (file-provider) HTTP routes; routes on a remote agent are unaffected.
+The preset is driven entirely by the route form. Clients that do not send its fields - the mobile app, your own API calls - leave the middleware exactly as it is.
 
 ## Streaming preset
 
@@ -118,7 +130,7 @@ It shares the same `<service>-transport` as [Skip TLS Verification](#creating-a-
 
 Streaming works best **without response buffering** - if a `buffering` or `compress` middleware is attached to the route, the form warns you to remove it. Entry-point `respondingTimeouts` are global and static, so they are not changed here; adjust them in the [Static Config editor](./static) if long transcodes still cut off.
 
-Like the headers preset, streaming is managed only through the route form for local HTTP routes; API, agent and other saves leave the transport untouched.
+Like the headers preset, streaming is written only from the route form; other clients leave the transport untouched.
 
 ## Multiple backends and load balancing
 
@@ -129,7 +141,7 @@ For HTTP routes, the **Load balancing** section adds:
 | Option | Writes | Notes |
 |---|---|---|
 | Sticky sessions | `loadBalancer.sticky.cookie` | Pins a client to one backend via a cookie. Cookie name, `secure` and `httpOnly` are optional. |
-| Health check | `loadBalancer.healthCheck` | Path is required; interval and timeout accept Go durations (`10s`, `500ms`). A bare number is read as seconds. |
+| Health check | `loadBalancer.healthCheck` | Path is required; interval and timeout take a number plus `ms`, `s`, `m` or `h`. A bare number is read as seconds. |
 | Router priority | `router.priority` | Higher wins when several routers match the same request. Negative values are allowed, which is how you make a wildcard catchall lose against every explicit route. `0` means unset and is not written. Also available for TCP routes. |
 
 These round-trip on edit, so reopening a route shows the backends and settings it already has.
@@ -142,25 +154,25 @@ The mobile app and older cached pages post only a single target. Saving from one
 
 ## Shared services
 
-Several routers can point at the same service - a native Traefik pattern, useful when the same backend needs different middlewares per hostname (an internal name with no auth and an external one behind Authelia, for example) or when one edge Traefik fans multiple domains into the same downstream instance (#125).
+Several routers can point at the same service - a native Traefik pattern, useful when one backend needs different middlewares per hostname (an internal name with no auth, an external one behind Authelia) or when an edge Traefik fans several domains into the same downstream instance (#125).
 
-Switch the **Backend** toggle in the route form to **Existing service** and pick any service from your config files. The route then writes only a router with `service: <name>`; the service block is never created, modified, or deleted by that route. The picker lists file-provider services for the active server across all config files.
+Switch the **Backend** toggle to **Existing service** and pick any service from your config files. The route then writes only a router with `service: <name>`; that route never creates, modifies, or deletes the service block. The picker lists file-provider services for the active server across all config files.
 
 Behavior worth knowing:
 
 - Deleting or disabling a route never removes a service another router still references.
 - Deleting the route that originally created a shared service keeps the service as long as another router points at it.
 - Editing a route that references a shared service keeps the reference; backends, sticky sessions and health checks are managed where the service is defined - through the route that owns it, or in YAML.
-- Older clients (the mobile app, cached pages) editing a referenced route cannot accidentally convert it into an owned service - the reference is preserved server-side.
+- Older clients editing a referenced route cannot convert it into an owned service - the reference is preserved server-side.
 - Hand-written cross-provider references such as `service: whoami@docker` are preserved on edit, but the picker does not create them.
 
 ## Deleting a route
 
-Click the trash icon on the route card. The corresponding service entry in `dynamic.yml` is removed automatically.
+Open **More - Delete** on the route card and type `DELETE` to confirm. The route's service entry is removed with it, unless another router still references it.
 
 ## Entrypoint middlewares
 
-When `STATIC_CONFIG_PATH` is set, traefik-manager reads `entryPoints[name].http.middlewares` from the static config and shows those middlewares as grey **ep** chips on route cards - one chip per middleware inherited from a matched entry point. Hovering the chip shows "Applied via entrypoint". These are read-only and managed in the static config, not the dynamic config.
+When a static config is readable (`STATIC_CONFIG_PATH`, or the path set under **Settings - System Monitoring - File Paths**), traefik-manager reads `entryPoints[name].http.middlewares` and lists those middlewares on the cards of every route bound to that entry point, marked `ep` with an "Applied via entrypoint" tooltip. They are read-only here and managed in the static config.
 
 ## Bulk actions
 
@@ -168,23 +180,23 @@ Click the **selection icon** in the filter bar to enter bulk mode. Each route ca
 
 - **Enable** - enables all selected routes
 - **Disable** - disables all selected routes
-- **Delete** - deletes all selected routes after a confirmation prompt
+- **Delete** - deletes all selected routes, confirmed by typing `DELETE`
 
 Click the X in the action bar or the selection button again to exit bulk mode.
 
 ## Enabling and disabling routes
 
-Each route card has a toggle icon (green when active, grey when inactive). Clicking it:
+Each route card has a toggle in its hover rail. Clicking it:
 
-- **Disable** - removes the router and service from `dynamic.yml` (Traefik immediately stops routing traffic) and saves the full config in `manager.yml`. The card is greyed out.
-- **Enable** - restores the router and service to `dynamic.yml`. Traefik picks it up instantly.
+- **Disable** - removes the router and service from the config file (Traefik immediately stops routing traffic) and saves the full config in `manager.yml`. The card is greyed out.
+- **Enable** - restores the router and service to the config file. Traefik picks it up instantly.
 
-A backup is created before each toggle operation. Disabled routes persist across restarts.
+A shared service is left in place when a route that references it is disabled. A backup is created before each toggle. Disabled routes persist across restarts.
 
 ## Backups
 
-A backup of `dynamic.yml` is created automatically before every create, edit, delete, or toggle operation. Access backups via **Settings → Backups**.
+A backup is created automatically before every create, edit, delete, or toggle operation. Access backups via **Settings - Backups**.
 
 ## How it works
 
-Routes are stored in Traefik dynamic config files (the file provider config). traefik-manager reads and writes these files directly using `ruamel.yaml` to preserve comments and formatting. When multiple config files are mounted, each route card shows a small badge with its source file. The Routes tab shows the combined list from all config files plus live status from the Traefik API.
+Routes are stored in Traefik dynamic config files (the file provider config). traefik-manager reads and writes these files directly using `ruamel.yaml` to preserve comments and formatting. The tab shows the combined list from all config files plus live status from the Traefik API.

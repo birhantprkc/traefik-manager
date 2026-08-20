@@ -1,6 +1,6 @@
 # Beta
 
-The `:beta` image tracks the `dev` branch, so it carries the next release before it ships. Running it means you see fixes early, and bugs get caught before they reach everyone else.
+The `:beta` image tracks the `dev` branch, so it carries the next release before it ships. You get fixes early, and bugs get caught before they reach everyone else.
 
 ---
 
@@ -14,7 +14,7 @@ image: ghcr.io/chr0nzz/traefik-manager:beta
 docker compose pull traefik-manager && docker compose up -d traefik-manager
 ```
 
-Agents have a `:beta` tag too. Keep the Host and its agents on the same channel.
+Agents have a `:beta` tag too (`ghcr.io/chr0nzz/traefik-manager-agent:beta`). Keep the Host and its agents on the same channel.
 
 ---
 
@@ -34,7 +34,7 @@ Your `manager.yml` and backups are untouched by the switch, in either direction.
 
 ## Before you switch
 
-`dev` is where fixes land the day they are written, so a beta image can be newer than any testing it has had. Treat it accordingly:
+`dev` is where fixes land the day they are written, so a beta image can be newer than any testing it has had:
 
 - Take a backup first, from **Settings - Backups**, or copy your config directory
 - Expect the occasional rough edge. Anything that reaches `:latest` has been through a release
@@ -56,9 +56,9 @@ The useful bug report says what you did, what happened, and what you expected. B
 
 ## Testing a specific fix
 
-Issues are often fixed on `dev` and asked to be confirmed before release. When that happens you will be asked to pull `:beta` and try the exact thing that failed. That confirmation is the difference between a fix that is believed to work and one that is known to.
+A fix often lands on `dev` and needs confirming before release: pull `:beta` and try the exact thing that failed. That confirmation is the difference between a fix that is believed to work and one that is known to.
 
-If you would rather not run beta permanently, switching over for one test and rolling back afterwards is a perfectly good way to help.
+Switching over for one test and rolling back afterwards is a perfectly good way to help.
 
 ---
 
