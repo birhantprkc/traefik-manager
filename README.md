@@ -77,7 +77,7 @@ Open **http://your-server:5000** and the setup wizard takes it from there.
 
 **Monitoring** - live router and service health from the Traefik API, provider tabs for Docker, Kubernetes, Swarm, Nomad, ECS, Consul, Redis and more, TLS expiry tracking, and CVE advisories for your running Traefik version.
 
-**Logs and CrowdSec as analytics** - the access log becomes click-through cards instead of a wall of text, and CrowdSec is built around the attack rather than the ban list. Optional country flags and a world map, resolved on your own server.
+**Logs and CrowdSec** - access log analytics and CrowdSec attacks, bans and decisions. Optional country flags and a world map, resolved on your own server.
 
 **Static config editor** - edit `traefik.yml` from the UI and apply it with a one-click restart, via socket proxy, poison pill or direct socket.
 
@@ -89,9 +89,9 @@ Open **http://your-server:5000** and the setup wizard takes it from there.
 
 **Security** - bcrypt, TOTP two-factor, OIDC single sign-on, per-device API keys, CSRF protection, rate limiting, and secrets encrypted at rest.
 
-**Two layouts** - *Fluid* fills the screen, *Fixed* caps the width. Same navigation and cards either way, grouped Traffic, Observability, Infrastructure and Providers.
+**Two layouts** - *Fluid* fills the screen, *Fixed* caps the width.
 
-**Mobile** - a native Android app on Google Play.
+**Mobile** - a native Android app on Google Play, and the web app installs as a PWA on any platform.
 
 Full [documentation](https://traefik-manager.xyzlab.dev/).
 
