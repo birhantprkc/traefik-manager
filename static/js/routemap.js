@@ -394,19 +394,22 @@ window.rmClearFilters = function() {
     rmRender();
 };
 
-window.refreshRoutemapTab = async function() {
-    if (!_rmDrawn) {
+window.refreshRoutemapTab = async function(force) {
+    if (!_rmDrawn || force) {
         document.getElementById('rmLoading').classList.remove('hidden');
         document.getElementById('rmTopoContainer').classList.add('hidden');
         document.getElementById('rmEmpty').classList.add('hidden');
     }
 
-    const ok = await window.rmEnsureData();
+    const ok = await window.rmEnsureData(force);
 
     document.getElementById('rmLoading').classList.add('hidden');
-    if (!ok && !_rmDrawn) {
-        showToast('Could not load route map data. Retrying on next open.', 'error');
-        return;
+    if (!ok) {
+        if (!_rmDrawn) {
+            showToast('Could not load route map data. Retrying on next open.', 'error');
+            return;
+        }
+        showToast('Could not refresh the route map - showing the last data.', 'error');
     }
     _rmDrawn = true;
     rmRenderProviderFilters();
