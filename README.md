@@ -73,11 +73,15 @@ Open **http://your-server:5000** and the setup wizard takes it from there.
 
 **Middlewares** - 24 wizards covering auth, rate limiting, headers, CORS, redirects and prefixes, plus a raw YAML editor and your own reusable templates.
 
+**Dashboard and Route Map** - a homepage-style grid of your apps with icons and health, and a topology map from entry point through middlewares to backend, coloured per hop.
+
 **Monitoring** - live router and service health from the Traefik API, provider tabs for Docker, Kubernetes, Swarm, Nomad, ECS, Consul, Redis and more, TLS expiry tracking, and CVE advisories for your running Traefik version.
 
 **Logs and CrowdSec as analytics** - the access log becomes click-through cards instead of a wall of text, and CrowdSec is built around the attack rather than the ban list. Optional country flags and a world map, resolved on your own server.
 
 **Static config editor** - edit `traefik.yml` from the UI and apply it with a one-click restart, via socket proxy, poison pill or direct socket.
+
+**Plugins** - see every Traefik plugin with the middlewares using it, install new ones, and get flagged when the catalog has a newer version.
 
 **Backups** - timestamped local backups before every change, plus git push with commit history, diffs and one-click restore.
 
