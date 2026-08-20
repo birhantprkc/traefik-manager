@@ -33,7 +33,7 @@ For **security vulnerabilities**, do not open a public issue - see [SECURITY.md]
 
 ## Suggesting features
 
-Open a [Feature Request](.github/ISSUE_TEMPLATE/feature_request.yml) issue before writing any code. This lets us discuss the idea first and avoids wasted effort if it doesn't fit the project's direction.
+Start an [Idea discussion](https://github.com/chr0nzz/traefik-manager/discussions/new?category=ideas) before writing any code. This lets us discuss it first and avoids wasted effort if it doesn't fit the project's direction. Ideas become an issue once they are planned.
 
 ---
 
