@@ -441,17 +441,23 @@ async function triggerTraefikRestart() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         });
-        const data = await res.json();
+        let data = {};
+        try { data = await res.json() || {}; } catch(e) {}
         if (data.ok) {
             _hideStaticRestartBanner();
             _staticSaved = false;
             _waitForReconnect(false);
+        } else if (res.status === 502 || res.status === 504) {
+            _hideStaticRestartBanner();
+            _staticSaved = false;
+            _waitForReconnect(true);
         } else {
             _hideRestartOverlay();
             showToast(data.error || 'Restart failed', 'error');
         }
     } catch(e) {
         _hideStaticRestartBanner();
+        _staticSaved = false;
         _waitForReconnect(true);
     }
 }
