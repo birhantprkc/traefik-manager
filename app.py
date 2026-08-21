@@ -168,6 +168,9 @@ _send_webhook                = _noti._send_webhook
 _fire_webhook                = _noti._fire_webhook
 _load_notifications          = _noti._load_notifications
 _save_notifications_bg       = _noti._save_notifications_bg
+get_notifications            = _noti.get_notifications
+delete_notification          = _noti.delete_notification
+clear_notifications          = _noti.clear_notifications
 add_notification             = _noti.add_notification
 _traefik_verify              = _trae._traefik_verify
 traefik_api_get              = _trae.traefik_api_get
@@ -2964,9 +2967,7 @@ def api_git_backup_reset():
 @app.route('/api/notifications')
 @login_required
 def api_notifications():
-    with _notif_lock:
-        entries = list(reversed(list(_notifications)))
-    return jsonify(entries)
+    return jsonify(get_notifications())
 
 @app.route('/api/notifications/log', methods=['POST'])
 @csrf_protect
@@ -2990,21 +2991,14 @@ def api_notifications_delete():
     ts = (request.get_json(silent=True) or {}).get('ts', '')
     if not ts:
         return jsonify({'ok': False, 'message': 'Missing ts'}), 400
-    with _notif_lock:
-        for i, entry in enumerate(list(_notifications)):
-            if entry.get('ts') == ts:
-                del _notifications[i]
-                break
-    threading.Thread(target=_save_notifications_bg, daemon=True).start()
+    delete_notification(ts)
     return jsonify({'ok': True})
 
 @app.route('/api/notifications/clear', methods=['POST'])
 @csrf_protect
 @login_required
 def api_notifications_clear():
-    with _notif_lock:
-        _notifications.clear()
-    threading.Thread(target=_save_notifications_bg, daemon=True).start()
+    clear_notifications()
     return jsonify({'ok': True})
 
 @app.route('/api/notifications/add', methods=['POST'])

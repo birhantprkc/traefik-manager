@@ -3,6 +3,7 @@ import os
 import threading
 import time
 from collections import deque
+from contextlib import contextmanager
 
 import requests
 from ruamel.yaml import YAML as SafeYAML
@@ -11,8 +12,78 @@ from core import env
 from core import settings as settings_mod
 from core.env import logger
 
-_notifications = deque(maxlen=200)
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
+MAX_ENTRIES = 200
+
+_notifications = deque(maxlen=MAX_ENTRIES)
 _notif_lock    = threading.Lock()
+
+
+def _lock_path():
+    return env.NOTIFICATIONS_PATH + '.lock'
+
+
+@contextmanager
+def _file_lock():
+    fh = None
+    if fcntl is not None:
+        try:
+            fh = open(_lock_path(), 'a+')
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        except Exception:
+            if fh is not None:
+                try:
+                    fh.close()
+                except Exception:
+                    pass
+            fh = None
+    try:
+        yield
+    finally:
+        if fh is not None:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+            try:
+                fh.close()
+            except Exception:
+                pass
+
+
+def _read_file():
+    try:
+        with open(env.NOTIFICATIONS_PATH, 'r') as f:
+            data = SafeYAML(typ='safe').load(f) or []
+        return [e for e in data if isinstance(e, dict)]
+    except Exception:
+        return []
+
+
+def _write_file(entries):
+    from core.config import _replace_or_copy
+    path = env.NOTIFICATIONS_PATH
+    tmp  = f"{path}.tmp.{os.getpid()}"
+    try:
+        with open(tmp, 'w') as f:
+            SafeYAML(typ='safe').dump(list(entries), f)
+        _replace_or_copy(tmp, path)
+    finally:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+
+
+def _sync(entries):
+    _notifications.clear()
+    for e in entries[-MAX_ENTRIES:]:
+        _notifications.append(e)
 
 
 def _is_ntfy_url(url: str) -> bool:
@@ -58,33 +129,21 @@ def _fire_webhook(type_: str, msg: str, ts: str):
         logger.warning(f"Webhook delivery failed: {e}")
 
 def _load_notifications():
-    if os.path.exists(env.NOTIFICATIONS_PATH):
-        try:
-            _y = SafeYAML(typ='safe')
-            with open(env.NOTIFICATIONS_PATH, 'r') as f:
-                data = _y.load(f) or []
-            with _notif_lock:
-                _notifications.clear()
-                for entry in data[-100:]:
-                    _notifications.append(entry)
-        except Exception:
-            pass
+    with _notif_lock, _file_lock():
+        _sync(_read_file())
 
 def _save_notifications_bg():
     try:
-        _y = SafeYAML(typ='safe')
-        with _notif_lock:
-            data = list(_notifications)
-        with open(env.NOTIFICATIONS_PATH, 'w') as f:
-            _y.dump(data, f)
+        with _notif_lock, _file_lock():
+            _write_file(list(_notifications))
     except Exception:
         logger.exception("Failed to save notifications")
 
 DEDUPE_WINDOW = 8
 
 
-def _recently_logged(msg, now):
-    for entry in reversed(_notifications):
+def _recently_logged(entries, msg, now):
+    for entry in reversed(entries):
         try:
             age = now - time.mktime(time.strptime(entry.get('ts', ''), "%Y-%m-%d %H:%M:%S"))
         except (ValueError, TypeError):
@@ -96,17 +155,52 @@ def _recently_logged(msg, now):
     return False
 
 
+def get_notifications():
+    """Newest first. Reads the file so every worker sees the same list."""
+    with _notif_lock, _file_lock():
+        entries = _read_file()
+        _sync(entries)
+        return list(reversed(entries[-MAX_ENTRIES:]))
+
+
+def delete_notification(ts):
+    with _notif_lock, _file_lock():
+        entries = _read_file()
+        for i, entry in enumerate(entries):
+            if entry.get('ts') == ts:
+                del entries[i]
+                break
+        _write_file(entries)
+        _sync(entries)
+    return True
+
+
+def clear_notifications():
+    with _notif_lock, _file_lock():
+        _write_file([])
+        _sync([])
+    return True
+
+
 def add_notification(type_, msg, webhook=True):
     msg = str(msg or '').strip()
     if not msg:
         return False
-    now = time.time()
-    with _notif_lock:
-        if _recently_logged(msg, now):
-            return False
-        entry = {'ts': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)), 'type': type_, 'msg': msg}
-        _notifications.append(entry)
-    _save_notifications_bg()
+    now   = time.time()
+    entry = {'ts': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)), 'type': type_, 'msg': msg}
+    try:
+        with _notif_lock, _file_lock():
+            entries = _read_file()
+            if _recently_logged(entries, msg, now):
+                _sync(entries)
+                return False
+            entries.append(entry)
+            entries = entries[-MAX_ENTRIES:]
+            _write_file(entries)
+            _sync(entries)
+    except Exception:
+        logger.exception("Failed to store notification")
+        return False
     if webhook:
         threading.Thread(target=_fire_webhook, args=(type_, msg, entry['ts']), daemon=True).start()
     return True
