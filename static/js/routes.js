@@ -1893,7 +1893,11 @@ function closeRouteDetail() {
 
 function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints, apiState) {
     const status = liveRouter ? liveRouter.status : null;
-    const routerError = liveRouter ? (liveRouter.error || null) : null;
+    const _rawErr = liveRouter ? liveRouter.error : null;
+    const routerError = !_rawErr ? null
+        : (Array.isArray(_rawErr) ? _rawErr : [_rawErr])
+            .map(x => (typeof x === 'string' ? x : (x && x.message) || JSON.stringify(x)))
+            .map(x => String(x).trim()).filter(Boolean).join(' - ') || null;
     const isDisabled = app.enabled === false;
     const statusBadge = isDisabled
         ? _dState('Disabled')
