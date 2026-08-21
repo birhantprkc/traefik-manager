@@ -15,7 +15,8 @@ TM stores some data in separate files alongside `manager.yml` in the same config
 | `manager.yml`             | All TM settings - auth, domains, tabs, webhooks, OIDC, git backup, CrowdSec, disabled routes                                    |
 | `agents.yml`              | Remote agent registrations (encrypted API keys). Auto-created and migrated from `manager.yml` on first start after v1.5.0       |
 | `templates.yml`           | Custom middleware templates created from the Middlewares tab toolbar                                                            |
-| `notifications.yml`       | Recent notification history                                                                                                     |
+| `notifications.yml`       | Recent notification history, capped at the 200 newest entries                                                                   |
+| `notifications.yml.lock`  | Empty lock file that keeps the workers from overwriting each other's notifications. Safe to delete while TM is stopped          |
 | `dashboard.yml`           | Dashboard custom groups and per-card overrides, kept per server                                                                 |
 | `.secret_key`, `.otp_key` | Auto-generated session key and the Fernet key for every encrypted field below. Lose `.otp_key` and those secrets are unreadable |
 

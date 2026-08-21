@@ -89,6 +89,12 @@ Payload format:
 
 ---
 
+## Storage
+
+The notification log lives in `notifications.yml` in the config directory and keeps the 200 newest entries. An empty `notifications.yml.lock` sits beside it and can be ignored.
+
+---
+
 ## Event types
 
 | Type | When |
