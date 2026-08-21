@@ -1,3 +1,4 @@
+import fcntl
 import os
 import re
 import time
@@ -163,7 +164,6 @@ ensure_backup_dir            = _back.ensure_backup_dir
 _backup_keep_count           = _back._backup_keep_count
 _prune_backups               = _back._prune_backups
 create_backup                = _back.create_backup
-_is_ntfy_url                 = _noti._is_ntfy_url
 _send_webhook                = _noti._send_webhook
 _fire_webhook                = _noti._fire_webhook
 _load_notifications          = _noti._load_notifications
@@ -298,6 +298,30 @@ def _ssrf_ok(url: str) -> bool:
 
 def _register_config_path(path: str):
     env.register_config_path(path)
+
+
+GEOIP_CHECK_INTERVAL = 86400
+
+
+def _geoip_autoupdate_loop():
+    lock_path = os.path.join(env.CONFIG_DIR, '.geoip.lock')
+    while True:
+        fh = None
+        try:
+            fh = open(lock_path, 'a+')
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _geoip_maybe_autoupdate()
+        except (OSError, BlockingIOError):
+            pass
+        except Exception:
+            logger.exception("GeoIP auto-update check failed")
+        finally:
+            if fh is not None:
+                try:
+                    fh.close()
+                except Exception:
+                    pass
+        time.sleep(GEOIP_CHECK_INTERVAL)
 
 
 def _geoip_maybe_autoupdate():
@@ -489,7 +513,7 @@ def _get_effective_hash() -> str:
 
 _load_notifications()
 
-threading.Thread(target=_geoip_maybe_autoupdate, daemon=True).start()
+threading.Thread(target=_geoip_autoupdate_loop, daemon=True).start()
 
 _SILENT_PREFIXES = (
     '/static/',
