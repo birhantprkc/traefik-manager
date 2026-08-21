@@ -1,11 +1,9 @@
-name: Feature Request
-description: Suggest an idea or improvement
-labels: ["feature request"]
+title: "[Idea] "
 body:
   - type: markdown
     attributes:
       value: |
-        Please check [existing issues](https://github.com/chr0nzz/traefik-manager/issues) first - your idea may already be tracked.
+        Please check [existing ideas](https://github.com/chr0nzz/traefik-manager/discussions/categories/ideas) first - yours may already be here.
 
   - type: textarea
     id: problem

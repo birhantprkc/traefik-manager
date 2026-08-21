@@ -13,7 +13,7 @@ Traefik Manager is a standard Python/Flask application and runs natively on any 
 - Python 3.11 or newer
 - `pip`
 - A running Traefik instance reachable from the same host
-- Write access to your Traefik `dynamic.yml`
+- Write access to your Traefik `dynamic.yml` and the directory holding it
 
 ---
 
@@ -40,7 +40,7 @@ pip install -r requirements.txt gunicorn
 bash scripts/setup-assets.sh
 ```
 
-This downloads Monaco, fonts, icons, and other vendored JS libraries, then compiles Tailwind CSS. These are excluded from the Git repository (they are built into the Docker image at build time). The script can be run from any directory and does not require `sudo` - when `/usr/local/bin` is not writable, the `tailwindcss` binary is downloaded to a temporary location instead. If the compiled CSS would contain no utility classes the script fails loudly instead of leaving a broken UI.
+This downloads Monaco, fonts, icons and the other vendored JS libraries, then compiles Tailwind CSS - none of them are in the Git repository. It runs from any directory and needs no `sudo`: when `/usr/local/bin` is not writable the `tailwindcss` binary goes to a temporary location instead.
 
 **4. Create the data directories**
 
@@ -48,7 +48,7 @@ This downloads Monaco, fonts, icons, and other vendored JS libraries, then compi
 mkdir -p /var/lib/traefik-manager/backups
 ```
 
-**4. Test run**
+**5. Test run**
 
 ```bash
 CONFIG_PATH=/etc/traefik/dynamic.yml \
@@ -62,13 +62,13 @@ COOKIE_SECURE=false \
   app:app
 ```
 
-Open **http://your-server:5000** - the setup wizard will guide you through the rest.
+Open **http://your-server:5000** and log in with the temporary password printed in the startup output, then the setup wizard takes over.
 
 ---
 
 ## Systemd service
 
-Running as a systemd service gives you automatic start on boot and restart on crash.
+Running as a systemd service gives you start on boot and restart on crash.
 
 **1. Create a dedicated user (recommended)**
 
@@ -76,17 +76,14 @@ Running as a systemd service gives you automatic start on boot and restart on cr
 useradd --system --no-create-home --shell /usr/sbin/nologin traefik-manager
 ```
 
-Give it read/write access to the files it needs:
+Give it write access to the config file **and its directory** - saves are written to a temporary file next to the config and then renamed:
 
 ```bash
-# Write access to dynamic.yml and its directory (for backups/config)
-chown traefik-manager: /etc/traefik/dynamic.yml
-chown traefik-manager: /var/lib/traefik-manager
-chown traefik-manager: /var/lib/traefik-manager/backups
-
-# Read-only optional mounts (if using Certs/Plugins/Logs tabs)
-# The user just needs read access to these files
+chown traefik-manager: /etc/traefik /etc/traefik/dynamic.yml
+chown traefik-manager: /var/lib/traefik-manager /var/lib/traefik-manager/backups
 ```
+
+Read access is enough for the optional Certs and Logs files.
 
 **2. Create the service unit**
 
@@ -147,11 +144,13 @@ systemctl status traefik-manager
 journalctl -u traefik-manager -f
 ```
 
+The temporary first-run password is in that journal output.
+
 ---
 
-## Optional monitoring mounts
+## Optional monitoring paths
 
-The Certs, Plugins, and Logs tabs work the same as with Docker - just point the env vars at your existing files:
+The Certs, Plugins and Logs tabs work as they do under Docker - point the env vars at your existing files, then switch each tab on in **Settings -> System Monitoring**:
 
 ```ini
 # In the [Service] section of the systemd unit:
@@ -159,22 +158,22 @@ The Certs, Plugins, and Logs tabs work the same as with Docker - just point the 
 # Certs tab - path to acme.json
 Environment=ACME_JSON_PATH=/etc/traefik/acme.json
 
-# Plugins + Static Config tab - path to traefik.yml
+# Plugins + Static Config - path to traefik.yml
 Environment=STATIC_CONFIG_PATH=/etc/traefik/traefik.yml
 
 # Logs tab - path to access.log
-Environment=ACCESS_LOG_PATH=/logs/access.log
+Environment=ACCESS_LOG_PATH=/var/log/traefik/access.log
 ```
 
-Make sure `traefik-manager` user has read access to each file:
+The `traefik-manager` user needs read access to each file:
 
 ```bash
 chmod o+r /etc/traefik/acme.json
-chmod o+r /etc/traefik/traefik.yml   # use write access instead if using Static Config editor
+chmod o+r /etc/traefik/traefik.yml   # write access instead, for the Static Config editor
 chmod o+r /var/log/traefik/access.log
 ```
 
-Access logs are often owned by `root` or a `adm`/`syslog` group. If `chmod o+r` is not appropriate for your setup, add the user to the owning group instead:
+Access logs are often owned by `root` or an `adm`/`syslog` group. Where `chmod o+r` is not appropriate, add the user to the owning group instead:
 
 ```bash
 usermod -aG adm traefik-manager
@@ -184,11 +183,11 @@ usermod -aG adm traefik-manager
 
 ## Static config editor
 
-The Static Config tab lets you edit `traefik.yml` directly from the UI. After saving, click **Restart Traefik** to apply the changes via your configured restart method.
+Edit `traefik.yml` from the UI. After saving, click **Restart Traefik** to apply the change with your configured restart method.
 
 ### Requirements
 
-Give `traefik-manager` write access to `traefik.yml` and set `RESTART_METHOD` in the service unit.
+Give `traefik-manager` write access to `traefik.yml` and set `RESTART_METHOD` in the service unit. Choose where the editor appears in **Settings -> Interface -> Tabs -> Static Config**: `Off`, `Settings` (inside the settings window) or `Tab` (its own side-nav entry).
 
 ```bash
 chown traefik-manager: /etc/traefik/traefik.yml
@@ -196,7 +195,7 @@ chown traefik-manager: /etc/traefik/traefik.yml
 
 ### Method 1: Poison pill (recommended)
 
-Traefik Manager writes a signal file. A watcher script monitors it and restarts Traefik. No Docker socket access needed.
+Traefik Manager writes a signal file, a watcher script sees it and restarts Traefik. No Docker socket access needed.
 
 Add to the `[Service]` section of your unit file:
 
@@ -251,7 +250,7 @@ systemctl enable --now traefik-restart-watcher
 
 ### Method 2: Direct Docker socket
 
-If Traefik is running as a Docker container, mount the Docker socket and give `traefik-manager` access to it.
+When Traefik itself runs as a Docker container, give `traefik-manager` access to the socket:
 
 ```bash
 usermod -aG docker traefik-manager
@@ -269,8 +268,8 @@ Environment=TRAEFIK_CONTAINER=traefik
 | Variable | Values | Default | Description |
 |---|---|---|---|
 | `RESTART_METHOD` | `proxy`, `socket`, `poison-pill` | `proxy` | How to restart Traefik after a static config change (`proxy` and `socket` both restart the container over the Docker API) |
-| `TRAEFIK_CONTAINER` | container name | `traefik` | Docker container name to restart (socket method) |
-| `SIGNAL_FILE_PATH` | path | `/signals/restart.sig` | Signal file path for the `poison-pill` method |
+| `TRAEFIK_CONTAINER` | container name | `traefik` | Docker container to restart (socket method) |
+| `SIGNAL_FILE_PATH` | path | `/signals/restart.sig` | Signal file for the `poison-pill` method |
 
 ---
 
@@ -278,7 +277,7 @@ Environment=TRAEFIK_CONTAINER=traefik
 
 ### Single config file (default)
 
-The default setup. Point `CONFIG_PATH` at your dynamic config file:
+Point `CONFIG_PATH` at your dynamic config file:
 
 ```ini
 # In the [Service] section of the systemd unit:
@@ -287,11 +286,11 @@ Environment=CONFIG_PATH=/etc/traefik/dynamic.yml
 
 ### Multiple config files
 
-Mount more than one Traefik dynamic config and manage them all from one UI. A **Config File** picker appears automatically in the route and middleware forms when more than one file is loaded.
+Manage several Traefik dynamic configs from one UI. A **Config File** picker appears in the route, middleware and TLS option forms once more than one file is loaded.
 
 :::tabs
 == CONFIG_PATHS (explicit list)
-Comma-separated list of config file paths. Use this when you want to name exactly which files are managed.
+Comma-separated list of config file paths. Use it to name exactly which files are managed.
 
 ```ini
 # In the [Service] section of the systemd unit:
@@ -301,10 +300,10 @@ Comma-separated list of config file paths. Use this when you want to name exactl
 Environment=CONFIG_PATHS=/etc/traefik/routes.yml,/etc/traefik/services.yml
 ```
 
-Make sure `traefik-manager` user has read/write access to each file.
+The `traefik-manager` user needs read/write access to each file and to its directory.
 
 == CONFIG_DIR (auto-discover from directory)
-Point at a directory and every `.yml` and `.yaml` file inside it - including files in subdirectories - is picked up automatically. Useful when the number of config files changes over time. Useful when the number of config files changes over time.
+Point at a directory and every `.yml` and `.yaml` file inside it, subdirectories included, is picked up. Useful when the number of config files changes over time.
 
 ```ini
 # In the [Service] section of the systemd unit:
@@ -314,7 +313,7 @@ Point at a directory and every `.yml` and `.yaml` file inside it - including fil
 Environment=CONFIG_DIR=/etc/traefik/conf.d
 ```
 
-Make sure `traefik-manager` user has read/write access to the directory and all `.yml` files in it.
+The `traefik-manager` user needs read/write access to the directory and every `.yml` file in it.
 :::
 
 See the [Environment Variables](env-vars.md) reference for the full priority order.
@@ -370,7 +369,7 @@ http:
 
 ## Password reset
 
-Without Docker, use the `flask` CLI directly from the install directory:
+Without Docker, run the `flask` CLI from the install directory:
 
 ```bash
 cd /opt/traefik-manager
@@ -378,13 +377,7 @@ SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
   venv/bin/flask reset-password
 ```
 
-With `--disable-otp` if you have also lost access to your TOTP app:
-
-```bash
-cd /opt/traefik-manager
-SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
-  venv/bin/flask reset-password --disable-otp
-```
+Prints a new temporary password and forces a change at next login. Two-factor authentication is preserved - add `--disable-otp` if you have also lost your TOTP app. Other recovery methods: [Reset Password](reset-password.md).
 
 ---
 
@@ -399,7 +392,7 @@ bash scripts/setup-assets.sh
 systemctl restart traefik-manager
 ```
 
-Run `setup-assets.sh` on every update - new versions may add new vendor libraries or reference new Tailwind CSS classes that are not in the previously compiled stylesheet.
+Run `setup-assets.sh` on every update - new versions may add vendor libraries or use Tailwind classes that are not in the compiled stylesheet.
 
 ---
 
@@ -410,5 +403,5 @@ systemctl disable --now traefik-manager
 rm /etc/systemd/system/traefik-manager.service
 systemctl daemon-reload
 rm -rf /opt/traefik-manager
-# Keep /var/lib/traefik-manager if you want to preserve your settings and backups
+# Keep /var/lib/traefik-manager to preserve your settings and backups
 ```

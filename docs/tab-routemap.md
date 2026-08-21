@@ -1,70 +1,64 @@
 # Route Map Tab
 
-The **Route Map** tab shows a topology view of your Traefik routing setup as a 4-column connection map.
+The **Route Map** tab shows a topology view of your Traefik routing setup: entry points to routes to middlewares to services, connected by Bezier curves.
 
 ## Enabling the tab
 
-The Route Map tab is hidden by default. To show it, go to **Settings - Interface - Tabs** and toggle **Route Map** on. The preference is saved to `manager.yml` and persists across restarts.
+Enable this tab via **Settings - Interface - Tabs - Route Map**. The preference is saved to `manager.yml` and persists across restarts.
 
 ---
 
 ## Topology view
 
-A 4-column connection map: **Entry Points - Routes - Middlewares - Services**, connected by Bezier curves.
+Node positions are computed by the [dagre](https://github.com/dagrejs/dagre) graph layout engine, which ranks the graph left to right into four lanes: **Entry Points - Routes - Middlewares - Services**. The map spreads to fill the available width and the curves are drawn from live DOM positions, so connections stay pixel-accurate under any filter. Curves sit above the background but below the node cards, so a route-to-service connection stays visible where it crosses the middleware lane.
 
-Node positions are computed automatically using the [dagre](https://github.com/dagrejs/dagre) graph layout engine. Columns spread to fill the full available width and bezier curves are drawn from live DOM element positions, so connections are always pixel-accurate regardless of filtering or grouping.
+Each node carries a coloured spine on its left edge:
 
-Each column has a solid colored header and semi-transparent node cards:
+| Node | Colour |
+|--------|--------|
+| Entry point | Teal |
+| Route - HTTP | Blue |
+| Route - TCP | Green |
+| Route - UDP | Yellow |
+| Middleware | Purple |
+| Service | Orange |
+| Provider group | Grey |
 
-| Column | Color |
-|--------|-------|
-| Entry Points | Teal |
-| Routes - HTTP | Blue |
-| Routes - TCP | Green |
-| Routes - UDP | Amber |
-| Middlewares | Purple |
-| Services | Orange |
-
-Bezier curves run between columns. Curves are drawn above column lane backgrounds but below node cards so they remain visible when crossing through intermediate columns (e.g. a direct route-to-service connection that passes through the middleware lane).
+Route nodes carry a health dot from the live router state: green loaded, yellow loaded but not enabled, red errored. Service nodes take one once backend health has been read, which the Dashboard tab fetches. Disabled routes are not mapped.
 
 **Hover** a route node to highlight its full path:
-- All unrelated nodes dim to 10% opacity
-- The active route, its entry point(s), middleware(s), and service highlight with a box shadow
-- A tooltip shows the route's target, entry points, and middlewares
-- Move the mouse away to reset
+- Unrelated nodes dim
+- The route, its entry point(s), middleware(s) and service take a box shadow
+- A tooltip shows the route's target, entry points and middlewares
 
-**Click** any node to open a focused popup:
-- The background dims and a mini route map appears centered on screen
-- The mini map uses the same 4-column layout and node styles, scoped to only the selected node's connections
+**Click** a route node to open the full route detail panel. Clicking an entry point, middleware, service or group node opens a focused popup instead:
+- The background dims and a mini map appears centred on screen, using the same node styles, scoped to that node's connections
 - A **details strip** below the header shows contextual information for the selected node: domain(s), target URL, protocol, TLS status, cert resolver, entry point address, or connected route count depending on node type
-- Hover and click interactions work inside the popup - hover highlights a path, click drills into any connected node
-- Clicking a **group node** opens the popup showing all routes in that group with their full topology
-- Press **Esc** or click outside the popup to close it
+- Hover and click work inside the popup - hover highlights a path, click drills into any connected node
+- Press **Esc** or click outside to close it
 
-Middleware nodes show a usage count badge (e.g. `3x`) when they are used by more than one route, reducing visual noise from dense curve fans.
+Middleware nodes show a usage count badge (e.g. `3×`) when more than one route uses them, reducing visual noise from dense curve fans.
+
+On a phone the map pans by dragging and zooms by pinching, with zoom in, zoom out and fit-to-screen buttons in the bottom right corner.
 
 ---
 
 ## Route grouping
 
-Routes that share a name prefix are collapsed into a single group node showing the member count (`×3`); routes with no prefix partner render as individual nodes. Clicking a group node opens the popup with all its routes. Set **Group By** to ungrouped to show every route as its own node.
+Routes from a non-file provider are collapsed into a single group node per provider once that provider has 6 or more routes, keeping a large Docker or Kubernetes estate readable. The node shows the provider name and the member count; clicking it opens the popup with all of its routes and their topology. File routes are always drawn individually.
 
 ---
 
 ## Filtering
 
-Open the **Filters** dropdown to access all filter options. An active-filter badge on the button shows how many non-default filters are set.
-
 | Filter | Description |
 |--------|-------------|
+| Search | Matches the route name |
 | Protocol | Show only HTTP, TCP, or UDP routes |
-| Provider | Filter by Traefik provider (file, docker, kubernetes, etc.). Only shown when routes from more than one provider are present |
-| Entry Point | Filter to routes that use a specific entry point. Only shown when more than one entry point exists |
-| Group By | Control how routes are grouped - by name prefix (default), by domain, by first middleware, or ungrouped |
+| Provider | Filter by Traefik provider. The list of providers appears only when routes come from more than one |
+| Entry Point | Filter to routes that use a specific entry point |
 
-**Clear filters** resets all options to their defaults.
-
-The Entry Points column updates to show only the entry points used by the currently visible (filtered) routes.
+The **clear filters** button resets all four. The Entry Points lane shows only the entry points used by the routes still visible.
 
 ---
 
@@ -74,6 +68,7 @@ Fetches from:
 
 - `/api/routes/all` - routes from all providers (file-managed + live from Traefik API); `/api/agents/<id>/routes` when a remote agent is selected
 - `/api/traefik/entrypoints` - entry point names from the Traefik API
+- `/api/traefik/routers` - live router state for the health dots
 
 No extra mounts or configuration required beyond a working Traefik API connection.
 

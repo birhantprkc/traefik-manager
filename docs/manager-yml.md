@@ -10,19 +10,20 @@ You don't normally need to edit this file by hand - all settings are managed thr
 
 TM stores some data in separate files alongside `manager.yml` in the same config directory:
 
-| File | Contents |
-|---|---|
-| `manager.yml` | All TM settings - auth, domains, tabs, webhooks, OIDC, git backup, CrowdSec, disabled routes |
-| `agents.yml` | Remote agent registrations (encrypted API keys). Auto-created and migrated from `manager.yml` on first start after v1.5.0 |
-| `templates.yml` | Custom middleware templates created from the Middlewares tab toolbar |
-| `notifications.yml` | Recent notification history |
-| `dashboard.yml` | Dashboard custom groups and per-card overrides, kept per server |
+| File                      | Contents                                                                                                                        |
+| ---------------------------| ---------------------------------------------------------------------------------------------------------------------------------|
+| `manager.yml`             | All TM settings - auth, domains, tabs, webhooks, OIDC, git backup, CrowdSec, disabled routes                                    |
+| `agents.yml`              | Remote agent registrations (encrypted API keys). Auto-created and migrated from `manager.yml` on first start after v1.5.0       |
+| `templates.yml`           | Custom middleware templates created from the Middlewares tab toolbar                                                            |
+| `notifications.yml`       | Recent notification history                                                                                                     |
+| `dashboard.yml`           | Dashboard custom groups and per-card overrides, kept per server                                                                 |
+| `.secret_key`, `.otp_key` | Auto-generated session key and the Fernet key for every encrypted field below. Lose `.otp_key` and those secrets are unreadable |
 
-None of these companion files need to be edited by hand. Back up the entire config directory to preserve all TM state.
+None of these need to be edited by hand. Back up the entire config directory to preserve all TM state.
 
 ---
 
-## Full example
+## Example
 
 ```yaml
 domains:
@@ -30,6 +31,8 @@ domains:
   - example.net
 cert_resolver: cloudflare
 traefik_api_url: http://traefik:8080
+traefik_api_user: ""
+traefik_api_password: ""
 acme_json_path: ""
 access_log_path: ""
 static_config_path: ""
@@ -50,13 +53,17 @@ oidc_display_name: "OIDC"
 oidc_allowed_emails: ""
 oidc_allowed_groups: ""
 oidc_groups_claim: "groups"
+oidc_allow_any_authenticated: false
+oidc_auto_login: false
 webhook_url: ""
 webhook_type: "discord"
 webhook_username: ""
 webhook_password: ""
 default_theme: "dark"
+ui_prefs: {}
 geoip_enabled: false
 geoip_db_path: ""
+backup_keep_count: 0
 visible_tabs:
   dashboard: false
   routemap: false
@@ -77,6 +84,7 @@ visible_tabs:
   crowdsec: false
   plugins: false
   logs: true
+  static: false
 disabled_routes: {}
 managed_middlewares: {}
 self_route:
@@ -128,6 +136,14 @@ traefik_api_url: http://traefik:8080
 
 ---
 
+### `traefik_api_user` / `traefik_api_password`
+
+**Type:** string - **Default:** `""` - **Env:** `TRAEFIK_API_USER` / `TRAEFIK_API_PASSWORD`
+
+HTTP Basic Auth credentials for the Traefik API, needed only when it sits behind basic auth. Both are required together. The password is stored encrypted. Set via **Settings - Connection**.
+
+---
+
 ## Authentication
 
 ### `auth_enabled`
@@ -146,11 +162,19 @@ When `false` and OIDC is also disabled, the UI is fully open (TM logs a SECURITY
 
 ---
 
+### `auth_external_ack`
+
+**Type:** boolean - **Default:** `false`
+
+Confirms the open-UI state above is deliberate. When `true` the startup SECURITY warning becomes an informational line. Set by **Acknowledge and hide** in Settings - Authentication.
+
+---
+
 ### `password_hash`
 
-**Type:** string (bcrypt hash) - **Default:** auto-generated
+**Type:** string (bcrypt hash) - **Default:** `""`
 
-Managed by the UI (Settings - Authentication) or the [CLI reset command](reset-password.md). To generate manually:
+Managed by the UI (Settings - Authentication) or the [CLI reset command](reset-password.md). Left empty, TM generates a random password on first start and prints it to the container log. To generate a hash manually:
 
 ```bash
 python3 -c "import bcrypt; print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()).decode())"
@@ -191,7 +215,7 @@ Set to `true` automatically at the end of the setup wizard. Pre-set to `true` to
 
 **Type:** boolean - **Default:** `false`
 
-Whether TOTP 2FA is active. Managed via **Settings - Authentication - 2FA**.
+Whether TOTP 2FA is active. Managed via **Settings - Authentication - Two-factor**.
 
 ---
 
@@ -223,8 +247,6 @@ List of active API keys. Each entry contains `name`, `hash`, `preview`, and `cre
 api_keys:
   - name: My Phone
     hash: "sha256:3f9a..."
-    preview: "abcd1234...ef56"
-    created_at: "2026-04-03 12:00"
     preview: "abcd1234...ef56"
     created_at: "2026-04-03 12:00"
 ```
@@ -282,7 +304,7 @@ Label on the login button: "Sign in with [display name]".
 
 **Type:** string (comma-separated) - **Default:** `""`
 
-Restrict login to specific email addresses. Leaving this **and** `oidc_allowed_groups` empty denies all OIDC logins - to allow any authenticated account you must set `oidc_allow_any_authenticated: true` (Settings - Authentication - OIDC / SSO - Access Control).
+Restrict login to specific email addresses. Leaving this **and** `oidc_allowed_groups` empty denies all OIDC logins unless `oidc_allow_any_authenticated` is `true`.
 
 ---
 
@@ -294,11 +316,27 @@ At least one group must match. Leave empty to skip group enforcement.
 
 ---
 
+### `oidc_allow_any_authenticated`
+
+**Type:** boolean - **Default:** `false`
+
+Allow every account the provider authenticates, with no email or group allowlist. Set in **Settings - Authentication - OIDC / SSO - Access Control**.
+
+---
+
 ### `oidc_groups_claim`
 
 **Type:** string - **Default:** `"groups"`
 
 The claim name in the userinfo response that contains groups. Varies by provider (Keycloak: `groups`, some use `roles`).
+
+---
+
+### `oidc_auto_login`
+
+**Type:** boolean - **Default:** `false`
+
+Redirect straight to the provider instead of showing the login page. Append `?auto=0` to the login URL to reach the password form.
 
 ---
 
@@ -342,7 +380,7 @@ These can be changed without a container restart via **Settings - System Monitor
 
 ### `acme_json_path`
 
-**Type:** string - **Default:** `""` (falls back to `ACME_JSON_PATH` env var, then `/app/acme.json`)
+**Type:** string - **Default:** `""` (falls back to `ACME_JSON_PATH`, then `/app/acme.json`)
 
 Path to Traefik's `acme.json` inside the TM container. Required for the Certificates tab.
 
@@ -358,7 +396,7 @@ acme_json_path: /letsencrypt
 
 ### `access_log_path`
 
-**Type:** string - **Default:** `""` (falls back to `ACCESS_LOG_PATH` env var, then `/app/logs/access.log`)
+**Type:** string - **Default:** `""` (falls back to `ACCESS_LOG_PATH`, then `/app/logs/access.log`)
 
 Path to Traefik's access log. Required for the Logs tab.
 
@@ -370,13 +408,23 @@ access_log_path: /var/log/traefik/access.log
 
 ### `static_config_path`
 
-**Type:** string - **Default:** `""` (falls back to the `STATIC_CONFIG_PATH` env var; if neither is set, the Plugins tab and Static Config editor stay unconfigured - there is no built-in default path)
+**Type:** string - **Default:** `""` (falls back to `STATIC_CONFIG_PATH`; there is no built-in default path)
 
-Path to Traefik's static config. Required for the Plugins tab and Static Config editor.
+Path to Traefik's static config. Required for the Plugins tab and Static Config editor - both stay unconfigured while this and the env var are empty.
 
 ```yaml
 static_config_path: /etc/traefik/traefik.yml
 ```
+
+---
+
+## Backups
+
+### `backup_keep_count`
+
+**Type:** integer - **Default:** `0` (keep all) - **Env:** `BACKUP_KEEP_COUNT`
+
+How many timestamped `.bak` files to keep per config file. Set in **Settings - Backups**.
 
 ---
 
@@ -401,13 +449,15 @@ Display preferences, stored here rather than in the browser so they follow you a
 | Key | Values | Default |
 |---|---|---|
 | `showStatCards`, `compactStatCards`, `showEntrypoints` | boolean | `true`, `false`, `true` |
-| `layoutMode` | `classic` \| `modern` | Classic top tab row, or the Modern collapsible sidebar with full-width content |
-| `dashPodDensity` | `list` \| `icons` | Dashboard categories as rows with domains, or a compact grid of app icons |
+| `layoutMode` | `fluid` \| `fixed` | `fluid` - fills the screen, or capped width |
+| `staticPlacement` | `off` \| `settings` \| `tab` | Where the Static Config editor lives. Unset follows `visible_tabs.static` |
+| `dashPodDensity` | `list` \| `icons` | `list` - dashboard categories as rows with domains, or a compact grid of app icons |
 | `statBarScope` | `all` \| `dashboard` | Which tabs show the stat cards and entry points. `all` (default) means Dashboard, Routes, Middlewares and Services; `dashboard` limits them to the Dashboard tab. Only these two values are stored - any other value (including `none` or a comma-separated list) is discarded when the file is loaded. |
 | `logsAutoRefresh` | boolean | `false` - poll the access log while the Logs tab is open and visible |
 | `showDocsLink`, `showApiLink`, `showShortcutsBtn`, `showIpDiagBtn` | boolean | `true`, `false`, `true`, `true` |
 | `showTraefikBadge`, `showTmBadge`, `showRouteIcons` | boolean | `true`, `true`, `false` |
-| `routeViewMode`, `mwViewMode`, `svcViewMode` | `grid` or `list` | `grid` |
+| `routeViewMode`, `mwViewMode`, `svcViewMode` | `grid` \| `list` | `grid` |
+| `staticOpenSections`, `settingsOpenSections` | list | Which accordion sections were left open |
 
 ```yaml
 ui_prefs:
@@ -432,9 +482,9 @@ geoip_enabled: true
 
 ### `geoip_db_path`
 
-**Type:** string - **Default:** `""` (auto-download DB-IP Lite)
+**Type:** string - **Default:** `""` (auto-download DB-IP Lite) - **Env:** `GEOIP_DB_PATH`
 
-Path to a custom GeoIP `.mmdb` database. Leave empty to use the free DB-IP Lite country database TM downloads automatically. Also settable via the `GEOIP_DB_PATH` environment variable.
+Path to a custom GeoIP `.mmdb` database. Leave empty to use the free DB-IP Lite country database TM downloads automatically.
 
 ```yaml
 geoip_db_path: /data/GeoLite2-Country.mmdb
@@ -444,7 +494,7 @@ geoip_db_path: /data/GeoLite2-Country.mmdb
 
 **Type:** map of string - boolean - **Default:** all `false`
 
-Controls which optional tabs are shown. Managed via the setup wizard or **Settings - System Monitoring / Route Monitoring**.
+Controls which optional tabs are shown. Managed via the setup wizard, **Settings - Route Monitoring** (providers), **Settings - System Monitoring** (certs, plugins, logs, CrowdSec) and **Settings - Interface - Tabs** (dashboard, routemap, tls, static).
 
 | Key | Tab |
 |---|---|
@@ -467,6 +517,7 @@ Controls which optional tabs are shown. Managed via the setup wizard or **Settin
 | `crowdsec` | CrowdSec tab |
 | `plugins` | Plugins tab |
 | `logs` | Logs tab |
+| `static` | Static Config tab - kept in step with `ui_prefs.staticPlacement` |
 
 ---
 
@@ -510,6 +561,21 @@ self_route:
   router_name: traefik-manager
   entry_point: websecure
 ```
+
+---
+
+## CrowdSec and Git backup
+
+These sections are documented on their own pages. All are set through the UI and stored here; the secrets are Fernet-encrypted.
+
+| Keys | Set in | Reference |
+|---|---|---|
+| `crowdsec_lapi_url`, `crowdsec_api_key`, `crowdsec_machine_id`, `crowdsec_machine_password`, `crowdsec_client_cert`, `crowdsec_client_key`, `crowdsec_ca_cert` | Settings - System Monitoring - CrowdSec | [CrowdSec tab](tab-crowdsec.md) |
+| `git_backup_enabled`, `git_backup_repo`, `git_backup_branch`, `git_backup_username`, `git_backup_token`, `git_backup_commit_message`, `git_backup_auto_push` | Settings - Backups - Git | [Git Backup](git-backup.md) |
+
+`crowdsec_read_timeout` and `crowdsec_alert_limit` are read from this file if you add them by hand, but TM never writes them - the next Settings save drops them. Use [`CROWDSEC_READ_TIMEOUT`](env-vars.md) and `CROWDSEC_ALERT_LIMIT` instead.
+
+`agent_api_rate_limit` is stored here but not enforced in this release. Registered agents live in `agents.yml`, not in this file.
 
 ---
 

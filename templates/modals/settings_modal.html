@@ -48,6 +48,44 @@
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
                 </button>
                 <div class="settings-mobile-section">Infrastructure</div>
+                <div id="staticMobileGroup" style="display:none">
+                    <button class="settings-mobile-row" onclick="switchSettingsPanel('static')">
+                        <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-file-code" style="color:var(--muted)"></i>Static Config</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'entrypoints')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-door-open" style="color:var(--muted)"></i>Entrypoints</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'providers')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-cloud" style="color:var(--muted)"></i>Providers</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'resolvers')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-certificate" style="color:var(--muted)"></i>Cert Resolvers</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'api')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-gauge" style="color:var(--muted)"></i>API &amp; Dashboard</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'log')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-scroll" style="color:var(--muted)"></i>Logging</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'observability')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-heartbeat" style="color:var(--muted)"></i>Observability</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'system')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-gear-six" style="color:var(--muted)"></i>System</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                    <button class="settings-mobile-row is-child" onclick="openSettingsChild('static', 'plugins')">
+                        <span style="display:flex;align-items:center;gap:12px;padding-left:20px;"><i class="ph-bold ph-plug" style="color:var(--muted)"></i>Plugins</span>
+                        <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
+                    </button>
+                </div>
                 <button class="settings-mobile-row" id="msb-backups-mobile" onclick="switchSettingsPanel('backups'); loadBackups()">
                     <span style="display:flex;align-items:center;gap:12px;"><i class="ph-bold ph-archive-box" style="color:var(--muted)"></i>Backups</span>
                     <i class="ph-bold ph-caret-right" style="color:var(--muted)"></i>
@@ -124,6 +162,16 @@
                 <button class="modal-sidebar-btn" id="msb-static" onclick="switchSettingsPanel('static', this)" style="display:none">
                     <i class="ph-bold ph-file-code"></i> Static Config
                 </button>
+                <div class="modal-sidebar-sub" id="mss-static">
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-entrypoints" onclick="openSettingsChild('static', 'entrypoints')"><i class="ph-bold ph-door-open"></i> Entrypoints</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-providers" onclick="openSettingsChild('static', 'providers')"><i class="ph-bold ph-cloud"></i> Providers</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-resolvers" onclick="openSettingsChild('static', 'resolvers')"><i class="ph-bold ph-certificate"></i> Cert Resolvers</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-api" onclick="openSettingsChild('static', 'api')"><i class="ph-bold ph-gauge"></i> API &amp; Dashboard</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-log" onclick="openSettingsChild('static', 'log')"><i class="ph-bold ph-scroll"></i> Logging</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-observability" onclick="openSettingsChild('static', 'observability')"><i class="ph-bold ph-heartbeat"></i> Observability</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-system" onclick="openSettingsChild('static', 'system')"><i class="ph-bold ph-gear-six"></i> System</button>
+                    <button type="button" class="modal-sidebar-btn is-child" id="msc-static-plugins" onclick="openSettingsChild('static', 'plugins')"><i class="ph-bold ph-plug"></i> Plugins</button>
+                </div>
                 <button class="modal-sidebar-btn" id="msb-backups" onclick="switchSettingsPanel('backups', this); loadBackups()">
                     <i class="ph-bold ph-archive-box"></i> Backups
                 </button>
@@ -965,24 +1013,13 @@
                                     <button type="button" id="theme-opt-system" onclick="setTheme('system')" class="proto-btn" title="System" style="padding:4px 12px;font-size:11px;border-radius:6px"><i class="ph-bold ph-desktop"></i></button>
                                 </div></div>
                             </div>
-                            <div class="sc-set sc-set-stack">
-                                <div class="flex items-center justify-between" style="gap:12px">
-                                    <div class="sc-set-l">
-                                        <div class="sc-set-n">Layout</div>
-                                        <div class="sc-set-d">Collapsible side navigation and full-width content</div>
-                                    </div>
-                                    <div class="sc-set-v flex gap-1 flex-shrink-0">
-                                        <button type="button" id="layout-classic" onclick="setLayoutMode('classic')" class="proto-btn" style="padding:4px 12px;font-size:11px;border-radius:6px">Classic</button>
-                                        <button type="button" id="layout-modern" onclick="setLayoutMode('modern')" class="proto-btn" style="padding:4px 12px;font-size:11px;border-radius:6px">Modern</button>
-                                    </div>
+                            <div class="sc-set">
+                                <div class="sc-set-l">
+                                    <div class="sc-set-n">Layout<span class="tm-info-btn" data-tip="Fluid fills the screen and the detail panel pushes the page aside. Fixed caps the content at a comfortable reading width, centres it with the navigation, and slides the detail panel over instead."><i class="ph-bold ph-info"></i></span></div>
                                 </div>
-                                <div id="layoutSunsetNote" class="flex items-start gap-2 mt-2.5 rounded-lg" style="padding:8px 10px;background:color-mix(in srgb, var(--blue) 8%, transparent);border:1px solid color-mix(in srgb, var(--blue) 24%, transparent)">
-                                    <i class="ph-bold ph-info shrink-0" style="color:var(--blue);margin-top:1px;font-size:13px"></i>
-                                    <div class="text-xs" style="color:var(--muted);line-height:1.55">
-                                        <b style="color:var(--text)">Try the new design - Classic is being phased out in v1.11.0.</b>
-                                        Run into anything?
-                                        <a href="https://github.com/chr0nzz/traefik-manager/issues" target="_blank" rel="noopener" style="color:var(--blue)">Open an issue</a>
-                                    </div>
+                                <div class="sc-set-v flex gap-1 flex-shrink-0">
+                                    <button type="button" id="layout-fluid" onclick="setLayoutMode('fluid')" class="proto-btn" style="padding:4px 12px;font-size:11px;border-radius:6px">Fluid</button>
+                                    <button type="button" id="layout-fixed" onclick="setLayoutMode('fixed')" class="proto-btn" style="padding:4px 12px;font-size:11px;border-radius:6px">Fixed</button>
                                 </div>
                             </div>
                         </div>

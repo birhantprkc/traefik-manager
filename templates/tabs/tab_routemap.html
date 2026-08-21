@@ -36,6 +36,9 @@
         <div class="flex gap-1 p-1 rounded-lg fb-secondary" style="background:var(--input-bg);border:1px solid var(--border)">
             <button onclick="rmClearFilters()" class="proto-btn text-xs px-3 py-1.5" title="Clear filters"><i class="ph-bold ph-x-circle"></i></button>
         </div>
+        <div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)">
+            <button onclick="refreshRoutemapTab(true)" class="proto-btn text-xs px-3 py-1.5" title="Refresh"><i class="ph-bold ph-arrows-clockwise"></i></button>
+        </div>
     </div>
 
     <div id="rmLoading" class="text-center py-20 hidden" style="color:var(--muted)">
@@ -61,11 +64,12 @@
     <div id="rmPopupOverlay" style="display:none;position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,0.55);backdrop-filter:blur(2px)" onclick="_onBackdropClick(event,rmClosePopup)"></div>
     <div id="rmPopup" class="rm-popup-panel" style="display:none">
         <div class="rm-popup-header">
-            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+            <div class="flex items-center gap-2" style="min-width:0">
+                <i id="rmPopupIcon" class="ph-fill ph-graph" style="color:var(--blue);font-size:18px;flex-shrink:0"></i>
+                <h3 id="rmPopupTitle" class="font-bold text-sm" style="color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></h3>
                 <span id="rmPopupTypeBadge" class="rm-popup-type-badge"></span>
-                <span id="rmPopupTitle" style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
             </div>
-            <button onclick="rmClosePopup()" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:4px 6px;border-radius:6px;font-size:18px;line-height:1;flex-shrink:0" title="Close (Esc)">×</button>
+            <button type="button" onclick="rmClosePopup()" class="btn-icon" title="Close (Esc)"><i class="ph-bold ph-x text-sm"></i></button>
         </div>
         <div id="rmPopupDetails" class="rm-popup-details"></div>
         <div style="padding:16px;overflow-x:auto;-webkit-overflow-scrolling:touch">

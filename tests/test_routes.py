@@ -489,3 +489,18 @@ def test_editing_a_disabled_route_keeps_it_disabled(client, app_module):
     disabled = app_module.load_settings().get("disabled_routes", {})
     assert "app1" in disabled, "the route must still be recorded as disabled after the edit"
     assert disabled["app1"]["router"], "the stored disabled route must carry the edited router"
+
+
+def test_load_balancing_checkboxes_are_wired_to_their_panels(client):
+    """#148: checking Sticky sessions / Health check must reveal their fields.
+
+    _lbSyncToggles() shows the matching panel, but it only ran while loading a
+    saved route, so a new route's checkboxes toggled nothing and the config was
+    saved without the feature the user thought they had enabled.
+    """
+    html = client.get('/').get_data(as_text=True)
+    for box in ('lbStickyEnabled', 'lbHealthEnabled'):
+        tag = next((t for t in html.split('<input') if 'id="%s"' % box in t), None)
+        assert tag is not None, '%s is missing from the route modal' % box
+        assert '_lbSyncToggles()' in tag.split('>')[0], (
+            '%s has no handler, so its panel never opens' % box)

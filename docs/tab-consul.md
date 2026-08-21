@@ -1,28 +1,26 @@
 # Consul KV Tab
 
-The **Consul KV** tab shows all routes stored in Traefik's Consul KV provider in read-only mode.
+The **Consul KV** tab lists the routes Traefik reads from its Consul KV provider.
 
-> **Note:** This tab covers the Consul *KV store* provider (`consul`), which reads Traefik configuration from Consul's key-value store. This is different from the Consul Catalog provider which discovers services registered in Consul's service catalog.
+> **Note:** This is the Consul *key-value store* provider (`consul`). Services registered in Consul's service catalog appear in the [Consul Catalog](tab-consulcatalog.md) tab instead.
 
 ## What it shows
 
-- Route name, rule, status (enabled/disabled/error)
-- Protocol (HTTP / TCP / UDP)
-- TLS indicator
-- Service name
-- Entry points
-- Full detail view via the info button
+- One card per route: status, name, rule, protocol, TLS state, service, entry points, middlewares
+- Summary strip: route counts per protocol, plus any route not serving
+- Middlewares from the Consul KV provider, listed under the routes
+- Search, protocol filter, refresh
 
+Click a card for its detail panel.
 
 Routes are **read-only** - edit them directly in the Consul KV store.
 
 ## Enabling the tab
 
-### During setup wizard
-Toggle **Consul KV** on in the "Optional monitoring" step.
-
-### After setup
-Go to **Settings → Route Monitoring** and enable Consul KV.
+| Where | Path |
+|---|---|
+| Setup wizard | Monitoring step → Provider tabs → Consul KV |
+| Later | Settings → Route Monitoring → Consul KV |
 
 ## Requirements
 
@@ -35,4 +33,4 @@ providers:
       - "consul:8500"
 ```
 
-No extra file mounts into the traefik-manager container are needed - data is pulled live from the Traefik API.
+No mounts into traefik-manager needed - data comes live from the Traefik API.

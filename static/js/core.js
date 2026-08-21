@@ -27,49 +27,91 @@ const OPTIONAL_TABS = ['dashboard', 'routemap', 'docker', 'kubernetes', 'swarm',
 let _visibleTabsCache = {};
 let _localTabsCache   = {};
 
+const TAB_DEFS = [
+    { id: 'dashboard',     label: 'Dashboard',       icon: 'ph-house' },
+    { id: 'services',      label: 'Routes',          icon: 'ph-arrows-split' },
+    { id: 'middlewares',   label: 'Middlewares',     icon: 'ph-stack' },
+    { id: 'live',          label: 'Services',        icon: 'ph-hard-drives' },
+    { id: 'routemap',      label: 'Route Map',       icon: 'ph-tree-structure' },
+    { id: 'logs',          label: 'Logs',            icon: 'ph-receipt' },
+    { id: 'crowdsec',      label: 'CrowdSec',        icon: 'ph-shield' },
+    { id: 'certs',         label: 'Certs',           icon: 'ph-shield-check' },
+    { id: 'tls',           label: 'TLS Options',     icon: 'ph-lock-laminated' },
+    { id: 'plugins',       label: 'Plugins',         icon: 'ph-puzzle-piece' },
+    { id: 'static',        label: 'Static Config',   icon: 'ph-file-code' },
+    { id: 'docker',        label: 'Docker',          icon: 'ph-cube' },
+    { id: 'kubernetes',    label: 'Kubernetes',      icon: 'ph-circles-three' },
+    { id: 'swarm',         label: 'Swarm',           icon: 'ph-graph' },
+    { id: 'nomad',         label: 'Nomad',           icon: 'ph-circles-four' },
+    { id: 'ecs',           label: 'ECS',             icon: 'ph-cloud' },
+    { id: 'consulcatalog', label: 'Consul Catalog',  icon: 'ph-address-book' },
+    { id: 'redis',         label: 'Redis',           icon: 'ph-database' },
+    { id: 'etcd',          label: 'etcd',            icon: 'ph-database' },
+    { id: 'consul',        label: 'Consul KV',       icon: 'ph-database' },
+    { id: 'zookeeper',     label: 'ZooKeeper',       icon: 'ph-database' },
+    { id: 'http_provider', label: 'HTTP Provider',   icon: 'ph-link' },
+    { id: 'file_external', label: 'File (external)', icon: 'ph-file-text' },
+];
+const TAB_BY_ID = Object.fromEntries(TAB_DEFS.map(t => [t.id, t]));
+
+const _tabCounts = {};
+
+function setTabCount(tab, n) {
+    const val = (n === null || n === undefined || n === '' || n === '-') ? null : String(n);
+    if (_tabCounts[tab] === val) return;
+    _tabCounts[tab] = val;
+    const el = document.querySelector('#sbtn-' + tab + ' .side-nav-count');
+    if (el) { el.textContent = val ?? ''; el.style.display = val === null ? 'none' : ''; }
+    else buildSideNav();
+}
+
 const SIDE_NAV_GROUPS = [
     { label: 'Traffic',        tabs: ['dashboard', 'services', 'middlewares', 'live', 'routemap'] },
     { label: 'Observability',  tabs: ['logs', 'crowdsec'] },
-    { label: 'Infrastructure', tabs: ['certs', 'tls', 'plugins'] },
-    { label: 'System',         tabs: ['static'] },
+    { label: 'Infrastructure', tabs: ['certs', 'tls', 'plugins', 'static'] },
     { label: 'Providers',      tabs: ['docker', 'kubernetes', 'swarm', 'nomad', 'ecs', 'consulcatalog', 'redis', 'etcd', 'consul', 'zookeeper', 'http_provider', 'file_external'] },
 ];
 
+function _tabVisible(tab) {
+    if (OPTIONAL_TABS.includes(tab)) return !!_visibleTabsCache[tab];
+    return true;
+}
+
+let _activeTab = 'services';
+
 function buildSideNav() {
     const nav = document.getElementById('sideNavItems');
-    const bar = document.getElementById('tabBar');
-    if (!nav || !bar) return;
+    if (!nav) return;
     nav.innerHTML = '';
-    const items = {};
-    bar.querySelectorAll('.tab-btn').forEach(btn => {
-        const optional = btn.classList.contains('tab-optional');
-        if (optional && btn.style.display !== 'block') return;
-        if (!optional && btn.style.display === 'none') return;
-        const tab   = btn.id.replace(/^btn-/, '');
-        const icon  = btn.querySelector('i');
-        const badge = btn.querySelector('.badge');
-        const clone = btn.cloneNode(true);
-        clone.querySelectorAll('i, .badge').forEach(n => n.remove());
-        const label = (clone.textContent || '').trim();
-        const count = badge ? badge.textContent.trim() : '';
-        const item  = document.createElement('button');
-        item.className = 'side-nav-item' + (btn.classList.contains('active') ? ' active' : '');
-        item.id = 'sbtn-' + tab;
-        item.title = (window.innerWidth >= 768 && document.documentElement.classList.contains('tm-nav-collapsed')) ? label : '';
-        item.onclick = () => { closeSideNavDrawer(); switchTab(tab); };
-        item.innerHTML = `${icon ? `<i class="${icon.className}"></i>` : ''}<span class="side-nav-label">${_esc(label)}</span>${count && count !== '-' ? `<span class="side-nav-count">${_esc(count)}</span>` : ''}`;
-        items[tab] = item;
-    });
+    const collapsed = window.innerWidth >= 768
+        && document.documentElement.classList.contains('tm-nav-collapsed');
+
+    const make = (def) => {
+        const item = document.createElement('button');
+        item.className = 'side-nav-item' + (def.id === _activeTab ? ' active' : '');
+        item.id = 'sbtn-' + def.id;
+        item.title = collapsed ? def.label : '';
+        item.onclick = () => { closeSideNavDrawer(); switchTab(def.id); };
+        const count = _tabCounts[def.id];
+        item.innerHTML = `<i class="ph-bold ${def.icon}"></i>`
+            + `<span class="side-nav-label">${_esc(def.label)}</span>`
+            + `<span class="side-nav-count"${count === null || count === undefined ? ' style="display:none"' : ''}>`
+            + `${count === null || count === undefined ? '' : _esc(count)}</span>`;
+        return item;
+    };
+
     const grouped = new Set(SIDE_NAV_GROUPS.flatMap(g => g.tabs));
-    Object.keys(items).filter(t => !grouped.has(t)).forEach(t => nav.appendChild(items[t]));
+    TAB_DEFS.filter(d => !grouped.has(d.id) && _tabVisible(d.id))
+            .forEach(d => nav.appendChild(make(d)));
+
     for (const group of SIDE_NAV_GROUPS) {
-        const present = group.tabs.filter(t => items[t]);
+        const present = group.tabs.filter(t => TAB_BY_ID[t] && _tabVisible(t));
         if (!present.length) continue;
         const head = document.createElement('div');
         head.className = 'side-nav-section';
         head.textContent = group.label;
         nav.appendChild(head);
-        present.forEach(t => nav.appendChild(items[t]));
+        present.forEach(t => nav.appendChild(make(TAB_BY_ID[t])));
     }
 }
 
@@ -97,6 +139,12 @@ const MODAL_CLOSERS = {
     trustedIpsModal: 'closeTrustedIpsModal',
     rmEditModal:     'rmCloseEditModal',
     rmGroupsModal:   'rmCloseGroupsModal',
+    mwDetailPanel:     'closeMwDetail',
+    svcDetailPanel:    'closeSvcDetail',
+    pluginDetailPanel: 'closePluginDetail',
+    logDetailPanel:    'closeLogDetail',
+    tlsOptDetailPanel: 'closeTlsOptDetail',
+    mwTplPanel:        'closeTemplatesPanel',
 };
 
 function closeOtherPanels(keepId) {
@@ -114,7 +162,7 @@ function closeOtherPanels(keepId) {
 }
 
 function _detailDockActive() {
-    return document.documentElement.classList.contains('tm-modern')
+    return !document.documentElement.classList.contains('tm-fixed')
         && !document.documentElement.classList.contains('tm-settings-open')
         && window.matchMedia('(min-width: 1440px)').matches;
 }
@@ -181,23 +229,11 @@ function toggleSideNavCollapse() {
 
 function applyTabVisibility(map) {
     if (map) _visibleTabsCache = map;
-    OPTIONAL_TABS.forEach(tab => {
-        const btn = document.getElementById('btn-' + tab);
-        if (!btn) return;
-        btn.style.display = _visibleTabsCache[tab] ? 'block' : 'none';
-    });
-    
-    const activeBtn = document.querySelector('.tab-btn.active');
-    if (activeBtn && activeBtn.style.display === 'none') {
-        switchTab('services');
-    }
+    if (!_tabVisible(_activeTab)) switchTab('services');
     buildSideNav();
     applyGeoipRelevance();
 }
 
-// GeoIP only feeds the Logs and CrowdSec tabs, so the setting is pointless with
-// both off. It stays visible while enabled, otherwise turning it back off would
-// mean re-enabling a tab first.
 function applyGeoipRelevance() {
     const sec = document.getElementById('geoipSection');
     if (!sec) return;
@@ -236,12 +272,11 @@ function placeStatCards() {
 function switchTab(tab) {
     document.documentElement.classList.toggle('tm-tab-dashboard', tab === 'dashboard');
     document.documentElement.classList.toggle('tm-stats-here', _statTabSet().has(tab));
+    _activeTab = tab;
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.side-nav-item').forEach(i => i.classList.remove('active'));
     document.getElementById('sbtn-' + tab)?.classList.add('active');
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('tab-' + tab)?.classList.add('active');
-    document.getElementById('btn-' + tab)?.classList.add('active');
     if (tab === 'dashboard')     refreshDashboardTab();
     if (tab === 'routemap')      refreshRoutemapTab();
     if (tab === 'services' || tab === 'middlewares') refreshRoutes();
@@ -328,6 +363,34 @@ function _dState(state) {
     const dot = s === 'enabled' ? 'status-online' : (s === 'disabled' || s === 'error') ? 'status-offline' : 'status-unknown';
     const cls = s === 'enabled' ? 'd-on' : (s === 'disabled' || s === 'error') ? 'd-bad' : 'd-off';
     return `<span class="d-state d-flat ${cls}"><span class="status-dot ${dot}"></span>${_esc(state || 'Unknown')}</span>`;
+}
+
+function renderSection(title, icon, rows) {
+    const rowsHtml = rows.map(([key, val, isHtml]) => {
+        const displayVal = isHtml ? val
+            : `<span class="font-mono" style="color:var(--text)">${String(val).replace(/</g, '&lt;')}</span>`;
+        return `<div class="detail-key">${key}</div><div class="detail-val">${displayVal}</div>`;
+    }).join('');
+    return `<div class="detail-section">
+        <div class="detail-section-header">
+            <i class="ph-bold ${icon} sc-sec-icon" style="color:var(--blue)"></i>
+            <span class="sc-sec-label">${_esc(title)}</span>
+            <span class="sc-sec-rule"></span>
+        </div>
+        <div class="detail-kv">${rowsHtml}</div>
+    </div>`;
+}
+
+function renderDetailBlock(title, icon, bodyHtml, badgeHtml) {
+    return `<div class="detail-section">
+        <div class="detail-section-header">
+            <i class="ph-bold ${icon} sc-sec-icon" style="color:var(--blue)"></i>
+            <span class="sc-sec-label">${_esc(title)}</span>
+            ${badgeHtml || ''}
+            <span class="sc-sec-rule"></span>
+        </div>
+        <div class="detail-body">${bodyHtml}</div>
+    </div>`;
 }
 
 function _dCount(n) {
@@ -456,7 +519,7 @@ const TM_PREF_DEFAULTS = {
     routeViewMode: 'grid', mwViewMode: 'grid', svcViewMode: 'grid',
     statBarScope: 'all',
     dashPodDensity: 'list',
-    layoutMode: 'classic',
+    layoutMode: 'fluid',
     logsAutoRefresh: false,
 };
 
@@ -1124,7 +1187,11 @@ function _navVisible(el) {
     return getComputedStyle(el).display !== 'none';
 }
 
-const NAV_COLLAPSE_ALL_BELOW = 1024;
+const NAV_CAP_BELOW = 1440;
+
+const NAV_PINNED = ['navAddRouteBtn', 'navAddMwBtn', 'themeToggleBtn'];
+
+const NAV_NARROW_MAX = 5;
 
 function reflowNav() {
     const bar = document.getElementById('navActions');
@@ -1133,14 +1200,25 @@ function reflowNav() {
     if (!bar || !wrap || !menu || getComputedStyle(bar).display === 'none') return;
 
     const items = _navItems(bar, menu);
-    const collapseAll = window.innerWidth < NAV_COLLAPSE_ALL_BELOW;
+    const phone  = window.innerWidth < NAV_PHONE_BELOW;
+    const narrow = !phone && window.innerWidth < NAV_CAP_BELOW;
 
     _navRestore(bar, menu, wrap);
 
-    if (collapseAll) {
+    if (phone) {
         wrap.style.display = '';
         for (const { el } of items) {
             if (_navMovable(el)) menu.appendChild(el);
+        }
+    } else if (narrow) {
+        wrap.style.display = '';
+        const pinnedCount = items.filter(({ el }) => NAV_PINNED.includes(el.id) && _navVisible(el)).length;
+        let slots = Math.max(0, NAV_NARROW_MAX - 1 - pinnedCount);
+        for (const { el } of [...items].reverse()) {
+            if (NAV_PINNED.includes(el.id)) continue;
+            if (!_navMovable(el)) continue;
+            if (_navVisible(el) && slots > 0) { slots--; continue; }
+            menu.appendChild(el);
         }
     } else {
         wrap.style.display = 'none';

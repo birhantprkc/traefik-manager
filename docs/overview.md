@@ -1,4 +1,4 @@
-# Traefik Manager
+# Overview
 
 A self-hosted web UI for managing and monitoring your [Traefik](https://traefik.io/) reverse proxy - add routes, manage middlewares, view TLS certificates, and inspect live traffic, all without editing YAML by hand.
 
@@ -6,59 +6,44 @@ A self-hosted web UI for managing and monitoring your [Traefik](https://traefik.
 
 ## Get Started
 
-<div class="vp-grid-cards">
-<div class="vp-card">
+One command installs Traefik and Traefik Manager together, Traefik Manager on its own, or the agent on a remote host.
 
-**<img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/windows-terminal.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block">  Traefik Stack**
+```bash
+curl -fsSL https://get-traefik.xyzlab.dev | bash
+```
 
-One command installs Traefik + Traefik Manager together, or Traefik Manager on its own via Docker or a native Linux service.
+[What the installer sets up →](traefik-stack.md)
 
-[Traefik Stack guide →](traefik-stack.md)
+### Install it yourself
 
-</div>
-<div class="vp-card">
-
-**<img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/docker.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block"> Docker**
-
-Deploy with Docker Compose - minimal setup, pre-built image on GHCR.
-
-[Docker guide →](docker.md)
-
-</div>
-<div class="vp-card">
-
-**<img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/podman.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block"> Podman**
-
-Rootless containers, Quadlet/systemd, SELinux volume labels.
-
-[Podman guide →](podman.md)
-
-</div>
-<div class="vp-card">
-
-**<img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/linux.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block"> Linux (native)**
-
-Run directly on the host with Python + systemd. No container runtime needed.
-
-[Linux guide →](linux.md)
-
-</div>
-<div class="vp-card">
-
-**<img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/unraid.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block"> Unraid**
-
-Install on Unraid with a pre-built template.
-
-[Unraid guide →](unraid.md)
-
-</div>
+<div class="vp-pick">
+<a class="vp-pick-card" href="./docker">
+  <img src="/images/i-docker.png" alt="" width="28" height="28">
+  <strong>Docker</strong>
+  <span>You already run containers. Compose file, image on GHCR.</span>
+</a>
+<a class="vp-pick-card" href="./podman">
+  <img src="/images/i-podman.png" alt="" width="28" height="28">
+  <strong>Podman</strong>
+  <span>You want rootless. Quadlet units and SELinux labels covered.</span>
+</a>
+<a class="vp-pick-card" href="./linux">
+  <img src="/images/i-linux.png" alt="" width="28" height="28">
+  <strong>Linux</strong>
+  <span>No container runtime. Python and a systemd service on the host.</span>
+</a>
+<a class="vp-pick-card" href="./unraid">
+  <img src="/images/i-unraid.png" alt="" width="28" height="28">
+  <strong>Unraid</strong>
+  <span>Install from the Community Applications template.</span>
+</a>
 </div>
 
 ---
 
 ## Management
 
-These tabs are always visible. They let you read and write your Traefik dynamic config.
+Always visible. These tabs read and write your Traefik dynamic config.
 
 | Tab | Description |
 |-----|-------------|
@@ -66,7 +51,20 @@ These tabs are always visible. They let you read and write your Traefik dynamic 
 | [Middlewares](tab-middlewares.md) | Create and manage middlewares with built-in templates |
 | [Services](tab-services.md) | Read-only view of all services across every provider |
 
-**Multiple config files** - mount several Traefik dynamic config files using `CONFIG_DIR` or `CONFIG_PATHS`. A dropdown in the route/middleware forms lets you choose which file each entry is saved to. See [Environment Variables](env-vars.md) for setup.
+**Multiple config files** - mount several dynamic config files with `CONFIG_DIR` or `CONFIG_PATHS`. A dropdown in the route and middleware forms picks the file each entry is written to. See [Environment Variables](env-vars.md).
+
+---
+
+## Navigation and layout
+
+Tabs live in the left side nav, grouped Traffic, Observability, Infrastructure and Providers. Settings opens from its foot, or with **Shift** + **P**.
+
+Layout is set under **Settings - Interface - Layout**, instance-wide.
+
+| Layout | Content | Detail panel |
+|--------|---------|--------------|
+| **Fluid** (default) | Fills the screen | Pushes the page |
+| **Fixed** | Capped width | Slides over |
 
 ---
 
@@ -74,17 +72,17 @@ These tabs are always visible. They let you read and write your Traefik dynamic 
 
 Above the content on the Dashboard, Routes, Middlewares and Services tabs sits a panel that answers one question: is anything wrong right now.
 
-A verdict line sums up every problem in plain language and names the providers responsible. Four cards - HTTP routers, TCP/UDP routers, services and middlewares - each show a total, a strip with one cell per object sorted worst-first, and counts you can click to jump straight to the broken ones. Below them, entry points are listed with their protocol, flags, address, how many routers are bound to each, and a runtime footer with the Traefik version, uptime and whether metrics, access logs and tracing are on.
+A verdict line sums up every problem in plain language and names the providers responsible. Four cards - HTTP routers, TCP/UDP routers, services and middlewares - each show a total, a strip with one cell per object worst-first, and counts you can click to jump straight to the broken ones. A provider strip scopes all four cards to one provider in a click. Below them, entry points list their protocol, flags, address and bound router count, over a runtime footer with the Traefik version, uptime and whether metrics, access logs and tracing are on.
 
-Colour is rationed: a healthy install is calm and almost monochrome, so anything coloured is worth reading. A provider strip lets you scope all four cards to one provider in a click.
+Colour is rationed: a healthy install is almost monochrome, so anything coloured is worth reading.
 
-Choose which of the four tabs show it under **Settings - Interface - Show on**, and switch it to a denser layout with **Compact stat cards**. The same visual language is used by the [Logs](tab-logs.md) and [CrowdSec](tab-crowdsec.md) analytics panels.
+Choose which of the four tabs show it under **Settings - Interface - Show on**, and switch to a denser layout with **Compact stat cards**. The [Logs](tab-logs.md) and [CrowdSec](tab-crowdsec.md) analytics panels use the same visual language.
 
 ---
 
 ## Static Config Editor
 
-Edit your Traefik static config (`traefik.yml`) directly from the UI - no SSH or file editor needed. Changes are staged and backed up automatically; a one-click restart applies them via your configured restart method.
+Edit your Traefik static config (`traefik.yml`) from the UI - no SSH needed. Changes are staged until you save, every save is backed up first, and a one-click restart applies them via your configured restart method.
 
 **What you can manage:**
 - Entrypoints - ports, redirects, trusted IPs, PROXY protocol, TLS defaults, middleware chains, timeouts
@@ -96,22 +94,25 @@ Edit your Traefik static config (`traefik.yml`) directly from the UI - no SSH or
 
 Works identically for [remote agents](agent.md#static-config-editing) - the sections read and write the active agent's own `traefik.yml`.
 
-**Setup required** - this feature needs two things configured:
+**Setup required:**
 
 | Requirement | Details |
 |-------------|---------|
 | Mount `traefik.yml` read-write | `-v /path/to/traefik.yml:/app/traefik.yml` (no `:ro`) |
-| Set `RESTART_METHOD` | How TM restarts Traefik after a config change - `proxy`, `poison-pill`, or `socket` |
+| Set `STATIC_CONFIG_PATH` | Path inside the container, e.g. `/app/traefik.yml`. No default. Also settable under **Settings - System Monitoring - File Paths** |
+| Set `RESTART_METHOD` | How TM restarts Traefik after a config change - `proxy` (default), `poison-pill` or `socket` |
 
-See the [Static Config Editor](static.md) page for full setup instructions including how to configure each restart method.
+Once the file is readable, **Settings - Interface - Tabs** places the editor: **Off**, inside **Settings**, or as its own **Tab**.
+
+See [Static Config Editor](static.md) for each restart method.
 
 ---
 
 ## Multi-Server
 
-Manage unlimited remote Traefik instances from one UI through [TMA](agent.md), a small Go agent that runs next to Traefik on each server. A switcher in the nav bar changes the active server, and every tab - routes, middlewares, services, backups, logs - then works against it. No VPN or SSH required.
+Manage remote Traefik instances from one UI through [TMA](agent.md), a small Go agent that runs next to Traefik on each server. A switcher at the top of the side nav changes the active server, and every tab - routes, middlewares, services, backups, logs - then works against it. No VPN or SSH required.
 
-The setup wizard generates a ready-to-paste Docker Compose or Docker Run command, and the API key is shown once and stored encrypted.
+Adding an agent generates a ready-to-paste Docker Compose or Docker Run command. The API key is shown once and stored encrypted.
 
 ---
 
@@ -125,7 +126,7 @@ Every change writes a timestamped backup first, and any of them can be restored 
 
 ## Visualizations
 
-Optional tabs. Dashboard, Route Map and TLS Options toggle on in **Settings - Interface - Tabs**; CrowdSec toggles on in **Settings - System Monitoring - Tab Visibility**. The setup wizard offers Dashboard and Route Map, but not TLS Options or CrowdSec. No extra mounts needed. No extra mounts needed.
+Optional tabs, no extra mounts needed. Dashboard, Route Map and TLS Options toggle on in **Settings - Interface - Tabs**; CrowdSec in **Settings - System Monitoring - Tab Visibility**. The setup wizard can turn on Dashboard and Route Map; TLS Options and CrowdSec are Settings only.
 
 | Tab                           | Description                                                                    |
 | -------------------------------| --------------------------------------------------------------------------------|
@@ -143,14 +144,14 @@ Optional tabs - each requires a file mounted into the container.
 | Tab | Mount required | Description |
 |-----|----------------|-------------|
 | [Certificates](tab-certs.md) | `acme.json:/app/acme.json:ro` | TLS certificates with expiry tracking. `ACME_JSON_PATH` accepts several files or a directory, for setups with one resolver per storage file |
-| [Plugins](tab-plugins.md) | `traefik.yml:/app/traefik.yml:ro` plus `STATIC_CONFIG_PATH=/app/traefik.yml` (no default) | Plugins declared in your static config |
+| [Plugins](tab-plugins.md) | `traefik.yml:/app/traefik.yml` plus `STATIC_CONFIG_PATH=/app/traefik.yml` (no default) | Plugins from your static config with the middlewares using each one, plus a guided install. Versions are checked against the catalog daily and flagged when one is out of date. Add `:ro` to keep the tab read-only |
 | [Logs](tab-logs.md) | `access.log:/app/logs/access.log:ro` | Access log analytics: status, latency, paths, clients and services as clickable cards over a live tail, with optional auto refresh and a [world map](geoip.md) |
 
 ---
 
 ## Providers
 
-Read-only tabs that pull live data from the Traefik API. No extra mounts needed - just a working API connection.
+Read-only tabs that pull live data from the Traefik API - no extra mounts, just a working API connection. Each lists that provider's routers and its middlewares.
 
 ### Orchestrators
 
@@ -185,17 +186,17 @@ Read-only tabs that pull live data from the Traefik API. No extra mounts needed 
 
 ## Configuration
 
-Settings open from the gear in the top bar. Each pane lists its settings as aligned rows carrying the setting name, what it does and its control, in the same visual language as the rest of the app.
+Settings open from the foot of the side nav. Each pane lists its settings as aligned rows carrying the setting name, what it does and its control.
 
-The search box above the panes filters by setting name and description, and it searches every pane at once: matches in panes you are not looking at show as a count beside that pane in the sidebar, so you can find a setting without knowing where it lives. Clearing the box restores everything.
+The search box above the panes filters every pane at once by name and description: matches elsewhere show as a count beside that pane in the sidebar, so you can find a setting without knowing where it lives.
 
-A verdict line appears above the search when something needs attention, so a warning like no authentication being active is visible from any pane rather than only from the one that owns it.
+A verdict line above the search flags anything that needs attention, such as no authentication being active.
 
 | Page                                   | Description                                                                                   |
 | ----------------------------------------| -----------------------------------------------------------------------------------------------|
 | [manager.yml](manager-yml.md)          | Full settings file reference - all keys, types, and defaults                                  |
 | [Environment Variables](env-vars.md)   | All supported environment variables with override behaviour                                   |
-| [OIDC / SSO Login](oidc.md)            | Supports OpenID Connect (OIDC) as an additional login method alongside the built-in password. |
+| [OIDC / SSO Login](oidc.md)            | OpenID Connect as an additional login method alongside the built-in password                  |
 | [Notification Webhooks](webhooks.md)   | Forward events to Discord, Slack, ntfy or any JSON endpoint                                   |
 | [Git Repository Backup](git-backup.md) | Auto-push, commit history, diff viewer and one-click restore                                  |
 
@@ -214,9 +215,9 @@ A verdict line appears above the search when something needs attention, so a war
 
 ## Self Route
 
-Put Traefik Manager itself behind Traefik so you can access it via a domain with HTTPS.
+Put Traefik Manager itself behind Traefik so you can reach it on a domain with HTTPS.
 
-Go to **Settings - Connection - Self Route**. The URL field pre-fills from your current hostname and the service URL is detected from your existing config if a matching route is found. Click **Save Route** - TM writes the router and service entries into your dynamic config file. No changes to `traefik.yml` needed.
+Go to **Settings - Connection - Self Route**. The URL pre-fills from your current hostname; the service URL and entry point are detected from your existing config. Click **Save Route** and TM writes the router and service entries into your dynamic config file. No changes to `traefik.yml` needed.
 
 ---
 
@@ -332,7 +333,7 @@ accessLog:
 
 ## Mobile App
 
-A companion Android app for managing Traefik Manager on the go. See the [requirements table](mobile.md#requirements) for which server version each app release needs.
+A companion Android app. See the [requirements table](mobile.md#requirements) for which server version each app release needs.
 
 Connect it with an API key: go to **Settings - Authentication - API Keys**, click **Add Key**, enter a device name, and copy the generated key. Each device gets its own key, so one can be revoked without affecting the others.
 
@@ -342,8 +343,6 @@ Connect it with an API key: go to **Settings - Authentication - API Keys**, clic
 **<img src="/images/icon.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block"> Traefik Manager Mobile**
 
 Browse routes, middlewares, and services. Enable/disable routes. Add and edit with built-in templates. Follows system light/dark theme.
-
-Authenticates via the API key from **Settings → Authentication**.
 
 <MobileRelease /> [Mobile docs →](mobile.md)
 
@@ -362,7 +361,7 @@ Authenticates via the API key from **Settings → Authentication**.
 | Auth | bcrypt · pyotp (TOTP) · Flask sessions · CSRF · Flask-Limiter · Fernet |
 | Frontend | Vanilla JS · Tailwind CSS 3.4 · Phosphor Icons |
 | Editor | Monaco Editor 0.52 (VS Code engine) |
-| Route Map | dagre 0.8 (graph layout) |
+| Route Map | dagre 3.1 (graph layout) |
 | Geolocation | maxminddb · DB-IP Lite (local lookups, no external calls) |
 | Tests | pytest · ruff · `go test` - run on every pull request |
 | Container | Docker · Alpine Linux · all JS/CSS bundled at build time (no CDN at runtime) |

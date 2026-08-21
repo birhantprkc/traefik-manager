@@ -1,29 +1,66 @@
+function _tvFlag(f) {
+    return '<span class="sig-flag ' + f.cls + ' lg-static" title="' + _esc(f.tip || (f.n + ' ' + f.label)) + '">'
+        + '<i class="' + f.ic + '"></i>'
+        + (f.n === '' ? '' : '<b>' + _sdNum(f.n) + '</b>')
+        + (f.label ? '<span class="sig-fl">' + _esc(f.label) + '</span>' : '')
+        + '</span>';
+}
+
+function _tvStrip(mountId, v) {
+    const el = document.getElementById(mountId);
+    if (!el) return;
+    if (v === null) { el.innerHTML = ''; return; }
+    const note = el.dataset.note || v.note || '';
+    const tip = note
+        ? '<span class="tm-info-btn" data-tip="' + _esc(note) + '"><i class="ph-bold ph-info"></i></span>'
+        : '';
+    el.innerHTML = '<div class="sig-verdict" data-health="' + (v.health || 'up') + '">'
+        + '<i class="' + v.ic + ' sig-verdict-ic"></i>'
+        + '<span class="sig-verdict-txt">' + _esc(v.txt) + '</span>'
+        + '<span class="sig-verdict-items">' + (v.flags || []).map(_tvFlag).join('') + '</span>'
+        + '<span class="sig-verdict-meta">' + (v.meta || '') + tip + '</span></div>';
+}
+
+function renderProviderVerdict(prefix, routes, mws) {
+    const mountId = prefix + 'Verdict';
+    if (!document.getElementById(mountId)) return;
+    if (!routes || !routes.length) { _tvStrip(mountId, null); return; }
+    const err = routes.filter(r => r.status && r.status !== 'enabled').length;
+    const by = p => routes.filter(r => r._proto === p).length;
+    const flags = [];
+    const h = by('HTTP'), t = by('TCP'), u = by('UDP');
+    if (h) flags.push({ cls: 'd-off', ic: 'ph-bold ph-globe', n: h, label: 'HTTP' });
+    if (t) flags.push({ cls: 'd-off', ic: 'ph-bold ph-arrows-left-right', n: t, label: 'TCP' });
+    if (u) flags.push({ cls: 'd-off', ic: 'ph-bold ph-broadcast', n: u, label: 'UDP' });
+    if (err) flags.push({ cls: 'd-bad', ic: 'ph-fill ph-warning-octagon', n: err, label: 'not serving' });
+    if (mws && mws.length) flags.push({ cls: 'd-off', ic: 'ph-bold ph-stack', n: mws.length,
+        label: mws.length === 1 ? 'middleware' : 'middlewares' });
+    _tvStrip(mountId, {
+        health: err ? 'down' : 'up',
+        ic: err ? 'ph-fill ph-warning-octagon' : 'ph-fill ph-check-circle',
+        txt: err ? _sdNum(err) + (err === 1 ? ' route' : ' routes') + ' not serving'
+                 : _sdNum(routes.length) + (routes.length === 1 ? ' route' : ' routes') + ' live',
+        flags,
+        meta: '<b>read-only</b>',
+    });
+}
+
 function renderProviderMiddlewareSection(middlewares, containerId) {
     const el = document.getElementById(containerId);
     if (!el) return;
     if (!middlewares || middlewares.length === 0) { el.innerHTML = ''; return; }
-    const modern = _tmModern();
     const cards = middlewares.map(mw => {
         const name = (mw.name || '').split('@')[0];
         const type = mw.type || '';
         const st   = (mw.status || '').toLowerCase();
         const dot  = st === 'enabled' ? 'status-online' : (st === 'disabled' || st === 'error') ? 'status-offline' : 'status-unknown';
-        if (modern) {
-            return `<div class="tm-card tm-card-flat" style="--tm-accent:var(--purple)">
-                <div class="tm-head">
-                    <span class="tm-ic tm-ic-tile"><i class="ph-bold ${_tmMwIcon({ yaml: type })}"></i><span class="status-dot ${dot}"></span></span>
-                    <div class="tm-head-txt">
-                        <div class="tm-title"><span class="tm-name">${_esc(name)}</span></div>
-                        ${type ? `<div class="tm-sub">${_esc(type)}</div>` : ''}
-                    </div>
+        return `<div class="tm-card tm-card-flat" style="--tm-accent:var(--purple)">
+            <div class="tm-head">
+                <span class="tm-ic tm-ic-tile"><i class="ph-bold ${_tmMwIcon({ yaml: type })}"></i><span class="status-dot ${dot}"></span></span>
+                <div class="tm-head-txt">
+                    <div class="tm-title"><span class="tm-name">${_esc(name)}</span></div>
+                    ${type ? `<div class="tm-sub">${_esc(type)}</div>` : ''}
                 </div>
-            </div>`;
-        }
-        return `<div class="card p-3 flex items-center gap-3">
-            <span class="status-dot ${dot}" style="flex-shrink:0"></span>
-            <div class="min-w-0 flex-1">
-                <div class="text-sm font-semibold font-mono truncate" style="color:var(--text)" title="${_esc(name)}">${_esc(name)}</div>
-                ${type ? `<div class="text-xs mt-0.5" style="color:var(--muted)">${_esc(type)}</div>` : ''}
             </div>
         </div>`;
     }).join('');
@@ -31,12 +68,12 @@ function renderProviderMiddlewareSection(middlewares, containerId) {
         <div class="text-xs font-semibold uppercase tracking-wide mb-3 flex items-center gap-2" style="color:var(--muted)">
             <i class="ph-bold ph-plugs-connected"></i> Middlewares <span class="font-normal">(${middlewares.length})</span>
         </div>
-        <div class="${modern ? 'tm-card-grid' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3'}">${cards}</div>
+        <div class="tm-card-grid">${cards}</div>
     </div>`;
 }
 
 function providerGridClass() {
-    return _tmModern() ? 'tm-card-grid' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+    return 'tm-card-grid';
 }
 
 function _tmProviderCard(r, opts, ctx) {
@@ -104,64 +141,5 @@ function renderProviderCard(r, opts = {}) {
 
     const extUrl = (domain && isHTTP && !domain.includes('{') && !domain.includes('*')) ? 'https://' + domain : '';
 
-    if (_tmModern()) {
-        return _tmProviderCard(r, opts, { proto, name, svc, domain, isHTTP, dotCls, extUrl });
-    }
-
-    const externalBtn = extUrl
-        ? `<a href="${extUrl}" target="_blank" class="pill-btn pill-btn-blue" title="Open site"><i class="ph-bold ph-arrow-square-out text-sm"></i></a>`
-        : '';
-
-    const domainBlock = isHTTP
-        ? `<div class="rounded-md p-2.5" style="background:var(--input-bg);border:1px solid var(--border)">
-               <div class="text-xs font-semibold uppercase tracking-wider mb-1" style="color:var(--muted)">Domain</div>
-               <div class="text-xs font-mono truncate" style="color:var(--blue)" title="${_esc(r.rule || '-')}">${_esc(domain || r.rule || '-')}</div>
-           </div>`
-        : (r.rule ? `<div class="rounded-md p-2.5" style="background:var(--input-bg);border:1px solid var(--border)">
-               <div class="text-xs font-semibold uppercase tracking-wider mb-1" style="color:var(--muted)">Rule</div>
-               <div class="text-xs font-mono truncate" style="color:var(--blue)">${_esc(r.rule)}</div>
-           </div>` : '');
-
-    const targetBlock = opts.target
-        ? `<div class="rounded-md p-2.5" style="background:var(--input-bg);border:1px solid var(--border)">
-               <div class="text-xs font-semibold uppercase tracking-wider mb-1" style="color:var(--muted)">Target</div>
-               <div class="text-xs font-mono truncate" style="color:var(--green)">${_esc(opts.target)}</div>
-           </div>`
-        : '';
-
-    const rowsBlock = (opts.rows || []).filter(row => row.value).map(row =>
-        `<div class="rounded-md p-2.5" style="background:var(--input-bg);border:1px solid var(--border)">
-               <div class="text-xs font-semibold uppercase tracking-wider mb-1" style="color:var(--muted)">${_esc(row.label || '')}</div>
-               <div class="text-xs font-mono truncate" style="color:var(--muted)">${_esc(row.value)}</div>
-           </div>`).join('');
-
-    const epHtml = (r.entryPoints || []).length
-        ? `<div class="flex flex-wrap gap-1">${(r.entryPoints || []).map(ep => `<span class="badge badge-muted text-xs">${_esc(ep)}</span>`).join('')}</div>`
-        : '';
-
-    const mwHtml = (r.middlewares || []).length
-        ? `<div class="flex flex-wrap gap-1">${(r.middlewares || []).map(mw => `<span class="badge" style="background:rgba(163,113,247,0.1);color:var(--purple);border:1px solid rgba(163,113,247,0.25)">${_esc(mw.split('@')[0])}</span>`).join('')}</div>`
-        : '';
-
-    return `
-    <div class="card route-card">
-        <div class="route-card-inner p-4 pb-2">
-            <div class="flex justify-between items-start mb-3">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-0.5">
-                        ${protoBadge}${tlsBadge}<span class="status-dot ${dotCls}"></span>
-                    </div>
-                    <h3 class="font-bold text-sm mt-1.5 truncate" style="color:var(--text)" title="${_esc(name)}">${_esc(name)}</h3>
-                    <div class="text-xs font-mono truncate" style="color:var(--muted)">${_esc(svc)}</div>
-                </div>
-                <div class="flex items-center gap-1.5 ml-2 flex-shrink-0">
-                    ${opts.extraBadges || ''}${externalBtn}
-                    ${opts.onDetailClick ? `<button onclick="${opts.onDetailClick}" class="pill-btn pill-btn-blue" title="View details"><i class="ph-bold ph-info text-sm"></i></button>` : ''}
-                </div>
-            </div>
-            <div class="space-y-2">
-                ${domainBlock}${targetBlock}${rowsBlock}${epHtml}${mwHtml}
-            </div>
-        </div>
-    </div>`;
+    return _tmProviderCard(r, opts, { proto, name, svc, domain, isHTTP, dotCls, extUrl });
 }

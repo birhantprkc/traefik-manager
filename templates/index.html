@@ -37,7 +37,9 @@
             if (!pref('showApiLink', false))     d.add('tm-hide-api');
             if (!pref('showShortcutsBtn', true)) d.add('tm-hide-shortcuts');
             if (!pref('showIpDiagBtn', true))    d.add('tm-hide-ipdiag');
-            if (pref('layoutMode', 'classic') === 'modern') d.add('tm-modern');
+            var _lm = pref('layoutMode', 'fluid');
+            if (_lm === 'classic') _lm = 'fixed';
+            if (_lm === 'fixed') d.add('tm-fixed');
             if (localStorage.getItem('tm-nav-collapsed') === '1') d.add('tm-nav-collapsed');
             var sbs = pref('statBarScope', 'all');
             var sbSet = (sbs === 'all' || sbs === true || sbs === undefined || sbs === null || sbs === '')
@@ -228,11 +230,26 @@
             <span>Traefik <span style="color:var(--blue)">Manager</span></span>
         </div>
         <div id="drawerServerWrap" style="display:none">
-            <button class="drawer-srv-head" id="drawerServerBtn" onclick="toggleDrawerServerList()">
+            <button class="drawer-srv-head" id="drawerServerBtn" onclick="toggleDrawerServerList()" title="Switch server">
+                <span class="drawer-srv-mark" id="drawerServerMark">
+                    <svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <rect x="206" y="206" width="100" height="100" rx="20" stroke="currentColor" stroke-width="34"/>
+                        <line x1="256" y1="206" x2="256" y2="80" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+                        <line x1="256" y1="306" x2="256" y2="432" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+                        <line x1="206" y1="256" x2="80" y2="256" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+                        <line x1="306" y1="256" x2="432" y2="256" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+                        <circle cx="256" cy="60" r="26" fill="currentColor"/>
+                        <circle cx="256" cy="452" r="26" fill="currentColor"/>
+                        <circle cx="60" cy="256" r="26" fill="currentColor"/>
+                        <circle cx="452" cy="256" r="26" fill="currentColor"/>
+                    </svg>
+                    <i class="ph-bold ph-hard-drives" id="drawerServerAgentIcon"></i>
+                    <span class="drawer-srv-badge" id="drawerServerBadge" style="background:var(--green)"></span>
+                </span>
                 <span class="drawer-srv-dot" id="drawerServerDot" style="background:var(--green)"></span>
                 <span class="drawer-srv-t">
                     <span class="drawer-srv-n" id="drawerServerName">Host</span>
-                    <span class="drawer-srv-s" id="drawerServerSub">This Traefik Manager</span>
+                    <span class="drawer-srv-s" id="drawerServerSub">Traefik Manager</span>
                 </span>
                 <i class="ph-bold ph-caret-down" id="drawerServerCaret"></i>
             </button>
@@ -244,6 +261,17 @@
         <button onclick="toggleSideNavCollapse()" id="sideNavCollapseBtn" title="Collapse navigation">
             <i class="ph-bold ph-caret-double-left" id="sideNavCollapseIcon"></i><span class="side-nav-toggle-label">Collapse</span>
         </button>
+        {% if auth_enabled %}
+        <form method="POST" action="{{ url_for('logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" id="sideNavLogoutBtn" title="Sign out">
+                <i class="ph-bold ph-sign-out"></i><span class="side-nav-toggle-label">Sign out</span>
+            </button>
+        </form>
+        {% endif %}
+        <button onclick="closeSideNavDrawer(); openSettingsModal()" id="sideNavSettingsBtn" title="Settings">
+            <i class="ph-bold ph-gear"></i><span class="side-nav-toggle-label">Settings</span>
+        </button>
     </div>
 </aside>
 
@@ -251,165 +279,7 @@
 
     {% include 'sections/stats.html' %}
 
-    <div class="tab-bar mb-6" id="tabBar">
-        <button onclick="switchTab('dashboard')" id="btn-dashboard" class="tab-btn tab-optional" data-tab="dashboard">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-house"></i>
-                Dashboard
-            </span>
-        </button>
-        <button onclick="switchTab('services')" id="btn-services" class="tab-btn active">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-arrows-split"></i>
-                Routes
-                <span class="badge badge-muted" id="countRoutes">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('middlewares')" id="btn-middlewares" class="tab-btn">
-            <span class="flex items-center gap-2 ">
-                <i class="ph-bold ph-stack"></i>
-                Middlewares
-                <span class="badge badge-muted" id="countMw">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('live')" id="btn-live" class="tab-btn">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-hard-drives"></i>
-                Services
-                <span class="badge badge-muted" id="svcTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('routemap')" id="btn-routemap" class="tab-btn tab-optional" data-tab="routemap">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-tree-structure"></i>
-                Route Map
-            </span>
-        </button>
-        <button onclick="switchTab('docker')" id="btn-docker" class="tab-btn tab-optional" data-tab="docker">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-cube"></i>
-                Docker
-                <span class="badge badge-muted" id="dockerTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('kubernetes')" id="btn-kubernetes" class="tab-btn tab-optional" data-tab="kubernetes">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-circles-three"></i>
-                Kubernetes
-                <span class="badge badge-muted" id="kubernetesTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('swarm')" id="btn-swarm" class="tab-btn tab-optional" data-tab="swarm">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-graph"></i>
-                Swarm
-                <span class="badge badge-muted" id="swarmTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('nomad')" id="btn-nomad" class="tab-btn tab-optional" data-tab="nomad">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-circles-four"></i>
-                Nomad
-                <span class="badge badge-muted" id="nomadTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('ecs')" id="btn-ecs" class="tab-btn tab-optional" data-tab="ecs">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-cloud"></i>
-                ECS
-                <span class="badge badge-muted" id="ecsTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('consulcatalog')" id="btn-consulcatalog" class="tab-btn tab-optional" data-tab="consulcatalog">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-address-book"></i>
-                Consul Catalog
-                <span class="badge badge-muted" id="consulcatalogTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('redis')" id="btn-redis" class="tab-btn tab-optional" data-tab="redis">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-database"></i>
-                Redis
-                <span class="badge badge-muted" id="redisTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('etcd')" id="btn-etcd" class="tab-btn tab-optional" data-tab="etcd">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-database"></i>
-                etcd
-                <span class="badge badge-muted" id="etcdTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('consul')" id="btn-consul" class="tab-btn tab-optional" data-tab="consul">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-database"></i>
-                Consul KV
-                <span class="badge badge-muted" id="consulTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('zookeeper')" id="btn-zookeeper" class="tab-btn tab-optional" data-tab="zookeeper">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-database"></i>
-                ZooKeeper
-                <span class="badge badge-muted" id="zookeeperTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('http_provider')" id="btn-http_provider" class="tab-btn tab-optional" data-tab="http_provider">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-link"></i>
-                HTTP Provider
-                <span class="badge badge-muted" id="httpProviderTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('file_external')" id="btn-file_external" class="tab-btn tab-optional" data-tab="file_external">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-file-text"></i>
-                File (external)
-                <span class="badge badge-muted" id="fileExternalTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('tls')" id="btn-tls" class="tab-btn tab-optional" data-tab="tls">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-lock-laminated"></i>
-                TLS Options
-            </span>
-        </button>
-        <button onclick="switchTab('certs')" id="btn-certs" class="tab-btn tab-optional" data-tab="certs">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-shield-check"></i>
-                Certs
-                <span class="badge badge-muted" id="certsTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('logs')" id="btn-logs" class="tab-btn tab-optional" data-tab="logs">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-receipt"></i>
-                Logs
-            </span>
-        </button>
-        <button onclick="switchTab('crowdsec')" id="btn-crowdsec" class="tab-btn tab-optional" data-tab="crowdsec">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-shield"></i>
-                CrowdSec
-            </span>
-        </button>
-        <button onclick="switchTab('plugins')" id="btn-plugins" class="tab-btn tab-optional" data-tab="plugins">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-puzzle-piece"></i>
-                Plugins
-                <span class="badge badge-muted" id="pluginsTabCount">-</span>
-            </span>
-        </button>
-        <button onclick="switchTab('static')" id="btn-static" class="tab-btn tab-optional" data-tab="static">
-            <span class="flex items-center gap-2">
-                <i class="ph-bold ph-file-code"></i>
-                Static Config
-            </span>
-        </button>
-    </div>
-
-    
+        
     {% include 'tabs/tab_services.html' %}
 
     
@@ -507,7 +377,6 @@ function agentFetch(path, opts) {
 
 async function refreshStaticTabAvailability() {
     const row = document.getElementById('staticTabToggleRow');
-    const btn = document.getElementById('btn-static');
     let available = false;
     try {
         if (_activeAgent) {
@@ -517,11 +386,8 @@ async function refreshStaticTabAvailability() {
         }
     } catch(e) { available = false; }
     if (row) row.style.display = available ? '' : 'none';
-    if (!available && btn) {
-        btn.style.display = 'none';
-        if (btn.classList.contains('active')) switchTab('services');
-        if (typeof buildSideNav === 'function') buildSideNav();
-    }
+    if (!available && _activeTab === 'static') switchTab('services');
+    if (typeof buildSideNav === 'function') buildSideNav();
     _staticAvailable = available;
     applyStaticPlacement(getStaticPlacement());
 }
@@ -541,6 +407,8 @@ function applyStaticPlacement(mode) {
     const mount = document.getElementById('staticSettingsMount');
     const home = document.querySelector('main');
     if (sidebarBtn) sidebarBtn.style.display = (mode === 'settings' && _staticAvailable) ? '' : 'none';
+    const mobileGroup = document.getElementById('staticMobileGroup');
+    if (mobileGroup) mobileGroup.style.display = (mode === 'settings' && _staticAvailable) ? '' : 'none';
     document.documentElement.classList.toggle('tm-static-in-settings', mode === 'settings');
     ['off', 'settings', 'tab'].forEach(m => {
         document.getElementById('scPlace-' + m)?.classList.toggle('active-http', m === mode);
@@ -636,11 +504,26 @@ function _renderDrawerServerList() {
     const sub  = document.getElementById('drawerServerSub');
     const dot  = document.getElementById('drawerServerDot');
     if (name) name.textContent = _activeAgent ? _activeAgent.name : 'Host';
-    if (sub)  sub.textContent  = _activeAgent ? (_agentSubLine(_activeAgent) || 'Agent') : 'This Traefik Manager';
+    if (sub)  sub.textContent  = _activeAgent ? (_agentSubLine(_activeAgent) || 'Agent') : 'Traefik Manager';
     if (dot)  dot.style.background = _activeAgent ? (_agentHealthCache[_activeAgent.id] || 'var(--muted)') : 'var(--green)';
+    const mark  = document.getElementById('drawerServerMark');
+    const badge = document.getElementById('drawerServerBadge');
+    if (mark)  mark.classList.toggle('is-agent', !!_activeAgent);
+    if (badge) badge.style.background = _activeAgent ? (_agentHealthCache[_activeAgent.id] || 'var(--muted)') : 'var(--green)';
+    const TM_MARK = `<span class="drawer-srv-glyph"><svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="206" y="206" width="100" height="100" rx="20" stroke="currentColor" stroke-width="34"/>
+            <line x1="256" y1="206" x2="256" y2="80" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+            <line x1="256" y1="306" x2="256" y2="432" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+            <line x1="206" y1="256" x2="80" y2="256" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+            <line x1="306" y1="256" x2="432" y2="256" stroke="currentColor" stroke-width="34" stroke-linecap="round"/>
+            <circle cx="256" cy="60" r="26" fill="currentColor"/>
+            <circle cx="256" cy="452" r="26" fill="currentColor"/>
+            <circle cx="60" cy="256" r="26" fill="currentColor"/>
+            <circle cx="452" cy="256" r="26" fill="currentColor"/>
+        </svg></span>`;
     const item = (id, icon, title, subText, active, dotColor) =>
         `<button class="drawer-srv-item${active ? ' active' : ''}" onclick="_drawerPickServer(${id ? `'${id}'` : 'null'})">
-            <i class="ph-bold ${icon}"></i>
+            ${icon ? `<i class="ph-bold ${icon}"></i>` : TM_MARK}
             <span class="drawer-srv-t">
                 <span class="drawer-srv-n">${title}</span>
                 ${subText ? `<span class="drawer-srv-s">${subText}</span>` : ''}
@@ -648,7 +531,8 @@ function _renderDrawerServerList() {
             ${active ? '<i class="ph-bold ph-check drawer-srv-check"></i>' : `<span class="drawer-srv-dot" style="background:${dotColor}"></span>`}
         </button>`;
     list.innerHTML =
-        item(null, 'ph-house', 'Host', 'This Traefik Manager', !_activeAgent, 'var(--green)') +
+        '<div class="drawer-srv-title">Switch server</div>' +
+        item(null, null, 'Host', 'Traefik Manager', !_activeAgent, 'var(--green)') +
         _agentList.map(a => item(a.id, 'ph-hard-drives', _esc(a.name), _esc(_agentSubLine(a)), _activeAgent && _activeAgent.id === a.id, _agentHealthCache[a.id] || 'var(--muted)')).join('');
 }
 
@@ -663,10 +547,20 @@ function _drawerPickServer(id) {
 function toggleDrawerServerList() {
     const list  = document.getElementById('drawerServerList');
     const caret = document.getElementById('drawerServerCaret');
+    const btn   = document.getElementById('drawerServerBtn');
     if (!list) return;
     const opening = list.style.display === 'none';
     list.style.display = opening ? '' : 'none';
     if (caret) caret.classList.toggle('open', opening);
+    const railed = document.documentElement.classList.contains('tm-nav-collapsed') && window.innerWidth >= 768;
+    if (opening && btn && railed) {
+        const r = btn.getBoundingClientRect();
+        list.style.left = (r.right + 8) + 'px';
+        list.style.top  = Math.min(r.top, window.innerHeight - list.offsetHeight - 12) + 'px';
+    } else {
+        list.style.left = '';
+        list.style.top  = '';
+    }
 }
 
 function _updateServerSwitcherList(agents) {
@@ -714,10 +608,7 @@ function switchServer(agentId) {
     _renderServerSwitcherList(false);
     if (typeof _staticLoadedFor !== 'undefined') _staticLoadedFor = null;
     refreshStaticTabAvailability();
-    // The route and middleware grids are shared by two tabs and are not rebuilt unless one of
-    // them is on screen, so switching server while on any other tab used to leave the previous
-    // server's rows in place. Boot already refetches them unconditionally; do the same here.
-    const _cur = document.querySelector('.tab-btn.active')?.id.replace('btn-', '');
+    const _cur = _activeTab;
     if (_cur !== 'services' && _cur !== 'middlewares') refreshRoutes();
     refreshCurrentTab();
     loadOverviewStats();
@@ -730,10 +621,7 @@ function switchServer(agentId) {
 function _setAgentEditControls(_agentActive) {}
 
 function refreshCurrentTab() {
-    const active = document.querySelector('.tab-btn.active');
-    if (!active) return;
-    const tab = active.id.replace('btn-', '');
-    switchTab(tab);
+    switchTab(_activeTab);
 }
 
 function toggleServerMenu() {

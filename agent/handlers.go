@@ -361,50 +361,81 @@ func (a *App) staticRestartHandler(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "failed to write signal file: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		jsonOK(w, map[string]any{"ok": true})
+		jsonOK(w, map[string]any{"ok": true, "restarting": true})
 
 	case "socket", "proxy":
-		if err := a.dockerRestart(r.Context()); err != nil {
+		if err := a.dockerPreflight(r.Context()); err != nil {
 			jsonError(w, "docker restart failed: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		jsonOK(w, map[string]any{"ok": true})
+		// Traefik usually carries this very connection, so the restart runs once
+		// the answer is on its way out. Failures land in the agent log.
+		jsonOK(w, map[string]any{"ok": true, "restarting": true})
+		go func() {
+			time.Sleep(400 * time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			if err := a.dockerRestart(ctx); err != nil {
+				log.Printf("traefik restart failed: %v", err)
+			}
+		}()
 
 	default:
 		jsonError(w, "RESTART_METHOD not configured or unsupported", http.StatusBadRequest)
 	}
 }
 
-func (a *App) dockerRestart(ctx context.Context) error {
-	container := a.cfg.TraefikContainer
-	if container == "" {
-		container = "traefik"
+func (a *App) traefikContainer() string {
+	if a.cfg.TraefikContainer != "" {
+		return a.cfg.TraefikContainer
 	}
-	apiPath := "/containers/" + container + "/restart?t=10"
+	return "traefik"
+}
 
-	var client *http.Client
-	var baseURL string
-
+func (a *App) dockerClient() (*http.Client, string) {
 	dockerHost := a.cfg.DockerHost
 	if a.cfg.RestartMethod == "socket" || dockerHost == "" {
-		client = &http.Client{
+		return &http.Client{
 			Transport: &http.Transport{
 				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 					return net.Dial("unix", "/var/run/docker.sock")
 				},
 			},
-		}
-		baseURL = "http://localhost"
-	} else {
-		client = http.DefaultClient
-		h := strings.TrimRight(dockerHost, "/")
-		if strings.HasPrefix(h, "tcp://") {
-			h = "http://" + strings.TrimPrefix(h, "tcp://")
-		} else if !strings.HasPrefix(h, "http://") && !strings.HasPrefix(h, "https://") {
-			h = "http://" + h
-		}
-		baseURL = h
+		}, "http://localhost"
 	}
+	h := strings.TrimRight(dockerHost, "/")
+	if strings.HasPrefix(h, "tcp://") {
+		h = "http://" + strings.TrimPrefix(h, "tcp://")
+	} else if !strings.HasPrefix(h, "http://") && !strings.HasPrefix(h, "https://") {
+		h = "http://" + h
+	}
+	return http.DefaultClient, h
+}
+
+// dockerPreflight reports problems that would make the restart fail, while the
+// connection carrying the answer is still alive. Only a dead endpoint or a
+// missing container count: anything else is left to the restart itself.
+func (a *App) dockerPreflight(ctx context.Context) error {
+	client, baseURL := a.dockerClient()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		baseURL+"/containers/"+a.traefikContainer()+"/json", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("cannot reach the Docker API: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("container %q not found", a.traefikContainer())
+	}
+	return nil
+}
+
+func (a *App) dockerRestart(ctx context.Context) error {
+	apiPath := "/containers/" + a.traefikContainer() + "/restart?t=10"
+	client, baseURL := a.dockerClient()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+apiPath, nil)
 	if err != nil {
@@ -1800,7 +1831,6 @@ func (a *App) writeActiveDecisions(w http.ResponseWriter, rows []json.RawMessage
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(active)
 }
-
 
 func bakBaseName(n string) string {
 	base := strings.TrimSuffix(n, ".bak")

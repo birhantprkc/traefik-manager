@@ -200,6 +200,7 @@ import TiltIn from './TiltIn.vue'
   }
   .sm-monitor {
     width: 100%;
+    margin-left: 0;
   }
   .sm-phone {
     left: auto;

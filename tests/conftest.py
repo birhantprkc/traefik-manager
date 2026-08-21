@@ -45,8 +45,17 @@ EMPTY_CONFIG = "http:\n  routers: {}\n  services: {}\n"
 def clean_config():
     DYNAMIC_PATH.write_text(EMPTY_CONFIG)
     _reset_settings()
+    _reset_rate_limits()
     yield
     DYNAMIC_PATH.write_text(EMPTY_CONFIG)
+
+
+def _reset_rate_limits():
+    try:
+        import app as _app
+        _app.limiter.reset()
+    except Exception:
+        pass
 
 
 def _reset_settings():

@@ -29,7 +29,6 @@ def _discovery(methods=None):
         'authorization_endpoint': 'https://idp.example.com/authorize',
         'token_endpoint': 'https://idp.example.com/token',
         'userinfo_endpoint': 'https://idp.example.com/userinfo',
-        # the stubbed GET serves this for userinfo too, so the callback can run to completion
         'email': 'someone@example.com',
     }
     if methods is not None:
@@ -45,8 +44,7 @@ def _start(client, monkeypatch, methods=None):
         return sess['oidc_state']
 
 
-def test_basic_is_tried_first_when_discovery_is_silent(client, monkeypatch):
-    """OIDC Core: an unregistered method defaults to client_secret_basic."""
+def test_body_is_tried_first_when_discovery_is_silent(client, monkeypatch):
     state = _start(client, monkeypatch, methods=None)
     calls = []
 
@@ -58,11 +56,9 @@ def test_basic_is_tried_first_when_discovery_is_silent(client, monkeypatch):
     monkeypatch.setattr('app.requests.post', _post)
     client.get(f'/auth/oidc/callback?code=abc&state={state}')
     assert len(calls) == 1
-    hdr = calls[0]['headers'].get('Authorization', '')
-    assert hdr.startswith('Basic '), 'should authenticate with HTTP Basic'
-    import base64 as _b64
-    assert _b64.b64decode(hdr.split()[1]).decode() == 'tm-client:tm-secret'
-    assert calls[0]['body_secret'] is None, 'the secret must not also be in the body'
+    assert not calls[0]['headers'].get('Authorization'), \
+        'body-first: no Basic header on the first attempt'
+    assert calls[0]['body_secret'] == 'tm-secret', 'the secret goes in the body'
 
 
 def test_post_is_used_when_basic_is_not_advertised(client, monkeypatch):
@@ -79,25 +75,24 @@ def test_post_is_used_when_basic_is_not_advertised(client, monkeypatch):
     assert calls[0]['body_secret'] == 'tm-secret'
 
 
-def test_invalid_grant_is_not_retried(client, monkeypatch):
-    """invalid_grant means the code is bad or already spent. Re-sending it would replace the real
-    error with 'authorization code has already been used'."""
+def test_a_401_with_an_empty_body_is_retried(client, monkeypatch):
     state = _start(client, monkeypatch, methods=None)
-    calls = []
+    attempts = []
 
     def _post(url, data=None, headers=None, **k):
-        calls.append(1)
-        return _Resp({'error': 'invalid_grant',
-                      'error_description': 'authorization code has already been used'}, status=400)
+        attempts.append('basic' if (headers or {}).get('Authorization') else 'body')
+        if len(attempts) == 1:
+            r = _Resp({}, status=401)
+            r.text = ''
+            return r
+        return _Resp({'access_token': 'a', 'id_token': ''})
 
     monkeypatch.setattr('app.requests.post', _post)
     client.get(f'/auth/oidc/callback?code=abc&state={state}')
-    assert len(calls) == 1, f'a spent code must not be re-sent, got {len(calls)} attempts'
+    assert attempts == ['body', 'basic'], attempts
 
 
 def test_invalid_client_retries_with_the_other_method(client, monkeypatch):
-    """A provider authenticates the client before it looks at the code, so the code survives an
-    invalid_client rejection and the other auth method is worth trying."""
     state = _start(client, monkeypatch, methods=['client_secret_post', 'client_secret_basic'])
     attempts = []
 
@@ -109,4 +104,41 @@ def test_invalid_client_retries_with_the_other_method(client, monkeypatch):
 
     monkeypatch.setattr('app.requests.post', _post)
     client.get(f'/auth/oidc/callback?code=abc&state={state}')
-    assert attempts == ['basic', 'body'], attempts
+    assert attempts == ['body', 'basic'], attempts
+
+
+def test_invalid_grant_is_never_retried(client, monkeypatch):
+    state = _start(client, monkeypatch, methods=None)
+    calls = []
+
+    def _post(url, data=None, headers=None, **k):
+        calls.append(1)
+        return _Resp({'error': 'invalid_grant',
+                      'error_description': 'The authorization code has already been used.'},
+                     status=400)
+
+    monkeypatch.setattr('app.requests.post', _post)
+    client.get(f'/auth/oidc/callback?code=abc&state={state}')
+    assert len(calls) == 1, f'a spent code must not be re-sent, got {len(calls)}'
+
+
+def test_a_failed_retry_keeps_the_first_error(client, monkeypatch, caplog):
+    state = _start(client, monkeypatch, methods=None)
+    calls = []
+
+    def _post(url, data=None, headers=None, **k):
+        calls.append(1)
+        if len(calls) == 1:
+            return _Resp({'error': 'invalid_client',
+                          'error_description': 'wrong secret'}, status=401)
+        return _Resp({'error': 'invalid_grant',
+                      'error_description': 'The authorization code has already been used.'},
+                     status=400)
+
+    monkeypatch.setattr('app.requests.post', _post)
+    with caplog.at_level('ERROR'):
+        client.get(f'/auth/oidc/callback?code=abc&state={state}')
+    assert len(calls) == 2
+    assert 'wrong secret' in caplog.text, 'the first, truthful error must survive'
+    assert 'already been used' not in caplog.text, \
+        'the retry consuming the code must not replace the real error'

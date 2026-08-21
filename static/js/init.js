@@ -45,8 +45,7 @@ document.addEventListener('keydown', e => {
             case 'X': e.preventDefault(); openStaticYamlPopoutFromShortcut(); break;
             case 'P': e.preventDefault(); openSettingsModal(); break;
             case 'D': {
-                const b = document.getElementById('btn-dashboard');
-                if (b && b.offsetParent !== null) { e.preventDefault(); switchTab('dashboard'); }
+                if (_tabVisible('dashboard')) { e.preventDefault(); switchTab('dashboard'); }
                 break;
             }
             case 'A': {
@@ -160,6 +159,9 @@ buildSideNav();
 _initDetailPanelSizers();
 
 (() => {
-    const nav = document.querySelector('nav');
-    if (nav) document.documentElement.style.setProperty('--tm-nav-h', nav.offsetHeight + 'px');
+    const nav = document.querySelector('nav.sticky') || document.querySelector('nav');
+    if (!nav) return;
+    const banner = document.getElementById('noAuthBanner');
+    const h = nav.offsetHeight + (banner ? banner.offsetHeight : 0);
+    document.documentElement.style.setProperty('--tm-nav-h', h + 'px');
 })();

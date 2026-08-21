@@ -724,10 +724,6 @@ function _routeIconHtml(app) {
     return `<img src="${url}" data-slug="${slug}" onerror="window.rmIconFallback(this)" alt="" class="route-app-icon" style="width:18px;height:18px;border-radius:4px;object-fit:contain;flex-shrink:0">`;
 }
 
-function _tmModern() {
-    return document.documentElement.classList.contains('tm-modern');
-}
-
 function _tmFolderMode(apps) {
     const d = new Set((apps || []).filter(a => !a.provider || a.provider === 'file')
                                   .map(a => a.configFile).filter(Boolean));
@@ -831,8 +827,7 @@ function renderRouteGrid(apps) {
         });
     }
     if (_activeAgent) apps = apps.filter(a => !a.provider || a.provider === 'file');
-    const countEl = document.getElementById('countRoutes');
-    if (countEl) countEl.textContent = apps.filter(a => (!a.provider || a.provider === 'file') && a.enabled !== false).length;
+    setTabCount('services', apps.filter(a => (!a.provider || a.provider === 'file') && a.enabled !== false).length);
     const grid = document.getElementById('routeGrid');
     if (!grid) return;
     const emptyEl = document.getElementById('routeEmpty');
@@ -860,7 +855,7 @@ function renderRouteGrid(apps) {
     }
     if (emptyEl) emptyEl.style.display = 'none';
     const _allAppsForRender = apps;
-    const _tmOn = _tmModern() && _routeViewMode !== 'list';
+    const _tmOn = _routeViewMode !== 'list';
     const _tmCfShow = _tmOn ? _tmFolderMode(apps) : false;
     grid.innerHTML = apps.map((app, i) => {
         if (_tmOn) return _tmRouteCard(app, i, { showCf: _tmCfShow });
@@ -1790,6 +1785,15 @@ function openRouteDetailFromCard(card) {
     if (!appData) return;
     openRouteDetail(appData.name, appData.protocol, appData);
 }
+function _openRouteByName(name) {
+    const bare = String(name).split('@')[0];
+    const pool = window._lastRenderedApps || APP_DATA || [];
+    const a = pool.find(x => x.name === name)
+        || pool.find(x => String(x.name).split('@')[0] === bare);
+    if (!a) return;
+    openRouteDetail(a.name, (a.protocol || 'http').toLowerCase(), a);
+}
+
 let _liveRoutersCache = null;
 let _liveServicesCache = null;
 let _liveEntrypointsCache = null;
@@ -1841,13 +1845,17 @@ async function openRouteDetail(name, protocol, appData) {
         ]);
 
         let liveRouter = null, liveService = null, entrypoints = [];
+        const apiState = { reachable: false, fileRouters: 0 };
 
-        if (routersRes.status === 'fulfilled') {
+        if (routersRes.status === 'fulfilled' && routersRes.value
+                && !routersRes.value.error && routersRes.value.reachable !== false) {
+            apiState.reachable = true;
             const allRouters = [
                 ...(routersRes.value.http || []),
                 ...(routersRes.value.tcp  || []),
                 ...(routersRes.value.udp  || []),
             ];
+            apiState.fileRouters = allRouters.filter(r => (r.provider || '') === 'file' || String(r.name || '').endsWith('@file')).length;
             liveRouter = allRouters.find(r => r.name && r.name.split('@')[0] === name);
         }
 
@@ -1865,10 +1873,10 @@ async function openRouteDetail(name, protocol, appData) {
             entrypoints = entrypointsRes.value || [];
         }
 
-        content.innerHTML = renderDetailPanel(appData, protocol, liveRouter, liveService, entrypoints);
+        content.innerHTML = renderDetailPanel(appData, protocol, liveRouter, liveService, entrypoints, apiState);
 
     } catch(e) {
-        content.innerHTML = renderDetailPanel(appData, protocol, null, null, []);
+        content.innerHTML = renderDetailPanel(appData, protocol, null, null, [], { reachable: false, fileRouters: 0 });
     }
 }
 
@@ -1883,7 +1891,7 @@ function closeRouteDetail() {
     document.body.style.overflow = '';
 }
 
-function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) {
+function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints, apiState) {
     const status = liveRouter ? liveRouter.status : null;
     const routerError = liveRouter ? (liveRouter.error || null) : null;
     const isDisabled = app.enabled === false;
@@ -1894,11 +1902,19 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
         ? `<div class="mt-4 p-3 rounded-lg text-xs font-mono leading-relaxed" style="color:var(--red);background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.25);word-break:break-word"><i class="ph-bold ph-warning-circle" style="margin-right:6px"></i>${_esc(routerError)}</div>`
         : '';
 
+    const isFileRoute = !app.provider || app.provider === 'file';
+    const _warnNote = html => `<div class="text-xs mb-5 p-2.5 rounded" style="color:var(--yellow);background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.2);line-height:1.6"><i class="ph-bold ph-warning text-sm" style="margin-right:5px"></i>${html}</div>`;
     const apiNote = liveRouter
         ? `<div class="flex items-center gap-1.5 text-xs mb-5" style="color:var(--muted)"><div style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></div> Live data from Traefik API</div>`
         : isDisabled
         ? `<div class="flex items-center gap-1.5 text-xs mb-5 p-2 rounded" style="color:var(--muted);background:var(--input-bg);border:1px solid var(--border)"><i class="ph-bold ph-pause-circle text-sm"></i> Not served by Traefik while disabled - showing your saved configuration</div>`
-        : `<div class="flex items-center gap-1.5 text-xs mb-5 p-2 rounded" style="color:var(--yellow);background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.2)"><i class="ph-bold ph-warning text-sm"></i> Traefik API unavailable - showing config file data only</div>`;
+        : !(apiState && apiState.reachable)
+        ? _warnNote(`<b>Traefik API unreachable</b> - showing your saved configuration. Check the API URL under Settings &gt; Connection, and that Traefik has <span class="font-mono">api: {}</span> enabled.`)
+        : isFileRoute && apiState.fileRouters === 0
+        ? _warnNote(`<b>Traefik is running but has loaded nothing from the file provider</b>, so this route is not being served. Traefik is most likely not watching the file Traefik Manager writes to - check that both containers mount the same config path and that <span class="font-mono">providers.file</span> points at it with <span class="font-mono">watch: true</span>. Showing your saved configuration.`)
+        : isFileRoute
+        ? _warnNote(`<b>Traefik has not loaded this route</b>, although other file-provider routes are live. If you saved it seconds ago, close and reopen. Otherwise check the Traefik logs for a config error${app.configFile ? `, and that <span class="font-mono">${_esc(app.configFile)}</span> is inside the watched path` : ''}. Showing your saved configuration.`)
+        : _warnNote(`<b>Traefik does not report this route</b> - showing your saved configuration.`);
 
     
     const routerEPs = (liveRouter ? liveRouter.entryPoints : app.entryPoints) || [];
@@ -1925,9 +1941,7 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
         ? serversList.map(s => `<div class="font-mono text-xs break-all mt-1 px-2 py-1 rounded" style="color:var(--green);background:var(--input-bg);word-break:break-all">${_esc(s.url || s.address || '-')}</div>`).join('')
         : `<div class="font-mono text-xs break-all mt-1 px-2 py-1 rounded" style="color:var(--green);background:var(--input-bg);word-break:break-all">${_esc(app.target)}</div>`;
 
-    const flowHtml = `
-    <div class="mb-5">
-        <div class="text-xs font-bold uppercase tracking-wider mb-3" style="color:var(--muted)">Traffic Flow</div>
+    const flowHtml = renderDetailBlock('Traffic Flow', 'ph-flow-arrow', `
         <div class="flex items-stretch gap-2 flow-diagram-row">
             <div class="flex flex-col gap-2 flex-1">${epBoxes}</div>
             <div class="flow-arrow">→</div>
@@ -1943,8 +1957,7 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
                 <div class="font-bold text-sm truncate" style="color:var(--text)">${_esc(app.service_name)}</div>
                 <div class="mt-2">${serversHtml}</div>
             </div>
-        </div>
-    </div>`;
+        </div>`);
 
     
     const rule = liveRouter ? liveRouter.rule : app.rule;
@@ -1978,26 +1991,15 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
     const mws = (liveRouter ? liveRouter.middlewares : app.middlewares) || [];
     let mwSection = '';
     if (protocol !== 'udp') {
-        if (mws.length > 0) {
-            const mwHtml = `<div class="p-4">${_dList(mws, 'd-mw')}</div>`;
-            mwSection = `<div class="detail-section mb-4">
-                <div class="detail-section-header flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-                    <i class="ph-bold ph-plugs-connected text-sm" style="color:var(--purple)"></i>
-                    <span class="font-bold text-sm" style="color:var(--text)">Middlewares</span>
-                    ${_dCount(mws.length)}
-                </div>${mwHtml}</div>`;
-        } else {
-            mwSection = `<div class="detail-section mb-4">
-                <div class="detail-section-header flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-                    <i class="ph-bold ph-plugs-connected text-sm" style="color:var(--purple)"></i>
-                    <span class="font-bold text-sm" style="color:var(--text)">Middlewares</span>
-                </div>
-                <div class="p-6 text-center" style="color:var(--muted)">
+        const mwBody = mws.length > 0
+            ? `<div class="flex flex-wrap gap-1.5">${mws.map(m =>
+                `<button type="button" class="route-deep-chip" onclick="_openMwByName('${_esc(String(m))}')" title="Open middleware"><i class="ph-bold ph-plugs-connected"></i>${_esc(String(m).split('@')[0])}</button>`).join('')}</div>`
+            : `<div class="text-center py-3" style="color:var(--muted)">
                     <i class="ph-light ph-stack text-2xl block mb-1 opacity-30"></i>
                     <p class="text-xs">No middlewares configured</p>
-                </div>
-            </div>`;
-        }
+                </div>`;
+        mwSection = renderDetailBlock('Middlewares', 'ph-plugs-connected', mwBody,
+            mws.length > 0 ? _dCount(mws.length) : '');
     }
 
     
@@ -2033,14 +2035,8 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
                     <span style="color:var(--text);text-align:right;word-break:break-all">${String(v).replace(/</g,'&lt;')}</span>
                 </div>`
             ).join('');
-            labelsSection = `<div class="detail-section mb-4">
-                <div class="flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-                    <i class="ph-bold ph-tag text-sm" style="color:var(--blue)"></i>
-                    <span class="font-bold text-sm" style="color:var(--text)">Docker Labels</span>
-                    <span class="d-n ml-auto">${labelEntries.length}</span>
-                </div>
-                <div class="px-4 py-2">${labelRows}</div>
-            </div>`;
+            labelsSection = renderDetailBlock('Docker Labels', 'ph-tag', labelRows,
+                _dCount(labelEntries.length));
         }
     }
 
@@ -2056,17 +2052,4 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints) 
     `;
 }
 
-function renderSection(title, icon, rows) {
-    const rowsHtml = rows.map(([key, val, isHtml]) => {
-        const displayVal = isHtml ? val : `<span class="font-mono" style="color:var(--text)">${String(val).replace(/</g,'&lt;')}</span>`;
-        return `<div class="detail-key">${key}</div><div class="detail-val">${displayVal}</div>`;
-    }).join('');
 
-    return `<div class="detail-section mb-4">
-        <div class="flex items-center gap-2 px-4 py-3" style="background:var(--card);border-bottom:1px solid var(--border)">
-            <i class="ph-bold ${icon} text-sm" style="color:var(--blue)"></i>
-            <span class="font-bold text-sm" style="color:var(--text)">${title}</span>
-        </div>
-        <div class="detail-kv">${rowsHtml}</div>
-    </div>`;
-}

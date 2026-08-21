@@ -1343,6 +1343,7 @@ function renderLogs() {
 }
 
 function openLogDetail(e) {
+    closeOtherPanels('logDetailPanel');
     const sc = !e.status ? 'var(--muted)' : e.status >= 500 ? 'var(--red)' : e.status >= 400 ? 'var(--yellow)' : 'var(--green)';
     const mc = { GET:'var(--blue)', POST:'var(--green)', PUT:'var(--yellow)', DELETE:'var(--red)', PATCH:'var(--purple)' }[e.method] || 'var(--muted)';
     document.getElementById('ldBadges').innerHTML =

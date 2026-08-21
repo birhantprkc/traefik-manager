@@ -1,10 +1,18 @@
 # Static Config Editor
 
-The **Static Config** tab lets you view and edit Traefik's static configuration (`traefik.yml`) directly from the Traefik Manager UI. It is an optional tab, off by default - enable it under **Settings → Interface** once the file is available. Changes are staged and backed up before saving; a banner then prompts you to restart Traefik with one click, using whichever restart method you configure.
+Static Config lets you view and edit Traefik's static configuration (`traefik.yml`) from the Traefik Manager UI. Changes are staged and backed up before saving; a banner then prompts you to restart Traefik with one click, using whichever restart method you configure.
 
-The tab toggle only appears once a static config path is configured and the file exists. The path comes from the `static_config_path` field in `manager.yml` (Settings) if set, otherwise from the `STATIC_CONFIG_PATH` environment variable - the manager.yml value wins when both are present. In the Modern layout the sections tile into responsive columns; in Classic they appear as sub-tabs.
+It is off by default. Once a static config path is set and the file exists, a **Static Config** row appears under **Settings → Interface** with three placements:
 
-Everything on this page also works for [remote agents](agent.md#static-config-editing): with an agent selected in the server switcher, the same section editors read and write the agent's own `traefik.yml`, with the agent's backup and restart flow.
+| Placement | Where it appears |
+|---|---|
+| Off | Nowhere. |
+| Settings | As a **Static Config** panel in the Settings sidebar. |
+| Tab | As its own tab in the side navigation. |
+
+The path comes from the `static_config_path` field in `manager.yml` (**Settings → System Monitoring → File Paths**) if set, otherwise from the `STATIC_CONFIG_PATH` environment variable.
+
+Everything here also works for [remote agents](agent.md#static-config-editing): with an agent selected in the server switcher, the same section editors read and write the agent's own `traefik.yml`, with the agent's backup and restart flow.
 
 ---
 
@@ -25,56 +33,58 @@ Traefik's static configuration controls settings that cannot be changed at runti
 
 | Section               | Description                                                                                                                                          |
 | -----------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Entrypoints           | Add, edit, and remove entrypoints - port, protocol, optional HTTP-to-HTTPS redirect, the [Underscore Headers](hardening.md#header-alias-spoofing-underscore-headers) strategy (Traefik 3.6.20 / 3.7.6+), trusted IPs for forwarded headers (`forwardedHeaders.trustedIPs` / `insecure`, one CIDR per line), PROXY protocol trust (`proxyProtocol.trustedIPs` / `insecure`), an entrypoint-wide middleware chain (`http.middlewares`), TLS-by-default (`http.tls` with cert resolver and TLS options), `asDefault`, and responding timeouts (read / write / idle). Edits merge into the existing entrypoint, preserving keys the form does not manage. |
-| Certificate Resolvers | ACME email, storage path, DNS / HTTP / TLS challenge type, custom CA server, key type, external account binding (EAB), and DNS propagation controls (check resolvers, delay, disable checks). Edits merge into the existing resolver, preserving keys the form does not manage. |
+| Entrypoints           | Port, protocol, optional HTTP-to-HTTPS redirect, the [Underscore Headers](hardening.md#header-alias-spoofing-underscore-headers) strategy (Traefik 3.6.20 / 3.7.6+), trusted IPs for forwarded headers (`forwardedHeaders.trustedIPs` / `insecure`, one CIDR per line), PROXY protocol trust (`proxyProtocol.trustedIPs` / `insecure`), an entrypoint-wide middleware chain (`http.middlewares`), TLS-by-default (`http.tls` with cert resolver and TLS options), `asDefault`, and responding timeouts (read / write / idle). |
+| Certificate Resolvers | ACME email, storage path, DNS / HTTP / TLS challenge type, custom CA server, key type, external account binding (EAB), and DNS propagation controls (check resolvers, delay, disable checks). |
 | Plugins               | Remote plugins (module + version) and local plugins from the `plugins-local` directory. The [Plugins tab](tab-plugins.md) offers the richer install flow. |
-| API                   | Enable or disable the Traefik API and Dashboard, insecure mode, and debug mode                                                                       |
-| Logging               | Traefik log: level, text/JSON format, optional log file with rotation (max size, backups, age, compression). Access log: file path, CLF/JSON format, buffering, status-code and min-duration filters, retry-only mode, and header keep/redact. Edits merge, preserving keys the form does not manage. |
+| API                   | Enable or disable the Traefik API and Dashboard, insecure mode, and debug mode. |
+| Logging               | Traefik log: level, text/JSON format, optional log file with rotation (max size, backups, age, compression). Access log: file path, CLF/JSON format, buffering, status-code and min-duration filters, retry-only mode, and header keep/redact. |
 | Observability         | Ping health endpoint, Prometheus metrics with entrypoint / router / service label toggles, and OTLP tracing (service name, sample rate, collector endpoint). Other metrics backends configured in YAML are left untouched. |
 | System                | Traefik version check, anonymous usage statistics, the default rule syntax (v3 / v2 compatibility), and servers transport defaults - backend TLS verification skip, root CAs, max idle connections, forwarding timeouts. |
-| Providers             | Enable and configure Docker and File providers via dedicated toggles, set the providers throttle duration, and add other provider types via the **+ Provider** button which opens a template editor |
+| Providers             | Docker and File providers via dedicated toggles, the providers throttle duration, and other provider types via the **+ Provider** button. |
 
-Anything the sections do not cover is reachable through the **raw YAML editor** - the code button in the tab's toolbar opens `traefik.yml` in Monaco. Section edits and raw edits share the same staged buffer, so they never overwrite each other, and keys the forms do not manage always survive a save.
+Edits merge into the existing entry, so keys the forms do not manage survive a save.
+
+Anything the sections do not cover is reachable through the **raw YAML editor** - the code button in the toolbar opens `traefik.yml` in Monaco. Section edits and raw edits share the same staged buffer, so they never overwrite each other.
 
 ::: warning API section
-Disabling the Traefik API from the API section will prevent Traefik Manager from reading routes, services, and middleware. Keep it enabled while using TM.
+Disabling the Traefik API will prevent Traefik Manager from reading routes, services, and middleware. Keep it enabled while using TM.
 :::
 
 ### Adding providers
 
-Docker and File providers have dedicated toggle cards with form fields (endpoint, directory, watch). For all other providers, click **+ Provider** to open the template editor:
+Docker and File have dedicated toggle cards with form fields (endpoint, directory, watch). For all other providers, click **+ Provider**:
 
 1. Select the provider type from the dropdown
 2. A Monaco YAML editor appears pre-filled with a working template for that provider
 3. Edit the values as needed
 4. Click **Add Provider**
 
-Supported provider types: Docker Swarm, HTTP, Kubernetes CRD, Kubernetes Ingress, Kubernetes Gateway, HashiCorp Nomad, AWS ECS, Consul Catalog, Consul KV, Redis KV, etcd KV, ZooKeeper KV.
+Supported types: Docker Swarm, HTTP, Kubernetes (CRD), Kubernetes Ingress, Kubernetes Gateway, HashiCorp Nomad, AWS ECS, Consul Catalog, Consul KV, Redis KV, etcd KV, ZooKeeper KV.
 
-Clicking the edit button on an existing provider opens the same editor with its current configuration loaded.
+The edit button on an existing provider opens the same editor with its current configuration loaded.
 
 ### Pending changes and saving
 
-1. Edit any value in any section - an **Unsaved changes** bar appears; nothing is written to `traefik.yml` until you save.
+1. Edit any value - an **Unsaved changes** bar appears; nothing is written to `traefik.yml` until you save.
 2. Click **Save** - TM validates the YAML, backs up the current file, then writes the new one. **Discard** reloads from disk instead.
-3. The bar changes to **Saved - Traefik is still running the previous config** with a **Restart Traefik** button.
-4. Click it - TM triggers the configured restart method. A full-screen overlay shows while Traefik restarts and dismisses automatically once it is back (for agents, once the agent is reachable again).
+3. The bar changes to **Saved. Traefik is still running the previous config.** with a **Restart Traefik** button.
+4. Click it - TM triggers the configured restart method. A full-screen overlay shows while Traefik restarts and dismisses once it is back (for agents, once the agent is reachable again).
 
-Multiple edits in one session only require a single restart.
+Multiple edits in one session need only a single restart.
 
 ---
 
 ## Trusted IPs helper
 
-Behind a proxy such as Cloudflare, Traefik only believes `X-Forwarded-For` from sources listed in an entrypoint's `forwardedHeaders.trustedIPs`. Until those are set, your logs, CrowdSec, `ipAllowList` and the login limiter all see the proxy IP instead of the real client. The **Trusted IPs** button in the Static Config header opens a guided helper that writes that field for you.
+Behind a proxy such as Cloudflare, Traefik only believes `X-Forwarded-For` from sources listed in an entrypoint's `forwardedHeaders.trustedIPs`. Until those are set, your logs, CrowdSec, `ipAllowList` and the login limiter all see the proxy IP instead of the real client. The shield button in the Static Config toolbar opens a guided helper that writes that field for you.
 
 1. Pick the target entrypoint (for example `websecure`). Any `trustedIPs` already configured are shown.
 2. Choose one or more sources:
    - **Cloudflare edge ranges** - the full IPv4 + IPv6 set, hardcoded with a capture date. Nothing is fetched at runtime.
    - **Private ranges** - `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`.
    - **Your own proxies / LAN** - free-form CIDRs or single IPs, one per line. Invalid entries are flagged and skipped.
-3. Click **Preview change** to see exactly which ranges will be added. Existing entries are kept, and anything already trusted is deduplicated - the helper only ever adds.
-4. Click **Apply & Save** to stage the change into the static config, back it up, and save. As with any static change, a **Restart required** banner then appears.
+3. Click **Preview change** to see which ranges will be added. Existing entries are kept and duplicates are dropped - the helper only ever adds.
+4. Click **Apply & Save** to stage the change, back up the file, and save. A **Restart required** banner then appears.
 
 Because `trustedIPs` lives in the static config, this is global and needs a Traefik restart. Every trusted range can forge client IPs downstream, so only add proxies you control. Use the [Client IP Diagnostic](hardening.md) to confirm what actually reaches the app before and after. The helper works for the Host and for remote agents.
 
@@ -110,7 +120,7 @@ On native Linux TM reads the file directly from the host path - no volume mount 
 
 ### 2. Set the restart method
 
-Set `RESTART_METHOD` to one of: `proxy`, `socket`, or `poison-pill`.
+Set `RESTART_METHOD` to `proxy`, `socket`, or `poison-pill`.
 
 :::tabs
 == Docker / Podman
@@ -123,8 +133,9 @@ environment:
 == Linux (systemd)
 ```ini
 Environment=RESTART_METHOD=poison-pill
-Environment=TRAEFIK_CONTAINER=traefik
+Environment=SIGNAL_FILE_PATH=/var/lib/traefik-manager/signals/restart.sig
 ```
+Point the signal file at a directory the service user can write to. `TRAEFIK_CONTAINER` is only used by `proxy` and `socket`.
 :::
 
 ### 3. Configure the restart method
@@ -204,8 +215,8 @@ volumes:
   tm-signals:
 ```
 
-**Pros:** No Docker socket needed at all, no extra container.
-**Cons:** Requires adding a healthcheck to Traefik's compose. Up to 5s delay before the signal is detected.
+**Pros:** No Docker socket at all, no extra container.
+**Cons:** Requires a healthcheck on Traefik. Up to 5s delay before the signal is detected.
 
 ---
 
@@ -225,14 +236,14 @@ services:
 ```
 
 ::: danger
-The full Docker socket gives TM the ability to start, stop, or delete any container on the host. If TM is ever compromised, the blast radius is the entire Docker daemon. Use the socket proxy method instead unless you have a specific reason to avoid the extra container.
+The full Docker socket lets TM start, stop, or delete any container on the host. If TM is ever compromised, the blast radius is the entire Docker daemon. Use the socket proxy method instead unless you have a specific reason to avoid the extra container.
 :::
 
 ---
 
 ## Using the traefik-stack installer
 
-If you installed with [setup.sh](traefik-stack.md), the static config editor is optional during install. When you answer **y** to "Mount Traefik static config?", the script asks which restart method you want and generates all the required compose additions automatically - volume mounts, env vars, socket proxy service, or Traefik healthcheck depending on your choice.
+If you installed with [setup.sh](traefik-stack.md), answering **y** to "Mount Traefik static config?" asks which restart method you want and generates every required compose addition - volume mounts, env vars, socket proxy service, or Traefik healthcheck.
 
 For existing installs, see [Enable static config editor](static-enable.md).
 
@@ -242,10 +253,10 @@ For existing installs, see [Enable static config editor](static-enable.md).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STATIC_CONFIG_PATH` | _(unset)_ | Path to `traefik.yml` inside TM's container (or host path for native). No default - the editor stays hidden until it is set. |
-| `RESTART_METHOD` | `proxy` | `proxy`, `socket`, or `poison-pill`. When unset, TM behaves as `proxy` and tries a Docker restart via `DOCKER_HOST`. |
-| `TRAEFIK_CONTAINER` | `traefik` | Container name to restart (used by `proxy` and `socket` methods) |
-| `DOCKER_HOST` | _(unset)_ | Docker socket URL - set to `tcp://socket-proxy:2375` for the proxy method |
-| `SIGNAL_FILE_PATH` | `/signals/restart.sig` | Path to the signal file (poison pill method only) |
+| `STATIC_CONFIG_PATH` | _(unset)_ | Path to `traefik.yml` inside TM's container (or host path for native). The editor stays hidden until this or `static_config_path` in Settings is set. |
+| `RESTART_METHOD` | `proxy` | `proxy`, `socket`, or `poison-pill` |
+| `TRAEFIK_CONTAINER` | `traefik` | Container name to restart (`proxy` and `socket` only) |
+| `DOCKER_HOST` | _(unset - uses `/var/run/docker.sock`)_ | Docker socket URL - set to `tcp://socket-proxy:2375` for the proxy method |
+| `SIGNAL_FILE_PATH` | `/signals/restart.sig` | Path to the signal file (`poison-pill` only) |
 
 Full reference: [Environment Variables](env-vars.md).

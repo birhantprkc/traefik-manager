@@ -17,7 +17,7 @@ description: The Traefik Manager dashboard, routes, middlewares, services, logs,
   .shot-grid { grid-template-columns: repeat(2, 1fr); }
 }</style>
 
-**The screenshots below follow whichever theme you are reading this page in** - switch it with the toggle in the header to see the other one. Click any image to open it full screen.
+**Screenshots follow the theme you are reading this page in** - switch it with the toggle in the header. Click any image to open it full screen.
 
 ## Dashboard
 
@@ -26,7 +26,7 @@ Every route as a launchable app, grouped into categories, with live health on ea
 <img class="screenshot dark-only" src="/images/dark-dashboard.png" alt="Dashboard">
 <img class="screenshot light-only" src="/images/light-dashboard.png" alt="Dashboard">
 
-Switch the categories to an icon grid under Settings -> Interface, and the dashboard becomes an app launcher.
+Switch the categories to an icon grid under **Settings - Interface - Dashboard categories**, and the dashboard becomes an app launcher.
 
 <img class="screenshot dark-only" src="/images/dark-dashboard-icons.png" alt="Dashboard icon grid">
 <img class="screenshot light-only" src="/images/light-dashboard-icons.png" alt="Dashboard icon grid">
@@ -84,7 +84,7 @@ The full path of a request, entry point to backend, as a live diagram.
 
 ## Static Config
 
-`traefik.yml` as editable cards: entry points, certificate resolvers, providers, logging, observability and system, with raw YAML one click away.
+`traefik.yml` as editable cards: entry points, certificate resolvers, providers, plugins, API, logging, observability and system, with raw YAML one click away.
 
 <img class="screenshot dark-only" src="/images/dark-static-config.png" alt="Static config tab">
 <img class="screenshot light-only" src="/images/light-static-config.png" alt="Static config tab">
@@ -119,7 +119,7 @@ The attack surface: who is probing, from which networks and countries, with what
 
 ## Plugins
 
-Installed Traefik plugins, and a guided install straight from the catalog.
+Installed Traefik plugins with the middlewares using each one, and a guided install straight from the catalog.
 
 <img class="screenshot dark-only" src="/images/dark-plugins.png" alt="Plugins">
 <img class="screenshot light-only" src="/images/light-plugins.png" alt="Plugins">
@@ -188,7 +188,7 @@ First run walks through everything in one pass: the Traefik connection, a route 
 
 ## Android
 
-The companion app, connected to the same instance. Every screen, in the theme you are reading this page in.
+The companion app, connected to the same instance.
 
 <div class="shot-grid">
   <img class="screenshot dark-only" src="/images/dark-mobile-overview.png" alt="Overview">
@@ -241,7 +241,7 @@ The companion app, connected to the same instance. Every screen, in the theme yo
 
 ## Tablet
 
-The tablet layout swaps the bottom tab bar for a side rail and lays the cards out in two columns.
+The tablet layout swaps the bottom bar for a navigation rail and puts the list and the detail side by side.
 
 <div class="shot-grid">
   <img class="screenshot dark-only" src="/images/dark-tablet-overview.png" alt="Overview">

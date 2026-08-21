@@ -1,78 +1,67 @@
-# Beta Program
+# Beta
 
-Traefik Manager v1 is generally available. The `:beta` tag tracks the `dev` branch, ahead of the next release - this page explains how to run it, test it, and report issues.
-
----
-
-## What's in beta
-
-- Static Config editor - view and edit `traefik.yml` directly from **Settings**
-- Restart method support - socket proxy, poison pill, and direct socket
-- UI and stability improvements across all tabs
+The `:beta` image tracks the `dev` branch, so it carries the next release before it ships. You get fixes early, and bugs get caught before they reach everyone else.
 
 ---
 
-## Fresh install (beta)
-
-Run the beta installer:
-
-```bash
-curl -fsSL https://get-traefik.xyzlab.dev/beta | bash
-```
-
-This uses the `:beta` image tag automatically.
-
----
-
-## Upgrade an existing install
-
-If you just want to test the beta without the Static Config editor, simply change your image tag to `:beta` and restart:
+## Switch to beta
 
 ```yaml
 image: ghcr.io/chr0nzz/traefik-manager:beta
 ```
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose pull traefik-manager && docker compose up -d traefik-manager
 ```
 
-If you want to also enable the Static Config editor, use the tool below to upgrade your compose file with the correct restart method and volumes. Paste your compose file, choose a restart method, and click **Upgrade**.
-
-<ComposeUpgrader />
-
-After copying the upgraded compose, apply it:
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
----
-
-## Enable the Static Config editor
-
-The Static Config editor requires a read-write `traefik.yml` mount and a restart method. The Compose Upgrader above handles this automatically. For manual setup see [Enabling Static Config](./static-enable.md).
+Agents have a `:beta` tag too (`ghcr.io/chr0nzz/traefik-manager-agent:beta`). Keep the Host and its agents on the same channel.
 
 ---
 
 ## Roll back
 
-To go back to the stable release, change the image tag in your compose file:
-
 ```yaml
 image: ghcr.io/chr0nzz/traefik-manager:latest
 ```
 
-Then pull and restart:
-
 ```bash
-docker compose pull
-docker compose up -d
+docker compose pull traefik-manager && docker compose up -d traefik-manager
 ```
+
+Your `manager.yml` and backups are untouched by the switch, in either direction.
 
 ---
 
-## Report issues
+## Before you switch
 
-Found a bug or have feedback? Open an issue on [GitHub](https://github.com/chr0nzz/traefik-manager/issues).
+`dev` is where fixes land the day they are written, so a beta image can be newer than any testing it has had:
+
+- Take a backup first, from **Settings - Backups**, or copy your config directory
+- Expect the occasional rough edge. Anything that reaches `:latest` has been through a release
+- A new setting written by a beta may not be understood by the older `:latest` build if you roll back
+
+---
+
+## Reporting
+
+The useful bug report says what you did, what happened, and what you expected. Beyond that:
+
+- **Logs from the moment it broke** - `docker compose logs traefik-manager` - are worth more than a description of the error
+- **Your version**, from **Settings - About**
+- **Your setup** where it is relevant: reverse proxy in front, agents, OIDC provider, CrowdSec
+
+[Open an issue](https://github.com/chr0nzz/traefik-manager/issues/new/choose), or [start a discussion](https://github.com/chr0nzz/traefik-manager/discussions) if you are unsure whether something is a bug.
+
+---
+
+## Testing a specific fix
+
+A fix often lands on `dev` and needs confirming before release: pull `:beta` and try the exact thing that failed. That confirmation is the difference between a fix that is believed to work and one that is known to.
+
+Switching over for one test and rolling back afterwards is a perfectly good way to help.
+
+---
+
+## What is in it
+
+The [release notes](https://github.com/chr0nzz/traefik-manager/releases) cover each release. For what is on `dev` right now, the [commit history](https://github.com/chr0nzz/traefik-manager/commits/dev) is the source of truth.

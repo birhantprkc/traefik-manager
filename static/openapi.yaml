@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Traefik Manager API
-  version: 1.10.3
+  version: 1.11.0
   description: |
     REST API powering the Traefik Manager web UI and official mobile app.
 
@@ -675,6 +675,23 @@ paths:
         "200":
           description: Router object from Traefik API
 
+  /api/plugins/catalog:
+    get:
+      tags: [Traefik]
+      summary: Plugin catalog versions
+      description: Latest known version per plugin module, from the Traefik plugin catalog, cached for 24 hours. Returns an empty map when the catalog is unreachable.
+      responses:
+        "200":
+          description: Module to latest-version map
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plugins:
+                    type: object
+                    additionalProperties:
+                      type: string
   /api/traefik/plugins:
     get:
       tags: [Traefik]
@@ -2712,7 +2729,7 @@ paths:
             schema:
               type: object
               properties:
-                version: { type: string, example: "1.10.3" }
+                version: { type: string, example: "1.11.0" }
                 product: { type: string, enum: [manager, traefik] }
       responses:
         "401": { $ref: '#/components/responses/Unauthorized' }

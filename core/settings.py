@@ -55,7 +55,8 @@ def sanitize_ui_prefs(prefs) -> dict:
     for k in UI_PREF_LAYOUTS:
         if k in prefs:
             v = str(prefs[k]).strip().lower()
-            if v in ('classic', 'modern'):
+            v = {'classic': 'fixed', 'modern': 'fluid'}.get(v, v)
+            if v in ('fluid', 'fixed'):
                 out[k] = v
     for k in UI_PREF_DENSITY:
         if k in prefs:

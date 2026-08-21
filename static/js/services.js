@@ -176,7 +176,7 @@ function renderServicesTable() {
                 ${usedBy.length > 3 ? `<span class="svc-used-chip">+${usedBy.length - 3}</span>` : ''}
             </div>` : '';
 
-        if (_tmModern() && _svcViewMode !== 'list') {
+        if (_svcViewMode !== 'list') {
             const anyDown = serverEntries.length > 0 && activeCount < serverEntries.length;
             const dotCls = st === 'error' || (anyDown && activeCount === 0) ? 'status-offline'
                          : anyDown || st !== 'success' ? 'status-checking' : 'status-online';
@@ -219,7 +219,7 @@ function renderServicesTable() {
                     <span class="badge badge-${proto.toLowerCase()}" style="font-size:9px">${proto}</span>
                     ${type ? `<span class="svc-type-badge">${type}</span>` : ''}
                 </div>
-                <span class="svc-status-chip" style="color:${stColor};background:color-mix(in srgb,${stColor} 12%,transparent);border-color:color-mix(in srgb,${stColor} 35%,transparent)">
+                <span class="svc-status-chip" style="color:${stColor};background:color-mix(in srgb,${stColor} 14%,transparent)">
                     <span class="svc-status-dot" style="background:${stColor}"></span>${stLabel}
                 </span>
             </div>
@@ -287,14 +287,15 @@ function renderServicesTable() {
         </div>`;
         document.getElementById('liveContent').innerHTML = `<div class="svc-list">${header}${rows}${empty}</div>`;
     } else {
-        const cls = _tmModern() ? 'tm-card-grid' : 'svc-card-grid';
+        const cls = 'tm-card-grid';
         document.getElementById('liveContent').innerHTML = `<div class="${cls}">${cards}${empty}</div>`;
     }
 
-    document.getElementById('svcTabCount').textContent = _allServices.filter(s => s._proto === 'HTTP').length;
+    setTabCount('live', _allServices.length);
 }
 
 function openSvcDetail(idx) {
+    closeOtherPanels('svcDetailPanel');
     const s = _allServices[idx];
     if (!s) return;
 
@@ -343,50 +344,19 @@ function openSvcDetail(idx) {
     
     const usedBy = s.usedBy || [];
     const usedByHtml = usedBy.length > 0
-        ? _dList(usedBy, 'd-blue')
+        ? `<div class="flex flex-wrap gap-1.5">${usedBy.map(r =>
+            `<button type="button" class="route-deep-chip" onclick="_openRouteByName('${_esc(String(r))}')" title="Open route"><i class="ph-bold ph-arrows-split"></i>${_esc(String(r).split('@')[0])}</button>`).join('')}</div>`
         : `<span class="text-xs" style="color:var(--muted)">-</span>`;
 
-    const kv = (label, val, isHtml = false) => `
-        <div class="flex items-start py-2.5" style="border-bottom:1px solid var(--border)">
-            <div class="text-xs font-semibold uppercase tracking-wider w-40 shrink-0 pt-0.5" style="color:var(--muted)">${label}</div>
-            <div class="text-sm ${isHtml ? '' : 'font-mono'} flex-1" style="color:var(--text)">${isHtml ? val : val}</div>
-        </div>`;
-
-    body.innerHTML = `
-        
-        <div class="mb-5">
-            <div class="flex items-center gap-2 mb-3">
-                <i class="ph-bold ph-info" style="color:var(--blue)"></i>
-                <span class="text-xs font-bold uppercase tracking-wider" style="color:var(--muted)">Service Details</span>
-            </div>
-            <div class="card p-0 overflow-hidden">
-                <div class="px-4">
-                    ${kv('Type', type)}
-                    ${kv('Provider', _dText(provider, 'd-off'), true)}
-                    ${kv('Status', statusBadge, true)}
-                    ${kv('Pass Host Header', passHostHeader === '-' ? '-' : _dBool(passHostHeader === 'true'), true)}
-                </div>
-            </div>
-        </div>
-
-        
-        <div class="mb-5">
-            <div class="flex items-center gap-2 mb-3">
-                <i class="ph-bold ph-globe" style="color:var(--green)"></i>
-                <span class="text-xs font-bold uppercase tracking-wider" style="color:var(--muted)">Servers</span>
-                ${_dCount(servers.length)}
-            </div>
-            <div class="card p-0 overflow-hidden">${serversHtml}</div>
-        </div>
-
-        
-        <div class="mb-5">
-            <div class="flex items-center gap-2 mb-3">
-                <i class="ph-bold ph-git-branch" style="color:var(--purple)"></i>
-                <span class="text-xs font-bold uppercase tracking-wider" style="color:var(--muted)">Used by Routers</span>
-            </div>
-            <div class="card px-4 py-3">${usedByHtml}</div>
-        </div>`;
+    body.innerHTML =
+        renderSection('Service Details', 'ph-info', [
+            ['Type', type, false],
+            ['Provider', _dText(provider, 'd-off'), true],
+            ['Status', statusBadge, true],
+            ['Pass Host Header', passHostHeader === '-' ? '-' : _dBool(passHostHeader === 'true'), true],
+        ])
+        + renderDetailBlock('Servers', 'ph-globe', serversHtml, _dCount(servers.length))
+        + renderDetailBlock('Used by Routers', 'ph-git-branch', usedByHtml);
 
     backdrop.classList.add('open');
     panel.classList.add('open');

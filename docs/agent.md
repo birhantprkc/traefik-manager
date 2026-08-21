@@ -1,6 +1,6 @@
 # Traefik Manager Agent (TMA)
 
-TMA is a lightweight Go daemon that runs alongside Traefik on a remote server. It exposes an HTTP API on port 8090 that lets a central Traefik Manager instance manage the remote server's routes, config files, backups, and more - without needing direct access to the Traefik API or config files.
+TMA is a lightweight Go daemon that runs alongside Traefik on a remote server. It exposes an HTTP API on port 8090 that lets a central Traefik Manager instance manage that server's routes, config files, backups and more, without direct access to its Traefik API or config files.
 
 ## How it works
 
@@ -9,49 +9,49 @@ TMA is a lightweight Go daemon that runs alongside Traefik on a remote server. I
 3. TM generates an API key - save it and set it as `TMA_API_KEY` in the agent's environment
 4. Use the **server switcher** in the TM navigation bar to switch between the Host and remote servers
 
-Each agent card in Settings - Agents has three action buttons on the right, plus inline pencil buttons next to the name and the URL:  | Pencil next to the name | Rename the agent - click to edit inline, Enter or click the checkmark to save |  | Pencil next to the URL | Change the agent's URL the same way |
+Each agent card in Settings - Agents carries three buttons on the right, plus an inline pencil next to the name and next to the URL:
 
-| Button | Action |
-|---|---|
-| Key icon | Manage API keys for this agent |
-| Pencil icon | Rename the agent - click to edit inline, Enter or click the checkmark to save |
-| Gear icon | Edit agent settings (Traefik config, paths, restart method, git backup, CrowdSec) |
-| Trash icon | Remove the agent from TM (does not affect the agent service on the remote server) |
+| Control                        | Action                                                                            |
+| --------------------------------| -----------------------------------------------------------------------------------|
+| Pencil next to the name or URL | Edit it inline - Enter or the checkmark saves, Escape cancels                     |
+| Key icon                       | Manage API keys for this agent                                                    |
+| Gear icon                      | Edit agent settings (Traefik config, paths, restart method, git backup, CrowdSec) |
+| Trash icon                     | Remove the agent from TM (the agent service on the remote server keeps running)   |
 
 When a remote agent is active:
 
-- **Routes** - The Routes tab shows the agent's routes fetched live from the remote Traefik instance. You can add, edit, delete, and toggle routes exactly as you would locally - changes are written to the agent's config files and a `.bak` backup is created before every write. The Config File selector in the Add/Edit Route form lists the agent's actual config files (fetched live), not the Host's config files. If the agent has **Domains** configured (Settings - Agents - Traefik tab) or existing routes to detect domains from, the Add/Edit Route form shows domain chip selectors - the same experience as the Host, including domains auto-detected from the agent's routes and a **+** chip for ad-hoc entry. Without any domains, the Subdomain field becomes a free-form **Hostname** field (enter the full hostname, e.g. `app.example.com`). Entrypoints in the route form are fetched live from the agent's Traefik instance. The **Security headers** and **Optimize for streaming** presets are available on agents too - the generated middleware and `serversTransport` are written to that agent's own config. Cert resolvers offered in the route form are detected automatically from the agent's Traefik API - any resolver already used by one of that server's routers is offered, so no extra configuration is needed. Resolvers found in the agent's static config are merged in when it is mounted, and the optional **Certificate Resolver** field (Settings - Agents - Traefik tab) lets you add resolver names that aren't in use by any route yet.
-- **Middlewares** - The Middlewares tab shows only middlewares managed by TM - those in config files under `CONFIG_PATH` with the `@file` provider suffix. Traefik built-in and other provider middlewares are excluded from the badge count and the chip selector. You can add and edit middlewares on the agent exactly as you would locally.
-- **Services** - Shows the agent's services from the remote Traefik API.
-- **Route Map** - The route map diagram renders the agent's routes and services.
-- **Tab visibility** - Provider and monitoring tab toggles (Docker, Kubernetes, Certs, Plugins, etc.) are stored per-server: an agent's toggles are saved with its registration in `agents.yml`, the Host's in `manager.yml`. Changes made while on an agent do not affect the Host or other agents. Changes made while on an agent do not affect the Host or other agents.
-- **Static Config tab** - Available if the agent has `STATIC_CONFIG_PATH` set and `traefik.yml` mounted read-write. With that agent selected in the server switcher, the Off / Settings / Tab choice appears under **Settings - Interface** and it offers the same section editing as the Host: entrypoint, cert resolver, plugin and provider cards, the API/log panels, the trusted-IPs helper and the raw YAML editor. Changes are staged and written to the agent's file on save, with a `.bak` backup first. Traefik restart after save works if the agent has `RESTART_METHOD` configured. See [Static config editing](#static-config-editing).
-- **Plugins tab** - Lists and manages the plugins declared under `experimental.plugins` in the agent's static config (requires `STATIC_CONFIG_PATH`). Install from a pasted snippet, edit and remove all work against the agent's `traefik.yml`; a generated middleware snippet is written to the agent config file you pick in the install form (default `plugin-middlewares.yml`).
-- **Backups** (Settings - Backups) - Shows the agent's local `.bak` backup files. The agent creates a `.bak` automatically before every config write; you can also create a manual backup at any time. In the Git sub-tab you can enable **Use Host Repository** to have the Host push this agent's config to the Host's git repository on a dedicated branch (no agent-side git config needed), or leave the agent autonomous via its `GIT_BACKUP_*` env vars. The Static Config backup sub-tab appears for an agent when it has `STATIC_CONFIG_PATH` set (or already has static backups); it lists the `traefik.yml` backups separately from the route config backups.
-- **Logs** - The Logs tab shows the agent's access log when `ACCESS_LOG_PATH` is set on the agent. When installed via the installer script alongside Traefik, this is set automatically.
-- **Certificates** - The Certificates tab shows certs from the agent's `acme.json` when `ACME_JSON_PATH` is set. When installed via the installer script alongside Traefik, this is set automatically.
-- **CrowdSec** - If the agent has `CROWDSEC_LAPI_URL` plus a bouncer key, machine credentials, or both, the CrowdSec tab shows that server's attack surface: who is hitting it, from which networks, which scenarios fired, what they were going after, and the bans in force. The Host does not need any access to that CrowdSec instance - every call is proxied through the agent. See [CrowdSec on an agent](#crowdsec-on-an-agent).
-- **Settings sidebar** - When an agent is active, only agent-relevant Settings panels are shown: Backups, Route Monitoring tab toggles, Static Config (if configured), and System Monitoring tab toggles (Tab Visibility and File Paths only). Authentication, Connection, Notifications, and the CrowdSec credentials sub-tab are hidden - they only apply to the Host. CrowdSec on an agent is configured with env vars on the agent itself, not from the Host UI.
+- **Routes** - Fetched live from the remote Traefik instance. Add, edit, delete and toggle work exactly as they do locally; changes are written to the agent's config files, with a `.bak` backup before every write. The Config File selector lists the agent's own files, fetched live, and entrypoints come from the agent's Traefik API. If the agent has **Domains** configured (Settings - Agents - Traefik tab) or existing routes to detect domains from, the form shows the same domain chip selectors as the Host, including auto-detected domains and a **+** chip for ad-hoc entry. Without any domains the Subdomain field becomes a free-form **Hostname** field (enter the full hostname, e.g. `app.example.com`). The **Security headers** and **Optimize for streaming** presets write their middleware and `serversTransport` into that agent's own config. Cert resolvers are detected automatically from the agent's Traefik API - any resolver already used by one of that server's routers is offered - merged with the resolvers in its static config when that is mounted. The optional **Certificate Resolver** field (Settings - Agents - Traefik tab) adds resolver names that no route uses yet.
+- **Middlewares** - Shows only middlewares managed by TM: those in config files under `CONFIG_PATH` with the `@file` provider suffix. Traefik built-in and other provider middlewares are excluded from the badge count and the chip selector. Add and edit work as they do locally.
+- **Services** - The agent's services from the remote Traefik API.
+- **Route Map** - Renders the agent's routes and services.
+- **Tab visibility** - Provider and monitoring tab toggles (Docker, Kubernetes, Certs, Plugins, etc.) are stored per server: an agent's toggles are saved with its registration in `agents.yml`, the Host's in `manager.yml`. Changes made while on an agent do not affect the Host or other agents.
+- **Static Config** - Available if the agent has `STATIC_CONFIG_PATH` set and `traefik.yml` mounted read-write. With that agent selected, the Off / Settings / Tab choice appears under **Settings - Interface** and offers the same section editing as the Host. Changes are staged and written to the agent's file on save, with a `.bak` backup first. Traefik restart after save works if the agent has `RESTART_METHOD` configured. See [Static config editing](#static-config-editing).
+- **Plugins** - Lists and manages the plugins declared under `experimental.plugins` in the agent's static config (requires `STATIC_CONFIG_PATH`). Install from a pasted snippet, edit and remove all work against the agent's `traefik.yml`; the generated middleware snippet is written to the agent config file you pick in the install form (default `plugin-middlewares.yml`).
+- **Backups** (Settings - Backups) - Shows the agent's local `.bak` files. The agent creates one automatically before every config write, and you can create a manual backup at any time. In the Git sub-tab, **Use Host Repository** has the Host push this agent's config to the Host's git repository on a dedicated branch (no agent-side git config needed); otherwise the agent stays autonomous via its `GIT_BACKUP_*` env vars. The Static Config sub-tab appears when the agent has `STATIC_CONFIG_PATH` set (or already has static backups) and lists the `traefik.yml` backups separately from the route config backups.
+- **Logs** - Shows the agent's access log when `ACCESS_LOG_PATH` is set on the agent. The installer sets it when it deploys Traefik alongside the agent.
+- **Certificates** - Shows certs from the agent's `acme.json` when `ACME_JSON_PATH` is set. The installer sets it when it deploys Traefik alongside the agent.
+- **CrowdSec** - If the agent has `CROWDSEC_LAPI_URL` plus a bouncer key, machine credentials, or both, the CrowdSec tab shows that server's attack surface: who is hitting it, from which networks, which scenarios fired, what they were going after, and the bans in force. The Host needs no access to that CrowdSec instance - every call is proxied through the agent. See [CrowdSec on an agent](#crowdsec-on-an-agent).
+- **Settings sidebar** - Authentication, Connection, Notifications and the CrowdSec credentials sub-tab are hidden while an agent is active; they only apply to the Host. An **API Keys** entry appears under Remote for the agent's own keys. CrowdSec on an agent is configured with env vars on the agent itself, not from the Host UI.
 
 ## Install via installer script
 
-The fastest way is to use the `traefik-stack` installer with the agent option pre-selected:
+The fastest way is the `traefik-stack` installer:
 
 ```bash
 curl -fsSL https://get-traefik.xyzlab.dev | bash
 ```
 
-Choose **Traefik Manager Agent** from the menu. Or, to skip the menu entirely:
+Choose **Traefik Manager Agent** from the menu. To skip the menu entirely:
 
 ```bash
 export TMA_INSTALL=1
 curl -fsSL https://get-traefik.xyzlab.dev | bash
 ```
 
-The installer uses an arrow-key menu and a review screen - type a section number to go back and edit it, or press Enter to proceed. It covers all options including:
+The installer uses an arrow-key menu and a review screen - type a section number to go back and edit it, or press Enter to proceed. It covers:
 
 - **Install method** - Docker agent only, Docker agent + Traefik (deploys both), or binary (systemd)
-- **Traefik connection** - API URL, config path, static config mount, and TLS skip-verify (prompted automatically when URL is `https://`)
+- **Traefik connection** - API URL, config path, static config mount, and TLS skip-verify (prompted automatically when the URL is `https://`)
 - **Traefik install** (Agent + Traefik mode) - TLS method, Let's Encrypt email, Cloudflare token, dashboard hostname, network name
 - **CrowdSec** - install alongside the agent (Docker only) or connect to an existing instance
 - **Git backup**, **optional paths**, **restart method**, **install location**
@@ -91,11 +91,11 @@ volumes:
   tma_backups:
 ```
 
-> **Backup persistence**: Always include the `tma_backups` named volume (or a bind mount to a host path via `BACKUP_DIR`). Without it, all backup files stored in `/app/backups` are lost when the container is recreated (e.g. on image update). The Settings - Agents wizard generates this volume automatically.
+> **Backup persistence**: always include the `tma_backups` named volume (or a bind mount to a host path via `BACKUP_DIR`). Without it everything under `/app/backups` is lost when the container is recreated, for example on an image update. The Settings - Agents wizard generates this volume automatically.
 
 ## Static config editing
 
-Two additions to the agent service enable the **Static Config** tab for that server: the env var, and a volume that actually puts the file inside the agent container.
+Two things enable the **Static Config** tab for an agent: the env var, and a volume that puts the file inside the agent container.
 
 ```yaml
 services:
@@ -123,13 +123,12 @@ services:
       - /srv/traefik/traefik.yml:/traefik.yml          # agent edits the same file
 ```
 
-Note the paths inside the two containers do not have to match - only the host path does. Traefik may keep its copy read-only; the agent's must not be.
+Only the host path has to match. Traefik may keep its copy read-only; the agent's must not be.
 
-- The mount must be **writable** - no `:ro`. A `.bak` backup is created in `BACKUP_DIR` before every save. Single-file bind mounts are supported.
-- The path is wherever you mount the file inside the **agent** container - it does not have to match the path inside the Traefik container.
-- The tab toggle only appears under **Settings - Interface** while that agent is the active server, and only when the agent reports the file as readable. Recreate the agent after adding the env var, then check again.
+- The agent's mount must be **writable** - no `:ro`. A `.bak` is written to the agent's backup directory before every save. Single-file bind mounts are supported.
+- The Off / Settings / Tab choice appears under **Settings - Interface** while that agent is the active server, and only when the agent reports the file as readable. Recreate the agent after adding the env var, then check again.
 - To restart Traefik after a save, set `RESTART_METHOD` on the agent. `proxy` needs `TRAEFIK_CONTAINER` plus `DOCKER_HOST` pointing at a docker socket proxy (e.g. `tcp://socket-proxy:2375`) with `CONTAINERS=1` and `POST=1`, reachable from the agent's network.
-- Agents get the full section editing experience - entrypoints, cert resolvers, plugins, providers, API/log panels, trusted-IPs helper and the raw YAML editor - identical to the Host.
+- Agents get the same section editing as the Host: entrypoints, providers, cert resolvers, API and dashboard, logging, observability and system sections, plugin cards, the trusted-IPs helper and the raw YAML editor.
 - Setting `STATIC_CONFIG_PATH` also enables plugin management in the agent's **Plugins** tab.
 
 ## CrowdSec on an agent
@@ -156,15 +155,16 @@ Run both on the machine hosting CrowdSec. In Docker, prefix with `docker exec <c
 
 ```bash
 cscli bouncers add traefik-manager
-cscli machines add traefik-manager --auto
-cat /etc/crowdsec/local_api_credentials.yaml
+cscli machines add traefik-manager --auto -f-
 ```
 
-The bouncer key is printed once - copy it immediately into `CROWDSEC_API_KEY`. The machine's `login` and `password` come from that credentials file and go into `CROWDSEC_MACHINE_ID` and `CROWDSEC_MACHINE_PASSWORD`. If the machine shows as unvalidated, run `cscli machines validate traefik-manager`.
+Both are printed once - copy the bouncer key into `CROWDSEC_API_KEY`, and the machine's `login` and `password` into `CROWDSEC_MACHINE_ID` and `CROWDSEC_MACHINE_PASSWORD`. If the machine shows as unvalidated, run `cscli machines validate traefik-manager`. Escape a `$` in the password as `$$` in `docker-compose.yml` (Compose reads a single `$` as a variable reference); no escaping is needed for `docker run` or a systemd unit.
+
+> `-f-` prints the credentials. Without it `cscli` overwrites `/etc/crowdsec/local_api_credentials.yaml`, which is what CrowdSec's own log processor logs in with.
 
 ### What each credential gets you
 
-The two are complementary, not tiered, because CrowdSec accepts each on different endpoints. You can set either one alone and the tab will say plainly what it cannot see:
+The LAPI accepts each on different endpoints, so the two are complementary, not tiered: the machine token is refused on `/v1/decisions`, the bouncer key on `/v1/alerts`. Set either one alone and the tab says plainly what it cannot see.
 
 | Configured | What the CrowdSec tab shows |
 |---|---|
@@ -172,16 +172,34 @@ The two are complementary, not tiered, because CrowdSec accepts each on differen
 | Machine credentials only | The full attack surface from alerts, but no ban state - sources are reported as *unknown* rather than guessed as unbanned |
 | Both | Everything, including unbanning from the UI and adding manual decisions |
 
+**LAPI behind mutual TLS?** Set `CROWDSEC_CLIENT_CERT`, `CROWDSEC_CLIENT_KEY` and `CROWDSEC_CA_CERT` instead (paths as mounted inside the agent container, added as read-only volumes). One client certificate covers decisions and alerts when its OU is listed in both `bouncers_allowed_ou` and `agents_allowed_ou`, and the LAPI auto-provisions the bouncer and machine on first contact - no key or password needed.
+
+**CrowdSec running as a systemd service on the agent's host?** The agent container cannot reach `127.0.0.1` on the host directly. Use `host.docker.internal` and add `extra_hosts`:
+
+```yaml
+services:
+  traefik-manager-agent:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - CROWDSEC_LAPI_URL=http://host.docker.internal:8070
+```
+
+You also need to allow the agent's Docker network subnet to reach the CrowdSec LAPI port through the host firewall:
+
+```bash
+docker network inspect <your-network> | grep Subnet
+sudo ufw allow from <subnet> to any port <crowdsec-port> proto tcp
+```
+
 ### Notes
 
-- The tab is enabled per server. With the agent active, toggle **CrowdSec** under **Settings - Interface**.
-- The agent must be able to reach the LAPI. If CrowdSec runs as a systemd service on the agent's host rather than in Docker, see the `host.docker.internal` and firewall notes under [CrowdSec environment variables](#crowdsec).
+- The tab is enabled per server. With the agent active, toggle **CrowdSec** under **Settings - System Monitoring - Tab Visibility**.
 - If the agent cannot reach the LAPI at all, the tab says so rather than reporting zero decisions as fact.
-- Escape a `$` in the machine password as `$$` in `docker-compose.yml`.
 
 ## Install via binary
 
-Download the binary for your platform from the [GitHub Releases](https://github.com/chr0nzz/traefik-manager/releases) page (`tma-linux-amd64`, `tma-linux-arm64`, etc.) and create a systemd unit:
+Download the binary for your platform from the [GitHub Releases](https://github.com/chr0nzz/traefik-manager/releases) page (`tma-linux-amd64`, `tma-linux-arm64`, `tma-linux-armv7`) and create a systemd unit:
 
 ```ini
 [Unit]
@@ -211,16 +229,16 @@ sudo systemctl enable --now tma
 
 | Variable | Description |
 |---|---|
-| `TMA_API_KEY` | API key generated in TM Settings - Agents |
+| `TMA_API_KEY` | API key generated in TM Settings - Agents. The agent refuses to start without it |
 
 ### Traefik connection
 
 | Variable | Default | Description |
 |---|---|---|
-| `TRAEFIK_API_URL` | `http://traefik:8080` | Traefik API URL. Use `http://traefik:8080` when TMA runs alongside Traefik on the same Docker network, or a public HTTPS URL for a remote Traefik instance. |
-| `TRAEFIK_API_USER` | - | Username for a Traefik API behind basic auth. Set together with `TRAEFIK_API_PASSWORD`; when both are set the agent sends HTTP Basic Auth on every Traefik API call. Leave empty for an unauthenticated API. |
-| `TRAEFIK_API_PASSWORD` | - | Password paired with `TRAEFIK_API_USER`. |
-| `TRAEFIK_INSECURE_SKIP_VERIFY` | `false` | Skip TLS certificate verification for HTTPS Traefik API URLs. Useful when using a self-signed cert or Cloudflare Origin Certificate. |
+| `TRAEFIK_API_URL` | `http://traefik:8080` | Traefik API URL. Use `http://traefik:8080` when TMA runs alongside Traefik on the same Docker network, or a public HTTPS URL for a remote Traefik instance |
+| `TRAEFIK_API_USER` | - | Username for a Traefik API behind basic auth. Set together with `TRAEFIK_API_PASSWORD`; when both are set the agent sends HTTP Basic Auth on every Traefik API call |
+| `TRAEFIK_API_PASSWORD` | - | Password paired with `TRAEFIK_API_USER` |
+| `TRAEFIK_INSECURE_SKIP_VERIFY` | `false` | Skip TLS verification for HTTPS Traefik API URLs. For self-signed or Cloudflare Origin certificates |
 | `CONFIG_PATH` | `/app/config` | Dynamic config directory or file. This is the **only** config-location variable the agent has - see the note below |
 | `STATIC_CONFIG_PATH` | - | Path to `traefik.yml` - enables static config R/W |
 
@@ -244,7 +262,7 @@ A directory is read **one level deep**, not recursively. Point it at the folder 
 
 | Variable | Default | Description |
 |---|---|---|
-| `ACME_JSON_PATH` | - | Path to `acme.json` - enables cert info reads. Accepts several files comma-separated, or a directory whose `.json` files are all read (Traefik writes one storage file per cert resolver). |
+| `ACME_JSON_PATH` | - | Path to `acme.json` - enables cert info reads. Accepts several files comma-separated, or a directory whose `.json` files are all read (Traefik writes one storage file per cert resolver) |
 | `ACCESS_LOG_PATH` | - | Path to Traefik access log file |
 | `PLUGINS_DIR` | - | Path to Traefik plugins directory |
 | `BACKUP_DIR` | `/app/backups` | Agent data directory. `.bak` files are written to `<BACKUP_DIR>/backups`, the API key store to `<BACKUP_DIR>/api_keys.json`, and the git clone to `<BACKUP_DIR>/git-repo` |
@@ -254,68 +272,26 @@ A directory is read **one level deep**, not recursively. Point it at the folder 
 
 | Variable | Default | Description |
 |---|---|---|
-| `RESTART_METHOD` | - | `proxy`, `poison-pill`, or `socket` |
-| `TRAEFIK_CONTAINER` | `traefik` | Container name (used by `proxy` and `socket` methods) |
-| `DOCKER_HOST` | - | e.g. `tcp://socket-proxy:2375` (used by `proxy` method) |
-| `SIGNAL_FILE_PATH` | - | e.g. `/signals/restart.sig` (used by `poison-pill` method) |
+| `RESTART_METHOD` | - | `proxy`, `poison-pill`, or `socket`. `socket` talks to `/var/run/docker.sock`, so mount it into the agent |
+| `TRAEFIK_CONTAINER` | `traefik` | Container name (used by `proxy` and `socket`) |
+| `DOCKER_HOST` | - | e.g. `tcp://socket-proxy:2375` (used by `proxy`) |
+| `SIGNAL_FILE_PATH` | - | e.g. `/signals/restart.sig` (used by `poison-pill`) |
 
 ### CrowdSec
+
+Setup, credential generation and what each credential unlocks are in [CrowdSec on an agent](#crowdsec-on-an-agent).
 
 | Variable | Default | Description |
 |---|---|---|
 | `CROWDSEC_LAPI_URL` | - | CrowdSec LAPI URL (e.g. `http://crowdsec:8080`) |
-| `CROWDSEC_API_KEY` | - | CrowdSec bouncer API key - used to read **decisions** (active bans/captchas/bypasses) |
-| `CROWDSEC_MACHINE_ID` | - | CrowdSec machine login - required to read **alerts** and to unban (delete decisions) |
+| `CROWDSEC_API_KEY` | - | Bouncer API key - reads **decisions** (active bans/captchas/bypasses) |
+| `CROWDSEC_MACHINE_ID` | - | Machine login - required to read **alerts** and to unban (delete decisions) |
 | `CROWDSEC_MACHINE_PASSWORD` | - | Password for the machine login |
-| `CROWDSEC_CLIENT_CERT` | - | Path to a TLS client certificate for a LAPI behind mTLS, replaces the API key and machine login |
-| `CROWDSEC_CLIENT_KEY` | - | Path to the client certificate's private key |
-| `CROWDSEC_CA_CERT` | - | Path to the CA certificate that signed the LAPI's own certificate (private PKI) |
-| `CROWDSEC_READ_TIMEOUT` | `20` | Seconds to wait for the LAPI to answer. Raise it on a busy or large LAPI |
+| `CROWDSEC_CLIENT_CERT` | - | TLS client certificate for a LAPI behind mTLS, replaces the API key and machine login |
+| `CROWDSEC_CLIENT_KEY` | - | The client certificate's private key |
+| `CROWDSEC_CA_CERT` | - | CA certificate that signed the LAPI's own certificate (private PKI) |
+| `CROWDSEC_READ_TIMEOUT` | `20` | Seconds to wait for the LAPI to answer, clamped to 1-120. Raise it on a busy or large LAPI |
 | `CROWDSEC_ALERT_LIMIT` | `500` | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
-
-**Two credential types - why both?**
-
-CrowdSec's LAPI uses two different authentication methods for different endpoints:
-
-- **Bouncer key** (`CROWDSEC_API_KEY`) can read the active **decisions** list. This is all you need to see and filter bans, captchas, and bypasses in the CrowdSec tab.
-- **Machine credentials** (`CROWDSEC_MACHINE_ID` + `CROWDSEC_MACHINE_PASSWORD`) are required to read the **alerts** list and to **unban** (delete a decision). Bouncer keys cannot access these endpoints - the LAPI returns `403 access forbidden` or an empty result.
-
-Set both for the full CrowdSec tab. They are complementary, not tiered: the machine token is refused on `/v1/decisions` and the bouncer key is refused on `/v1/alerts`. With only the bouncer key you get the bans in force and nothing about who attacked you.
-
-**LAPI behind mutual TLS?** Set `CROWDSEC_CLIENT_CERT`, `CROWDSEC_CLIENT_KEY` and `CROWDSEC_CA_CERT` instead (paths as mounted inside the agent container, add the files as read-only volumes). One client certificate covers decisions and alerts when its OU is listed in both `bouncers_allowed_ou` and `agents_allowed_ou`, and the LAPI auto-provisions the bouncer and machine on first contact - no key or password needed.
-
-**Creating a machine login:**
-
-On the CrowdSec host, register a machine and let CrowdSec generate the credentials:
-
-```bash
-sudo cscli machines add traefik-manager --auto
-sudo cat /etc/crowdsec/local_api_credentials.yaml
-```
-
-Copy the `login` and `password` from that file into `CROWDSEC_MACHINE_ID` and `CROWDSEC_MACHINE_PASSWORD`. If the machine shows as unvalidated, run `sudo cscli machines validate traefik-manager`.
-
-> **Compose gotcha**: if the generated password contains a `$`, escape it as `$$` in `docker-compose.yml` (Docker Compose treats a single `$` as a variable reference). No escaping is needed for a Docker `run` command or a systemd unit.
-
-**If CrowdSec runs as a systemd service on the same host as the agent:**
-
-The agent container cannot reach `127.0.0.1` on the host directly. Use `host.docker.internal` instead and add `extra_hosts` to the agent service:
-
-```yaml
-services:
-  traefik-manager-agent:
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    environment:
-      - CROWDSEC_LAPI_URL=http://host.docker.internal:8070
-```
-
-You also need to allow the agent's Docker network subnet to reach the CrowdSec LAPI port through the host firewall. Find the subnet and add the rule:
-
-```bash
-docker network inspect <your-network> | grep Subnet
-sudo ufw allow from <subnet> to any port <crowdsec-port> proto tcp
-```
 
 ### Git backup
 
@@ -334,7 +310,7 @@ Do not point multiple servers (Host or agents) at the same repository and branch
 :::
 
 ::: tip Prefer Host-managed backup
-Instead of configuring `GIT_BACKUP_*` on every agent, you can enable **Use Host Repository** in Settings - Backups - Git while the agent is active: the Host pushes the agent's config to its own repository on a per-agent branch, using the Host's credentials.
+Instead of configuring `GIT_BACKUP_*` on every agent, enable **Use Host Repository** in Settings - Backups - Git while the agent is active: the Host pushes the agent's config to its own repository on a per-agent branch, using the Host's credentials.
 :::
 
 ### Agent server
@@ -342,18 +318,18 @@ Instead of configuring `GIT_BACKUP_*` on every agent, you can enable **Use Host 
 | Variable | Default | Description |
 |---|---|---|
 | `TMA_PORT` | `8090` | Listening port |
-| `TMA_RATE_LIMIT` | `300` | Requests per minute per IP (0 = disabled) |
-| `TMA_DEBUG` | `false` | When `true`, log each failed Traefik API call (the request URL and the returned status) to the journal. Off by default; the agent otherwise only logs startup and fatal errors. Turn it on when a tab shows "could not load" and you need to see why (for example a `401` from an authenticated API). |
+| `TMA_RATE_LIMIT` | `300` | Requests per minute per IP on `/api/` (0 = disabled) |
+| `TMA_DEBUG` | `false` | Log each failed Traefik API call (request URL and returned status) to the journal. Turn it on when a tab shows "could not load" and you need to see why, for example a `401` from an authenticated API |
 
-`TMA_PORT` and `TMA_RATE_LIMIT` can also be set from the **Settings - Agents** wizard. They appear as optional fields in the configuration step; leave them blank to use the defaults. The generated Docker Compose only includes these env vars when a non-default value is entered.
+`TMA_PORT` and `TMA_RATE_LIMIT` can also be set from the **Settings - Agents** wizard, as optional fields in the configuration step. The generated Docker Compose only includes them when you enter a non-default value.
 
 ### Domains (TM-side, not an env var)
 
-The **Domains** field in Settings - Agents (Traefik tab) is a TM-side configuration - it is not passed to the agent container. It tells TM what domains are available on this agent when creating or editing routes. Enter one or more domains separated by commas (e.g. `example.com, example.net`). Domains found in the agent's existing routes are added to the route form automatically, so this field is optional seeding. When the agent has no configured domains and no routes to detect them from, the Subdomain field becomes a free-form Hostname field for the full hostname.
+The **Domains** field in Settings - Agents (Traefik tab) is TM-side configuration - it is not passed to the agent container. It tells TM which domains are available on this agent when creating or editing routes. Enter one or more domains separated by commas (e.g. `example.com, example.net`). Domains found in the agent's existing routes are added to the route form automatically, so this field is optional seeding. With no configured domains and no routes to detect them from, the Subdomain field becomes a free-form Hostname field.
 
 ## Storage
 
-Agent registrations (name, URL, encrypted API key, and configuration) are stored in `agents.yml` in the same config directory as `manager.yml` (default `/app/config/agents.yml`). The file is created automatically when the first agent is added. If you are upgrading from a version before v1.5.0, agents are migrated automatically from `manager.yml` to `agents.yml` on first start - no manual action required.
+Agent registrations (name, URL, encrypted API key, and configuration) live in `agents.yml`, in the same config directory as `manager.yml` (default `/app/config/agents.yml`). The file is created when the first agent is added. Upgrading from a version before v1.5.0 migrates agents from `manager.yml` to `agents.yml` on first start, with no manual action.
 
 Back up `agents.yml` alongside `manager.yml` to preserve agent registrations.
 
@@ -361,7 +337,7 @@ Back up `agents.yml` alongside `manager.yml` to preserve agent registrations.
 
 - The API key is the only credential - keep it secret and use HTTPS between TM and TMA
 - Put TMA behind a reverse proxy (Traefik itself) with TLS for production use
-- `TMA_RATE_LIMIT` defaults to 300 req/min - TM makes many API calls per tab switch so the default is intentionally generous; lower it only if you need to restrict access
+- `TMA_RATE_LIMIT` defaults to 300 req/min because TM makes many API calls per tab switch; lower it only if you need to restrict access
 - The `/health` endpoint is public (no auth required) - use it for uptime monitoring
 
 ## Updating
@@ -381,13 +357,13 @@ sudo systemctl restart tma
 
 ## Agent git backup
 
-When `GIT_BACKUP_ENABLED=true`, the agent handles its own git backup cycle autonomously using the `GIT_BACKUP_*` env vars. You do not configure agent git backup through the TM Settings UI - the Settings - Agents wizard generates the Docker Compose with all env vars pre-filled based on your inputs.
+With `GIT_BACKUP_ENABLED=true` the agent runs its own git backup cycle from its `GIT_BACKUP_*` env vars. There is no agent git configuration in the TM Settings UI - the Settings - Agents wizard generates the Docker Compose with those env vars pre-filled from your answers.
 
-When an agent is active in the TM server switcher, Settings - Backups shows the agent's backup data:
+With an agent active, Settings - Backups shows that agent's backup data:
 
-- **Dynamic Config tab** - lists and restores the agent's local `.bak` backups. The agent automatically creates a `.bak` file before every config write (route or middleware save), so changes can always be rolled back. Manual "Create Backup" backs up all config files at once. Backup files are named `filename.YYYYMMDD_HHMMSS.bak` and stored in `BACKUP_DIR`.
-- **Git tab** - shows the agent's git history, status, and allows manual push and git restore; git configuration fields are hidden (managed by env vars on the agent)
-- - **Static Config tab** - shown when the agent has `STATIC_CONFIG_PATH` configured; lists and restores the agent's `traefik.yml` backups
+- **Dynamic Config** - lists and restores the agent's local `.bak` files, named `filename.YYYYMMDD_HHMMSS.bak` under `<BACKUP_DIR>/backups`. "Create Backup" backs up all config files at once.
+- **Git** - the agent's git history and status, with manual push and git restore. The configuration fields are hidden, since env vars on the agent own them.
+- **Static Config** - shown when the agent has `STATIC_CONFIG_PATH` configured; lists and restores the agent's `traefik.yml` backups.
 
 See [API Reference - Agent](api-agent.md) for the full endpoint list.
 
@@ -395,7 +371,7 @@ See [API Reference - Agent](api-agent.md) for the full endpoint list.
 
 **Switched to an agent but the Routes/Services tabs are empty ("No routes found")**
 
-This almost always means the agent container can reach Traefik Manager, but the **agent itself cannot reach its Traefik API**. Routes from the Docker, Kubernetes, and other providers come from the Traefik API, so if `TRAEFIK_API_URL` is wrong or unreachable from inside the agent container, those routes all disappear. The Routes tab shows a banner with the exact connection error (e.g. `traefik unavailable at http://traefik:8080: connection refused`).
+This almost always means the agent container can reach Traefik Manager, but the **agent itself cannot reach its Traefik API**. Routes from the Docker, Kubernetes and other providers come from the Traefik API, so if `TRAEFIK_API_URL` is wrong or unreachable from inside the agent container, those routes all disappear. The Routes tab shows a banner with the exact connection error (e.g. `traefik unavailable at http://traefik:8080: connection refused`).
 
 Check the agent's `TRAEFIK_API_URL`:
 
@@ -414,7 +390,7 @@ TRAEFIK_API_USER=youruser
 TRAEFIK_API_PASSWORD=yourpassword
 ```
 
-When both are set the agent sends HTTP Basic Auth on every Traefik API call. The setup wizard also asks for these when you tell it the Traefik API is behind basic auth.
+The setup wizard also asks for these when you tell it the Traefik API is behind basic auth.
 
 **Viewing the agent's logs (binary install)**
 
@@ -425,4 +401,4 @@ sudo journalctl -u tma -n 200 --no-pager
 sudo journalctl -u tma -f
 ```
 
-By default the agent only logs its startup line and fatal errors - per-request failures are returned to the Manager, not logged. Set `TMA_DEBUG=true` to log each failed Traefik API call (URL and status) to the journal, then reproduce the error. The startup line also shows the active config, e.g. `traefik=http://localhost:8080, insecure-tls=false, traefik-auth=true, debug=true`.
+By default the agent logs its startup line, fatal errors and background failures (git push, Traefik restart, pre-write backup). Per-request failures are returned to the Manager instead. Set `TMA_DEBUG=true` to log each failed Traefik API call (URL and status), then reproduce the error. The startup line also shows the active config, e.g. `traefik=http://localhost:8080, insecure-tls=false, traefik-auth=true, debug=true`.

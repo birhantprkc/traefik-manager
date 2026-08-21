@@ -1,26 +1,24 @@
 # ECS Tab
 
-The **ECS** tab shows all routes discovered by Traefik's Amazon ECS provider in read-only mode.
+The **ECS** tab lists the routes Traefik discovered through its Amazon ECS provider.
 
 ## What it shows
 
-- Route name, rule, status (enabled/disabled/error)
-- Protocol (HTTP / TCP / UDP)
-- TLS indicator
-- Service name
-- Entry points
-- Full detail view via the info button
+- One card per route: status, name, rule, protocol, TLS state, service, entry points, middlewares
+- Summary strip: route counts per protocol, plus any route not serving
+- Middlewares from the ECS provider, listed under the routes
+- Search, protocol filter, refresh
 
+Click a card for its detail panel.
 
 Routes are **read-only** - edit them via your ECS task definitions and Traefik labels.
 
 ## Enabling the tab
 
-### During setup wizard
-Toggle **ECS** on in the "Optional monitoring" step.
-
-### After setup
-Go to **Settings → Route Monitoring** and enable ECS.
+| Where | Path |
+|---|---|
+| Setup wizard | Monitoring step → Provider tabs → ECS |
+| Later | Settings → Route Monitoring → ECS |
 
 ## Requirements
 
@@ -34,4 +32,4 @@ providers:
       - my-cluster
 ```
 
-No extra file mounts into the traefik-manager container are needed - data is pulled live from the Traefik API.
+No mounts into traefik-manager needed - data comes live from the Traefik API.

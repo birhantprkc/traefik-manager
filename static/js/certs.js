@@ -2,6 +2,39 @@ let _allCerts   = [];
 
 function filterCerts() { renderCertCards(); }
 
+
+function renderCertsVerdict() {
+    if (!document.getElementById('certsVerdict')) return;
+    if (!_allCerts.length) { _tvStrip('certsVerdict', null); return; }
+    const now = Date.now();
+    let critical = 0, expiring = 0, next = null;
+    _allCerts.forEach(c => {
+        if (!c.not_after) return;
+        const exp = new Date(c.not_after);
+        if (isNaN(exp)) return;
+        const d = Math.ceil((exp - now) / 86400000);
+        if (d < 7) critical++;
+        else if (d < 30) expiring++;
+        if (next === null || d < next) next = d;
+    });
+    const resolvers = new Set(_allCerts.map(c => c.resolver).filter(Boolean)).size;
+    const flags = [{ cls: 'd-off', ic: 'ph-bold ph-shield-check', n: _allCerts.length,
+                     label: _allCerts.length === 1 ? 'certificate' : 'certificates' }];
+    if (critical) flags.push({ cls: 'd-bad', ic: 'ph-fill ph-warning-octagon', n: critical, label: 'under 7d' });
+    if (expiring) flags.push({ cls: 'd-warn', ic: 'ph-fill ph-hourglass-high', n: expiring, label: 'under 30d' });
+    if (!critical && !expiring) flags.push({ cls: 'd-on', ic: 'ph-bold ph-check', n: '', label: 'none expiring soon' });
+    if (resolvers > 1) flags.push({ cls: 'd-off', ic: 'ph-bold ph-certificate', n: resolvers, label: 'resolvers' });
+    _tvStrip('certsVerdict', {
+        health: critical ? 'down' : expiring ? 'warn' : 'up',
+        ic: critical ? 'ph-fill ph-warning-octagon' : expiring ? 'ph-fill ph-hourglass-high' : 'ph-fill ph-check-circle',
+        txt: critical ? _sdNum(critical) + ' expiring within 7 days'
+           : expiring ? _sdNum(expiring) + ' expiring within 30 days'
+           : 'All certificates healthy',
+        flags,
+        meta: next !== null ? 'next expiry in <b>' + _sdNum(next) + 'd</b>' : '',
+    });
+}
+
 function renderCertCards() {
     const q   = (document.getElementById('certsSearch')?.value || '').toLowerCase();
     const now = Date.now();
@@ -29,40 +62,24 @@ function renderCertCards() {
         const expiryBadge = daysLeft !== null
             ? `<span class="badge" style="background:${daysLeft<7?'rgba(248,81,73,0.15)':daysLeft<30?'rgba(210,153,34,0.15)':'rgba(63,185,80,0.15)'};color:${expiryColor};border-color:${expiryColor}40">${daysLeft}d left</span>`
             : '';
-        if (_tmModern()) {
-            const extra = sans.filter(d => d !== main);
-            const vals = extra.slice(0, 2).map(d =>
-                `<div class="tm-val tm-val-host"><i class="ph-bold ph-globe-simple"></i><span class="tm-v">${_esc(d)}</span>${_tmCopy(d)}</div>`).join('')
-                + (extra.length > 2 ? `<div class="tm-val"><i class="ph-bold ph-dot" style="opacity:0"></i><span class="tm-more" title="${_esc(extra.join(', '))}">+${extra.length - 2} more</span></div>` : '');
-            return `<div class="tm-card tm-card-flat"${daysLeft !== null && daysLeft < 7 ? ' data-health="down"' : ''} style="--tm-accent:${expiryColor}">
-                <div class="tm-head">
-                    <span class="tm-ic tm-ic-tile"><i class="ph-bold ph-shield-check"></i></span>
-                    <div class="tm-head-txt">
-                        <div class="tm-title"><span class="tm-name">${_esc(main)}</span></div>
-                        <div class="tm-sub">${_esc(resolver)}</div>
-                    </div>
+        const extra = sans.filter(d => d !== main);
+        const vals = extra.slice(0, 2).map(d =>
+            `<div class="tm-val tm-val-host"><i class="ph-bold ph-globe-simple"></i><span class="tm-v">${_esc(d)}</span>${_tmCopy(d)}</div>`).join('')
+            + (extra.length > 2 ? `<div class="tm-val"><i class="ph-bold ph-dot" style="opacity:0"></i><span class="tm-more" title="${_esc(extra.join(', '))}">+${extra.length - 2} more</span></div>` : '');
+        return `<div class="tm-card tm-card-flat"${daysLeft !== null && daysLeft < 7 ? ' data-health="down"' : ''} style="--tm-accent:${expiryColor}">
+            <div class="tm-head">
+                <span class="tm-ic tm-ic-tile"><i class="ph-bold ph-shield-check"></i></span>
+                <div class="tm-head-txt">
+                    <div class="tm-title"><span class="tm-name">${_esc(main)}</span></div>
+                    <div class="tm-sub">${_esc(resolver)}</div>
                 </div>
-                ${vals ? `<div class="tm-vals">${vals}</div>` : ''}
-                <div class="tm-foot"><span class="tm-meta">expires ${_esc(expiryStr)}${extra.length ? ` · ${extra.length + 1} domains` : ''}</span>${daysLeft !== null ? `<span class="tm-cf" style="color:${expiryColor}">${daysLeft}d left</span>` : ''}</div>
-            </div>`;
-        }
-        return `<div class="card p-4">
-            <div class="flex items-start justify-between mb-3">
-                <div class="flex items-center gap-2 min-w-0">
-                    <i class="ph-bold ph-shield-check text-sm shrink-0" style="color:var(--green)"></i>
-                    <span class="font-bold text-sm truncate" style="color:var(--text)" title="${_esc(main)}">${_esc(main)}</span>
-                </div>
-                ${expiryBadge}
             </div>
-            ${sans.length ? `<div class="flex flex-wrap gap-1 mb-3">${sans.map(d=>`<span class="badge badge-muted" style="font-size:9px">${_esc(d)}</span>`).join('')}</div>` : ''}
-            <div class="grid grid-cols-2 gap-2 text-xs">
-                <div><span style="color:var(--muted)">Resolver</span><div class="font-mono mt-0.5" style="color:var(--text)">${_esc(resolver)}</div></div>
-                <div><span style="color:var(--muted)">Expires</span><div class="font-mono mt-0.5" style="color:${expiryColor}">${expiryStr}</div></div>
-            </div>
+            ${vals ? `<div class="tm-vals">${vals}</div>` : ''}
+            <div class="tm-foot"><span class="tm-meta">expires ${_esc(expiryStr)}${extra.length ? ` · ${extra.length + 1} domains` : ''}</span>${daysLeft !== null ? `<span class="tm-cf" style="color:${expiryColor}">${daysLeft}d left</span>` : ''}</div>
         </div>`;
     }).join('');
     document.getElementById('certsContent').innerHTML =
-        `<div class="${_tmModern() ? 'tm-card-grid' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}">${cards}</div>`;
+        `<div class="tm-card-grid">${cards}</div>`;
 }
 
 async function refreshCertsTab() {
@@ -83,7 +100,7 @@ async function refreshCertsTab() {
                 ],
                 note: 'No Traefik restart needed - only traefik-manager needs to be updated.'
             });
-            document.getElementById('certsTabCount').textContent = '0';
+            setTabCount('certs', '0');
             return;
         }
 
@@ -93,12 +110,13 @@ async function refreshCertsTab() {
                 <p class="font-medium">No certificates found</p>
                 <p class="text-xs mt-1">acme.json may be empty - certs are issued on first request.</p>
             </div>`;
-            document.getElementById('certsTabCount').textContent = '0';
+            setTabCount('certs', '0');
             return;
         }
 
         _allCerts = certs;
-        document.getElementById('certsTabCount').textContent = certs.length;
+        setTabCount('certs', certs.length);
+        renderCertsVerdict();
         renderCertCards();
     } catch(e) {
         container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>Could not load certificate data</p></div>`;
@@ -190,47 +208,9 @@ function renderTlsOptions(opts) {
     }
     const cards = opts.map(o => {
         const i = _tlsOptions.indexOf(o);
-        if (_tmModern()) return _tmTlsOptCard(o, i);
-        const cfBadge = o.configFile ? `<span class="badge badge-muted" style="font-size:9px">${_esc(o.configFile)}</span>` : '';
-        const verBadge = o.minVersion ? `<span class="badge badge-green" style="font-size:9px"><i class="ph-bold ph-lock"></i> ${_esc(_tlsVer(o.minVersion))}+</span>` : '';
-        const sniBadge = o.sniStrict ? `<span class="badge" style="font-size:9px;background:rgba(36,161,222,0.12);color:var(--blue);border:1px solid rgba(36,161,222,0.35)">SNI Strict</span>` : '';
-        const mtlsBadge = (o.clientAuthType && o.clientAuthType !== 'NoClientCert') ? `<span class="badge badge-muted" style="font-size:9px">mTLS</span>` : '';
-
-        const mkRow = (label, val) => `
-            <div class="rounded-md p-2.5" style="background:var(--input-bg);border:1px solid var(--border)">
-                <div class="text-xs font-semibold uppercase tracking-wider mb-1" style="color:var(--muted)">${label}</div>
-                <div class="text-xs font-mono" style="color:var(--text)">${val}</div>
-            </div>`;
-        const mkListRow = (label, items) => items?.length ? `
-            <div class="rounded-md p-2.5" style="background:var(--input-bg);border:1px solid var(--border)">
-                <div class="text-xs font-semibold uppercase tracking-wider mb-1.5" style="color:var(--muted)">${label}</div>
-                <pre class="font-mono leading-relaxed" style="color:var(--green);font-size:11px">${items.map(v => _esc(v)).join('\n')}</pre>
-            </div>` : '';
-
-        const rows = [];
-        if (o.cipherSuites?.length) rows.push(mkListRow('Cipher Suites', o.cipherSuites));
-        if (o.curvePreferences?.length) rows.push(mkRow('Curves', _esc(o.curvePreferences.join(', '))));
-        if (o.alpnProtocols?.length) rows.push(mkRow('ALPN', _esc(o.alpnProtocols.join(', '))));
-        if (o.clientAuthType && o.clientAuthType !== 'NoClientCert') rows.push(mkRow('Client Auth', _esc(o.clientAuthType)));
-
-        return `<div class="card route-card tls-opt-card" data-name="${_esc(o.name.toLowerCase())}" data-idx="${i}">
-            <div class="route-card-inner p-4 pb-2">
-                <div class="flex justify-between items-start mb-3">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-1.5 mb-1.5">${verBadge}${sniBadge}${mtlsBadge}${cfBadge}</div>
-                        <h3 class="font-bold text-sm font-mono truncate" style="color:var(--text)" title="${_esc(o.name)}">${_esc(o.name)}</h3>
-                    </div>
-                    <div class="flex items-center gap-1.5 ml-2 flex-shrink-0">
-                        <button type="button" data-idx="${i}" onclick="_tlsOptInfo(this)" class="pill-btn pill-btn-blue" title="View details"><i class="ph-bold ph-info text-xs"></i></button>
-                        <button type="button" onclick="deleteTlsOption('${_esc(o.name)}','${_esc(o.configFile || '')}')" class="pill-btn pill-btn-red" title="Delete"><i class="ph-bold ph-trash text-xs"></i></button>
-                        <button type="button" data-idx="${i}" onclick="_tlsOptEdit(this)" class="pill-btn pill-btn-blue" title="Edit"><i class="ph-bold ph-pencil-simple text-xs"></i></button>
-                    </div>
-                </div>
-                <div class="space-y-2">${rows.join('')}</div>
-            </div>
-        </div>`;
+        return _tmTlsOptCard(o, i);
     }).join('');
-    el.innerHTML = `<div class="${_tmModern() ? 'tm-card-grid' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'}">${cards}</div>`;
+    el.innerHTML = `<div class="tm-card-grid">${cards}</div>`;
 }
 
 function _tlsOptEdit(btn) {
@@ -244,33 +224,32 @@ function _tlsOptInfo(btn) {
 }
 
 function openTlsOptDetail(o) {
+    closeOtherPanels('tlsOptDetailPanel');
     document.getElementById('tlsOptDetailTitle').textContent = o.name;
     document.getElementById('tlsOptDetailEditBtn').onclick = () => { closeTlsOptDetail(); openTlsOptionModal(o); };
-    const row = (label, val) => val ? `<div class="flex gap-3 py-2.5" style="border-bottom:1px solid var(--border)"><div class="text-xs font-semibold uppercase tracking-wider w-36 flex-shrink-0 pt-0.5" style="color:var(--muted)">${label}</div><div class="text-sm font-mono break-all" style="color:var(--text)">${val}</div></div>` : '';
-    const listRow = (label, items) => items?.length ? `<div class="py-2.5" style="border-bottom:1px solid var(--border)"><div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--muted)">${label}</div><div class="space-y-1">${items.map(v => `<div class="text-xs font-mono px-2 py-1 rounded" style="background:var(--input-bg);color:var(--green)">${_esc(v)}</div>`).join('')}</div></div>` : '';
     const rows = [
-        row('Config File',   _esc(o.configFile || '')),
-        row('Min Version',   o.minVersion ? _esc(o.minVersion) : ''),
-        row('Max Version',   o.maxVersion ? _esc(o.maxVersion) : ''),
-        row('SNI Strict',    o.sniStrict ? 'Yes' : ''),
-        listRow('Cipher Suites',    o.cipherSuites),
-        listRow('Curve Preferences', o.curvePreferences),
-        listRow('ALPN Protocols',   o.alpnProtocols),
-        row('Client Auth Type', o.clientAuthType && o.clientAuthType !== 'NoClientCert' ? _esc(o.clientAuthType) : ''),
-        listRow('CA Files', o.clientAuthCAs),
-    ].filter(Boolean).join('');
+        o.configFile && ['Config File', _dText(o.configFile, 'd-off'), true],
+        o.minVersion && ['Min Version', _dText(o.minVersion), true],
+        o.maxVersion && ['Max Version', _dText(o.maxVersion), true],
+        o.sniStrict && ['SNI Strict', _dBool(true), true],
+        o.cipherSuites?.length && ['Cipher Suites', _dList(o.cipherSuites, 'd-on'), true],
+        o.curvePreferences?.length && ['Curve Preferences', _dList(o.curvePreferences, 'd-on'), true],
+        o.alpnProtocols?.length && ['ALPN Protocols', _dList(o.alpnProtocols, 'd-on'), true],
+        (o.clientAuthType && o.clientAuthType !== 'NoClientCert') && ['Client Auth Type', _dText(o.clientAuthType), true],
+        o.clientAuthCAs?.length && ['CA Files', _dList(o.clientAuthCAs, 'd-on'), true],
+    ].filter(Boolean);
     const allRoutes = window._lastRenderedApps || APP_DATA || [];
     const usedBy = allRoutes.filter(r => r.tlsOptionsProfile === o.name);
-    const usedByHtml = `<div class="mt-5">
-        <div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--muted)">Used By</div>
-        ${usedBy.length ? usedBy.map(r => `<div class="flex items-center gap-2 py-2" style="border-bottom:1px solid var(--border)">
-            <span class="d-flat d-off">HTTP</span>
-            <span class="text-sm font-mono truncate" style="color:var(--text)">${_esc(r.name)}</span>
-            ${r.configFile ? `<span class="d-flat d-off ml-auto" style="flex-shrink:0">${_esc(r.configFile)}</span>` : ''}
-        </div>`).join('') : `<div class="text-xs py-2" style="color:var(--muted)">No routes using this profile.</div>`}
-    </div>`;
-    const yamlHtml = o.yaml ? `<div class="mt-5"><button onclick="const b=this.nextElementSibling;const open=b.style.display!=='none';b.style.display=open?'none':'block';this.querySelector('i').className='ph-bold '+(open?'ph-caret-right':'ph-caret-down')+' text-xs mr-1'" class="flex items-center text-xs mb-2" style="color:var(--muted);background:none;border:none;cursor:pointer;padding:0"><i class="ph-bold ph-caret-right text-xs mr-1"></i><span class="font-semibold uppercase tracking-wider">Raw YAML</span></button><div style="display:none"><div class="rounded-lg p-4 overflow-x-auto" style="background:var(--input-bg);border:1px solid var(--border)"><pre class="text-xs font-mono leading-relaxed" style="color:var(--green)">${_esc(o.yaml)}</pre></div></div></div>` : '';
-    document.getElementById('tlsOptDetailContent').innerHTML = `<div>${rows}</div>${usedByHtml}${yamlHtml}`;
+    const usedByHtml = renderDetailBlock('Used by', 'ph-arrows-split',
+        usedBy.length
+            ? `<div class="flex flex-wrap gap-1.5">${usedBy.map(r =>
+                `<button type="button" class="route-deep-chip" onclick="_openRouteByName('${_esc(String(r.name))}')" title="Open route"><i class="ph-bold ph-arrows-split"></i>${_esc(String(r.name).split('@')[0])}</button>`).join('')}</div>`
+            : `<div class="text-xs" style="color:var(--muted)">No routes using this profile.</div>`,
+        _dCount(usedBy.length));
+    const yamlHtml = o.yaml ? renderDetailBlock('Raw YAML', 'ph-code',
+        `<div class="rounded-lg p-3 overflow-x-auto" style="background:var(--input-bg);border:1px solid var(--border)"><pre class="text-xs font-mono leading-relaxed" style="color:var(--green);margin:0">${_esc(o.yaml)}</pre></div>`) : '';
+    document.getElementById('tlsOptDetailContent').innerHTML =
+        `${renderSection('Profile', 'ph-lock-laminated', rows)}${usedByHtml}${yamlHtml}`;
     document.getElementById('tlsOptDetailPanel').classList.add('open');
     setDetailDockOpen(true);
     document.getElementById('tlsOptDetailBackdrop').classList.add('open');

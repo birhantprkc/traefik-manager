@@ -1,6 +1,6 @@
 # Security
 
-Traefik Manager is designed to run behind a reverse proxy on a trusted network. This page documents the security controls built in and recommended practices for hardening your installation.
+Traefik Manager is designed to run behind a reverse proxy on a trusted network. This page covers the security controls built in and how to harden your installation.
 
 > Looking to harden **Traefik itself** (underscore header spoofing, encoded characters, forwardAuth limits, CVE advisories)? See [Traefik Security Hardening](hardening.md).
 
@@ -12,7 +12,9 @@ Traefik Manager is designed to run behind a reverse proxy on a trusted network. 
 
 The login password is hashed with **bcrypt at cost 12** before storage in `manager.yml`. The plaintext password is never written to disk.
 
-Login attempts are rate-limited to **5 per minute per IP** to slow brute-force attacks. Remove the sentence, or replace with: "The limit counts every login POST from an IP, successful or not, so a burst of guesses is throttled after five attempts in a minute."
+Login POSTs are rate-limited to **5 per minute per IP**, successful or not.
+
+While [`ADMIN_PASSWORD`](env-vars.md#admin-password) is set, login compares that plaintext value instead of the stored hash, and 2FA, the in-UI password change and `flask reset-password` all have no effect.
 
 ### Session management
 
@@ -21,11 +23,13 @@ Sessions use signed client-side cookies (Flask SecureCookieSession). The signing
 | Setting | Value |
 |---|---|
 | Max session lifetime | 7 days (when "Remember me" is checked) |
-| Inactivity timeout | 120 minutes for regular sessions (configurable via `INACTIVITY_TIMEOUT_MINUTES`); 24x that value for "Remember me" sessions - 48 hours at the default |
-| Cookie flags | `HttpOnly`, `SameSite=Lax` |
-| Secure flag | Off by default - set `COOKIE_SECURE=true` when behind HTTPS |
+| Inactivity timeout | 120 minutes, configurable via `INACTIVITY_TIMEOUT_MINUTES`; 24x that value for "Remember me" sessions - 48 hours at the default |
+| Cookie flags | `HttpOnly`, `SameSite=Lax` (always on) |
+| `Secure` flag | Off by default - set `COOKIE_SECURE=true` env var |
 
-Sessions are invalidated immediately on logout.
+Set `COOKIE_SECURE=true` whenever TM is accessed over HTTPS. Without it, browsers may send cookies over HTTP, which is a risk if your reverse proxy is not enforcing HTTPS-only access. It also adds a `Strict-Transport-Security` response header.
+
+Logging out clears the session.
 
 ---
 
@@ -44,7 +48,7 @@ Disabling built-in authentication only turns off the password form - it does **n
 
 ### Authentication handled by a reverse proxy
 
-If something in front of Traefik Manager already requires a login - Authelia, Authentik, GateKeeper, or any forward-auth middleware - then running with both mechanisms off is a deliberate choice, and the red warning is noise. Under **Settings -> Authentication**, the warning offers **Acknowledge and hide this warning**. It is stored in `manager.yml` as `auth_external_ack`, so it applies to every browser and survives restarts, and the startup log drops from a `SECURITY:` warning to an informational line.
+If something in front of Traefik Manager already requires a login - Authelia, Authentik, GateKeeper, or any forward-auth middleware - then running with both mechanisms off is a deliberate choice, and the red warning is noise. Under **Settings → Authentication**, the warning offers **Acknowledge and hide**. It is stored in `manager.yml` as `auth_external_ack`, so it applies to every browser and survives restarts, and the startup log drops from a `SECURITY:` warning to an informational line.
 
 This changes what you are told, never what is enforced. Traefik Manager still authenticates nobody, so anything that reaches it directly - another container on the same Docker network, a LAN client hitting the port, a route that bypasses your middleware - has full administrative access. The acknowledgement cannot be set while a password or OIDC is active, and Settings keeps showing a neutral note stating that authentication is delegated, with an **Undo** link.
 
@@ -71,7 +75,7 @@ See the [OIDC setup guide](oidc.md) for full configuration details.
 
 TM supports TOTP-based 2FA compatible with any standard authenticator app (Google Authenticator, Authy, etc.).
 
-The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encryption key is independent of the session signing key: it is taken from the `OTP_ENCRYPTION_KEY` environment variable, or generated once and persisted to `/app/config/.otp_key`. Only the encrypted secret is stored in `manager.yml`.
+The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encryption key is independent of the session signing key: it is taken from the `OTP_ENCRYPTION_KEY` environment variable, or generated once and persisted to `/app/config/.otp_key`. The same key encrypts every other stored secret - OIDC client secret, Traefik API password, CrowdSec keys, webhook password, git backup token. Only the encrypted values are stored in `manager.yml`.
 
 2FA can be reset via the [reset password page](reset-password.md) if you lose access to your authenticator.
 
@@ -83,8 +87,7 @@ API keys are used by the mobile app and scripts to access the API without a brow
 
 - Up to **10 keys** can exist simultaneously, each with a **device name** for identification
 - Each key is **hashed with SHA-256** - the plaintext is shown once at creation and never stored
-- Keys are revoked individually by their key preview (the `X-Api-Key` request field is `preview`); the device name is display-only. Revoking one device does not affect others
-- API key requests bypass CSRF checks only when the key is valid - an invalid or missing key still requires a CSRF token
+- Keys are revoked by their preview (first 8 and last 4 characters), not by device name. Revoking one device does not affect others
 - Generation is rate-limited to **5 per hour per IP**
 
 Keys are passed via the `X-Api-Key` request header:
@@ -97,7 +100,7 @@ X-Api-Key: your-key-here
 
 ## CSRF protection
 
-All state-changing endpoints (POST, DELETE) require a CSRF token when using session authentication. The token is embedded in every HTML page and rotates on each session.
+All state-changing requests (POST, PUT, PATCH, DELETE) require a CSRF token when using session authentication. The token is embedded in every HTML page and is generated once per session.
 
 API key requests are exempt from CSRF checks only when a **valid** key is provided. A request with a missing or invalid key still requires a CSRF token.
 
@@ -105,7 +108,7 @@ API key requests are exempt from CSRF checks only when a **valid** key is provid
 
 ## External auth providers
 
-Traefik Manager's built-in auth can be disabled when using an external provider such as Authentik, Authelia, or Keycloak via Traefik's `forwardAuth` middleware. Once it is, [acknowledge the no-authentication warning](#authentication-handled-by-a-reverse-proxy) under Settings so it stops being reported as a misconfiguration.
+When an external provider such as Authentik, Authelia, or Keycloak already protects TM through Traefik's `forwardAuth` middleware, you can turn the built-in auth off and [acknowledge the no-authentication warning](#authentication-handled-by-a-reverse-proxy) so it stops being reported as a misconfiguration.
 
 ::: warning Mobile app compatibility
 `forwardAuth` intercepts all requests including mobile app API calls. To use the mobile app alongside an external auth provider, split the Traefik route so `/api/*` bypasses `forwardAuth` and relies on Traefik Manager's built-in API key auth. See the [mobile app docs](mobile.md#external-auth-providers) for the full example.
@@ -120,21 +123,13 @@ Traefik Manager's built-in auth can be disabled when using an external provider 
 | Login, OTP verification | 5 / min per IP |
 | OIDC login initiation | 10 / min per IP |
 | Password change | 10 / min per IP |
-| API key generation | 5 / hour per IP |
 | Backup restore | 10 / min per IP |
-Add rows "| GeoIP database update | 6 / hour per IP |" and "| Setup connection tests (CrowdSec, git) | 10 / min per IP |" before the "All other endpoints | Unlimited" row.
+| Setup connection tests (CrowdSec, git) | 10 / min per IP |
+| API key generation | 5 / hour per IP |
+| GeoIP database update | 6 / hour per IP |
+| All other endpoints | Unlimited |
 
----
-
-## Cookie security
-
-| Flag | Default | How to enable |
-|---|---|---|
-| `HttpOnly` | Always on | - |
-| `SameSite=Lax` | Always on | - |
-| `Secure` | Off | Set `COOKIE_SECURE=true` env var |
-
-Set `COOKIE_SECURE=true` whenever TM is accessed over HTTPS. Without it, browsers may send cookies over HTTP, which is a risk if your reverse proxy is not enforcing HTTPS-only access.
+Counters live in memory, per gunicorn worker, so they reset on restart.
 
 ---
 
@@ -148,7 +143,7 @@ The sign-in form is deliberately untouched, so your password manager still works
 
 ## Outbound requests (SSRF protection)
 
-Several features make TM issue outbound HTTP requests on your behalf - the connection test, the webhook test, the URL ping tool, and OIDC provider discovery. To prevent these from being used to reach cloud metadata endpoints, these fetchers reject:
+Several features make TM issue outbound HTTP requests on your behalf - the Traefik connection tests, the CrowdSec and git setup tests, the webhook test, the URL ping tool, and the OIDC provider test. To prevent these from being used to reach cloud metadata endpoints, these fetchers reject:
 
 - Link-local addresses (`169.254.0.0/16`, including the `169.254.169.254` cloud metadata IP)
 - Multicast, reserved, and unspecified addresses
@@ -159,7 +154,7 @@ Private and loopback targets are still allowed, because reaching internal servic
 
 ## IP geolocation
 
-[IP geolocation](geoip.md) (off by default) resolves client IPs to countries entirely **on the server against a local database** - IP addresses are never sent to any third-party geolocation API. The only outbound request is to download the database file itself (once a month, from `download.db-ip.com`), and only when the feature is enabled. Point `GEOIP_DB_PATH` at your own `.mmdb` to control which database is used. Note that if the file is older than 35 days Traefik Manager will still attempt the monthly DB-IP download and overwrite it, so keep its mtime fresh (or leave the feature disabled) to stay fully offline.
+[IP geolocation](geoip.md) (off by default) resolves client IPs to countries entirely **on the server against a local database** - IP addresses are never sent to any third-party geolocation API. The only outbound request downloads the database file itself from `download.db-ip.com`, and only when the feature is enabled: at startup TM re-downloads it if the local file is older than 35 days. Point `GEOIP_DB_PATH` at your own `.mmdb` to control which database is used, and keep its mtime fresh (or leave the feature disabled) to stay fully offline.
 
 ---
 
@@ -167,7 +162,7 @@ Private and loopback targets are still allowed, because reaching internal servic
 
 When you configure git backup:
 
-- The repository URL must use `https://`, `http://`, `ssh://`, or `git://`. Other transports (`ext::`, `file://`, `fd::`) are rejected, and git is invoked with those protocols disabled, so a crafted URL cannot execute local commands.
+- The repository URL must use `https://`, `http://`, `ssh://`, or `git://`. Other transports (`ext::`, `file://`, `fd::`) are rejected, and git is invoked with `protocol.ext.allow=never`, so a crafted URL cannot execute local commands.
 - The access token is passed to git through `GIT_ASKPASS` rather than being embedded in the remote URL. It is not written to `.git/config`, does not appear in process arguments, and is redacted from any error message shown in the UI.
 
 ---
@@ -178,11 +173,9 @@ When you configure git backup:
 Never expose Traefik Manager directly on port 5000 to the internet. Use a reverse proxy (Traefik itself works well) with a valid TLS certificate.
 :::
 
-Recommended configuration:
-
 1. **Use HTTPS** - configure a cert resolver in Traefik and enable the self-route in TM Settings
 2. **Set `COOKIE_SECURE=true`** in your docker-compose environment
-3. **Enable 2FA** via Settings → Authentication → Two-Factor Authentication
+3. **Enable 2FA** via Settings → Authentication → Password & 2FA
 4. **Use per-device API keys** - generate a separate key for each device/script, revoke individually if compromised
 5. **Mount config files read-only** where possible - TM needs write access to `CONFIG_DIR`, `/app/config`, and `BACKUP_DIR` (default `/app/backups`)
 
@@ -190,14 +183,14 @@ Recommended configuration:
 
 ## Static config editor
 
-The Static Config tab lets you edit `traefik.yml` directly from the UI and restart Traefik with one click. This has security implications beyond the dynamic config:
+The Static Config editor lets you edit `traefik.yml` directly from the UI and restart Traefik with one click. This has security implications beyond the dynamic config:
 
 - **Read-write mount** - `traefik.yml` must be mounted without `:ro`, giving TM write access to Traefik's entire static configuration including entrypoints, providers, and TLS settings
-- **Restart access** - restarting Traefik requires one of three methods, each with different trust boundaries:
+- **Restart access** - `RESTART_METHOD` selects how Traefik is restarted, and each option has a different trust boundary:
 
 | Method | Access granted |
 |---|---|
-| `proxy` (recommended) | TM connects to a socket proxy sidecar limited to container restart operations only |
+| `proxy` (default, recommended) | TM connects to a socket proxy sidecar limited to container restart operations only |
 | `poison-pill` | TM writes a signal file to a shared volume - no Docker API access at all |
 | `socket` | TM has direct access to the Docker socket - broadest access |
 
@@ -209,15 +202,15 @@ If you do not use the Static Config editor, do not mount `traefik.yml` read-writ
 
 ## File permissions
 
-TM writes to these locations:
+TM writes to these locations (default paths - they follow `SETTINGS_PATH`):
 
 | Path | Purpose |
 |---|---|
-| `/app/config/manager.yml` | Settings, hashed password, API key hashes |
+| `/app/config/manager.yml` | Settings, hashed password, API key hashes, encrypted secrets |
 | `/app/config/.secret_key` | Session signing key (generated once, written `0600`) |
-| `/app/config/.otp_key` | TOTP/secret encryption key (written `0600`) |
+| `/app/config/.otp_key` | Fernet key for the TOTP secret and every other stored secret |
 | `CONFIG_DIR` / `CONFIG_PATHS` | Dynamic Traefik config files |
 
-The `.secret_key` and `.otp_key` files are created with `0600` permissions so only the container user can read them. These paths should be owned by the container user and not world-readable on the host. The `/app/config/` directory is the most sensitive as it contains the password hash and encryption keys.
+`/app/config/` is the most sensitive directory: it holds the password hash and both encryption keys. Own it as the container user and keep it out of world-readable host directories - `.secret_key` is created `0600`, but `.otp_key` is written with the process umask.
 
 If you provide your own session key with the `SECRET_KEY` environment variable, it must be at least 32 characters - TM refuses to start with a shorter key.

@@ -17,8 +17,9 @@ window.rmGetCustomGroups = function() { return _rmConfig.custom_groups || []; };
 window.rmIconFallback = function(img) {
     const slug = img.dataset.slug;
     if (!slug) { img.style.display = 'none'; return; }
-    const shorter = slug.split('-')[0];
-    if (shorter !== slug) {
+    const parts = slug.split('-');
+    const shorter = parts.length > 2 ? parts.slice(0, -1).join('-') : parts[0];
+    if (shorter && shorter !== slug) {
         img.dataset.slug = shorter;
         img.src = `${RM_ICON_CDN}/${shorter}.png`;
     } else {
@@ -151,6 +152,7 @@ let _rmDrawn          = false;
 let _rmTopoSelected   = null;
 let _rmPopupOpen      = false;
 const _rmExpandedGroups = new Set();
+const RM_COLLAPSE_MIN = 6;
 let _rmRouteGroupKey  = new Map();
 let _rmDagreGraph     = null;
 let _rmDagreRoutes    = null;
@@ -165,16 +167,6 @@ const RM_NODE_DIMS = {
     svc:   { width: 160, height: 30 },
 };
 
-function _rmSmoothPath(points) {
-    if (!points || points.length < 2) return '';
-    let d = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
-    for (let i = 1; i < points.length; i++) {
-        const pp = points[i - 1], p = points[i];
-        const cx = ((pp.x + p.x) / 2).toFixed(1);
-        d += ` C${cx},${pp.y.toFixed(1)} ${cx},${p.y.toFixed(1)} ${p.x.toFixed(1)},${p.y.toFixed(1)}`;
-    }
-    return d;
-}
 
 function _rmBuildDagre(routes) {
     const g = new dagre.graphlib.Graph({ multigraph: true });
@@ -184,17 +176,66 @@ function _rmBuildDagre(routes) {
     const mwUsage = {};
     routes.forEach(r => (r.middlewares||[]).forEach(mw => { mwUsage[mw] = (mwUsage[mw]||0)+1; }));
 
+    const byProv = {};
+    routes.forEach(r => {
+        const prov = r.provider || 'file';
+        if (prov === 'file') return;
+        (byProv[prov] = byProv[prov] || []).push(r);
+    });
+    const collapsed = {};
+    Object.entries(byProv).forEach(([prov, rs]) => {
+        if (rs.length >= RM_COLLAPSE_MIN) collapsed[prov] = rs;
+    });
+    const collapsedIds = new Set(Object.values(collapsed).flat().map(r => r.id));
+    const shown = routes.filter(r => !collapsedIds.has(r.id));
+
     const epNames = [...new Set(routes.flatMap(r => _rmEps(r)))];
     const mwNames = [...new Set(routes.flatMap(r => r.middlewares||[]))];
     const svcMap  = new Map();
-    routes.forEach(r => { if (r.service_name) svcMap.set(r.service_name, r.target||r.service_name); });
-
-    epNames.forEach(n => g.setNode(`ep:${n}`,  { ...RM_NODE_DIMS.ep,  type:'ep',  id:n }));
-    mwNames.forEach(n => g.setNode(`mw:${n}`,  { ...RM_NODE_DIMS.mw,  type:'mw',  id:n }));
-    svcMap.forEach((target, n) => g.setNode(`svc:${n}`, { ...RM_NODE_DIMS.svc, type:'svc', id:n, target }));
-    routes.forEach(r => g.setNode(`route:${r.id}`, { ...RM_NODE_DIMS.route, type:'route', id:r.id, route:r }));
-
+    const svcOwner = new Map();
     routes.forEach(r => {
+        if (!r.service_name) return;
+        svcMap.set(r.service_name, r.target || r.service_name);
+        if (!svcOwner.has(r.service_name)) svcOwner.set(r.service_name, r);
+    });
+
+    const dims = (kind, html) => {
+        const m = _rmMeasure(html);
+        return m && m.width ? m : { ...RM_NODE_DIMS[kind] };
+    };
+
+    epNames.forEach(n => g.setNode(`ep:${n}`,
+        { ...dims('ep', _rmNodeHtml('ep', n, { mwUsage })), type:'ep', id:n }));
+    mwNames.forEach(n => g.setNode(`mw:${n}`,
+        { ...dims('mw', _rmNodeHtml('mw', n, { mwUsage })), type:'mw', id:n }));
+    svcMap.forEach((target, n) => g.setNode(`svc:${n}`,
+        { ...dims('svc', _rmNodeHtml('svc', n, { target, route: svcOwner.get(n) })),
+          type:'svc', id:n, target, owner: svcOwner.get(n) }));
+    shown.forEach(r => g.setNode(`route:${r.id}`,
+        { ...dims('route', _rmNodeHtml('route', r.id, { route:r })), type:'route', id:r.id, route:r }));
+    Object.entries(collapsed).forEach(([prov, rs]) => {
+        const ctx = { label: prov, count: rs.length,
+                      title: rs.length + ' ' + prov + ' routes - click to list them' };
+        g.setNode(`group:${prov}`,
+            { ...dims('group', _rmNodeHtml('group', prov, ctx)), type:'group', id:prov,
+              label: prov, count: rs.length, title: ctx.title, members: rs });
+    });
+
+    Object.entries(collapsed).forEach(([prov, rs]) => {
+        const gv = `group:${prov}`;
+        const eps = [...new Set(rs.flatMap(r => _rmEps(r)))];
+        eps.forEach(ep => {
+            const k = `${ep}->${gv}`;
+            if (!g.hasEdge(`ep:${ep}`, gv, k)) g.setEdge(`ep:${ep}`, gv, { type:'ep-route' }, k);
+        });
+        const svcs = [...new Set(rs.map(r => r.service_name).filter(Boolean))];
+        svcs.forEach(sn => {
+            const k = `${gv}->svc:${sn}`;
+            if (!g.hasEdge(gv, `svc:${sn}`, k)) g.setEdge(gv, `svc:${sn}`, { type:'route-svc' }, k);
+        });
+    });
+
+    shown.forEach(r => {
         const rv = `route:${r.id}`;
         _rmEps(r).forEach(ep => {
             const k = `${ep}→${rv}`;
@@ -218,7 +259,7 @@ function _rmBuildDagre(routes) {
     });
 
     dagre.layout(g);
-    return { g, mwUsage, svcMap, epNames, mwNames };
+    return { g, mwUsage, svcMap, epNames, mwNames, collapsed };
 }
 
 function _esc(s) {
@@ -336,12 +377,7 @@ function rmRenderProviderFilters() {
     }
 }
 
-window.rmToggleFilterPanel = function() {};
 
-window.rmSetGroupBy = function(mode) {
-    _rmGroupBy = mode;
-    rmRender();
-};
 
 window.rmClearFilters = function() {
     _rmProto = 'all'; _rmProvider = 'all'; _rmEpFilter = 'all'; _rmGroupBy = 'name'; _rmSearch = '';
@@ -358,19 +394,22 @@ window.rmClearFilters = function() {
     rmRender();
 };
 
-window.refreshRoutemapTab = async function() {
-    if (!_rmDrawn) {
+window.refreshRoutemapTab = async function(force) {
+    if (!_rmDrawn || force) {
         document.getElementById('rmLoading').classList.remove('hidden');
         document.getElementById('rmTopoContainer').classList.add('hidden');
         document.getElementById('rmEmpty').classList.add('hidden');
     }
 
-    const ok = await window.rmEnsureData();
+    const ok = await window.rmEnsureData(force);
 
     document.getElementById('rmLoading').classList.add('hidden');
-    if (!ok && !_rmDrawn) {
-        showToast('Could not load route map data. Retrying on next open.', 'error');
-        return;
+    if (!ok) {
+        if (!_rmDrawn) {
+            showToast('Could not load route map data. Retrying on next open.', 'error');
+            return;
+        }
+        showToast('Could not refresh the route map - showing the last data.', 'error');
     }
     _rmDrawn = true;
     rmRenderProviderFilters();
@@ -457,24 +496,9 @@ function rmRenderTopology(routes) {
         const wrap = document.createElement('div');
         wrap.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${nd.width}px`;
 
-        if (nd.type === 'ep') {
-            wrap.innerHTML = rmNode('ep', nd.id,
-                `<i class="ph-bold ph-arrows-in" style="font-size:10px;margin-right:6px;opacity:0.7"></i><span class="rm-node-label">${_esc(nd.id)}</span>`);
-        } else if (nd.type === 'route') {
-            const r = nd.route;
-            const proto = (r.protocol||'http').toLowerCase();
-            wrap.innerHTML = rmNode('route ' + proto, r.id,
-                `<span class="rm-proto-badge rm-proto-${_esc(proto)}">${proto.toUpperCase()}</span><span class="rm-node-label">${_esc(r.name)}</span>`,
-                r.id);
-        } else if (nd.type === 'mw') {
-            const badge = (mwUsage[nd.id]||0) > 1 ? `<span class="rm-mw-count">${mwUsage[nd.id]}×</span>` : '';
-            wrap.innerHTML = rmNode('mw', nd.id,
-                `<i class="ph-bold ph-shield-check" style="font-size:10px;margin-right:6px;opacity:0.7"></i><span class="rm-node-label">${_esc(nd.id.split('@')[0])}</span>${badge}`);
-        } else if (nd.type === 'svc') {
-            wrap.innerHTML = rmNode('svc', nd.id,
-                `<i class="ph-bold ph-cube" style="font-size:10px;margin-right:6px;opacity:0.7"></i><span class="rm-node-label">${_esc(nd.id.split('@')[0])}</span>`,
-                null, nd.target);
-        }
+        wrap.innerHTML = _rmNodeHtml(nd.type, nd.type === 'route' ? nd.id : nd.id,
+            { mwUsage, target: nd.target, route: nd.route || nd.owner, label: nd.label,
+              count: nd.count, title: nd.title });
         colsEl.appendChild(wrap);
     });
 
@@ -494,7 +518,23 @@ function rmRenderTopology(routes) {
         el.addEventListener('click', function(e) {
             e.stopPropagation();
             rmHideTooltip();
-            rmOpenPopup('route', this.dataset.routeid, routes);
+            const rid = this.dataset.routeid;
+            const r = routes.find(x => x.id === rid) || _rmAllRoutes.find(x => x.id === rid);
+            if (r && typeof openRouteDetail === 'function') {
+                openRouteDetail(r.name, r.protocol, r);
+            } else {
+                rmOpenPopup('route', rid, routes);
+            }
+        });
+    });
+
+    colsEl.querySelectorAll('.rm-node-group').forEach(el => {
+        const prov = (el.dataset.rmid || '').split(':')[1] || '';
+        el.addEventListener('click', function(e) {
+            e.stopPropagation();
+            rmHideTooltip();
+            const members = (_rmDagreGraph && _rmDagreGraph.node('group:' + prov) || {}).members || [];
+            rmOpenPopup('group', prov, members, members);
         });
     });
 
@@ -528,49 +568,95 @@ function rmRenderTopology(routes) {
 
 const _rmColIcons = { ep: 'ph-arrows-in', route: 'ph-git-branch', mw: 'ph-funnel', svc: 'ph-cube' };
 
-function rmBuildCol(header, type, items, renderFn) {
-    const col = document.createElement('div');
-    col.className = 'routemap-col';
-    col.dataset.coltype = type;
-    const icon = _rmColIcons[type] || '';
-    const hdrInner = icon ? `<i class="ph-bold ${icon}" style="font-size:13px"></i>${header}` : header;
-    col.innerHTML = `<div class="routemap-col-header">${hdrInner}</div>`;
-    items.forEach(item => col.insertAdjacentHTML('beforeend', renderFn(item)));
-    return col;
-}
 
-function rmBuildRouteCol(routes) {
-    const col = document.createElement('div');
-    col.className = 'routemap-col';
-    col.dataset.coltype = 'route';
-    col.innerHTML = `<div class="routemap-col-header"><i class="ph-bold ph-git-branch" style="font-size:13px"></i>ROUTES</div>`;
-    const { groups, grouped, routeGroupKey } = rmGetGroups(routes, _rmGroupBy);
-    _rmRouteGroupKey = routeGroupKey;
-    const renderRoute = r => {
-        const proto = (r.protocol||'http').toLowerCase();
-        return rmNode('route ' + proto, r.id,
-            `<span class="rm-proto-badge rm-proto-${_esc(proto)}">${proto.toUpperCase()}</span><span class="rm-node-label">${_esc(r.name)}</span>`,
-            r.id);
-    };
-    Object.entries(groups).forEach(([prefix, members]) => {
-        const proto = (members[0].protocol||'http').toLowerCase();
-        const groupEl = document.createElement('div');
-        groupEl.className = 'rm-group';
-        groupEl.dataset.groupid = prefix;
-        groupEl.innerHTML = `<div class="rm-node rm-node-${_esc(proto)} rm-node-group" data-groupid="${_esc(prefix)}"><span class="rm-proto-badge" style="background:rgba(255,255,255,0.35)">×${members.length}</span><span class="rm-node-label">${_esc(prefix)}</span><i class="ph-bold ph-caret-down rm-group-caret"></i></div><div class="rm-group-children">${members.map(renderRoute).join('')}</div>`;
-        col.appendChild(groupEl);
-    });
-    routes.forEach(r => { if (!grouped.has(r.id)) col.insertAdjacentHTML('beforeend', renderRoute(r)); });
-    return col;
-}
 
-function rmNode(typeClass, id, inner, routeId, title) {
+function rmNode(typeClass, id, inner, routeId, title, health) {
     const parts   = typeClass.split(' ');
     const base    = parts[0];
     const classes = ['rm-node', ...parts.map(p => 'rm-node-' + p)].join(' ');
     const rid     = routeId ? ` data-routeid="${_esc(routeId)}"` : '';
     const tip     = title ? ` title="${_esc(title)}"` : ` title="${_esc(String(id))}"`;
-    return `<div class="${classes}" data-rmid="${_esc(base+':'+id)}"${rid}${tip} style="cursor:pointer">${inner}</div>`;
+    const hl      = health ? ` data-health="${_esc(health)}"` : '';
+    return `<div class="${classes}" data-rmid="${_esc(base+':'+id)}"${rid}${tip}${hl}>${inner}</div>`;
+}
+
+function _rmQualify(name, prov) {
+    return String(name || '').includes('@') ? String(name) : String(name || '') + '@' + prov;
+}
+
+function _rmRouteHealth(r) {
+    if (_rmStatusBlind) return '';
+    const proto = (r.protocol || 'http') + ':';
+    const prov  = r.provider || 'file';
+    const st = _rmRouterStatus[proto + _rmQualify(r.name, prov)]
+            || _rmRouterStatus[proto + _rmQualify(r.id, prov)]
+            || _rmRouterStatus[proto + (r.name || '')]
+            || null;
+    if (!st) return '';
+    if (st.err) return 'down';
+    return st.up ? 'up' : 'warn';
+}
+
+function _rmSvcHealth(name, route) {
+    if (!_rmSvcLoaded || !name) return '';
+    const proto = ((route && route.protocol) || 'http') + ':';
+    const prov  = (route && route.provider) || 'file';
+    const st = _rmSvcStatus[proto + _rmQualify(name, prov)]
+            || _rmSvcStatus[proto + name]
+            || null;
+    if (!st || !st.total) return '';
+    if (st.up === 0) return 'down';
+    return st.up < st.total ? 'warn' : 'up';
+}
+
+function _rmNodeHtml(kind, id, ctx) {
+    ctx = ctx || {};
+    if (kind === 'ep') {
+        return rmNode('ep', id,
+            `<i class="ph-bold ph-door-open rm-node-ic"></i><span class="rm-node-label">${_esc(id)}</span>`);
+    }
+    if (kind === 'mw') {
+        const n = (ctx.mwUsage || {})[id] || 0;
+        const badge = n > 1 ? `<span class="rm-mw-count">${n}\u00d7</span>` : '';
+        return rmNode('mw', id,
+            `<i class="ph-bold ph-stack rm-node-ic"></i><span class="rm-node-label">${_esc(String(id).split('@')[0])}</span>${badge}`);
+    }
+    if (kind === 'svc') {
+        const h = _rmSvcHealth(id, ctx.route);
+        return rmNode('svc', id,
+            `<i class="ph-bold ph-hard-drives rm-node-ic"></i><span class="rm-node-label">${_esc(String(id).split('@')[0])}</span>`
+            + (h ? `<span class="rm-node-dot rm-dot-${h}"></span>` : ''),
+            null, ctx.target, h);
+    }
+    if (kind === 'group') {
+        return rmNode('group', id,
+            `<i class="ph-bold ph-squares-four rm-node-ic"></i><span class="rm-node-label">${_esc(ctx.label || id)}</span>`
+            + `<span class="rm-mw-count">${ctx.count || 0}</span>`, null, ctx.title || '');
+    }
+    const r = ctx.route || {};
+    const proto = (r.protocol || 'http').toLowerCase();
+    const h = _rmRouteHealth(r);
+    return rmNode('route ' + proto, r.id,
+        `<span class="rm-proto-badge rm-proto-${_esc(proto)}">${proto.toUpperCase()}</span>`
+        + `<span class="rm-node-label">${_esc(r.name)}</span>`
+        + (h ? `<span class="rm-node-dot rm-dot-${h}"></span>` : ''),
+        r.id, null, h);
+}
+
+function _rmMeasure(html, cls) {
+    let box = document.getElementById('rmMeasure');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'rmMeasure';
+        box.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;left:-9999px;top:0;';
+        document.body.appendChild(box);
+    }
+    box.className = cls || '';
+    box.innerHTML = html;
+    const el = box.firstElementChild;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { width: Math.ceil(r.width), height: Math.ceil(r.height) };
 }
 
 function rmHighlightRoute(routeId, routes) {
@@ -627,8 +713,12 @@ function rmOpenPopup(type, nodeId, allRoutes, preFiltered) {
     if (!popup) return;
 
     const typeLabels = { ep: 'Entry Point', mw: 'Middleware', svc: 'Service', route: 'Route', group: 'Group' };
+    const typeIcons  = { ep: 'ph-arrows-in', mw: 'ph-shield-check', svc: 'ph-hard-drives',
+                         route: 'ph-arrows-split', group: 'ph-stack' };
     document.getElementById('rmPopupTypeBadge').textContent = typeLabels[type] || type;
     document.getElementById('rmPopupTitle').textContent     = nodeId.split('@')[0];
+    const popIcon = document.getElementById('rmPopupIcon');
+    if (popIcon) popIcon.className = 'ph-fill ' + (typeIcons[type] || 'ph-graph');
 
     const chip = (icon, label, val, color) => {
         if (!val) return '';
@@ -647,18 +737,18 @@ function rmOpenPopup(type, nodeId, allRoutes, preFiltered) {
         if (!r) return;
         focusedRoutes = [r];
         const allDomains = [...(r.rule||'').matchAll(/Host\(`([^`]+)`\)/g)].map(m => m[1]);
-        allDomains.forEach(d => { detailsHtml += chip('ph-globe', 'Domain', d, 'var(--blue)'); });
+        allDomains.forEach(d => { detailsHtml += chip('ph-globe', 'Domain', d); });
         if (r.target && r.target !== 'N/A') detailsHtml += chip('ph-cube', 'Target', r.target);
         detailsHtml += chip('ph-arrows-left-right', 'Protocol', (r.protocol||'http').toUpperCase());
         _rmEps(r).forEach(ep => { detailsHtml += chip('ph-arrows-in', 'Entry Point', ep); });
-        if (r.tls)          detailsHtml += chip('ph-lock', 'TLS', 'Enabled', 'var(--green)');
-        if (r.certResolver) detailsHtml += chip('ph-certificate', 'Resolver', r.certResolver, 'var(--green)');
-        if (!r.enabled)     detailsHtml += chip('ph-eye-slash', 'Status', 'Inactive', 'var(--muted)');
+        if (r.tls)          detailsHtml += chip('ph-lock', 'TLS', 'Enabled');
+        if (r.certResolver) detailsHtml += chip('ph-certificate', 'Resolver', r.certResolver);
+        if (!r.enabled)     detailsHtml += chip('ph-eye-slash', 'Status', 'Inactive');
         if (r.provider && r.provider !== 'file') detailsHtml += chip('ph-package', 'Provider', r.provider);
     } else if (type === 'ep') {
         focusedRoutes = allRoutes.filter(r => _rmEps(r).includes(nodeId));
         const addr = _rmAllEps[nodeId]?.address || '';
-        if (addr) detailsHtml += chip('ph-plugs-connected', 'Address', addr, 'var(--blue)');
+        if (addr) detailsHtml += chip('ph-plugs-connected', 'Address', addr);
         detailsHtml += chip('ph-git-branch', 'Routes', focusedRoutes.length);
     } else if (type === 'mw') {
         focusedRoutes = allRoutes.filter(r => (r.middlewares||[]).includes(nodeId));
@@ -719,24 +809,18 @@ function rmRenderPopupTopology(focusedRoutes, activeType, activeNodeId, allRoute
 
         const isActive = activeType === nd.type && activeNodeId === nd.id;
         const poprmid  = `${nd.type}:${nd.id}`;
-        let typeClass = nd.type, inner = '';
 
-        if (nd.type === 'ep') {
-            inner = `<i class="ph-bold ph-arrows-in" style="font-size:10px;margin-right:6px;opacity:0.7"></i><span class="rm-node-label">${_esc(nd.id)}</span>`;
-        } else if (nd.type === 'route') {
-            const proto = (nd.route.protocol||'http').toLowerCase();
-            typeClass = `route ${proto}`;
-            inner = `<span class="rm-proto-badge rm-proto-${_esc(proto)}">${proto.toUpperCase()}</span><span class="rm-node-label">${_esc(nd.route.name)}</span>`;
-        } else if (nd.type === 'mw') {
-            const badge = (mwUsage[nd.id]||0) > 1 ? `<span class="rm-mw-count">${mwUsage[nd.id]}×</span>` : '';
-            inner = `<i class="ph-bold ph-shield-check" style="font-size:10px;margin-right:6px;opacity:0.7"></i><span class="rm-node-label">${_esc(nd.id.split('@')[0])}</span>${badge}`;
-        } else if (nd.type === 'svc') {
-            inner = `<i class="ph-bold ph-cube" style="font-size:10px;margin-right:6px;opacity:0.7"></i><span class="rm-node-label">${_esc(nd.id.split('@')[0])}</span>`;
+        wrap.innerHTML = _rmNodeHtml(nd.type, nd.id, {
+            mwUsage,
+            route:  nd.route || nd.owner,
+            target: nd.target,
+        });
+        const nodeEl = wrap.firstElementChild;
+        if (nodeEl) {
+            nodeEl.dataset.poprmid = poprmid;
+            nodeEl.style.cursor = 'pointer';
+            if (isActive) nodeEl.classList.add('rm-node-active');
         }
-
-        const classes = ['rm-node', ...typeClass.split(' ').map(p => 'rm-node-' + p), isActive ? 'rm-node-active' : ''].filter(Boolean).join(' ');
-        const rid = nd.type === 'route' ? ` data-routeid="${_esc(nd.route.id)}"` : '';
-        wrap.innerHTML = `<div class="${classes}" data-poprmid="${_esc(poprmid)}"${rid} style="cursor:pointer" title="${_esc(nd.id)}">${inner}</div>`;
         cols.appendChild(wrap);
     });
 
@@ -767,14 +851,6 @@ function rmRenderPopupTopology(focusedRoutes, activeType, activeNodeId, allRoute
     });
 }
 
-function rmPopupNode(typeClass, id, inner, isActive, allRoutes, routeId, title) {
-    const parts   = typeClass.split(' ');
-    const base    = parts[0];
-    const classes = ['rm-node', ...parts.map(p => 'rm-node-' + p), isActive ? 'rm-node-active' : ''].filter(Boolean).join(' ');
-    const rid     = routeId ? ` data-routeid="${_esc(routeId)}"` : '';
-    const tip     = title ? ` title="${_esc(title)}"` : ` title="${_esc(String(id))}"`;
-    return `<div class="${classes}" data-poprmid="${_esc(base+':'+id)}"${rid}${tip} style="cursor:pointer">${inner}</div>`;
-}
 
 function rmPopupHighlightRoute(routeId, routes) {
     const route = routes.find(r => r.id === routeId);
@@ -921,17 +997,11 @@ function rmDrawCurves(routes, forceHighlight) {
     const activeMws  = new Set(routes.flatMap(r => r.middlewares||[]));
     const activeSvcs = new Set(routes.filter(r => r.service_name).map(r => r.service_name));
 
-    const protoColor = proto => {
-        if (proto === 'tcp') return 'var(--green)';
-        if (proto === 'udp') return 'rgba(226,192,65,1)';
-        return 'var(--blue)';
-    };
-    const routeById = new Map((_rmDagreRoutes || []).map(r => [r.id, r]));
     const edgeColor = {
         'ep-route':  'var(--teal)',
         'route-mw':  'var(--purple)',
-        'mw-svc':    'var(--green)',
-        'route-svc': 'var(--green)',
+        'mw-svc':    'var(--orange)',
+        'route-svc': 'var(--orange)',
     };
 
     const getEl = rmid => {
@@ -967,18 +1037,7 @@ function rmDrawCurves(routes, forceHighlight) {
         if (drawn.has(key)) return;
         drawn.add(key);
 
-        let activeColor = edgeColor[type];
-        if (type === 'route-svc') {
-            const r = routeById.get(e.v.slice(6));
-            if (r) activeColor = protoColor(r.protocol);
-        } else if (type === 'route-mw') {
-            const r = routeById.get(e.v.slice(6));
-            if (r) activeColor = protoColor(r.protocol);
-        } else if (type === 'mw-svc') {
-            const mwName = e.v.slice(3);
-            const r = (_rmDagreRoutes || []).find(r => (r.middlewares||[]).includes(mwName));
-            if (r) activeColor = protoColor(r.protocol);
-        }
+        const activeColor = edgeColor[type];
 
         const fp = getNodePos(fromEl);
         const tp = getNodePos(toEl);
@@ -1176,6 +1235,21 @@ function rmInitMobilePan() {
     cont.addEventListener('touchend', () => { _rmZPinchDist = null; });
 }
 
+let _rmLastW = 0, _rmReflowTimer = null;
+
+function _rmReflow() {
+    if (!document.getElementById('tab-routemap')?.classList.contains('active')) return;
+    const cont = document.getElementById('rmTopoContainer');
+    if (!cont) return;
+    const w = Math.round(cont.clientWidth);
+    if (!w || Math.abs(w - _rmLastW) < 8) return;
+    _rmLastW = w;
+    clearTimeout(_rmReflowTimer);
+    _rmReflowTimer = setTimeout(() => {
+        if (_rmDrawn && _rmFilteredRoutes().length) rmRender();
+    }, 90);
+}
+
 window.addEventListener('resize', () => {
     if (!document.getElementById('tab-routemap')?.classList.contains('active')) return;
     const cont   = document.getElementById('rmTopoContainer');
@@ -1183,7 +1257,18 @@ window.addEventListener('resize', () => {
     if (cont && colsEl) cont.style.height = colsEl.offsetHeight + 'px';
     rmDrawCurves(_rmFilteredRoutes());
     if (_rmIsMobile && cont) cont.style.height = Math.round(window.innerHeight * 0.62) + 'px';
+    _rmReflow();
 });
+
+if (typeof ResizeObserver !== 'undefined') {
+    const startRmObserver = () => {
+        const cont = document.getElementById('rmTopoContainer');
+        if (!cont) { setTimeout(startRmObserver, 400); return; }
+        _rmLastW = Math.round(cont.clientWidth);
+        new ResizeObserver(_rmReflow).observe(cont);
+    };
+    startRmObserver();
+}
 
 document.addEventListener('click', e => {
     const wrap = document.getElementById('rmFilterWrap');

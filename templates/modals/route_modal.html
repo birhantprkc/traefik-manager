@@ -116,7 +116,7 @@
                         <div id="httpLbAdvBody" class="mt-2 p-3 rounded-lg space-y-3" style="display:none;background:var(--input-bg);border:1px solid var(--border)">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2">
-                                    <input type="checkbox" id="lbStickyEnabled" class="rounded" style="accent-color:var(--blue)">
+                                    <input type="checkbox" id="lbStickyEnabled" onchange="_lbSyncToggles()" class="rounded" style="accent-color:var(--blue)">
                                     <label for="lbStickyEnabled" class="text-sm" style="margin:0;color:var(--text)">Sticky sessions</label>
                                 </div>
                                 <span class="tm-info-btn" data-tip="Pins a client to the same backend using a cookie (loadBalancer.sticky.cookie)."><i class="ph-bold ph-info"></i></span>
@@ -133,7 +133,7 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2">
-                                    <input type="checkbox" id="lbHealthEnabled" class="rounded" style="accent-color:var(--blue)">
+                                    <input type="checkbox" id="lbHealthEnabled" onchange="_lbSyncToggles()" class="rounded" style="accent-color:var(--blue)">
                                     <label for="lbHealthEnabled" class="text-sm" style="margin:0;color:var(--text)">Health check</label>
                                 </div>
                                 <span class="tm-info-btn" data-tip="Traefik polls this path and stops sending traffic to backends that fail (loadBalancer.healthCheck)."><i class="ph-bold ph-info"></i></span>

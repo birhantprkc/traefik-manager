@@ -394,9 +394,10 @@ async function _loadAboutAgentInfo() {
 }
 
 const SETTINGS_CHILDREN = {
-    system:  { first: 'tabs',     switch: (k) => switchSystemTab(k) },
-    auth:    { first: 'password', switch: (k) => switchAuthTab(k) },
-    backups: { first: 'routes',   switch: (k) => switchBackupTab(k) },
+    system:  { first: 'tabs',        switch: (k) => switchSystemTab(k) },
+    auth:    { first: 'password',    switch: (k) => switchAuthTab(k) },
+    backups: { first: 'routes',      switch: (k) => switchBackupTab(k) },
+    static:  { first: 'entrypoints', switch: (k) => switchStaticSettingsSection(k) },
 };
 
 function openSettingsChild(parent, child) {
@@ -874,7 +875,9 @@ async function testTraefikApi() {
             result.textContent = `✓ Connected - Traefik v${d.version}`;
             result.style.color = 'var(--green)';
         } else {
-            result.textContent = `✗ ${d.error || 'No response from API'}`;
+            const err = String(d.error || 'No response from API');
+            result.textContent = `✗ ${err.length > 120 ? err.slice(0, 120) + '…' : err}`;
+            result.title = err;
             result.style.color = 'var(--red)';
         }
     } catch(e) {
@@ -1258,7 +1261,8 @@ function applyUiPrefs() {
     html.classList.toggle('tm-hide-entrypoints', !_uiPref('showEntrypoints'));
     const _act = document.querySelector('.tab-content.active');
     html.classList.toggle('tm-stats-here', !!_act && _statTabSet().has(_act.id.replace(/^tab-/, '')));
-    html.classList.toggle('tm-modern', tmPref('layoutMode') === 'modern');
+    const _pref = tmPref('layoutMode');
+    html.classList.toggle('tm-fixed', _pref === 'fixed' || _pref === 'classic');
     buildSideNav();
     placeStatCards();
     const overviewSection = document.getElementById('overviewSection');
@@ -1276,11 +1280,12 @@ function loadUiTogglesIntoModal() {
         const b = document.getElementById('scope-stats-' + t);
         if (b) b.className = 'proto-btn' + (on.has(t) ? ' active-http' : '');
     });
-    const layout = tmPref('layoutMode') === 'modern' ? 'modern' : 'classic';
-    const lC = document.getElementById('layout-classic');
-    const lM = document.getElementById('layout-modern');
-    if (lC) lC.className = 'proto-btn' + (layout === 'classic' ? ' active-http' : '');
-    if (lM) lM.className = 'proto-btn' + (layout === 'modern' ? ' active-http' : '');
+    const _lm = tmPref('layoutMode');
+    const layout = (_lm === 'fixed' || _lm === 'classic') ? 'fixed' : 'fluid';
+    const lFl = document.getElementById('layout-fluid');
+    const lFx = document.getElementById('layout-fixed');
+    if (lFl) lFl.className = 'proto-btn' + (layout === 'fluid' ? ' active-http' : '');
+    if (lFx) lFx.className = 'proto-btn' + (layout === 'fixed' ? ' active-http' : '');
     const dens = tmPref('dashPodDensity') === 'icons' ? 'icons' : 'list';
     const dL = document.getElementById('dashdens-list');
     const dI = document.getElementById('dashdens-icons');
@@ -2241,6 +2246,7 @@ function updateServerSwitcher(agents) {
 let _editingTemplateId = null;
 
 function openTemplatesPanel() {
+    closeOtherPanels('mwTplPanel');
     const panel = document.getElementById('mwTplPanel');
     const back  = document.getElementById('mwTplBackdrop');
     if (!panel) return;
@@ -2374,7 +2380,26 @@ function _setUnitText(el) {
     let out = '';
     el.querySelectorAll(SETTINGS_SEARCH_FIELDS).forEach(f => { out += ' ' + f.textContent; });
     if (!out.trim()) out = el.textContent;
+    el.querySelectorAll('[data-tip]').forEach(t => { out += ' ' + t.getAttribute('data-tip'); });
+    out += ' ' + _setSectionText(el);
     return out.toLowerCase();
+}
+
+function _setSectionText(el) {
+    let node = el;
+    while (node && !node.classList.contains('modal-panel')) {
+        let sib = node.previousElementSibling;
+        while (sib) {
+            const head = sib.classList.contains('sc-sec-head') ? sib : sib.querySelector?.('.sc-sec-head');
+            if (head) {
+                const tip = head.querySelector('[data-tip]')?.getAttribute('data-tip') || '';
+                return (head.textContent || '') + ' ' + tip;
+            }
+            sib = sib.previousElementSibling;
+        }
+        node = node.parentElement;
+    }
+    return '';
 }
 
 function _settingsUnits(pane) {
@@ -2457,8 +2482,24 @@ function filterSettings() {
         if (pane.classList.contains('active')) activeHits = hits;
     });
 
+    const elsewhere = [];
+    document.querySelectorAll('.modal-sidebar-btn .settings-hit').forEach(t => {
+        const btn = t.closest('.modal-sidebar-btn');
+        if (btn.classList.contains('active')) return;
+        const label = (btn.textContent || '').replace(t.textContent, '').trim();
+        elsewhere.push({ id: btn.id.replace('msb-', ''), label, hits: t.textContent });
+    });
+
     const empty = document.getElementById('settingsNoMatch');
-    if (empty) empty.style.display = (q && activeHits === 0) ? '' : 'none';
+    if (!empty) return;
+    if (!q || activeHits) { empty.style.display = 'none'; return; }
+    empty.style.display = '';
+    empty.innerHTML = elsewhere.length
+        ? 'No matches here. Found in '
+          + elsewhere.map(e =>
+              `<button type="button" class="settings-jump" onclick="switchSettingsPanel('${e.id}')">`
+              + `${_esc(e.label)} <span>${_esc(e.hits)}</span></button>`).join(' ')
+        : 'No settings match your search';
 }
 
 function clearSettingsSearch() {

@@ -2,7 +2,24 @@
 
 How to enable the static config editor for an existing Traefik Manager install without re-running the setup script.
 
-**Prerequisites:** path to your `traefik.yml` on the host, and a decision on which [restart method](static.md#restart-methods) you want to use.
+**Prerequisites:** the path to your `traefik.yml` on the host, and a choice of [restart method](static.md#restart-methods).
+
+---
+
+## Generate it
+
+Paste your compose file, pick a restart method, give it the host path to `traefik.yml`, and copy the result. This does Steps 1 to 3 for you.
+
+<ComposeUpgrader />
+
+Then apply it:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Prefer to do it by hand, or not using Compose? The steps below cover Docker, Podman and systemd.
 
 ---
 
@@ -35,7 +52,7 @@ services:
     environment:
       - STATIC_CONFIG_PATH=/app/traefik.yml
       - RESTART_METHOD=proxy        # proxy | socket | poison-pill
-      - TRAEFIK_CONTAINER=traefik   # your Traefik container name
+      - TRAEFIK_CONTAINER=traefik   # proxy and socket only
 ```
 
 == Linux (systemd)
@@ -43,7 +60,7 @@ Edit `/etc/systemd/system/traefik-manager.service` and add to the `[Service]` bl
 ```ini
 Environment=STATIC_CONFIG_PATH=/etc/traefik/traefik.yml
 Environment=RESTART_METHOD=poison-pill
-Environment=TRAEFIK_CONTAINER=traefik
+Environment=SIGNAL_FILE_PATH=/var/lib/traefik-manager/signals/restart.sig
 ```
 Then reload: `sudo systemctl daemon-reload`
 :::
@@ -57,7 +74,7 @@ Pick one tab below and follow only that section.
 :::tabs
 == Socket proxy
 
-Add the `socket-proxy` service and set `DOCKER_HOST` on TM. You can do this with a `docker-compose.override.yml` to avoid touching your main file:
+Add the `socket-proxy` service and set `DOCKER_HOST` on TM. A `docker-compose.override.yml` keeps your main file untouched:
 
 ```yaml
 # docker-compose.override.yml
@@ -87,13 +104,13 @@ networks:
     internal: true
 ```
 
-Docker Compose merges this with your existing `docker-compose.yml` automatically on every `up`.
+Docker Compose merges this with your existing `docker-compose.yml` on every `up`.
 
 To undo: `rm docker-compose.override.yml && docker compose up -d`
 
 == Poison pill
 
-Add the healthcheck and shared volume to your **Traefik** service. Edit your Traefik `docker-compose.yml`:
+Add the healthcheck and shared volume to your **Traefik** service:
 
 ```yaml
 services:
@@ -121,14 +138,14 @@ volumes:
   tm-signals:
 ```
 
-For **native Linux installs**, set the signal file path to a directory the TM service user can write to:
+For **native Linux installs**, point the signal file at a directory the TM service user can write to:
 
 ```ini
 Environment=RESTART_METHOD=poison-pill
 Environment=SIGNAL_FILE_PATH=/var/lib/traefik-manager/signals/restart.sig
 ```
 
-Then add the healthcheck to your Traefik Docker service (same YAML as above, pointing at the same path).
+Then add the healthcheck to your Traefik Docker service (same YAML as above, pointing at the same path). If Traefik also runs as a systemd service, use a `.path` unit watching that file to `systemctl restart traefik` instead.
 
 == Direct socket
 
@@ -146,7 +163,7 @@ services:
 ```
 
 ::: danger
-The full Docker socket gives TM the ability to start, stop, or delete any container. Consider using the socket proxy method instead.
+The full Docker socket lets TM start, stop, or delete any container. Consider the socket proxy method instead.
 :::
 :::
 
@@ -180,10 +197,10 @@ Open Traefik Manager - a **Static Config** row appears under **Settings → Inte
 | Choice | Where it appears |
 |---|---|
 | **Off** | Nowhere. |
-| **Settings** | Inside the Settings window, as a **Static Config** panel in the sidebar. |
+| **Settings** | As a **Static Config** panel in the Settings sidebar. |
 | **Tab** | As its own tab in the side navigation. |
 
-If the row does not appear, check that a static config path is set - either the `static_config_path` field in `manager.yml` (which takes precedence) or the `STATIC_CONFIG_PATH` environment variable - and that the file exists at that path inside the container:
+If the row does not appear, check that a static config path is set - either `STATIC_CONFIG_PATH` or the field under **Settings → System Monitoring → File Paths**, which wins when both are present - and that the file exists at that path inside the container:
 
 ```bash
 docker exec traefik-manager ls -la /app/traefik.yml
@@ -199,4 +216,4 @@ Remove the volume mount, env vars, and any compose additions you added, then res
 docker compose up -d --force-recreate traefik-manager
 ```
 
-The Static Config tab will disappear. Your `traefik.yml` is unchanged.
+Static Config disappears. Your `traefik.yml` is unchanged.

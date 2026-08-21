@@ -1,26 +1,24 @@
 # HTTP Provider Tab
 
-The **HTTP Provider** tab shows all routes sourced from Traefik's HTTP provider in read-only mode.
+The **HTTP Provider** tab lists the routes Traefik fetches from its HTTP provider.
 
 ## What it shows
 
-- Route name, rule, status (enabled/disabled/error)
-- Protocol (HTTP / TCP / UDP)
-- TLS indicator
-- Service name
-- Entry points
-- Full detail view via the info button
+- One card per route: status, name, rule, protocol, TLS state, service, entry points, middlewares
+- Summary strip: route counts per protocol, plus any route not serving
+- Middlewares from the HTTP provider, listed under the routes
+- Search, protocol filter, refresh
 
+Click a card for its detail panel.
 
-Routes are **read-only** - edit them at the source HTTP endpoint Traefik is polling.
+Routes are **read-only** - edit them at the endpoint Traefik polls.
 
 ## Enabling the tab
 
-### During setup wizard
-Toggle **HTTP Provider** on in the "Optional monitoring" step.
-
-### After setup
-Go to **Settings → Route Monitoring** and enable HTTP Provider.
+| Where | Path |
+|---|---|
+| Setup wizard | Monitoring step → Provider tabs → HTTP Provider |
+| Later | Settings → Route Monitoring → HTTP Provider |
 
 ## Requirements
 
@@ -33,4 +31,4 @@ providers:
     pollInterval: "5s"
 ```
 
-No extra file mounts into the traefik-manager container are needed - data is pulled live from the Traefik API.
+No mounts into traefik-manager needed - data comes live from the Traefik API.

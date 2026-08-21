@@ -1,22 +1,22 @@
 # Agent API Reference
 
-The Traefik Manager Agent (TMA) exposes an HTTP API on port 8090. All endpoints except `/health` require authentication.
+The Traefik Manager Agent (TMA) exposes an HTTP API on port 8090. Every endpoint except `/health` requires authentication.
 
 ## Authentication
 
-Include your API key in every request using the `X-Api-Key` header:
+Send your API key in the `X-Api-Key` header:
 
 ```http
 X-Api-Key: your-api-key-here
 ```
 
-Alternatively, use the `Authorization: Bearer <key>` header.
+`Authorization: Bearer <key>` works too.
 
 TM handles authentication automatically when proxying calls through `/api/agents/proxy/<id>/...`.
 
 ## Rate limiting
 
-Requests are rate-limited per IP using `TMA_RATE_LIMIT` (default: 300 requests/minute). Returns `429 Too Many Requests` when exceeded. Set `TMA_RATE_LIMIT=0` to disable. TM makes many API calls per tab switch so the default is intentionally generous - lower it only if you need stricter access control.
+`/api/` requests are rate-limited per IP using `TMA_RATE_LIMIT` (default: 300 requests/minute), and return `429 Too Many Requests` when exceeded. Set `TMA_RATE_LIMIT=0` to disable. The default is generous because TM makes many API calls per tab switch; lower it only if you need stricter access control.
 
 ## Endpoints
 
@@ -29,16 +29,17 @@ Requests are rate-limited per IP using `TMA_RATE_LIMIT` (default: 300 requests/m
 | GET | `/api/traefik/middlewares` | Middlewares across all protocols - returns `{"http":[...],"tcp":[...]}` |
 | GET | `/api/traefik/entrypoints` | Entrypoints |
 | GET | `/api/traefik/version` | Traefik version |
-| GET | `/api/traefik/logs` | Last N access log lines (requires `ACCESS_LOG_PATH`) - `?lines=100` |
+| GET | `/api/traefik/logs` | Last N access log lines (requires `ACCESS_LOG_PATH`) - `?lines=100`, capped at 1000 |
 | GET | `/api/traefik/certs` | Certificates from acme.json (requires `ACME_JSON_PATH`) |
-| GET | `/api/traefik/plugins` | Installed plugins declared in the agent's static config (requires `STATIC_CONFIG_PATH`) |
+| GET | `/api/traefik/plugins` | Plugins declared in the agent's static config (requires `STATIC_CONFIG_PATH`) |
 | GET | `/api/configs` | Read dynamic config file(s) |
-| POST | `/api/configs` | Write a dynamic config file (creates a `.bak` before writing) |
+| POST | `/api/configs` | Write a dynamic config file (creates a `.bak` before writing) - body: `{"name": "...", "content": "<yaml>"}` |
 | GET | `/api/static` | Read static config (requires `STATIC_CONFIG_PATH`) |
-| POST | `/api/static` | Write static config |
+| POST | `/api/static` | Write static config - body: `{"content": "<yaml>"}` |
 | GET | `/api/static/status` | Restart method info |
 | POST | `/api/static/restart` | Restart Traefik (requires `RESTART_METHOD`) |
 | GET | `/api/crowdsec/decisions` | CrowdSec active decisions (requires CrowdSec config) |
+| POST | `/api/crowdsec/decisions` | Add a decision - body: `{"value": "<ip>", "type": "ban", "duration": "24h", "reason": "..."}`; `type` is `ban`, `captcha` or `bypass` |
 | GET | `/api/crowdsec/alerts` | CrowdSec recent alerts |
 | DELETE | `/api/crowdsec/decisions/<id>` | Unban an IP |
 | GET | `/api/backups` | List local `.bak` backup files |
@@ -55,7 +56,7 @@ Requests are rate-limited per IP using `TMA_RATE_LIMIT` (default: 300 requests/m
 | GET | `/api/routes/<id>/raw` | Raw YAML for a single route (router + service block) - `id` is the route name or `configFile::routeName` |
 | POST | `/api/routes/<id>/raw` | Save raw YAML for a route - body: `{"content": "<yaml>"}` |
 | GET | `/api/keys` | List API keys |
-| POST | `/api/keys` | Create an API key |
+| POST | `/api/keys` | Create an API key - body: `{"name": "..."}` |
 | DELETE | `/api/keys/<id>` | Delete an API key |
 
 ## Health check
@@ -66,30 +67,31 @@ GET /health
 
 Response (no auth required):
 ```json
-{"ok": true, "version": "1.10.1"}
+{"ok": true, "version": "1.11.0"}
 ```
 
 ## Error responses
 
 | Status | Meaning |
 |---|---|
+| 400 | Bad request (invalid body or filename, `RESTART_METHOD` not configured) |
 | 401 | Missing or invalid API key |
 | 404 | Endpoint not available (e.g. `STATIC_CONFIG_PATH` not set) |
 | 429 | Rate limit exceeded |
 | 500 | Internal error |
-| 502 | Cannot reach Traefik (for proxy endpoints) |
+| 502 | Cannot reach Traefik or the CrowdSec LAPI |
 
-All errors return `{"error": "message"}`.
+All errors return `{"error": "message", "ok": false}`.
 
 ## Backup format
 
-Local backups use per-file `.bak` files, not zip archives. Each backup is named `filename.YYYYMMDD_HHMMSS.bak` (e.g. `dynamic.yml.20250601_143022.bak`). When restoring, the agent strips the timestamp suffix to recover the original filename and writes it back to `CONFIG_PATH` - or to `STATIC_CONFIG_PATH` when the recovered name is that of the static config file. A `.bak` of the destination is taken before the restore overwrites it.
+Local backups are per-file `.bak` files, not zip archives, named `filename.YYYYMMDD_HHMMSS.bak` (e.g. `dynamic.yml.20250601_143022.bak`) with a UTC timestamp. When restoring, the agent strips the timestamp suffix to recover the original filename and writes it back to `CONFIG_PATH` - or to `STATIC_CONFIG_PATH` when the recovered name is that of the static config file. A `.bak` of the destination is taken before the restore overwrites it.
 
-`POST /api/backup/create` creates one `.bak` file per config file found in `CONFIG_PATH` (and `STATIC_CONFIG_PATH` if configured) in a single request. `POST /api/configs` (config write) also creates a `.bak` for the affected file automatically before writing - this is the pre-write safety backup.
+`POST /api/backup/create` creates one `.bak` per config file found in `CONFIG_PATH` (and `STATIC_CONFIG_PATH` if configured) in a single request. `POST /api/configs` also creates a `.bak` for the affected file before writing.
 
 ## Traefik data envelope
 
-The `/api/traefik/routers`, `/api/traefik/services`, and `/api/traefik/middlewares` endpoints do NOT proxy the Traefik API directly. Instead they fetch all protocols and return a structured envelope:
+`/api/traefik/routers`, `/api/traefik/services` and `/api/traefik/middlewares` do NOT proxy the Traefik API directly. They fetch every protocol, following the API's pagination, and return a structured envelope:
 
 - `/api/traefik/routers` - `{"http": [...], "tcp": [...], "udp": [...]}`
 - `/api/traefik/services` - `{"http": [...], "tcp": [...], "udp": [...]}`
@@ -101,7 +103,7 @@ If the agent cannot reach its Traefik API, or Traefik answers with a non-`200` s
 
 ## API keys
 
-The agent supports multiple named API keys stored in `BACKUP_DIR/api_keys.json`. Only a SHA-256 hash of each key is stored - the raw key is shown once at creation and cannot be recovered. The primary `TMA_API_KEY` from the environment always works regardless of the key store. Additional keys can be created, listed, and deleted via `/api/keys`. This is useful when multiple TM instances need to connect to the same agent.
+The agent supports multiple named API keys, stored in `<BACKUP_DIR>/api_keys.json`. Only a SHA-256 hash of each key is stored - the raw key is shown once at creation and cannot be recovered. The primary `TMA_API_KEY` from the environment always works regardless of the key store. Create, list and delete additional keys via `/api/keys`, which is useful when several TM instances connect to the same agent.
 
 ## Proxying through TM
 

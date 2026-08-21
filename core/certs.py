@@ -36,10 +36,17 @@ def _certs_from_tls_configs():
                 try:
                     from cryptography import x509
                     from cryptography.hazmat.backends import default_backend
+                    from cryptography.x509.oid import NameOID
                     cert_obj = x509.load_pem_x509_certificate(pem_bytes, default_backend())
-                    sans = [n.value for n in cert_obj.subject_alternative_names(x509.SubjectAlternativeName).get_values_for_type(x509.DNSName)]
-                    main = sans[0] if sans else os.path.basename(cert_file)
-                except Exception:
+                    try:
+                        sans = cert_obj.extensions.get_extension_for_class(
+                            x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
+                    except x509.ExtensionNotFound:
+                        sans = []
+                    cn = [a.value for a in cert_obj.subject.get_attributes_for_oid(NameOID.COMMON_NAME)]
+                    main = sans[0] if sans else (cn[0] if cn else os.path.basename(cert_file))
+                except Exception as ex:
+                    logger.debug(f"Cert detail parse error for {cert_file}: {ex}")
                     sans = []
                     main = os.path.basename(cert_file)
                 certs.append({'resolver': 'file', 'main': main, 'sans': sans, 'not_after': not_after, 'certFile': cert_file})

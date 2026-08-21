@@ -58,11 +58,7 @@ function upgrade() {
 
     const svc = doc.services[tmKey]
 
-    // Update image tag
-    svc.image = svc.image.replace(/:(latest|\d+\.\d+\.\d+[\w.-]*)$/, ':beta')
-    if (!svc.image.endsWith(':beta')) svc.image += ':beta'
 
-    // Normalize environment to object
     if (!svc.environment) {
       svc.environment = {}
     } else if (Array.isArray(svc.environment)) {
@@ -142,7 +138,6 @@ function upgrade() {
       }
     }
 
-    // Static config
     if (enableStatic.value) {
       svc.environment['STATIC_CONFIG_PATH'] = '/app/traefik.yml'
 

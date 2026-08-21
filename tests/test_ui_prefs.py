@@ -86,7 +86,7 @@ def test_sanitiser_accepts_every_documented_key():
     payload = {k: True for k in settings_mod.UI_PREF_BOOLS}
     payload.update({k: 'list' for k in settings_mod.UI_PREF_VIEWS})
     payload.update({k: 'dashboard' for k in settings_mod.UI_PREF_SCOPES})
-    payload.update({k: 'modern' for k in settings_mod.UI_PREF_LAYOUTS})
+    payload.update({k: 'fixed' for k in settings_mod.UI_PREF_LAYOUTS})
     payload.update({k: 'icons' for k in settings_mod.UI_PREF_DENSITY})
     payload.update({k: 'tab' for k in settings_mod.UI_PREF_PLACEMENTS})
     payload.update({k: ['entrypoints'] for k in settings_mod.UI_PREF_SECTION_LISTS})
@@ -134,15 +134,32 @@ def test_stat_bar_scope_round_trips_and_validates(client):
     assert r.get_json()['ui_prefs'].get('statBarScope') == 'dashboard'
 
 
-def test_layout_mode_round_trips_and_rejects_junk(client):
-    r = client.post('/api/settings/ui', json={'ui_prefs': {'layoutMode': 'modern'}},
-                    headers={'X-CSRF-Token': 'testtoken', 'X-Requested-With': 'fetch'})
-    assert r.status_code == 200
-    assert client.get('/api/settings/ui').get_json()['ui_prefs']['layoutMode'] == 'modern'
+def _put_layout(client, value):
+    return client.post('/api/settings/ui', json={'ui_prefs': {'layoutMode': value}},
+                       headers={'X-CSRF-Token': 'testtoken', 'X-Requested-With': 'fetch'})
 
-    client.post('/api/settings/ui', json={'ui_prefs': {'layoutMode': 'yolo'}},
-                headers={'X-CSRF-Token': 'testtoken', 'X-Requested-With': 'fetch'})
-    assert client.get('/api/settings/ui').get_json()['ui_prefs']['layoutMode'] == 'modern'
+
+def _get_layout(client):
+    return client.get('/api/settings/ui').get_json()['ui_prefs'].get('layoutMode')
+
+
+def test_layout_mode_round_trips_and_rejects_junk(client):
+    assert _put_layout(client, 'fixed').status_code == 200
+    assert _get_layout(client) == 'fixed'
+
+    _put_layout(client, 'fluid')
+    assert _get_layout(client) == 'fluid'
+
+    _put_layout(client, 'yolo')
+    assert _get_layout(client) == 'fluid', 'junk must not overwrite a valid value'
+
+
+def test_pre_1_11_layout_names_migrate(client):
+    _put_layout(client, 'classic')
+    assert _get_layout(client) == 'fixed'
+
+    _put_layout(client, 'modern')
+    assert _get_layout(client) == 'fluid'
 
 
 def test_dash_pod_density_round_trips_and_validates(client):

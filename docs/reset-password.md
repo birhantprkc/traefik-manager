@@ -33,50 +33,15 @@ SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
 ```
 :::
 
-A new temporary password is printed to the terminal. On your next login you will be redirected to a forced password-change screen before you can access the dashboard.
+A new temporary password is printed to the terminal. On your next login you are sent to a forced password-change screen before you reach the dashboard.
 
-::: info
-Two-factor authentication is **preserved** by default. Your existing TOTP setup remains active.
+::: info Lost your authenticator too?
+Two-factor authentication is **preserved** by default. Add `--disable-otp` to the same command to reset the password and turn 2FA off in one step, then re-enable it from **Settings → Authentication → Password & 2FA**.
 :::
 
----
-
-## Lost TOTP access
-
-If you have also lost access to your TOTP authenticator app, add `--disable-otp` to reset both the password and 2FA in one step:
-
-:::tabs
-== Docker
-```bash
-docker exec traefik-manager flask reset-password --disable-otp
-```
-
-== Podman
-```bash
-podman exec traefik-manager flask reset-password --disable-otp
-```
-
-== Unraid
-Open the Unraid dashboard → Docker tab → click the Traefik Manager icon → **Console**, then run:
-```bash
-flask reset-password --disable-otp
-```
-
-== Linux (native)
-```bash
-cd /opt/traefik-manager
-SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
-  venv/bin/flask reset-password --disable-otp
-```
+::: warning
+The reset also sets `setup_password_reset: true` in `manager.yml`, which leaves the `/setup` page open to anyone who can reach Traefik Manager. Only setting a password on that page clears the flag - the forced-change screen does not. So either set your new password at `https://your-traefik-manager.example.com/setup`, or remove the key from `manager.yml` afterwards and restart.
 :::
-
-This will:
-
-- Generate a new temporary password and print it to the terminal
-- Disable TOTP 2FA
-- Require a password change on next login
-
-After logging in, you can re-enable 2FA from **Settings → Authentication → Enable 2FA**.
 
 ---
 
@@ -102,17 +67,15 @@ setup_password_reset: true
 docker compose restart traefik-manager
 ```
 
-**4. Open Traefik Manager.** You are asked for a new password and nothing else. The flag clears itself
-once the password is set.
+**4. Open `/setup`** (`https://your-traefik-manager.example.com/setup`). You are asked for a new password and nothing else. Setting it clears the flag and signs you in.
 
 ::: warning
-While the flag is set, anyone who can reach Traefik Manager can set the password. Restart, set the new
-password, and confirm you are signed in.
+While the flag is set, anyone who can reach Traefik Manager can set the password. Restart, set the new password, and confirm you are signed in.
 :::
 
 ## Method 3 - Pre-set a known password
 
-If you want to set a specific known password instead of using the auto-generated one, generate a bcrypt hash and write it directly to `manager.yml`:
+To set a specific password instead of the auto-generated one, generate a bcrypt hash and write it directly to `manager.yml`:
 
 ```bash
 python3 -c "import bcrypt; print(bcrypt.hashpw(b'yournewpassword', bcrypt.gensalt()).decode())"
@@ -136,15 +99,13 @@ See [manager.yml reference](manager-yml.md) for all available fields.
 
 ### Enable 2FA
 
-1. **Settings → Authentication → Enable 2FA**
+1. **Settings → Authentication → Password & 2FA → Enable 2FA**
 2. Scan the QR code with your TOTP app (Google Authenticator, Authy, 1Password, etc.)
 3. Enter the 6-digit code to confirm - 2FA is now active
 
 ### Disable 2FA (while logged in)
 
-**Settings → Authentication → Disable 2FA**
-
-No code is required - you are already authenticated.
+**Settings → Authentication → Password & 2FA → Disable 2FA**. No code is required - you are already authenticated.
 
 ### Disable 2FA (locked out)
 

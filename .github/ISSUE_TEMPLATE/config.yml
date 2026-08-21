@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Feature request or idea
+    url: https://github.com/chr0nzz/traefik-manager/discussions/new?category=ideas
+    about: Suggest an idea or improvement. Ideas start as a discussion, and become an issue once they are planned.
+  - name: Question or help with your setup
+    url: https://github.com/chr0nzz/traefik-manager/discussions/new?category=q-a
+    about: Not sure whether something is a bug? Ask here first.
   - name: Security vulnerability
     url: https://github.com/chr0nzz/traefik-manager/security/advisories/new
     about: Please report security issues privately using GitHub's vulnerability reporting.

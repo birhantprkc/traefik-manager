@@ -34,8 +34,9 @@ async function refreshKubernetesTab() {
         }
 
         const _mws = [...(mwRes.http || []), ...(mwRes.tcp || [])].filter(m => { const mwProv = m.provider || (m.name||'').split('@')[1] || ''; return new Set(['kubernetescrd','kubernetes','kubernetesgateway']).has(mwProv); });
+        renderProviderVerdict('kubernetes', _allKubernetesRoutes, _mws);
         renderProviderMiddlewareSection(_mws, 'kubernetesMiddlewares');
-        document.getElementById('kubernetesTabCount').textContent = _allKubernetesRoutes.length;
+        setTabCount('kubernetes', _allKubernetesRoutes.length);
         renderKubernetesRoutes();
     } catch(e) {
         container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Traefik API not reachable</p></div>`;

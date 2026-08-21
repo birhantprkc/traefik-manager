@@ -1,16 +1,16 @@
 # CrowdSec Tab
 
-The **CrowdSec** tab connects to a CrowdSec Local API (LAPI) and answers one question: who is hitting this host, how, and what were they going after. Alerts are the evidence and lead the page; the resulting bans are one click behind. You can unban addresses and add manual decisions without touching the CLI.
+The **CrowdSec** tab connects to a CrowdSec Local API (LAPI) and answers one question: who is hitting this host, how, and what were they going after. Alerts are the evidence and lead the page; the bans they produced are one click behind. You can unban addresses and add manual decisions without touching the CLI.
 
-The tab is optional and must be enabled in Settings or during the setup wizard.
+The tab is optional and must be turned on in Settings.
 
 ## Using it
 
-The tab works the same way as the [Logs tab](tab-logs.md): read the verdict, click whatever looks wrong, and the feed below narrows to it. Alerts lead because they are the evidence; the bans they produced are one click behind.
+The tab works like the [Logs tab](tab-logs.md): read the verdict, click whatever looks wrong, and the feed below narrows to it.
 
 Some worked examples:
 
-**"Am I actually under attack, or is this background noise?"** The verdict answers directly. A host being probed constantly but absorbed cleanly renders grey and says so - that is not a problem, it is CrowdSec working. Colour only appears when something got through unhandled: yellow when a source tripped a scenario and holds no ban, red when a whole vector produced no ban at all.
+**"Am I actually under attack, or is this background noise?"** The verdict answers directly. A host probed constantly but absorbed cleanly renders grey and says so - that is not a problem, it is CrowdSec working. Colour only appears when something got through unhandled: yellow when a source tripped a scenario and holds no ban, red when a whole vector produced no ban at all.
 
 **"Who is hitting me?"** **Attacking sources** ranks addresses worst-first, where "worst" means still unbanned rather than merely loud. Click one to see every alert it raised. From the row detail you can jump to its network or its country in one more click.
 
@@ -18,11 +18,9 @@ Some worked examples:
 
 **"Is this one person or a botnet?"** **Networks** ranks by ASN. A single AS with many distinct addresses is usually one actor on a cloud provider; many ASNs hitting the same path is usually a distributed scan. **Tooling** tells you what they used - `curl`, `masscan` and friends are unambiguous, a copied browser string less so.
 
-**"Why is this address still allowed in?"** Click `loose` on the Attacking sources card. Those are sources that tripped a scenario and hold no active decision, which is the gap worth looking at. Add a ban with **+ Add Decision**, or leave it if the scenario was a false positive.
+**"Why is this address still allowed in?"** Click `loose` on the Attacking sources card: sources that tripped a scenario and hold no active decision, which is the gap worth looking at. Add a ban with **+ Add Decision**, or leave it if the scenario was a false positive.
 
 **"What is CrowdSec actually blocking for me?"** **Bans in force** is the doorway to the decisions view. Its footer splits your own detections from the community blocklist, which matters: a typical install has tens of thousands of subscribed entries and only a handful earned locally. Click `crowdsec` to see the ones your own rules produced.
-
-Filters combine with AND, clicking the same one twice clears it, and the window row lists everything active with a **clear** button.
 
 ## How the page reads
 
@@ -68,19 +66,19 @@ Every count is clickable and filters the feed below. Filters combine with AND, c
 | A tooling row | `agent` |
 | `crowdsec` / `cscli` / `CAPI` / `lists` | `origin`, and switches to the decisions view |
 | `ban` / `captcha` on the Bans card | `type`, and switches to the decisions view |
-| `local detections only` in the window row | `origin=capi` in the decisions view |
+| `local detections only` in the window row | `origin=subscribed` in the decisions view, the CAPI and blocklist rows the cards leave out |
 
 `origin` and `type` only exist on decisions, so following one switches the view automatically unless the link named a view itself. `asn`, `cc`, `uri`, `verb`, `agent` and `outcome` only exist on alerts; if one is still active while you are looking at decisions the window row says so rather than silently dropping it.
 
 ### Attack evidence
 
-The feed is the alert stream, twenty rows to a page, newest first. Each row carries the source address, the scenario, the country flag and AS name, a proportional strip of that alert's events, `events_count`, the ban state, and how long ago it fired. Clicking a row opens a twelve-key detail panel where source, network, scenario, path, verb, agent and outcome are each themselves deep links:
+The feed is the alert stream, twenty rows to a page, newest first. Each row carries the source address, the scenario, the country flag and AS name, a proportional strip of that alert's events, `events_count`, the ban state, and how long ago it fired. Clicking a row opens a detail panel where source, network, scenario, path, verb, agent and outcome are each themselves deep links:
 
 `source`, `network`, `country`, `scenario`, `bucket`, `events`, `window`, `paths` and `verbs` (or `accounts`), `agent`, `outcome`, `reported by`.
 
 ### Bans in force
 
-The section header carries a single flat button to the decisions view, and flips to a back button once you are there. Decision rows are deliberately thinner and show the value, the scope, the scenario, the live countdown from `duration`, the type and a trash button. Rows from a subscribed blocklist are dimmed, so your own bans stand out against tens of thousands of background rows.
+The section header carries a single flat button to the decisions view, and flips to a back button once you are there. Decision rows are deliberately thinner and show the value, the scope, the scenario, the live countdown from `duration`, the type and a trash button. Subscribed blocklist rows are dimmed, so your own bans stand out against tens of thousands of background rows.
 
 Decisions are sorted with your own first, newest first, so a ban you just added is on page one rather than the last page.
 
@@ -90,10 +88,10 @@ Click **+ Add Decision**:
 
 - **IP / Range** - single IP or CIDR (e.g. `1.2.3.4` or `10.0.0.0/8`)
 - **Type** - Ban, Captcha, or Bypass
-- **Duration** - 1h, 4h, 24h, 7 days, 30 days, or 1 year
+- **Duration** - 1 hour, 4 hours, 24 hours, 7 days, 30 days, or 1 year
 - **Reason** - optional label stored as the decision scenario
 
-Below the form, **Custom Decisions** lists every decision you added by hand, each with its own unban button. CrowdSec records these with origin `cscli`; it has no `manual` origin.
+Below the form, **Custom Decisions** lists every decision you added by hand, each with an unban button. CrowdSec records these with origin `cscli`; it has no `manual` origin.
 
 ## What the numbers do and do not mean
 
@@ -109,19 +107,19 @@ Below the form, **Custom Decisions** lists every decision you added by hand, eac
 
 Countries come from `source.cn`, which CrowdSec resolves itself in the `crowdsecurity/geoip-enrich` parser on the machine that raised the alert. Nothing is sent anywhere.
 
-If the reporting agent does not enrich its alerts and [IP geolocation](geoip.md) is enabled, the tab falls back to the host database for the alert source addresses only. It never geolocates the decisions list, because a community blocklist describes the internet rather than your host.
+If no alert carries a country and [IP geolocation](geoip.md) is enabled, the tab falls back to the host database for the alert source addresses only. It never geolocates the decisions list, because a community blocklist describes the internet rather than your host.
 
 Click a country on the map or in the list to filter the whole tab to it.
 
 ## Degraded states
 
-Each of these is a designed screen rather than a grid of zeroes.
+Each of these is a designed screen, not a grid of zeroes.
 
 | Situation | What you see |
 |---|---|
 | **Bouncer key only** | Verdict reads "Bans visible, attacks are not". The five alert-derived cards go blind, each naming the exact reason, and the feed explains that the LAPI refused `/v1/alerts` as a permission boundary rather than an absence of attacks. The Bans card, the decisions view and the window row all still work. |
 | **Machine credentials only** | Verdict reads "Attacks visible, bans are not". Every attack card is live; the ban state of each source is reported as unknown rather than guessed, and the Bans card names the missing bouncer key. |
-| **Agent has no geoip-enrich** | The Networks card goes blind and names the parser, and states that the LAPI never computes those fields, it stores whatever the agent sent. |
+| **Agent has no geoip-enrich** | The Networks card goes blind, names the parser, and says the LAPI stores whatever the agent sent rather than computing these fields. |
 | **SSH-only host** | Targeted paths becomes Targeted accounts from `target_user`, and the Tooling card goes blind because SSH buckets share none of the HTTP meta keys. |
 | **No alert carries meta** | Targeted paths goes blind and names `cscli` and blocklist alerts as the cause. |
 | **Nothing has attacked** | A calm verdict, calm cards, and prose saying that every ban in force was subscribed rather than earned. Empty is not treated as an error. |
@@ -130,13 +128,9 @@ Each of these is a designed screen rather than a grid of zeroes.
 
 ## Enabling the tab
 
-### During setup wizard
+Go to **Settings → System Monitoring** and turn on the **CrowdSec** toggle.
 
-Toggle **CrowdSec** on in the "Optional monitoring" step.
-
-### After setup
-
-Go to **Settings → System Monitoring** and enable the CrowdSec toggle.
+The setup wizard's **CrowdSec** step only stores the LAPI connection - leave its URL blank to skip it. The tab itself is turned on in Settings afterwards.
 
 ## Configuration
 
@@ -149,7 +143,7 @@ CrowdSec's LAPI uses **two different credentials**, and they are **complementary
 | **Decisions** (active bans/captchas/bypasses) | Bouncer API key | Bouncers read the decisions stream. CrowdSec answers `403 access forbidden` to a machine token here |
 | **Alerts** + **unban** (delete decision) | Machine login | Bouncer keys get `403 access forbidden` on these endpoints |
 
-Neither credential is a superset of the other, so set **both** for the full tab. The tab is considered configured as soon as the LAPI URL plus either credential is present, and it says plainly which half is missing.
+Neither credential is a superset of the other, so set **both** for the full tab. The tab counts as configured as soon as the LAPI URL plus either credential is present, and it says plainly which half is missing.
 
 A **TLS client certificate** is the third option: if your LAPI authenticates with mutual TLS (`bouncers_allowed_ou` / `agents_allowed_ou`), one certificate covers both halves of the table and no key or password is needed. See below.
 
@@ -158,11 +152,11 @@ A **TLS client certificate** is the third option: if your LAPI authenticates wit
 Go to **Settings → System Monitoring → CrowdSec** and fill in:
 
 - **LAPI URL** - the base URL of your CrowdSec LAPI (e.g. `http://crowdsec:8080`)
-- **API key** - a bouncer API key, reads decisions (see below)
+- **API Key** - a bouncer API key, reads decisions (see below)
 - **Machine Credentials** - machine ID + password, reads alerts and enables unban
 - **Client Certificate mTLS** - cert, key and CA paths for a LAPI behind mutual TLS, replaces both credentials above
 
-Values are stored encrypted in `manager.yml` (the certificate fields are paths, not secrets).
+The API key and machine password are stored encrypted in `manager.yml`; the certificate fields are paths, not secrets.
 
 ### Option 2 - Environment variables
 
@@ -196,11 +190,12 @@ Copy the key that is printed - it is only shown once.
 ### Generating machine credentials (for alerts and unban)
 
 ```bash
-cscli machines add traefik-manager --auto
-cat /etc/crowdsec/local_api_credentials.yaml
+cscli machines add traefik-manager --auto -f-
 ```
 
-Copy the `login` and `password` from that file into the Machine Credentials fields (or the `CROWDSEC_MACHINE_ID` / `CROWDSEC_MACHINE_PASSWORD` env vars). If the machine shows as unvalidated, run `cscli machines validate traefik-manager`.
+Copy the `login` and `password` from the output into the Machine Credentials fields (or the `CROWDSEC_MACHINE_ID` / `CROWDSEC_MACHINE_PASSWORD` env vars). If the machine shows as unvalidated, run `cscli machines validate traefik-manager`.
+
+> `-f-` prints the credentials. Without it `cscli` overwrites `/etc/crowdsec/local_api_credentials.yaml`, which is what CrowdSec's own log processor logs in with.
 
 > **Compose gotcha**: if the machine password contains a `$`, escape it as `$$` in `docker-compose.yml` - Docker Compose treats a single `$` as a variable reference. No escaping is needed in the Settings UI.
 
@@ -210,9 +205,9 @@ This mirrors CrowdSec's own auth model: `cscli decisions list` uses the bouncer/
 
 ## Fetching
 
-- **Decisions** are read from `/v1/decisions/stream` - a full sync on first read, then cached deltas, resynced hourly. On a LAPI with no stream endpoint it falls back to cursor pagination (`id_gt`), 1000 rows per page up to 200 pages. Expired rows are dropped. Expired rows are dropped. There is no display cap: every active decision is fetched, and the strip on the Bans card rescales rather than truncating, printing its own `1 cell = N` legend.
-- **Alerts** are read in one request with `with_decisions=false` and a row limit - 500 by default, configurable via the `CROWDSEC_ALERT_LIMIT` env var (or the `crowdsec_alert_limit` setting, 0-100000). That flag stays: a single community blocklist alert can embed 15,000 decision objects. That flag stays: a single community blocklist alert can embed 15,000 decision objects.
-- Both are refetched together whenever you open the tab or press Refresh. The feed renders one page at a time, so a busy instance never builds tens of thousands of rows at once.
+- **Decisions** come from `/v1/decisions/stream` - a full sync on first read, then cached deltas, resynced hourly. On a LAPI with no stream endpoint it falls back to cursor pagination (`id_gt`), 1000 rows per page up to 200 pages. Expired rows are dropped. There is no display cap: every active decision is fetched, and the strip on the Bans card rescales rather than truncating, printing its own `1 cell = N` legend.
+- **Alerts** come from one request with `with_decisions=false` and a row limit - 500 by default, set with the `CROWDSEC_ALERT_LIMIT` env var or the `crowdsec_alert_limit` setting (0-100000). That flag stays: a single community blocklist alert can embed 15,000 decision objects.
+- Both are refetched together when you open the tab or press Refresh. The feed renders one page at a time, so a busy instance never builds tens of thousands of rows at once.
 
 ## Docker Compose example
 
@@ -240,5 +235,5 @@ networks:
 ```
 
 ::: tip Automated setup
-The [traefik-stack installer](traefik-stack.md) can configure CrowdSec automatically during installation. When you choose to install CrowdSec as part of the stack, it generates the bouncer key (for decisions) and also registers a **machine** and wires up `CROWDSEC_MACHINE_ID` / `CROWDSEC_MACHINE_PASSWORD` (for alerts and unban), so both views work out of the box. When connecting to an existing CrowdSec instance, the installer prompts for an optional machine ID and password.
+The [traefik-stack installer](traefik-stack.md) can configure CrowdSec during installation. Installing CrowdSec as part of the stack generates the bouncer key (for decisions), registers a **machine**, and wires up `CROWDSEC_MACHINE_ID` / `CROWDSEC_MACHINE_PASSWORD` (for alerts and unban), so both views work out of the box. When connecting to an existing CrowdSec instance, the installer prompts for an optional machine ID and password.
 :::

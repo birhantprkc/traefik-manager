@@ -1,32 +1,28 @@
 # Docker Tab
 
-The **Docker** tab shows all routes discovered by Traefik's Docker provider in read-only mode.
+The **Docker** tab lists the routes Traefik discovered through its Docker provider.
 
 ## What it shows
 
-- Route name, rule, status (enabled/disabled/error)
-- Protocol (HTTP / TCP / UDP)
-- TLS indicator
-- Service name
-- Entry points
-- Full detail view via the info button
+- One card per route: status, name, rule, protocol, TLS state, service, entry points, middlewares
+- Summary strip: route counts per protocol, plus any route not serving
+- Middlewares from the Docker provider, listed under the routes
+- Search, protocol filter, refresh
 
+Click a card for its detail panel, which adds the container address and the route's `traefik.*` labels.
 
 Routes are **read-only** - edit them via your container's Docker labels.
 
 ## Enabling the tab
 
-### During setup wizard
-Toggle **Docker** on in the "Optional monitoring" step.
-
-### After setup
-Go to **Settings → Route Monitoring** and enable Docker.
+| Where | Path |
+|---|---|
+| Setup wizard | Monitoring step → Provider tabs → Docker |
+| Later | Settings → Route Monitoring → Docker |
 
 ## Requirements
 
-Traefik must be configured with the Docker provider. No extra file mounts into the traefik-manager container are needed - data is pulled live from the Traefik API.
-
-Traefik itself needs access to the Docker socket:
+Traefik must be configured with the Docker provider and have access to the Docker socket:
 
 ```yaml
 providers:
@@ -34,4 +30,6 @@ providers:
     exposedByDefault: false
 ```
 
-Routes appear for any container with `traefik.enable=true` labels set.
+With `exposedByDefault: false`, only containers labelled `traefik.enable=true` appear.
+
+No mounts into traefik-manager needed - data comes live from the Traefik API.

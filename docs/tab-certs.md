@@ -7,28 +7,23 @@ The **Certs** tab shows TLS certificates managed by Traefik, read from two sourc
 
 ## What it shows
 
-- Domain (main domain + SANs)
-- ACME resolver name (or `file` for PEM certs)
-- Expiry date (parsed from the certificate)
-
-
-In the [Modern layout](guide.md), certificates use the redesigned card shared by the rest of the app: the main domain with its resolver below it, the additional SANs each with a copy button, and the expiry date with the days remaining coloured green, amber under 30 days, and red under 7.
+A summary strip counts your certificates, how many expire within 7 and within 30 days, and when the next one expires. Each card below shows the main domain with the issuing resolver underneath (`file` for PEM certs), the first two additional SANs with a copy button each (the rest behind a `+N more`), and the expiry date with the days remaining coloured green, amber under 30 days, and red under 7.
 
 Certificates are **read-only** - they are issued and renewed automatically by Traefik. To revoke or force a renewal, do so via your Traefik configuration.
 
 ## Enabling the tab
 
 ### During setup wizard
-Toggle **Certs** on in the "Optional monitoring" step.
+Toggle **Certificates** on in the Monitoring step.
 
 ### After setup
-Go to **Settings → System Monitoring** and enable Certs.
+Go to **Settings - System Monitoring - Tab Visibility** and enable Certs.
 
 ## Requirements
 
 ### ACME certificates (acme.json)
 
-Point traefik-manager at your `acme.json` via the `ACME_JSON_PATH` environment variable (default: `/app/acme.json`).
+Point traefik-manager at your `acme.json` with the `ACME_JSON_PATH` environment variable (default: `/app/acme.json`), or with the acme.json Path field under **Settings - System Monitoring - File Paths**, which wins over the env var. Mount it read-only (`:ro`) - traefik-manager never writes to `acme.json`.
 
 :::tabs
 == Docker / Podman
@@ -42,8 +37,6 @@ volumes:
 Environment=ACME_JSON_PATH=/etc/traefik/acme.json
 ```
 :::
-
-> **Tip:** Mount it read-only (`:ro`) - traefik-manager never writes to `acme.json`.
 
 #### Several storage files
 
@@ -71,13 +64,13 @@ environment:
   - ACME_JSON_PATH=/letsencrypt
 ```
 
-Certificates from every file are listed together, each showing the resolver that issued it. A file that is missing or unreadable is reported without hiding the certificates from the others. A file that is missing or unreadable is reported without hiding the certificates from the others.
+Certificates from every file are listed together, each showing the resolver that issued it. A file that is missing or unreadable is reported without hiding the certificates from the others.
 
 This works the same on the Host and on a [remote agent](agent.md).
 
 ### File-based certificates (tls.yml)
 
-Traefik Manager automatically scans all loaded dynamic config files for `tls.certificates` entries and reads each `certFile` PEM directly.
+Traefik Manager scans all loaded dynamic config files for `tls.certificates` entries and reads each `certFile` PEM directly. This is done on the Host only - a [remote agent](agent.md) reports its ACME certificates.
 
 Example `tls.yml`:
 ```yaml
@@ -106,4 +99,4 @@ On native Linux installs, make sure Traefik Manager has read access to the cert 
 chmod o+r /etc/traefik/certs/chain.pem
 ```
 
-If `acme.json` is not found, the tab shows an "acme.json not mounted" panel with the volume line to add to your compose file. File-based certs are still shown if available. File-based certs are still shown if available.
+If no certificates can be read at all, the tab shows an "acme.json not mounted" panel with the volume line to add to your compose file. File-based certs, when readable, are shown instead.
