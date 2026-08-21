@@ -86,14 +86,6 @@ def _sync(entries):
         _notifications.append(e)
 
 
-def _is_ntfy_url(url: str) -> bool:
-    from urllib.parse import urlparse
-    try:
-        h = urlparse(url).hostname or ''
-        return h == 'ntfy.sh' or h.startswith('ntfy.') or '/api/v1/publish' in url
-    except Exception:
-        return False
-
 def _send_webhook(url: str, wtype: str, type_: str, msg: str, ts: str, username: str = '', password: str = ''):
     color_map = {'warning': 0xf0a500, 'error': 0xf85149, 'info': 0x58a6ff, 'success': 0x3fb950}
     color = color_map.get(type_, 0x58a6ff)
