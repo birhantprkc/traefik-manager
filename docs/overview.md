@@ -6,52 +6,37 @@ A self-hosted web UI for managing and monitoring your [Traefik](https://traefik.
 
 ## Get Started
 
-<div class="vp-grid-cards">
-<div class="vp-card">
+One command installs Traefik and Traefik Manager together, Traefik Manager on its own, or the agent on a remote host.
 
-**<img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/windows-terminal.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block">  Traefik Stack**
+```bash
+curl -fsSL https://get-traefik.xyzlab.dev | bash
+```
 
-One command installs Traefik + Traefik Manager together, Traefik Manager on its own via Docker or a native Linux service, or the agent on a remote server.
+[What the installer sets up →](traefik-stack.md)
 
-[Traefik Stack guide →](traefik-stack.md)
+### Install it yourself
 
-</div>
-<div class="vp-card">
-
-**<img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/docker.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block"> Docker**
-
-Deploy with Docker Compose - minimal setup, pre-built image on GHCR.
-
-[Docker guide →](docker.md)
-
-</div>
-<div class="vp-card">
-
-**<img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/podman.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block"> Podman**
-
-Rootless containers, Quadlet/systemd, SELinux volume labels.
-
-[Podman guide →](podman.md)
-
-</div>
-<div class="vp-card">
-
-**<img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/linux.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block"> Linux (native)**
-
-Run directly on the host with Python + systemd. No container runtime needed.
-
-[Linux guide →](linux.md)
-
-</div>
-<div class="vp-card">
-
-**<img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/unraid.png" style="height:24px;width:24px;vertical-align:middle;display:inline-block"> Unraid**
-
-Install on Unraid with a pre-built template.
-
-[Unraid guide →](unraid.md)
-
-</div>
+<div class="vp-pick">
+<a class="vp-pick-card" href="./docker">
+  <img src="/images/i-docker.png" alt="" width="28" height="28">
+  <strong>Docker</strong>
+  <span>You already run containers. Compose file, image on GHCR.</span>
+</a>
+<a class="vp-pick-card" href="./podman">
+  <img src="/images/i-podman.png" alt="" width="28" height="28">
+  <strong>Podman</strong>
+  <span>You want rootless. Quadlet units and SELinux labels covered.</span>
+</a>
+<a class="vp-pick-card" href="./linux">
+  <img src="/images/i-linux.png" alt="" width="28" height="28">
+  <strong>Linux</strong>
+  <span>No container runtime. Python and a systemd service on the host.</span>
+</a>
+<a class="vp-pick-card" href="./unraid">
+  <img src="/images/i-unraid.png" alt="" width="28" height="28">
+  <strong>Unraid</strong>
+  <span>Install from the Community Applications template.</span>
+</a>
 </div>
 
 ---

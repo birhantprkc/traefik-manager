@@ -11,7 +11,7 @@ import { withBase } from 'vitepress'
     <h1 class="hh-headline">The self-hosted UI for Traefik</h1>
     <p class="hh-tagline">Manage routes, middlewares, static config, backups, and remote servers - without editing YAML.</p>
     <div class="hh-actions">
-      <a class="hh-btn hh-btn-brand" :href="withBase('/guide')">Get Started</a>
+      <a class="hh-btn hh-btn-brand" :href="withBase('/overview')">Get Started</a>
       <a class="hh-btn" href="#features">Features</a>
       <a class="hh-btn" href="https://github.com/chr0nzz/traefik-manager" target="_blank" rel="noopener noreferrer">GitHub</a>
     </div>

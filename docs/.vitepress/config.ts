@@ -26,7 +26,7 @@ export default defineConfig({
     siteTitle: 'Traefik Manager',
 
     nav: [
-      { text: 'Overview', link: '/guide' },
+      { text: 'Overview', link: '/overview' },
       { text: 'FAQ', link: '/faq' },
       {
         text: 'Install',
@@ -62,7 +62,7 @@ export default defineConfig({
         text: 'Start here',
         items: [
           { text: 'Home', link: '/' },
-          { text: 'Overview', link: '/guide' },
+          { text: 'Overview', link: '/overview' },
           { text: 'FAQ', link: '/faq' },
           { text: 'UI Examples', link: '/ui-examples' },
         ],

@@ -123,6 +123,57 @@
   background: var(--vp-c-bg-soft);
 }
 
+.vp-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+  margin: 18px 0 4px;
+}
+
+.vp-pick-card {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: center;
+  padding: 16px 18px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  background: var(--vp-c-bg-soft);
+  text-decoration: none !important;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+
+.vp-pick-card:hover {
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-bg);
+  transform: translateY(-1px);
+}
+
+.vp-pick-card:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+.vp-pick-card img {
+  grid-row: 1 / span 2;
+  width: 28px;
+  height: 28px;
+}
+
+.vp-pick-card strong {
+  color: var(--vp-c-text-1);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.vp-pick-card span {
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .vp-card p { margin: 0 0 8px; }
 .vp-card p:last-child { margin: 0; }
 .vp-card hr { margin: 10px 0; border-color: var(--vp-c-divider); }
