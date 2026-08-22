@@ -254,6 +254,28 @@ components:
         type: { type: string, example: "route_saved" }
         msg: { type: string, example: "Route my-app saved" }
 
+    NotificationChannel:
+      type: object
+      description: "A notification delivery target. Secrets are returned redacted as `***`."
+      properties:
+        id: { type: string, example: "ch_1a2b3c4d", description: "Generated server-side on create." }
+        name: { type: string, example: "Ops Discord", maxLength: 60, description: "Falls back to the kind when left empty." }
+        kind: { type: string, enum: [discord, slack, ntfy, generic, gotify, pushover, pushbullet, telegram] }
+        enabled: { type: boolean, default: true }
+        url: { type: string, maxLength: 500, description: "Webhook or server URL. Required for discord, slack, ntfy, generic and gotify." }
+        token: { type: string, example: "***", description: "Gotify app token, Pushover app token, Pushbullet access token, or Telegram bot token." }
+        token2: { type: string, example: "***", description: "Pushover user key, or Telegram chat id." }
+        username: { type: string, maxLength: 100, description: "Optional HTTP basic auth user for url-based kinds." }
+        password: { type: string, example: "***" }
+        categories:
+          type: array
+          description: "Event categories this channel accepts. Empty means every category."
+          items: { type: string, enum: [config, backup, security, traefik, certs, crowdsec, agent, update] }
+        min_severity: { type: string, enum: [info, success, warning, error], default: info }
+        digest: { type: string, enum: [immediate, hourly, daily], default: immediate }
+        quiet_hours: { type: string, example: "23:00-07:00", description: "HH:MM-HH:MM window, or empty for none. Wraps past midnight." }
+        break_through: { type: boolean, default: false, description: "Deliver error events even during quiet hours." }
+
     BackupFile:
       type: object
       properties:
@@ -2734,6 +2756,140 @@ paths:
       responses:
         "401": { $ref: '#/components/responses/Unauthorized' }
         "200": { description: Recorded }
+
+  /api/notifications/channels:
+    get:
+      tags: [Notifications]
+      summary: List notification channels
+      description: Every configured delivery target. Secrets are redacted to `***`.
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "200":
+          description: Channel list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  channels:
+                    type: array
+                    items: { $ref: "#/components/schemas/NotificationChannel" }
+    post:
+      tags: [Notifications]
+      summary: Create a notification channel
+      description: |
+        `kind` is required and must be one of the supported kinds; an unknown kind is
+        rejected rather than defaulted. The `id` is generated server-side. Omitted
+        fields take their defaults: enabled, every category, `min_severity` `info`,
+        `digest` `immediate`, no quiet hours.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/NotificationChannel"
+                - type: object
+                  required: [kind]
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400":
+          description: Unknown kind, category, min_severity or digest, or a malformed quiet_hours
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  channel: { $ref: "#/components/schemas/NotificationChannel" }
+
+  /api/notifications/channels/{channel_id}:
+    put:
+      tags: [Notifications]
+      summary: Update a notification channel
+      description: |
+        Update any subset of the channel's fields. Omitted fields keep their value.
+        Send a secret as `***` to keep the stored one, or any other string to replace it.
+      parameters:
+        - name: channel_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NotificationChannel" }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400":
+          description: Unknown kind, category, min_severity or digest, or a malformed quiet_hours
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404": { description: Channel not found }
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  channel: { $ref: "#/components/schemas/NotificationChannel" }
+    delete:
+      tags: [Notifications]
+      summary: Delete a notification channel
+      parameters:
+        - name: channel_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { description: Channel not found }
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OkResponse" }
+
+  /api/notifications/channels/{channel_id}/test:
+    post:
+      tags: [Notifications]
+      summary: Send a test notification to one channel
+      description: |
+        Delivers immediately, ignoring the channel's category, severity, digest and
+        quiet-hour filters. A channel missing a required field for its kind is rejected
+        with 400 naming the field, without attempting delivery.
+      parameters:
+        - name: channel_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "400":
+          description: The channel is missing a field its kind requires
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404": { description: Channel not found }
+        "200":
+          description: Delivery attempted. `ok` is false when the provider rejected it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  detail: { type: string, description: "Provider note on success, e.g. the Pushover monthly quota." }
+                  error: { type: string }
 
   /api/static/backup/create:
     post:

@@ -1062,6 +1062,7 @@ async function fetchNotifications() {
             localStorage.setItem('notifLastRead', _notifLastRead);
         }
         _renderNotifPanel();
+        _syncBrowserNotifs();
     } catch(e) {}
 }
 
@@ -1157,6 +1158,122 @@ async function clearAllNotifications() {
         localStorage.setItem('notifLastRead', _notifLastRead);
         await fetchNotifications();
     } catch(e) {}
+}
+
+const BROWSER_NOTIF_KEY     = 'tmBrowserNotifs';
+const BROWSER_NOTIF_SEV_KEY = 'tmBrowserNotifsSeverity';
+const BROWSER_NOTIF_SEVERITIES = ['all', 'warning'];
+const BROWSER_NOTIF_BURST = 3;
+
+const _BROWSER_NOTIF_TITLES = {
+    success: 'Traefik Manager',
+    info:    'Traefik Manager',
+    warning: 'Traefik Manager: warning',
+    error:   'Traefik Manager: error',
+};
+
+const _BROWSER_NOTIF_RANK = { info: 0, success: 0, warning: 1, error: 2 };
+
+let _notifSeenTs = null;
+
+function browserNotifSupport() {
+    if (window.isSecureContext === false) return { ok: false, reason: 'insecure' };
+    if (typeof Notification === 'undefined') return { ok: false, reason: 'unsupported' };
+    return { ok: true, reason: '' };
+}
+
+function browserNotifsEnabled() {
+    return localStorage.getItem(BROWSER_NOTIF_KEY) === '1';
+}
+
+function browserNotifsActive() {
+    return browserNotifsEnabled() && browserNotifSupport().ok && Notification.permission === 'granted';
+}
+
+function browserNotifSeverity() {
+    const v = localStorage.getItem(BROWSER_NOTIF_SEV_KEY);
+    return BROWSER_NOTIF_SEVERITIES.includes(v) ? v : 'all';
+}
+
+function setBrowserNotifSeverity(sev) {
+    if (!BROWSER_NOTIF_SEVERITIES.includes(sev)) return;
+    localStorage.setItem(BROWSER_NOTIF_SEV_KEY, sev);
+}
+
+function _requestNotifPermission() {
+    return new Promise(resolve => {
+        let settled = false;
+        const finish = perm => {
+            if (settled) return;
+            settled = true;
+            resolve(perm || Notification.permission);
+        };
+        try {
+            const ret = Notification.requestPermission(finish);
+            if (ret && typeof ret.then === 'function') ret.then(finish).catch(() => finish(Notification.permission));
+        } catch(e) {
+            finish(Notification.permission);
+        }
+    });
+}
+
+async function enableBrowserNotifs() {
+    const support = browserNotifSupport();
+    if (!support.ok) return support;
+    let perm = Notification.permission;
+    if (perm === 'default') perm = await _requestNotifPermission();
+    if (perm !== 'granted') {
+        localStorage.setItem(BROWSER_NOTIF_KEY, '0');
+        return { ok: false, reason: 'denied' };
+    }
+    localStorage.setItem(BROWSER_NOTIF_KEY, '1');
+    _notifSeenTs = new Set(_notifData.map(n => n.ts));
+    return { ok: true, reason: '' };
+}
+
+function disableBrowserNotifs() {
+    localStorage.setItem(BROWSER_NOTIF_KEY, '0');
+}
+
+function _browserNotifWanted(type) {
+    if (browserNotifSeverity() !== 'warning') return true;
+    return (_BROWSER_NOTIF_RANK[type] || 0) >= 1;
+}
+
+function _showBrowserNotif(type, body, tag) {
+    try {
+        const notif = new Notification(_BROWSER_NOTIF_TITLES[type] || _BROWSER_NOTIF_TITLES.info, {
+            body: body,
+            tag:  'tm-' + tag,
+            icon: '/static/icons/icon-192x192.png',
+        });
+        notif.onclick = () => {
+            window.focus();
+            try { notif.close(); } catch(e) {}
+            if (!_notifPanelOpen) toggleNotifPanel();
+        };
+    } catch(e) {}
+}
+
+function _syncBrowserNotifs() {
+    const seen = _notifSeenTs;
+    _notifSeenTs = new Set(_notifData.map(n => n.ts));
+    if (!browserNotifsEnabled()) return;
+    if (!browserNotifSupport().ok) return;
+    if (Notification.permission !== 'granted') {
+        disableBrowserNotifs();
+        if (typeof renderBrowserNotifs === 'function') renderBrowserNotifs();
+        showToast('Desktop notifications are blocked by this browser, so they have been turned off', 'error', false);
+        return;
+    }
+    if (seen === null) return;
+    const fresh = _notifData.filter(n => !seen.has(n.ts) && _browserNotifWanted(n.type || 'info'));
+    if (!fresh.length) return;
+    if (fresh.length > BROWSER_NOTIF_BURST) {
+        _showBrowserNotif('info', fresh.length + ' new notifications', 'burst');
+        return;
+    }
+    fresh.slice().reverse().forEach(n => _showBrowserNotif(n.type || 'info', n.msg || '', n.ts));
 }
 
 let _navReflowPending = false;

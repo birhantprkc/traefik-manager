@@ -449,6 +449,7 @@ function switchSettingsPanel(id, btn) {
     document.getElementById('mpanel-' + id).classList.add('active');
     _syncSettingsSubmenu(id);
     if (id === 'about') _loadAboutAgentInfo();
+    if (id === 'notifications') { loadChannelsList(); renderBrowserNotifs(); }
     if (window.innerWidth < 640) {
         const titles = {connection:'Connection',routes:'Route Monitoring',system:'System Monitoring',auth:'Authentication',backups:'Backups',ui:'Interface',notifications:'Notifications',about:'About','agent-keys':'API Keys',static:'Static Config'};
         document.getElementById('settingsModalTitle').textContent = titles[id] || 'Settings';
@@ -523,13 +524,9 @@ async function openSettingsModal(panel) {
         if (csCkEl) csCkEl.value = data.crowdsec_client_key || '';
         const csCaEl = document.getElementById('settingsCrowdSecCaCert');
         if (csCaEl) csCaEl.value = data.crowdsec_ca_cert || '';
-        const whEl = document.getElementById('webhookUrlInput');
-        if (whEl) whEl.value = data.webhook_url || '';
-        const whType = document.getElementById('webhookTypeSelect');
-        if (whType) whType.value = data.webhook_type || 'discord';
-        const whUser = document.getElementById('webhookUsername');
-        if (whUser) whUser.value = data.webhook_username || '';
-        onWebhookTypeChange();
+        _legacyWebhook.url      = data.webhook_url || '';
+        _legacyWebhook.type     = data.webhook_type || 'discord';
+        _legacyWebhook.username = data.webhook_username || '';
 
         if (data.visible_tabs) {
             _localTabsCache = data.visible_tabs;
@@ -704,25 +701,415 @@ async function toggleAuth() {
     }
 }
 
-function onWebhookTypeChange() {
-    const type = document.getElementById('webhookTypeSelect')?.value;
-    const authFields = document.getElementById('webhookAuthFields');
-    if (authFields) authFields.style.display = (type === 'ntfy' || type === 'generic') ? '' : 'none';
+let _legacyWebhook = { url: '', type: 'discord', username: '' };
+
+const CHANNEL_KIND_SPEC = {
+    discord:    { label: 'Discord',      fields: { url:    { label: 'Webhook URL',  desc: 'Where notifications are delivered.', ph: 'https://discord.com/api/webhooks/...' } } },
+    slack:      { label: 'Slack',        fields: { url:    { label: 'Webhook URL',  desc: 'Incoming webhook created in your Slack workspace.', ph: 'https://hooks.slack.com/services/...' } } },
+    ntfy:       { label: 'ntfy',         auth: true,
+                  fields: { url:         { label: 'URL',         desc: 'Full topic URL on ntfy.sh or your own server.', ph: 'https://ntfy.sh/my-topic' } } },
+    generic:    { label: 'Generic JSON', auth: true,
+                  fields: { url:         { label: 'URL',         desc: 'Receives a JSON body you can shape downstream.', ph: 'https://example.com/hooks/traefik' } } },
+    gotify:     { label: 'Gotify',
+                  fields: { url:         { label: 'Server URL',  desc: 'Base URL of your Gotify server.', ph: 'https://gotify.example.com' },
+                            token:       { label: 'App Token',   desc: 'Application token from Gotify. Stored encrypted.', secret: true } } },
+    pushover:   { label: 'Pushover',
+                  fields: { token:       { label: 'App Token',   desc: 'Application token from your Pushover app. Stored encrypted.', secret: true },
+                            token2:      { label: 'User Key',    desc: 'Your Pushover user or group key. Stored encrypted.', secret: true } } },
+    pushbullet: { label: 'Pushbullet',
+                  fields: { token:       { label: 'Access Token', desc: 'Access token from your Pushbullet account. Stored encrypted.', secret: true } } },
+    telegram:   { label: 'Telegram',
+                  fields: { token:       { label: 'Bot Token',   desc: 'Token issued by BotFather. Stored encrypted.', secret: true },
+                            token2:      { label: 'Chat ID',     desc: 'Target chat, group or channel to post into.', ph: '-1001234567890' } } },
+};
+
+const CHANNEL_CATEGORY_LABELS = {
+    config: 'Config', backup: 'Backups', security: 'Security', traefik: 'Traefik',
+    certs: 'Certificates', crowdsec: 'CrowdSec', agent: 'Agents', update: 'Updates',
+};
+
+const CHANNEL_SEVERITY_LABELS = { info: 'Info', success: 'Success', warning: 'Warning', error: 'Error' };
+
+const CHANNEL_DIGEST_LABELS = { immediate: 'Immediate', hourly: 'Hourly', daily: 'Daily' };
+
+let _channels    = [];
+let _chEditId    = null;
+let _chCats      = [];
+let _chSeverity  = 'info';
+let _chDigest    = 'immediate';
+
+function _channelKindLabel(kind) {
+    return (CHANNEL_KIND_SPEC[kind] || {}).label || kind || '';
 }
 
-async function testWebhook() {
-    const url      = document.getElementById('webhookUrlInput')?.value.trim();
-    const wtype    = document.getElementById('webhookTypeSelect')?.value || 'discord';
-    const username = document.getElementById('webhookUsername')?.value.trim() || '';
-    const password = document.getElementById('webhookPassword')?.value || '';
-    const res = document.getElementById('webhookTestResult');
-    if (!url) { if (res) { res.style.display=''; res.style.color='var(--red)'; res.textContent='Enter a webhook URL first.'; } return; }
-    if (res) { res.style.display=''; res.style.color='var(--muted)'; res.textContent='Sending...'; }
+function _channelFields(kind) {
+    return (CHANNEL_KIND_SPEC[kind] || {}).fields || {};
+}
+
+function _channelMissing(ch) {
+    const fields = _channelFields(ch.kind);
+    return Object.keys(fields).filter(k => !String(ch[k] || '').trim()).map(k => fields[k].label);
+}
+
+function _channelSummary(ch) {
+    const all   = Object.keys(CHANNEL_CATEGORY_LABELS);
+    const cats  = (ch.categories || []).filter(c => all.includes(c));
+    const parts = [];
+    parts.push(!cats.length || cats.length === all.length
+        ? 'All categories'
+        : cats.map(c => CHANNEL_CATEGORY_LABELS[c]).join(', '));
+    const sev = ch.min_severity || 'info';
+    if (sev !== 'info') parts.push((CHANNEL_SEVERITY_LABELS[sev] || sev) + ' and above');
+    const digest = ch.digest || 'immediate';
+    if (digest !== 'immediate') parts.push((CHANNEL_DIGEST_LABELS[digest] || digest) + ' digest');
+    if (ch.quiet_hours) parts.push('Quiet ' + _esc(ch.quiet_hours) + (ch.break_through ? ', errors break through' : ''));
+    return parts.join(' &middot; ');
+}
+
+async function loadChannelsList() {
+    const body = document.getElementById('channelsListBody');
+    if (!body) return;
+    document.getElementById('channelListView').style.display = 'flex';
+    document.getElementById('channelEditView').style.display = 'none';
     try {
-        const r = await fetch('/api/settings/webhook-test', { method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':_csrfHeaders()['X-CSRF-Token']}, body: JSON.stringify({url, webhook_type: wtype, username, password}) });
-        const d = await r.json();
-        if (res) { res.style.color = d.ok ? 'var(--green)' : 'var(--red)'; res.textContent = d.ok ? 'Delivered.' : (d.error || 'Failed.'); }
-    } catch(e) { if (res) { res.style.color='var(--red)'; res.textContent='Request failed.'; } }
+        const res  = await fetch('/api/notifications/channels');
+        const data = await res.json();
+        _channels = data.channels || [];
+        if (!_channels.length) {
+            body.innerHTML = `<div class="text-center py-8" style="color:var(--muted)"><i class="ph-light ph-bell text-4xl block mb-2 opacity-30"></i><p class="text-xs font-medium mb-1">No channels configured</p><p class="text-xs">Add a channel to get a message when routes change, backups run or certificates expire.</p></div>`;
+            return;
+        }
+        body.innerHTML = _channels.map(c => {
+            const missing = _channelMissing(c);
+            const detail  = missing.length
+                ? `<span style="color:var(--yellow)">Needs ${_esc(missing.join(', '))}</span>`
+                : _channelSummary(c);
+            return `
+            <div class="sc-set" data-channel-id="${_esc(c.id)}"${missing.length ? ' data-health="warn"' : ''}>
+                <div class="sc-set-l">
+                    <div class="flex items-center gap-2">
+                        <span class="sc-set-n truncate">${_esc(c.name)}</span>
+                        <span class="text-xs flex-shrink-0" style="color:var(--muted)">${_esc(_channelKindLabel(c.kind))}</span>
+                    </div>
+                    <div class="sc-set-d">${detail}</div>
+                </div>
+                <div class="sc-set-v">
+                    <div class="toggle-switch${c.enabled ? ' on' : ''}" onclick="toggleChannelEnabled('${c.id}')" title="Enabled"><div class="toggle-knob"></div></div>
+                    <button onclick="testChannelRow('${c.id}')" class="btn-icon" title="Send test"><i class="ph-bold ph-paper-plane-tilt text-xs"></i></button>
+                    <button onclick="editChannel('${c.id}')" class="btn-icon" title="Edit"><i class="ph-bold ph-gear text-xs"></i></button>
+                    <button onclick="deleteChannel('${c.id}')" class="btn-icon" title="Remove" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button>
+                </div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        body.innerHTML = `<div class="text-center py-6 text-xs" style="color:var(--red)">Failed to load channels</div>`;
+    }
+}
+
+function _channelById(id) {
+    return _channels.find(c => c.id === id) || null;
+}
+
+function _renderChannelChips() {
+    const cats = document.getElementById('chCategories');
+    if (cats) cats.innerHTML = Object.keys(CHANNEL_CATEGORY_LABELS).map(c =>
+        `<button type="button" class="agent-chip${_chCats.includes(c) ? ' active' : ''}" onclick="toggleChannelCategory('${c}')">${CHANNEL_CATEGORY_LABELS[c]}</button>`).join('');
+    const sev = document.getElementById('chSeverity');
+    if (sev) sev.innerHTML = Object.keys(CHANNEL_SEVERITY_LABELS).map(s =>
+        `<button type="button" class="agent-chip${_chSeverity === s ? ' active' : ''}" onclick="selectChannelSeverity('${s}')">${CHANNEL_SEVERITY_LABELS[s]}</button>`).join('');
+    const dig = document.getElementById('chDigest');
+    if (dig) dig.innerHTML = Object.keys(CHANNEL_DIGEST_LABELS).map(d =>
+        `<button type="button" class="agent-chip${_chDigest === d ? ' active' : ''}" onclick="selectChannelDigest('${d}')">${CHANNEL_DIGEST_LABELS[d]}</button>`).join('');
+}
+
+function toggleChannelCategory(cat) {
+    _chCats = _chCats.includes(cat) ? _chCats.filter(c => c !== cat) : _chCats.concat([cat]);
+    _renderChannelChips();
+}
+
+function selectChannelSeverity(sev) {
+    _chSeverity = sev;
+    _renderChannelChips();
+}
+
+function selectChannelDigest(digest) {
+    _chDigest = digest;
+    _renderChannelChips();
+}
+
+function clearChannelQuietHours() {
+    document.getElementById('chQuietStart').value = '';
+    document.getElementById('chQuietEnd').value   = '';
+}
+
+function onChannelKindChange() {
+    const kind   = document.getElementById('chKind').value;
+    const spec   = CHANNEL_KIND_SPEC[kind] || {};
+    const fields = spec.fields || {};
+    ['url', 'token', 'token2'].forEach(key => {
+        const cap  = key.charAt(0).toUpperCase() + key.slice(1);
+        const wrap = document.getElementById('chFld' + cap);
+        const meta = fields[key];
+        wrap.style.display = meta ? '' : 'none';
+        if (!meta) return;
+        document.getElementById('ch' + cap + 'Label').textContent = meta.label;
+        document.getElementById('ch' + cap + 'Desc').textContent  = meta.desc;
+        const input = document.getElementById('ch' + cap);
+        input.placeholder = meta.ph || '';
+        input.type = meta.secret ? 'password' : (key === 'url' ? 'url' : 'text');
+    });
+    document.getElementById('chFldAuth').style.display = spec.auth ? '' : 'none';
+}
+
+function _openChannelEditor(title) {
+    document.getElementById('channelEditTitle').textContent = title;
+    document.getElementById('chEditErr').style.display    = 'none';
+    document.getElementById('chTestResult').style.display = 'none';
+    document.getElementById('channelListView').style.display = 'none';
+    document.getElementById('channelEditView').style.display = 'flex';
+    onChannelKindChange();
+    _renderChannelChips();
+}
+
+function startAddChannel() {
+    _chEditId   = null;
+    _chCats     = [];
+    _chSeverity = 'info';
+    _chDigest   = 'immediate';
+    document.getElementById('chName').value       = '';
+    document.getElementById('chKind').value       = 'discord';
+    document.getElementById('chUrl').value        = '';
+    document.getElementById('chToken').value      = '';
+    document.getElementById('chToken2').value     = '';
+    document.getElementById('chUsername').value   = '';
+    document.getElementById('chPassword').value   = '';
+    document.getElementById('chQuietStart').value = '';
+    document.getElementById('chQuietEnd').value   = '';
+    document.getElementById('chEnabled').classList.add('on');
+    document.getElementById('chBreakThrough').classList.remove('on');
+    _openChannelEditor('Add Channel');
+    setTimeout(() => document.getElementById('chName').focus(), 50);
+}
+
+function editChannel(id) {
+    const ch = _channelById(id);
+    if (!ch) return;
+    _chEditId   = id;
+    _chCats     = (ch.categories || []).filter(c => c in CHANNEL_CATEGORY_LABELS);
+    _chSeverity = ch.min_severity || 'info';
+    _chDigest   = ch.digest || 'immediate';
+    document.getElementById('chName').value     = ch.name || '';
+    document.getElementById('chKind').value     = ch.kind || 'discord';
+    document.getElementById('chUrl').value      = ch.url || '';
+    document.getElementById('chToken').value    = ch.token || '';
+    document.getElementById('chToken2').value   = ch.token2 || '';
+    document.getElementById('chUsername').value = ch.username || '';
+    document.getElementById('chPassword').value = ch.password || '';
+    const quiet  = String(ch.quiet_hours || '');
+    const bounds = quiet.includes('-') ? quiet.split('-') : ['', ''];
+    document.getElementById('chQuietStart').value = bounds[0].trim();
+    document.getElementById('chQuietEnd').value   = bounds[1].trim();
+    document.getElementById('chEnabled').classList.toggle('on', !!ch.enabled);
+    document.getElementById('chBreakThrough').classList.toggle('on', !!ch.break_through);
+    _openChannelEditor('Edit Channel');
+}
+
+function cancelChannelEdit() {
+    _chEditId = null;
+    document.getElementById('channelEditView').style.display = 'none';
+    document.getElementById('channelListView').style.display = 'flex';
+}
+
+function _channelPayload() {
+    const kind   = document.getElementById('chKind').value;
+    const spec   = CHANNEL_KIND_SPEC[kind] || {};
+    const fields = spec.fields || {};
+    const start  = document.getElementById('chQuietStart').value.trim();
+    const end    = document.getElementById('chQuietEnd').value.trim();
+    const value  = key => (fields[key] ? document.getElementById('ch' + key.charAt(0).toUpperCase() + key.slice(1)).value.trim() : '');
+    return {
+        name:          document.getElementById('chName').value.trim(),
+        kind:          kind,
+        enabled:       document.getElementById('chEnabled').classList.contains('on'),
+        url:           value('url'),
+        token:         value('token'),
+        token2:        value('token2'),
+        username:      spec.auth ? document.getElementById('chUsername').value.trim() : '',
+        password:      spec.auth ? document.getElementById('chPassword').value : '',
+        categories:    _chCats.slice(),
+        min_severity:  _chSeverity,
+        digest:        _chDigest,
+        quiet_hours:   start && end ? start + '-' + end : '',
+        break_through: document.getElementById('chBreakThrough').classList.contains('on'),
+    };
+}
+
+function _channelError(message) {
+    const box = document.getElementById('chEditErr');
+    if (!box) return;
+    box.textContent = message;
+    box.style.display = message ? '' : 'none';
+}
+
+async function _persistChannel() {
+    const payload = _channelPayload();
+    const missing = _channelMissing(payload);
+    if (missing.length) { _channelError('Fill in ' + missing.join(' and ') + ' first.'); return null; }
+    const start = document.getElementById('chQuietStart').value.trim();
+    const end   = document.getElementById('chQuietEnd').value.trim();
+    if (!!start !== !!end) { _channelError('Set both a start and an end time for quiet hours, or clear them both.'); return null; }
+    _channelError('');
+    const path   = _chEditId ? '/api/notifications/channels/' + encodeURIComponent(_chEditId) : '/api/notifications/channels';
+    const method = _chEditId ? 'PUT' : 'POST';
+    try {
+        const res  = await fetch(path, {
+            method,
+            headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.error || !res.ok) { _channelError(data.error || 'Failed to save channel'); return null; }
+        const id = (data.channel && data.channel.id) || data.id || _chEditId;
+        _chEditId = id;
+        return id;
+    } catch(e) {
+        _channelError('Request failed');
+        return null;
+    }
+}
+
+async function saveChannel() {
+    const btn = document.getElementById('chSaveBtn');
+    btn.disabled = true;
+    const id = await _persistChannel();
+    btn.disabled = false;
+    if (!id) return;
+    showToast('Channel saved', 'success');
+    await loadChannelsList();
+}
+
+async function _sendChannelTest(id) {
+    const res  = await fetch('/api/notifications/channels/' + encodeURIComponent(id) + '/test', {
+        method: 'POST', headers: _csrfHeaders()
+    });
+    const data = await res.json();
+    return { ok: !data.error && res.ok, error: data.error || 'Failed.' };
+}
+
+async function testChannel() {
+    const out = document.getElementById('chTestResult');
+    const btn = document.getElementById('chTestBtn');
+    out.style.display = '';
+    out.style.color = 'var(--muted)';
+    out.textContent = 'Sending...';
+    btn.disabled = true;
+    const id = await _persistChannel();
+    if (!id) { btn.disabled = false; out.style.display = 'none'; return; }
+    try {
+        const result = await _sendChannelTest(id);
+        out.style.color   = result.ok ? 'var(--green)' : 'var(--red)';
+        out.textContent   = result.ok ? 'Delivered.' : result.error;
+    } catch(e) {
+        out.style.color = 'var(--red)';
+        out.textContent = 'Request failed.';
+    }
+    btn.disabled = false;
+}
+
+async function testChannelRow(id) {
+    try {
+        const result = await _sendChannelTest(id);
+        showToast(result.ok ? 'Test message delivered' : result.error, result.ok ? 'success' : 'error');
+    } catch(e) {
+        showToast('Test failed', 'error');
+    }
+}
+
+async function toggleChannelEnabled(id) {
+    const ch = _channelById(id);
+    if (!ch) return;
+    const knob = document.querySelector(`[data-channel-id="${id}"] .toggle-switch`);
+    if (knob) knob.classList.toggle('on');
+    try {
+        const res  = await fetch('/api/notifications/channels/' + encodeURIComponent(id), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
+            body: JSON.stringify({ ...ch, enabled: !ch.enabled })
+        });
+        const data = await res.json();
+        if (data.error || !res.ok) showToast(data.error || 'Failed to update channel', 'error');
+    } catch(e) {
+        showToast('Request failed', 'error');
+    }
+    loadChannelsList();
+}
+
+async function deleteChannel(id) {
+    const ch = _channelById(id);
+    if (!ch) return;
+    if (!await _confirm(`Remove channel "${ch.name}"? Events will stop being delivered to it.`, 'Remove Channel', 'Remove')) return;
+    try {
+        const res  = await fetch('/api/notifications/channels/' + encodeURIComponent(id), { method: 'DELETE', headers: _csrfHeaders() });
+        const data = await res.json();
+        if (data.error || !res.ok) { showToast(data.error || 'Failed to remove channel', 'error'); return; }
+        showToast('Channel removed', 'success');
+        loadChannelsList();
+    } catch(e) {
+        showToast('Request failed', 'error');
+    }
+}
+
+const BROWSER_NOTIF_SEVERITY_LABELS = { all: 'All events', warning: 'Warnings and errors' };
+
+const BROWSER_NOTIF_NOTES = {
+    insecure:    'Desktop notifications need a secure origin. Browsers only expose the Notification API over HTTPS or on localhost, so open Traefik Manager over HTTPS to use them.',
+    unsupported: 'This browser does not support desktop notifications.',
+    denied:      'This browser is blocking notifications for this site. Allow them in the site permissions, then turn this back on.',
+    dismissed:   'Permission was not granted, so desktop notifications stayed off. Turn the toggle on again to ask.',
+};
+
+function _browserNotifNote(message, color) {
+    const el = document.getElementById('browserNotifNote');
+    if (!el) return;
+    el.textContent = message || '';
+    el.style.color = color || 'var(--muted)';
+    el.style.display = message ? '' : 'none';
+}
+
+function renderBrowserNotifs() {
+    const tog = document.getElementById('toggle-browser-notif');
+    if (!tog) return;
+    const support = browserNotifSupport();
+    const on      = browserNotifsActive();
+    tog.classList.toggle('on', on);
+    tog.style.opacity = support.ok ? '' : '0.4';
+    const fld = document.getElementById('browserNotifSevFld');
+    if (fld) fld.style.display = on ? '' : 'none';
+    const sev = document.getElementById('browserNotifSeverity');
+    if (sev) sev.innerHTML = Object.keys(BROWSER_NOTIF_SEVERITY_LABELS).map(s =>
+        `<button type="button" class="agent-chip${browserNotifSeverity() === s ? ' active' : ''}" onclick="selectBrowserNotifSeverity('${s}')">${BROWSER_NOTIF_SEVERITY_LABELS[s]}</button>`).join('');
+    if (!support.ok) { _browserNotifNote(BROWSER_NOTIF_NOTES[support.reason], 'var(--yellow)'); return; }
+    if (Notification.permission === 'denied') { _browserNotifNote(BROWSER_NOTIF_NOTES.denied, 'var(--yellow)'); return; }
+    _browserNotifNote('');
+}
+
+async function toggleBrowserNotifs() {
+    const support = browserNotifSupport();
+    if (!support.ok) { renderBrowserNotifs(); return; }
+    if (browserNotifsEnabled()) {
+        disableBrowserNotifs();
+        renderBrowserNotifs();
+        return;
+    }
+    const result = await enableBrowserNotifs();
+    renderBrowserNotifs();
+    if (result.ok) { showToast('Desktop notifications on for this browser', 'success'); return; }
+    if (Notification.permission !== 'denied') _browserNotifNote(BROWSER_NOTIF_NOTES.dismissed, 'var(--yellow)');
+}
+
+function selectBrowserNotifSeverity(sev) {
+    setBrowserNotifSeverity(sev);
+    renderBrowserNotifs();
 }
 
 let _geoipEnabledState = false;
@@ -786,10 +1173,10 @@ async function saveSettings() {
     const acmeJsonPath     = document.getElementById('settingsAcmeJsonPath')?.value.trim() || '';
     const accessLogPath    = document.getElementById('settingsAccessLogPath')?.value.trim() || '';
     const staticConfigPath = document.getElementById('settingsStaticConfigPath')?.value.trim() || '';
-    const webhookUrl        = document.getElementById('webhookUrlInput')?.value.trim() || '';
-    const webhookType       = document.getElementById('webhookTypeSelect')?.value || 'discord';
-    const webhookUsername   = document.getElementById('webhookUsername')?.value.trim() || '';
-    const webhookPassword   = document.getElementById('webhookPassword')?.value || '';
+    const webhookUrl        = _legacyWebhook.url;
+    const webhookType       = _legacyWebhook.type;
+    const webhookUsername   = _legacyWebhook.username;
+    const webhookPassword   = '';
     const crowdsecLapiUrl     = document.getElementById('settingsCrowdSecUrl')?.value.trim() || '';
     const crowdsecApiKey      = document.getElementById('settingsCrowdSecKey')?.value || '';
     const crowdsecMachineId       = document.getElementById('settingsCrowdSecMachineId')?.value.trim() || '';

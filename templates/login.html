@@ -466,9 +466,9 @@
 
             <div class="wz-body">
 
-                <div id="globalError" class="banner banner-error wz-error" style="display:none">
+                <div id="globalError" class="banner banner-error wz-error" style="display:{{ 'flex' if error else 'none' }}">
                     <i class="ph-bold ph-warning-circle" style="flex-shrink:0;margin-top:1px"></i>
-                    <span id="globalErrorMsg"></span>
+                    <span id="globalErrorMsg">{{ error or '' }}</span>
                 </div>
 
                 <div class="modal-panel sc-root active" id="panel-0">
@@ -789,29 +789,51 @@
                 <div class="modal-panel sc-root" id="panel-6">
                     <div class="wz-lede">
                         <h1 class="wz-title">Notifications</h1>
-                        <p class="wz-sub">Send a message when a route is saved or deleted, a backup runs, or a restore completes. Leave the URL blank to skip.</p>
+                        <p class="wz-sub">Send a message when a route is saved or deleted, a backup runs, or a restore completes. This sets up one destination that receives every event; add more, and choose which events reach each one, in Settings.</p>
                     </div>
 
                     <div class="sc-sec-head">
                         <i class="ph-bold ph-bell sc-sec-icon" style="color:var(--blue)"></i>
-                        <span class="sc-sec-label">Webhook</span>
+                        <span class="sc-sec-label">Destination</span>
                         <span class="sc-sec-rule"></span>
                     </div>
                     <div class="sc-fld">
-                        <div class="sc-set-n">Destination</div>
-                        <div class="sc-set-d">Sets the payload format. Generic sends a plain JSON body you can shape yourself downstream.</div>
-                        <select id="s_webhook_type" class="input-field">
+                        <div class="sc-set-n">Type</div>
+                        <div class="sc-set-d">Payload format for the target service. Generic sends a plain JSON body you can shape yourself downstream.</div>
+                        <select id="s_notify_kind" class="input-field" onchange="onSetupNotifyKind()">
                             <option value="discord">Discord</option>
                             <option value="slack">Slack</option>
+                            <option value="ntfy">ntfy.sh / self-hosted ntfy</option>
+                            <option value="generic">Generic JSON</option>
                             <option value="gotify">Gotify</option>
-                            <option value="ntfy">ntfy</option>
-                            <option value="generic">Generic webhook</option>
+                            <option value="pushover">Pushover</option>
+                            <option value="pushbullet">Pushbullet</option>
+                            <option value="telegram">Telegram</option>
                         </select>
                     </div>
-                    <div class="sc-fld">
-                        <div class="sc-set-n">Webhook URL</div>
-                        <div class="sc-set-d">Where notifications are delivered. You can send a test message from the Notifications pane once setup is done.</div>
-                        <input type="url" id="s_webhook_url" placeholder="https://discord.com/api/webhooks/..." class="input-field">
+                    <div class="sc-fld" id="s_notify_fld_url">
+                        <div class="sc-set-n" id="s_notify_url_label">Webhook URL</div>
+                        <div class="sc-set-d" id="s_notify_url_desc">Where notifications are delivered.</div>
+                        <input type="url" id="s_notify_url" class="input-field">
+                    </div>
+                    <div class="sc-fld" id="s_notify_fld_token" style="display:none">
+                        <div class="sc-set-n" id="s_notify_token_label">App Token</div>
+                        <div class="sc-set-d" id="s_notify_token_desc">Stored encrypted.</div>
+                        <input type="password" id="s_notify_token" class="input-field">
+                    </div>
+                    <div class="sc-fld" id="s_notify_fld_token2" style="display:none">
+                        <div class="sc-set-n" id="s_notify_token2_label">User Key</div>
+                        <div class="sc-set-d" id="s_notify_token2_desc">Stored encrypted.</div>
+                        <input type="password" id="s_notify_token2" class="input-field">
+                        <p class="field-hint" id="s_notify_token2_hint" style="display:none"></p>
+                    </div>
+                    <div class="sc-fld" id="s_notify_fld_auth" style="display:none">
+                        <div class="sc-set-n">Basic auth <span class="wz-opt">optional</span></div>
+                        <div class="sc-set-d">Credentials for endpoints that require authentication.</div>
+                        <div class="flex gap-2">
+                            <input type="text" id="s_notify_user" placeholder="Username" class="input-field" style="flex:1">
+                            <input type="password" id="s_notify_pw" placeholder="Password" class="input-field" style="flex:1">
+                        </div>
                     </div>
                 </div>
 
@@ -880,8 +902,12 @@
         <input type="hidden" name="git_backup_username"  id="f_git_user">
         <input type="hidden" name="git_backup_token"     id="f_git_token">
         <input type="hidden" name="git_backup_auto_push" id="f_git_autopush">
-        <input type="hidden" name="webhook_url"  id="f_webhook_url">
-        <input type="hidden" name="webhook_type" id="f_webhook_type">
+        <input type="hidden" name="notify_kind"     id="f_notify_kind">
+        <input type="hidden" name="notify_url"      id="f_notify_url">
+        <input type="hidden" name="notify_token"    id="f_notify_token">
+        <input type="hidden" name="notify_token2"   id="f_notify_token2">
+        <input type="hidden" name="notify_username" id="f_notify_user">
+        <input type="hidden" name="notify_password" id="f_notify_pw">
         <input type="hidden" name="geoip_enabled" id="f_geoip">
         <input type="hidden" name="default_theme" id="f_default_theme">
     </form>
@@ -926,7 +952,7 @@ const STEPS = [
     { label: 'Monitoring',    note: 'Every tab can be changed later' },
     { label: 'CrowdSec',      note: 'Leave the URL blank to skip' },
     { label: 'Git backup',    note: 'Leave the URL blank to skip' },
-    { label: 'Notifications', note: 'Leave the URL blank to skip' },
+    { label: 'Notifications', note: 'Leave the fields blank to skip' },
     { label: 'Password',      note: '' },
 ];
 
@@ -977,6 +1003,10 @@ function goTo(step) {
 
 function nextStep() {
     if (currentStep === 1) { validateStep1(); return; }
+    if (currentStep === NOTIFY_STEP) {
+        const problem = _notifyProblem();
+        if (problem) { showError(problem); return; }
+    }
     if (currentStep === MAX_STEP) { submitSetup(); return; }
     goTo(currentStep + 1);
 }
@@ -1127,8 +1157,76 @@ async function testGitRepo() {
     } catch (e) { out.textContent = 'Request failed'; out.style.color = 'var(--red)'; }
 }
 
+const NOTIFY_STEP = 6;
+
+const SETUP_NOTIFY_KINDS = {
+    discord:    { fields: { url:    { label: 'Webhook URL',  desc: 'Where notifications are delivered.', ph: 'https://discord.com/api/webhooks/...' } } },
+    slack:      { fields: { url:    { label: 'Webhook URL',  desc: 'Incoming webhook created in your Slack workspace.', ph: 'https://hooks.slack.com/services/...' } } },
+    ntfy:       { auth: true,
+                  fields: { url:    { label: 'URL',          desc: 'Full topic URL on ntfy.sh or your own server.', ph: 'https://ntfy.sh/my-topic' } } },
+    generic:    { auth: true,
+                  fields: { url:    { label: 'URL',          desc: 'Receives a JSON body you can shape downstream.', ph: 'https://example.com/hooks/traefik' } } },
+    gotify:     { fields: { url:    { label: 'Server URL',   desc: 'Base URL of your Gotify server.', ph: 'https://gotify.example.com' },
+                            token:  { label: 'App Token',    desc: 'Application token from Gotify. Stored encrypted.', secret: true } } },
+    pushover:   { fields: { token:  { label: 'App Token',    desc: 'Application token from your Pushover app. Stored encrypted.', secret: true },
+                            token2: { label: 'User Key',     desc: 'Your Pushover user or group key. Stored encrypted.', secret: true } } },
+    pushbullet: { fields: { token:  { label: 'Access Token', desc: 'Access token from your Pushbullet account. Stored encrypted.', secret: true } } },
+    telegram:   { fields: { token:  { label: 'Bot Token',    desc: 'Token issued by BotFather. Stored encrypted.', secret: true },
+                            token2: { label: 'Chat ID',      desc: 'Target chat, group or channel to post into.', ph: '-1001234567890',
+                                      hint: 'Send your bot a message, open https://api.telegram.org/bot<token>/getUpdates and copy chat.id.' } } },
+};
+
+function onSetupNotifyKind() {
+    const spec   = SETUP_NOTIFY_KINDS[document.getElementById('s_notify_kind').value] || {};
+    const fields = spec.fields || {};
+    ['url', 'token', 'token2'].forEach(key => {
+        const meta = fields[key];
+        document.getElementById('s_notify_fld_' + key).style.display = meta ? '' : 'none';
+        if (!meta) return;
+        document.getElementById('s_notify_' + key + '_label').textContent = meta.label;
+        document.getElementById('s_notify_' + key + '_desc').textContent  = meta.desc;
+        const input = document.getElementById('s_notify_' + key);
+        input.placeholder = meta.ph || '';
+        input.type = meta.secret ? 'password' : (key === 'url' ? 'url' : 'text');
+    });
+    document.getElementById('s_notify_fld_auth').style.display = spec.auth ? '' : 'none';
+    const hint = document.getElementById('s_notify_token2_hint');
+    hint.textContent = (fields.token2 || {}).hint || '';
+    hint.style.display = hint.textContent ? 'block' : 'none';
+}
+onSetupNotifyKind();
+
+function _notifyValues() {
+    const kind = document.getElementById('s_notify_kind').value;
+    const spec = SETUP_NOTIFY_KINDS[kind] || {};
+    const val  = (id) => (document.getElementById(id).value || '').trim();
+    const uses = (key) => !!(spec.fields || {})[key];
+    return {
+        kind:     kind,
+        spec:     spec,
+        url:      uses('url')    ? val('s_notify_url')    : '',
+        token:    uses('token')  ? val('s_notify_token')  : '',
+        token2:   uses('token2') ? val('s_notify_token2') : '',
+        username: spec.auth ? val('s_notify_user') : '',
+        password: spec.auth ? val('s_notify_pw')   : '',
+    };
+}
+
+function _notifyProblem() {
+    const v = _notifyValues();
+    if (!['url', 'token', 'token2', 'username', 'password'].some(k => v[k])) return '';
+    if (!v.spec.fields) return 'Choose a notification destination.';
+    const missing = Object.keys(v.spec.fields).filter(k => !v[k]).map(k => v.spec.fields[k].label);
+    return missing.length
+        ? 'Notifications need ' + missing.join(' and ') + ', or clear the step to skip it.'
+        : '';
+}
+
 function submitSetup() {
     hideError();
+
+    const notifyProblem = _notifyProblem();
+    if (notifyProblem) { goTo(NOTIFY_STEP); showError(notifyProblem); return; }
 
     document.getElementById('f_domains').value      = document.getElementById('s_domains').value.trim();
     document.getElementById('f_resolver').value     = document.getElementById('s_resolver').value.trim();
@@ -1150,8 +1248,13 @@ function submitSetup() {
     document.getElementById('f_git_user').value       = v('s_git_user');
     document.getElementById('f_git_token').value      = v('s_git_token');
     document.getElementById('f_git_autopush').value   = setupGitAuto ? 'on' : '';
-    document.getElementById('f_webhook_url').value    = v('s_webhook_url');
-    document.getElementById('f_webhook_type').value   = v('s_webhook_type');
+    const notify = _notifyValues();
+    document.getElementById('f_notify_kind').value    = notify.kind;
+    document.getElementById('f_notify_url').value     = notify.url;
+    document.getElementById('f_notify_token').value   = notify.token;
+    document.getElementById('f_notify_token2').value  = notify.token2;
+    document.getElementById('f_notify_user').value    = notify.username;
+    document.getElementById('f_notify_pw').value      = notify.password;
     document.getElementById('f_geoip').value          = setupGeoip ? 'on' : '';
     document.getElementById('f_default_theme').value  = setupTheme;
 

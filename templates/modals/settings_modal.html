@@ -1190,38 +1190,130 @@
 
                                 <div class="modal-panel sig-root sc-root" id="mpanel-notifications">
                     <div class="sc-lede">
-                        <div class="sc-lede-t">Notifications<span class="tm-info-btn" data-tip="Send a message when a route is saved or deleted, a backup runs, or a restore completes. Discord, Slack, Gotify, ntfy, or a generic JSON payload you shape downstream."><i class="ph-bold ph-info"></i></span></div>
+                        <div class="sc-lede-t">Notifications<span class="tm-info-btn" data-tip="Send a message when a route is saved, a backup runs, a certificate nears expiry or an agent goes offline. Add one channel per destination: Discord, Slack, ntfy, Gotify, Pushover, Pushbullet, Telegram, or a generic JSON payload you shape downstream."><i class="ph-bold ph-info"></i></span></div>
                     </div>
-                    <div style="margin-bottom:12px;">
-                        <div class="sc-sec-head"><i class="ph-bold ph-webhooks-logo sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Webhook</span><span class="tm-info-btn" data-tip="Sends a notification on every event: route saved, deleted, backup restored, and more."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span></div>
+                    <div id="channelListView" style="display:flex;flex-direction:column;">
+                        <div class="sc-sec-head"><i class="ph-bold ph-bell sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Channels</span><span class="tm-info-btn" data-tip="Every enabled channel gets its own copy of an event, filtered by the categories, severity, digest and quiet hours set on it."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span><div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)"><button onclick="startAddChannel()" class="proto-btn text-xs px-3 py-1.5" title="Add channel"><i class="ph-bold ph-plus"></i></button></div></div>
+                        <div class="sc-panel" id="channelsListBody">
+                            <div class="text-center py-8" style="color:var(--muted)">
+                                <i class="ph-light ph-bell text-4xl block mb-2 opacity-30"></i>
+                                <p class="text-xs">Loading channels…</p>
+                            </div>
+                        </div>
+
+                        <div class="sc-sec-head" style="margin-top:14px"><i class="ph-bold ph-desktop sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">This Browser</span><span class="tm-info-btn" data-tip="Desktop notifications are raised by the open tab itself, with no push service in between. The setting is stored in this browser only, so every browser you sign in from is set up separately."><i class="ph-bold ph-info"></i></span><span class="sc-sec-rule"></span></div>
                         <div class="sc-panel">
+                            <div class="sc-set">
+                                <div class="sc-set-l">
+                                    <div class="sc-set-n">Desktop notifications</div>
+                                    <div class="sc-set-d">Show a system notification when an event arrives while a tab is open.</div>
+                                </div>
+                                <div class="sc-set-v"><div class="toggle-switch" id="toggle-browser-notif" onclick="toggleBrowserNotifs()"><div class="toggle-knob"></div></div></div>
+                            </div>
+                            <div class="sc-fld" id="browserNotifSevFld" style="display:none">
+                                <div class="sc-set-n">Show</div>
+                                <div class="sc-set-d">Which events raise a desktop notification.</div>
+                                <div class="flex gap-1.5 flex-wrap" id="browserNotifSeverity"></div>
+                            </div>
+                        </div>
+                        <div id="browserNotifNote" class="text-xs mt-3" style="display:none"></div>
+                    </div>
+
+                    <div id="channelEditView" style="display:none;flex-direction:column;">
+                        <div class="sc-sec-head"><button onclick="cancelChannelEdit()" class="btn-icon" style="margin-right:2px"><i class="ph-bold ph-caret-left text-sm"></i></button><span class="sc-sec-label" id="channelEditTitle">Add Channel</span><span class="sc-sec-rule"></span></div>
+                        <div class="sc-panel">
+                            <div class="sc-fld">
+                                <div class="sc-set-n">Name</div>
+                                <div class="sc-set-d">Label for this destination in the channel list.</div>
+                                <input id="chName" type="text" class="input-field text-sm" placeholder="e.g. Ops Discord" maxlength="60" autocomplete="off">
+                            </div>
                             <div class="sc-fld">
                                 <div class="sc-set-n">Type</div>
                                 <div class="sc-set-d">Payload format for the target service.</div>
-                                <select id="webhookTypeSelect" class="input-field" onchange="onWebhookTypeChange();saveSettings()">
+                                <select id="chKind" class="input-field" onchange="onChannelKindChange()">
                                     <option value="discord">Discord</option>
                                     <option value="slack">Slack</option>
                                     <option value="ntfy">ntfy.sh / self-hosted ntfy</option>
                                     <option value="generic">Generic JSON</option>
+                                    <option value="gotify">Gotify</option>
+                                    <option value="pushover">Pushover</option>
+                                    <option value="pushbullet">Pushbullet</option>
+                                    <option value="telegram">Telegram</option>
                                 </select>
                             </div>
-                            <div class="sc-fld">
-                                <div class="sc-set-n">Webhook URL</div>
-                                <div class="sc-set-d">Where notifications are delivered. Use Test to send a sample message.</div>
-                                <div class="flex gap-2">
-                                    <input type="url" id="webhookUrlInput" class="input-field text-sm flex-1" placeholder="https://discord.com/api/webhooks/..." onblur="saveSettings()">
-                                    <button type="button" onclick="testWebhook()" class="nav-btn text-xs" style="flex-shrink:0"><i class="ph-bold ph-paper-plane-tilt"></i> Test</button>
-                                </div>
-                                <div id="webhookTestResult" class="text-xs mt-1" style="display:none"></div>
+                            <div class="sc-fld" id="chFldUrl">
+                                <div class="sc-set-n" id="chUrlLabel">Webhook URL</div>
+                                <div class="sc-set-d" id="chUrlDesc">Where notifications are delivered.</div>
+                                <input id="chUrl" type="url" class="input-field text-sm" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
                             </div>
-                            <div class="sc-fld" id="webhookAuthFields" style="display:none">
+                            <div class="sc-fld" id="chFldToken" style="display:none">
+                                <div class="sc-set-n" id="chTokenLabel">App Token</div>
+                                <div class="sc-set-d" id="chTokenDesc">Stored encrypted.</div>
+                                <input id="chToken" type="password" class="input-field text-sm" autocomplete="off">
+                            </div>
+                            <div class="sc-fld" id="chFldToken2" style="display:none">
+                                <div class="sc-set-n" id="chToken2Label">User Key</div>
+                                <div class="sc-set-d" id="chToken2Desc">Stored encrypted.</div>
+                                <input id="chToken2" type="password" class="input-field text-sm" autocomplete="off">
+                            </div>
+                            <div class="sc-fld" id="chFldAuth" style="display:none">
                                 <div class="sc-set-n">Basic auth</div>
-                                <div class="sc-set-d">Optional credentials for ntfy or generic endpoints that require authentication.</div>
+                                <div class="sc-set-d">Optional credentials for endpoints that require authentication.</div>
                                 <label class="block">Username</label>
-                                <input type="text" id="webhookUsername" class="input-field text-sm" placeholder="Leave empty if not required" onblur="saveSettings()" autocomplete="off">
+                                <input id="chUsername" type="text" class="input-field text-sm" placeholder="Leave empty if not required" autocomplete="off">
                                 <label class="block mt-2">Password</label>
-                                <input type="password" id="webhookPassword" class="input-field text-sm" placeholder="Leave empty if not required" onblur="saveSettings()" autocomplete="off">
+                                <input id="chPassword" type="password" class="input-field text-sm" placeholder="Leave empty if not required" autocomplete="off">
                             </div>
+                        </div>
+
+                        <div class="sc-sec-head" style="margin-top:14px"><i class="ph-bold ph-funnel sc-sec-icon" style="color:var(--blue)"></i><span class="sc-sec-label">Delivery</span><span class="sc-sec-rule"></span></div>
+                        <div class="sc-panel">
+                            <div class="sc-set">
+                                <div class="sc-set-l">
+                                    <div class="sc-set-n">Enabled</div>
+                                    <div class="sc-set-d">Deliver events to this channel.</div>
+                                </div>
+                                <div class="sc-set-v"><div class="toggle-switch on" id="chEnabled" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div></div>
+                            </div>
+                            <div class="sc-fld">
+                                <div class="sc-set-n">Categories</div>
+                                <div class="sc-set-d">Which kinds of event reach this channel. Select none to send every category.</div>
+                                <div class="flex gap-1.5 flex-wrap" id="chCategories"></div>
+                            </div>
+                            <div class="sc-fld">
+                                <div class="sc-set-n">Minimum severity</div>
+                                <div class="sc-set-d">Anything below this level is dropped for this channel.</div>
+                                <div class="flex gap-1.5 flex-wrap" id="chSeverity"></div>
+                            </div>
+                            <div class="sc-fld">
+                                <div class="sc-set-n">Digest</div>
+                                <div class="sc-set-d">Send each event as it happens, or batch them into one message.</div>
+                                <div class="flex gap-1.5 flex-wrap" id="chDigest"></div>
+                            </div>
+                            <div class="sc-fld">
+                                <div class="sc-set-n">Quiet hours</div>
+                                <div class="sc-set-d">Hold messages inside this window and send them once it ends. Leave empty for none.</div>
+                                <div class="flex items-center gap-2">
+                                    <input id="chQuietStart" type="time" class="input-field text-sm" style="flex:1">
+                                    <span class="text-xs" style="color:var(--muted)">to</span>
+                                    <input id="chQuietEnd" type="time" class="input-field text-sm" style="flex:1">
+                                    <button type="button" onclick="clearChannelQuietHours()" class="btn-icon flex-shrink-0" title="Clear"><i class="ph-bold ph-x text-xs"></i></button>
+                                </div>
+                            </div>
+                            <div class="sc-set">
+                                <div class="sc-set-l">
+                                    <div class="sc-set-n">Break through quiet hours</div>
+                                    <div class="sc-set-d">Deliver errors right away even inside the quiet window.</div>
+                                </div>
+                                <div class="sc-set-v"><div class="toggle-switch" id="chBreakThrough" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div></div>
+                            </div>
+                        </div>
+
+                        <div id="chEditErr" class="text-xs mt-3 px-3 py-2 rounded" style="display:none;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--red)"></div>
+                        <div id="chTestResult" class="text-xs mt-3" style="display:none"></div>
+                        <div class="flex justify-end gap-2 mt-4">
+                            <button type="button" id="chTestBtn" onclick="testChannel()" class="nav-btn text-xs"><i class="ph-bold ph-paper-plane-tilt"></i> Test</button>
+                            <button type="button" id="chSaveBtn" onclick="saveChannel()" class="btn-primary text-xs py-1.5 px-4">Save</button>
                         </div>
                     </div>
                 </div>
