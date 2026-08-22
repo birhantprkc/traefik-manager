@@ -79,6 +79,88 @@ def sanitize_ui_prefs(prefs) -> dict:
     return out
 
 
+CHANNEL_KINDS = ('discord', 'slack', 'ntfy', 'generic',
+                 'gotify', 'pushover', 'pushbullet', 'telegram')
+
+CHANNEL_CATEGORIES = ('config', 'backup', 'security', 'traefik',
+                      'certs', 'crowdsec', 'agent', 'update')
+
+CHANNEL_SEVERITIES = ('info', 'success', 'warning', 'error')
+
+CHANNEL_DIGESTS = ('immediate', 'hourly', 'daily')
+
+_SECRET_KEEP = ('***',)
+
+
+def _parse_channels(raw):
+    """Parse the stored channel list. One bad entry is skipped, never fatal.
+
+    load_settings wraps everything in a bare except that falls back to full
+    defaults, so a single malformed channel would otherwise revert every
+    setting in the file, auth included.
+    """
+    out = []
+    for item in raw or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            kind = str(item.get('kind', '')).strip().lower()
+            if kind not in CHANNEL_KINDS:
+                continue
+            cats = [c for c in (item.get('categories') or []) if c in CHANNEL_CATEGORIES]
+            sev = str(item.get('min_severity', 'info')).strip().lower()
+            digest = str(item.get('digest', 'immediate')).strip().lower()
+            out.append({
+                'id':            str(item.get('id', '')).strip()[:40] or _new_channel_id(),
+                'name':          str(item.get('name', '')).strip()[:60] or kind.title(),
+                'kind':          kind,
+                'enabled':       bool(item.get('enabled', True)),
+                'url':           str(item.get('url', '')).strip()[:500],
+                'token':         crypto.decrypt_secret(item.get('token', '')),
+                'token2':        crypto.decrypt_secret(item.get('token2', '')),
+                'username':      str(item.get('username', '')).strip()[:100],
+                'password':      crypto.decrypt_secret(item.get('password', '')),
+                'categories':    cats or list(CHANNEL_CATEGORIES),
+                'min_severity':  sev if sev in CHANNEL_SEVERITIES else 'info',
+                'digest':        digest if digest in CHANNEL_DIGESTS else 'immediate',
+                'quiet_hours':   str(item.get('quiet_hours', '')).strip()[:11],
+                'break_through': bool(item.get('break_through', False)),
+            })
+        except Exception:
+            continue
+    return out
+
+
+def _dump_channels(channels):
+    """Serialise channels for manager.yml, encrypting every secret slot."""
+    out = []
+    for c in channels or []:
+        if not isinstance(c, dict):
+            continue
+        out.append({
+            'id':            str(c.get('id', '')),
+            'name':          str(c.get('name', '')),
+            'kind':          str(c.get('kind', '')),
+            'enabled':       bool(c.get('enabled', True)),
+            'url':           str(c.get('url', '')),
+            'token':         crypto.encrypt_secret(c.get('token', '')) if c.get('token') else '',
+            'token2':        crypto.encrypt_secret(c.get('token2', '')) if c.get('token2') else '',
+            'username':      str(c.get('username', '')),
+            'password':      crypto.encrypt_secret(c.get('password', '')) if c.get('password') else '',
+            'categories':    list(c.get('categories') or []),
+            'min_severity':  str(c.get('min_severity', 'info')),
+            'digest':        str(c.get('digest', 'immediate')),
+            'quiet_hours':   str(c.get('quiet_hours', '')),
+            'break_through': bool(c.get('break_through', False)),
+        })
+    return out
+
+
+def _new_channel_id():
+    import secrets as _s
+    return 'ch_' + _s.token_hex(4)
+
+
 def load_settings() -> dict:
     defaults = {
         'domains':              [d.strip() for d in os.environ.get('DOMAINS', 'example.com').split(',') if d.strip()] or ['example.com'],
@@ -115,6 +197,7 @@ def load_settings() -> dict:
         'ui_prefs':             {},
         'geoip_enabled':        False,
         'geoip_db_path':        '',
+        'notification_channels': [],
         'webhook_url':          '',
         'webhook_type':         'discord',
         'webhook_username':     '',
@@ -260,6 +343,18 @@ def load_settings() -> dict:
             merged['geoip_enabled'] = bool(data['geoip_enabled'])
         if 'geoip_db_path' in data:
             merged['geoip_db_path'] = str(data['geoip_db_path']).strip()
+        if 'notification_channels' in data and isinstance(data['notification_channels'], list):
+            merged['notification_channels'] = _parse_channels(data['notification_channels'])
+        elif str(data.get('webhook_url', '')).strip():
+            merged['notification_channels'] = _parse_channels([{
+                'id':       'legacy',
+                'name':     'Webhook',
+                'kind':     str(data.get('webhook_type', 'discord')).strip() or 'discord',
+                'enabled':  True,
+                'url':      str(data.get('webhook_url', '')).strip(),
+                'username': str(data.get('webhook_username', '')).strip(),
+                'password': data.get('webhook_password', ''),
+            }])
         if 'webhook_url' in data:
             merged['webhook_url'] = str(data['webhook_url']).strip()
         if 'webhook_type' in data:
@@ -330,6 +425,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
                   oidc_allowed_emails=None, oidc_allowed_groups=None,
                   oidc_allow_any_authenticated=None,
                   oidc_auto_login=None,
+                  notification_channels=None,
                   oidc_groups_claim=None, webhook_url=None, webhook_type=None,
                   webhook_username=None, webhook_password=None,
                   crowdsec_lapi_url=None, crowdsec_api_key=None,
@@ -405,6 +501,8 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         oidc_groups_claim = _cur.get('oidc_groups_claim', 'groups')
     if oidc_auto_login is None:
         oidc_auto_login = _cur.get('oidc_auto_login', False)
+    if notification_channels is None:
+        notification_channels = _cur.get('notification_channels', [])
     if webhook_url is None:
         webhook_url = _cur.get('webhook_url', '')
     if webhook_type is None:
@@ -494,6 +592,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'geoip_enabled':        bool(geoip_enabled),
         'geoip_db_path':        str(geoip_db_path or '').strip(),
         'oidc_groups_claim':    oidc_groups_claim,
+        'notification_channels': _dump_channels(notification_channels),
         'webhook_url':          webhook_url,
         'webhook_type':         webhook_type,
         'webhook_username':     webhook_username,
