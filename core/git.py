@@ -184,10 +184,10 @@ def _git_push_if_enabled(action='backup'):
         if enabled and auto_push and repo:
             ok, err = _git_push_configs(action)
             if ok and err != 'No changes':
-                notifications.add_notification('success', f'Git backup pushed ({action})')
+                notifications.add_notification('success', f'Git backup pushed ({action})', category='backup')
             elif not ok:
                 logger.warning(f"Git backup failed: {err}")
-                notifications.add_notification('error', f'Git backup failed ({action}): {err}')
+                notifications.add_notification('error', f'Git backup failed ({action}): {err}', category='backup')
     except Exception:
         logger.exception("Git push error")
 
@@ -288,10 +288,12 @@ def _git_push_agent_if_enabled(agent, action='backup'):
             return
         ok, err = _git_push_agent_configs(agent, action)
         if ok and err != 'No changes':
-            notifications.add_notification('success', f"Git backup pushed ({agent.get('name')}: {action})")
+            notifications.add_notification('success', f"Git backup pushed ({agent.get('name')}: {action})",
+                                           category='backup')
         elif not ok:
             logger.warning(f"Agent git backup failed: {err}")
-            notifications.add_notification('error', f"Git backup failed ({agent.get('name')}): {err}")
+            notifications.add_notification('error', f"Git backup failed ({agent.get('name')}): {err}",
+                                           category='backup')
     except Exception:
         logger.exception("Agent git push error")
 
