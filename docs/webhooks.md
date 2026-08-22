@@ -223,12 +223,12 @@ CrowdSec events report per window, not per ban. A typical instance carries tens 
 One window becomes one message, naming the source, its country and network, and every scenario it tripped:
 
 ```
-KWA: 80.94.95.211 (DE, AS24940 Hetzner) tripped 5 scenarios, 21 events in the
-last 10 minutes: http-bad-user-agent, http-crawl-non-statics, http-probing,
-http-sensitive-files and 1 more
+KWA: 80.94.95.211 (🇩🇪, AS24940 Hetzner) tripped 5 scenarios, 21 events in
+the last 10 minutes: http-bad-user-agent, http-crawl-non-statics,
+http-probing, http-sensitive-files and 1 more
 ```
 
-Country and network come from the `crowdsecurity/geoip-enrich` parser on the machine that raised the alert. Without it the address is still named, just without the detail.
+Country and network come from the `crowdsecurity/geoip-enrich` parser on the machine that raised the alert. Without it the address is still named, just without the detail. A client with no flag font shows the two letter code instead.
 
 ---
 

@@ -454,6 +454,18 @@ def _cs_alert_events(alert: dict) -> int:
 CS_SUMMARY_SCENARIOS = 4
 
 
+def _cs_flag(cc: str) -> str:
+    """Regional indicator pair for a two letter country code.
+
+    Mirrors _flagEmoji in static/js/core.js. Clients with no flag font fall
+    back to rendering the two letters, which is the code it replaced.
+    """
+    code = str(cc or '').strip().upper()
+    if len(code) != 2 or not code.isalpha():
+        return ''
+    return ''.join(chr(0x1F1E6 + ord(ch) - 65) for ch in code)
+
+
 def _cs_alert_origin_detail(alert: dict) -> str:
     """Country and network for a source, when geoip-enrich filled them in.
 
@@ -467,7 +479,7 @@ def _cs_alert_origin_detail(alert: dict) -> str:
     bits = []
     cn = str(src.get('cn') or '').strip()
     if cn:
-        bits.append(cn)
+        bits.append(_cs_flag(cn) or cn)
     as_name = str(src.get('as_name') or '').strip()
     as_num = str(src.get('as_number') or '').strip()
     if as_name and as_num:
