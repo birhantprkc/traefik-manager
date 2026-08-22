@@ -894,6 +894,77 @@ Record an "update available" notification. `product` is `manager` for Traefik Ma
 
 ---
 
+## Notification channels
+
+Channels are where notifications are delivered. Each one has a `kind`, a category filter, a
+severity floor and an optional quiet window. Secrets (`token`, `token2`, `password`) read back
+as `***`.
+
+| Field | Values |
+| --- | --- |
+| `kind` | `discord`, `slack`, `ntfy`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
+| `categories` | any of `config`, `backup`, `security`, `traefik`, `certs`, `crowdsec`, `agent`, `update` |
+| `min_severity` | `info`, `success`, `warning`, `error` |
+| `digest` | `immediate`, `hourly`, `daily` |
+| `quiet_hours` | `HH:MM-HH:MM`, or `""` for none |
+| `break_through` | `true` sends `error` events during quiet hours |
+
+An unknown `kind`, category, `min_severity`, `digest` or a malformed `quiet_hours` returns `400`.
+
+### `GET /api/notifications/channels`
+
+List every channel, secrets redacted.
+
+```json
+{ "channels": [{ "id": "ch_1a2b3c4d", "name": "Ops Discord", "kind": "discord", "enabled": true,
+  "url": "https://discord.com/api/webhooks/...", "token": "", "token2": "", "password": "",
+  "categories": ["certs", "crowdsec"], "min_severity": "warning", "digest": "immediate",
+  "quiet_hours": "23:00-07:00", "break_through": true }] }
+```
+
+---
+
+### `POST /api/notifications/channels`
+
+Create a channel. `kind` is required. The `id` is generated server-side and returned. An empty
+`name` falls back to the kind. Omitted fields take their defaults: enabled, every category,
+`min_severity` `info`, `digest` `immediate`, no quiet hours.
+
+```json
+{ "kind": "gotify", "name": "Phone", "url": "https://gotify.example.com", "token": "A1b2C3" }
+```
+
+---
+
+### `PUT /api/notifications/channels/{id}`
+
+Update a channel. Omitted fields keep their value. Send a secret as `***` to keep the stored one,
+or any other string to replace it. `404` if the id is unknown.
+
+```json
+{ "min_severity": "error", "token": "***" }
+```
+
+---
+
+### `DELETE /api/notifications/channels/{id}`
+
+Delete a channel. `404` if the id is unknown.
+
+---
+
+### `POST /api/notifications/channels/{id}/test`
+
+Send a test notification through the channel now, ignoring its category, severity, digest and
+quiet-hour filters. A channel missing a required field for its kind returns `400` naming the
+field, without attempting delivery. A delivery failure returns `200` with `ok: false`.
+
+```json
+{ "ok": true, "detail": "" }
+```
+
+---
+
 ## Authentication endpoints
 
 ### `POST /api/auth/change-password`

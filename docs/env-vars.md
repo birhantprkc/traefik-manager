@@ -751,7 +751,7 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 
 **Default:** _(auto-generated and stored as `.otp_key` alongside `SETTINGS_PATH`)_
 
-Fernet key for every secret TM stores encrypted: the TOTP secret, Traefik API password, OIDC client secret, webhook password, CrowdSec credentials, git backup token and agent API keys.
+Fernet key for every secret TM stores encrypted: the TOTP secret, Traefik API password, OIDC client secret, notification channel tokens and passwords, CrowdSec credentials, git backup token and agent API keys.
 
 :::tabs
 == Docker / Podman
