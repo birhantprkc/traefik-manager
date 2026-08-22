@@ -41,7 +41,9 @@ Routes, middlewares, certificates and logs, without editing YAML by hand.
 curl -fsSL https://get-traefik.xyzlab.dev | bash
 ```
 
-Three modes: **Traefik + Traefik Manager**, **Traefik Manager on its own** (Docker or systemd), or the **agent** for a remote host. [Full guide](https://traefik-manager.xyzlab.dev/traefik-stack.html)
+Installs the `tm` CLI and runs `tm install`. Six modes: Traefik + Traefik Manager together, Traefik Manager on its own (Docker or native), or the agent for a remote host (Docker, Docker + Traefik, or binary).
+
+Afterwards `tm` manages the install: `tm status`, `tm update`, `tm logs`, `tm reconfigure`, `tm doctor`. [Full guide](https://traefik-manager.xyzlab.dev/traefik-stack.html)
 
 ### Docker Compose
 

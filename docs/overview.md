@@ -6,11 +6,13 @@ A self-hosted web UI for managing and monitoring your [Traefik](https://traefik.
 
 ## Get Started
 
-One command installs Traefik and Traefik Manager together, Traefik Manager on its own, or the agent on a remote host.
+One command installs the `tm` CLI and runs `tm install`, which sets up Traefik and Traefik Manager together, Traefik Manager on its own, or the agent on a remote host.
 
 ```bash
 curl -fsSL https://get-traefik.xyzlab.dev | bash
 ```
+
+`tm` then manages the install: `tm status`, `tm update`, `tm reconfigure`, `tm doctor`.
 
 [What the installer sets up →](traefik-stack.md)
 
