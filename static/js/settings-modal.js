@@ -679,7 +679,19 @@ async function toggleAuth() {
     const currentlyOn = stateLabel.textContent === 'enabled';
     const newState    = !currentlyOn;
 
-    if (currentlyOn && !await _confirm('Disable built-in authentication? Anyone who can reach this URL will have full access.', 'Disable Authentication', 'Disable')) return;
+    if (currentlyOn) {
+        let oidcOn = false;
+        try {
+            const r = await fetch('/api/auth/oidc');
+            oidcOn = !!(await r.json()).oidc_enabled;
+        } catch (e) {
+            oidcOn = false;
+        }
+        const warning = oidcOn
+            ? 'Disable built-in authentication? Sign-in continues through your OIDC provider.'
+            : 'Disable built-in authentication? Anyone who can reach this URL will have full access.';
+        if (!await _confirm(warning, 'Disable Authentication', 'Disable')) return;
+    }
 
     try {
         const res  = await fetch('/api/auth/toggle', {
