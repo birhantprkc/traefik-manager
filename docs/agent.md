@@ -35,7 +35,7 @@ When a remote agent is active:
 
 ## Install via installer script
 
-The fastest way is the `traefik-stack` installer:
+The fastest way is the `traefik-stack` installer, which installs the `tm` CLI and opens its wizard:
 
 ```bash
 curl -fsSL https://get-traefik.xyzlab.dev | bash
@@ -48,7 +48,15 @@ export TMA_INSTALL=1
 curl -fsSL https://get-traefik.xyzlab.dev | bash
 ```
 
-The installer uses an arrow-key menu and a review screen - type a section number to go back and edit it, or press Enter to proceed. It covers:
+`TMA_INSTALL=1` is the same as `tm install --mode agent`. Once `tm` is installed you can also pass the mode and the agent settings directly:
+
+```bash
+tm install --mode agent-docker --api-key <key> --traefik-url http://traefik:8080
+```
+
+Modes: `agent-docker`, `agent-docker-traefik`, `agent-binary`. Afterwards `tm status`, `tm update`, `tm logs` and `tm reconfigure` manage the agent. See [Traefik Stack](traefik-stack.md#managing-the-install).
+
+The wizard uses an arrow-key menu and a review screen - type a section number to go back and edit it, or press Enter to proceed. It covers:
 
 - **Install method** - Docker agent only, Docker agent + Traefik (deploys both), or binary (systemd)
 - **Traefik connection** - API URL, config path, static config mount, and TLS skip-verify (prompted automatically when the URL is `https://`)
@@ -199,7 +207,9 @@ sudo ufw allow from <subnet> to any port <crowdsec-port> proto tcp
 
 ## Install via binary
 
-Download the binary for your platform from the [GitHub Releases](https://github.com/chr0nzz/traefik-manager/releases) page (`tma-linux-amd64`, `tma-linux-arm64`, `tma-linux-armv7`) and create a systemd unit:
+The easy path is `tm install --mode agent-binary`: it downloads the binary for your architecture, verifies the checksum, installs it to `/usr/local/bin/tma`, writes the unit, and puts the secrets in `/etc/traefik-manager-agent/env` (mode 600, referenced by `EnvironmentFile=`) rather than inline in the unit.
+
+Manually: download the binary for your platform from the [GitHub Releases](https://github.com/chr0nzz/traefik-manager/releases) page (`tma-linux-amd64`, `tma-linux-arm64`, `tma-linux-armv7`) and create a systemd unit:
 
 ```ini
 [Unit]
@@ -341,6 +351,14 @@ Back up `agents.yml` alongside `manager.yml` to preserve agent registrations.
 - The `/health` endpoint is public (no auth required) - use it for uptime monitoring
 
 ## Updating
+
+With `tm`, which also picks up agents installed by the old `setup.sh`:
+
+```bash
+tm update
+```
+
+Manually:
 
 **Docker:**
 ```bash

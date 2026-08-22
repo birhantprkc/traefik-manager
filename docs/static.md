@@ -243,9 +243,13 @@ The full Docker socket lets TM start, stop, or delete any container on the host.
 
 ## Using the traefik-stack installer
 
-If you installed with [setup.sh](traefik-stack.md), answering **y** to "Mount Traefik static config?" asks which restart method you want and generates every required compose addition - volume mounts, env vars, socket proxy service, or Traefik healthcheck.
+If you installed with [the traefik-stack installer](traefik-stack.md), answering **y** to "Mount Traefik static config?" asks which restart method you want and generates every required compose addition - volume mounts, env vars, socket proxy service, or Traefik healthcheck.
 
-For existing installs, see [Enable static config editor](static-enable.md).
+To turn it on or change the restart method afterwards, run `tm reconfigure --section mounts`.
+
+`tm doctor` checks the wiring: that the signals volume is mounted on both sides and the poison pill healthcheck is present, or that `traefik-restart.path` is active on systemd. Run it first when the Restart button does nothing.
+
+For existing installs set up by hand, see [Enable static config editor](static-enable.md).
 
 ---
 
