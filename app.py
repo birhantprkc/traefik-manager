@@ -4700,10 +4700,13 @@ def save_entry():
             old_transport_name = f"{plain_original_id}-transport"
             http_sec = old_config.get('http', {})
             old_transports = http_sec.get('serversTransports', {})
-            if old_transport_name in old_transports:
+            old_tp_key = f"agent_{agent_id}::tp::{old_transport_name}" if agent else f"tp::{old_transport_name}"
+            if old_transport_name in old_transports and old_tp_key in _ledger:
                 del old_transports[old_transport_name]
                 if not old_transports:
                     del http_sec['serversTransports']
+                del _ledger[old_tp_key]
+                _ledger_changed = True
             old_hdr_name = f"{plain_original_id}-headers"
             old_hdr_key  = f"agent_{agent_id}::{old_hdr_name}" if agent else old_hdr_name
             if hdr_preset_present and old_hdr_key in _ledger:
@@ -4828,25 +4831,37 @@ def save_entry():
                     if _prio:
                         r['priority'] = _prio
                 transport_name = f"{svc_name}-transport"
+                tp_ledger_key = f"agent_{agent_id}::tp::{transport_name}" if agent else f"tp::{transport_name}"
                 existing_transports = config.get('http', {}).get('serversTransports', {})
-                tp = existing_transports.get(transport_name)
-                tp = tp if isinstance(tp, dict) else {}
-                if insecure:
-                    tp['insecureSkipVerify'] = True
-                else:
-                    tp.pop('insecureSkipVerify', None)
-                if stream_preset_present:
-                    if stream_preset_on:
-                        tp['forwardingTimeouts'] = _streaming_forwarding_timeouts()
-                    else:
-                        tp.pop('forwardingTimeouts', None)
-                if tp:
-                    config['http'].setdefault('serversTransports', {})[transport_name] = tp
+                tp_existing = existing_transports.get(transport_name)
+                tp_existing = tp_existing if isinstance(tp_existing, dict) else None
+                tp_ours = tp_existing is None or tp_ledger_key in _ledger
+                if not tp_ours:
                     lb['serversTransport'] = transport_name
-                elif transport_name in existing_transports:
-                    del existing_transports[transport_name]
-                    if not existing_transports and 'serversTransports' in config['http']:
-                        del config['http']['serversTransports']
+                else:
+                    tp = dict(tp_existing) if tp_existing else {}
+                    if insecure:
+                        tp['insecureSkipVerify'] = True
+                    else:
+                        tp.pop('insecureSkipVerify', None)
+                    if stream_preset_present:
+                        if stream_preset_on:
+                            tp['forwardingTimeouts'] = _streaming_forwarding_timeouts()
+                        else:
+                            tp.pop('forwardingTimeouts', None)
+                    if tp:
+                        config['http'].setdefault('serversTransports', {})[transport_name] = tp
+                        lb['serversTransport'] = transport_name
+                        if tp_ledger_key not in _ledger:
+                            _ledger[tp_ledger_key] = {'kind': 'route-transport', 'route': router_name}
+                            _ledger_changed = True
+                    elif transport_name in existing_transports:
+                        del existing_transports[transport_name]
+                        if not existing_transports and 'serversTransports' in config['http']:
+                            del config['http']['serversTransports']
+                        if tp_ledger_key in _ledger:
+                            del _ledger[tp_ledger_key]
+                            _ledger_changed = True
                 _http_managed = ('rule', 'entryPoints', 'service', 'middlewares', 'tls', 'priority') \
                     if _managed_backends else ('rule', 'entryPoints', 'service', 'middlewares', 'tls')
                 _merge_router(config['http']['routers'], router_name, r, _http_managed)
