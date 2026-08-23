@@ -3373,7 +3373,7 @@ def api_tls_options_delete(name):
         return jsonify({'ok': False, 'message': 'Profile not found'}), 404
     del tls_opts[name]
     if agent:
-        _agent_write_config(agent, cfg_name, config)
+        _agent_write_config(agent, cfg_name, _strip_empty_sections(config))
     else:
         create_backup(target_path)
         save_config(_strip_empty_sections(config), target_path)
