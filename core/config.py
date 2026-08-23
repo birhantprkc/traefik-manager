@@ -166,13 +166,25 @@ def load_config(path=None):
 
 
 def strip_empty_sections(config: dict) -> dict:
+    """Drop containers left empty by a delete.
+
+    Traefik rejects the whole file when a container is present but empty:
+    an empty `tls.options` fails with "options cannot be a standalone
+    element", taking every router in the file down with it.
+    """
     for proto in ('http', 'tcp', 'udp'):
         if proto in config:
-            for section in ('routers', 'services', 'middlewares'):
+            for section in ('routers', 'services', 'middlewares', 'serversTransports'):
                 if section in config[proto] and not config[proto][section]:
                     del config[proto][section]
             if not config[proto]:
                 del config[proto]
+    if 'tls' in config and isinstance(config['tls'], dict):
+        for section in ('options', 'certificates', 'stores'):
+            if section in config['tls'] and not config['tls'][section]:
+                del config['tls'][section]
+        if not config['tls']:
+            del config['tls']
     return config
 
 
