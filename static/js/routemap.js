@@ -563,7 +563,7 @@ function rmRenderTopology(routes) {
     });
 
     rmDrawCurves(routes);
-    if (_rmIsMobile) rmInitMobilePan();
+    if (_rmTouchLayout()) rmInitMobilePan();
 }
 
 const _rmColIcons = { ep: 'ph-arrows-in', route: 'ph-git-branch', mw: 'ph-funnel', svc: 'ph-cube' };
@@ -960,7 +960,7 @@ function rmDrawCurves(routes, forceHighlight) {
 
     svg.innerHTML = '';
 
-    const useMobile = _rmIsMobile && !!document.getElementById('rmPanInner');
+    const useMobile = !!document.getElementById('rmPanInner');
     let getNodePos;
     if (useMobile) {
         const colsEl = document.getElementById('rmCols');
@@ -1125,7 +1125,12 @@ function rmHideTooltip() {
     if (_rmTipEl) _rmTipEl.style.display = 'none';
 }
 
-const _rmIsMobile = window.innerWidth <= 640;
+function _rmTouchLayout() {
+    try {
+        if (window.matchMedia('(pointer: coarse)').matches) return true;
+    } catch (e) {}
+    return window.innerWidth <= 640;
+}
 let _rmZScale = 1, _rmZPanX = 0, _rmZPanY = 0;
 let _rmZTouchX = 0, _rmZTouchY = 0, _rmZPinchDist = null;
 let _rmZoomInited = false;
@@ -1167,7 +1172,7 @@ window.rmZoomReset = function() {
 };
 
 function rmInitMobilePan() {
-    if (!_rmIsMobile) return;
+    if (!_rmTouchLayout()) return;
     const cont = document.getElementById('rmTopoContainer');
     const svg  = document.getElementById('rmSvg');
     if (!cont || !svg) return;
@@ -1250,13 +1255,21 @@ function _rmReflow() {
     }, 90);
 }
 
+let _rmLastWidth = window.innerWidth;
+
 window.addEventListener('resize', () => {
     if (!document.getElementById('tab-routemap')?.classList.contains('active')) return;
     const cont   = document.getElementById('rmTopoContainer');
     const colsEl = document.getElementById('rmCols');
+    const rotated = window.innerWidth !== _rmLastWidth;
+    _rmLastWidth = window.innerWidth;
     if (cont && colsEl) cont.style.height = colsEl.offsetHeight + 'px';
     rmDrawCurves(_rmFilteredRoutes());
-    if (_rmIsMobile && cont) cont.style.height = Math.round(window.innerHeight * 0.62) + 'px';
+    if (_rmTouchLayout() && cont) {
+        cont.style.height = Math.round(window.innerHeight * 0.62) + 'px';
+        if (!document.getElementById('rmPanInner')) rmInitMobilePan();
+        else if (rotated) window.rmZoomReset();
+    }
     _rmReflow();
 });
 
