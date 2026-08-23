@@ -716,6 +716,8 @@ async function toggleAuth() {
 let _legacyWebhook = { url: '', type: 'discord', username: '' };
 
 const CHANNEL_KIND_SPEC = {
+    unifiedpush: { label: 'Mobile app',
+                  fields: { url:         { label: 'Device endpoint', desc: 'Registered by the Traefik Manager app on your phone. Editing it stops push to that device.', ph: '' } } },
     discord:    { label: 'Discord',      fields: { url:    { label: 'Webhook URL',  desc: 'Where notifications are delivered.', ph: 'https://discord.com/api/webhooks/...' } } },
     slack:      { label: 'Slack',        fields: { url:    { label: 'Webhook URL',  desc: 'Incoming webhook created in your Slack workspace.', ph: 'https://hooks.slack.com/services/...' } } },
     ntfy:       { label: 'ntfy',         auth: true,
@@ -1059,7 +1061,10 @@ async function toggleChannelEnabled(id) {
 async function deleteChannel(id) {
     const ch = _channelById(id);
     if (!ch) return;
-    if (!await _confirm(`Remove channel "${ch.name}"? Events will stop being delivered to it.`, 'Remove Channel', 'Remove')) return;
+    const warning = ch.kind === 'unifiedpush'
+        ? `Remove "${ch.name}"? Push notifications to that phone stop until the app registers again.`
+        : `Remove channel "${ch.name}"? Events will stop being delivered to it.`;
+    if (!await _confirm(warning, 'Remove Channel', 'Remove')) return;
     try {
         const res  = await fetch('/api/notifications/channels/' + encodeURIComponent(id), { method: 'DELETE', headers: _csrfHeaders() });
         const data = await res.json();

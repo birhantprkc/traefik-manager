@@ -101,10 +101,12 @@ def test_slack_unknown_type_uses_bell(post):
 
 
 def test_ntfy_headers_and_plain_body(post):
-    np.send(_channel('ntfy', url='https://ntfy.test/topic'), 'warning', 'T', 'cert expiring', TS)
+    np.send(_channel('ntfy', url='https://ntfy.test/topic'), 'warning', 'Certificates',
+            'cert expiring', TS)
     call = post.last
     assert call['data'] == b'cert expiring'
-    assert call['headers'] == {'X-Title': 'Traefik Manager', 'X-Priority': '4', 'X-Tags': 'warning'}
+    assert call['headers'] == {'X-Title': 'Traefik Manager - Certificates',
+                               'X-Priority': '4', 'X-Tags': 'warning'}
     assert 'json' not in call
 
 
@@ -309,3 +311,32 @@ def test_timeout_reports_the_timeout(monkeypatch):
 
 def test_non_dict_channel_is_rejected():
     assert np.send(None, 'info', 'T', 'm', TS) == (False, 'invalid channel')
+
+
+def test_a_branded_destination_shows_the_bare_source():
+    for kind in ('gotify', 'pushover', 'telegram', 'unifiedpush'):
+        assert np.titled(kind, 'CrowdSec') == 'CrowdSec'
+
+
+def test_an_unbranded_destination_is_prefixed():
+    for kind in ('discord', 'slack', 'ntfy', 'pushbullet', 'generic'):
+        assert np.titled(kind, 'CrowdSec') == 'Traefik Manager - CrowdSec'
+
+
+def test_no_category_falls_back_to_the_product_name():
+    assert np.titled('discord', '') == 'Traefik Manager'
+    assert np.titled('gotify', None) == 'Traefik Manager'
+
+
+def test_unifiedpush_posts_the_generic_body_with_a_source(post):
+    np.send(_channel('unifiedpush', url='https://ntfy.test/upXYZ'), 'warning',
+            'CrowdSec', 'a source tripped 3 scenarios', TS)
+    call = post.last
+    assert call['url'] == 'https://ntfy.test/upXYZ'
+    assert call['json'] == {'event': 'warning', 'source': 'CrowdSec',
+                            'message': 'a source tripped 3 scenarios', 'timestamp': TS}
+
+
+def test_unifiedpush_needs_only_the_endpoint():
+    assert np.required_fields('unifiedpush') == ['url']
+    assert np.missing_fields(_channel('unifiedpush', url='https://x/y')) == []

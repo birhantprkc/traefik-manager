@@ -39,6 +39,7 @@ The setup wizard creates the first channel for you: pick a type, fill in its fie
 | Pushover | App token, user key |
 | Pushbullet | Access token |
 | Telegram | Bot token, chat ID |
+| Mobile app | Registered by the Traefik Manager Android app. Do not create it by hand |
 
 ### Discord
 

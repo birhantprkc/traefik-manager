@@ -80,7 +80,8 @@ def sanitize_ui_prefs(prefs) -> dict:
 
 
 CHANNEL_KINDS = ('discord', 'slack', 'ntfy', 'generic',
-                 'gotify', 'pushover', 'pushbullet', 'telegram')
+                 'gotify', 'pushover', 'pushbullet', 'telegram',
+                 'unifiedpush')
 
 CHANNEL_CATEGORIES = ('config', 'backup', 'security', 'traefik',
                       'certs', 'crowdsec', 'agent', 'update')

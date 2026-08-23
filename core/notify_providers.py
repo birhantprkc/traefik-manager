@@ -39,6 +39,7 @@ REQUIRED_FIELDS = {
     'pushover':   ['token', 'token2'],
     'pushbullet': ['token'],
     'telegram':   ['token', 'token2'],
+    'unifiedpush': ['url'],
 }
 
 
@@ -73,6 +74,22 @@ def _snippet(resp):
     return _clip(body, 200)
 
 
+BRANDED_KINDS = ('gotify', 'pushover', 'telegram', 'unifiedpush')
+
+
+def titled(kind: str, title: str) -> str:
+    """Prefix the source with the product name where the destination shows none.
+
+    Gotify, Pushover and Telegram already show the application or bot name, and
+    the mobile app is itself Traefik Manager, so those read the bare source.
+    Discord, Slack, ntfy, Pushbullet and generic show nothing of their own.
+    """
+    label = str(title or '').strip() or DEFAULT_TITLE
+    if label == DEFAULT_TITLE or kind in BRANDED_KINDS:
+        return label
+    return f'{DEFAULT_TITLE} - {label}'
+
+
 def _http_error(resp):
     detail = _snippet(resp)
     return 'HTTP %s%s' % (resp.status_code, ': ' + detail if detail else '')
@@ -87,6 +104,7 @@ def _result(resp):
 def _send_discord(channel, type_, title, msg, ts):
     payload = {'embeds': [{
         'title': msg,
+        'author': {'name': titled('discord', title)},
         'color': DISCORD_COLORS.get(type_, DISCORD_COLORS['info']),
         'footer': {'text': f'{DEFAULT_TITLE} - {ts}'},
     }]}
@@ -103,12 +121,18 @@ def _send_slack(channel, type_, title, msg, ts):
 
 def _send_ntfy(channel, type_, title, msg, ts):
     headers = {
-        'X-Title': DEFAULT_TITLE,
+        'X-Title': titled('ntfy', title),
         'X-Priority': '4' if type_ in ('warning', 'error') else '3',
         'X-Tags': NTFY_TAGS.get(type_, 'bell'),
     }
     return _result(requests.post(_field(channel, 'url'), data=msg.encode('utf-8'),
                                  headers=headers, timeout=TIMEOUT, auth=_legacy_auth(channel)))
+
+
+def _send_unifiedpush(channel, type_, title, msg, ts):
+    payload = {'event': type_, 'source': titled('unifiedpush', title),
+               'message': msg, 'timestamp': ts}
+    return _result(requests.post(_field(channel, 'url'), json=payload, timeout=TIMEOUT))
 
 
 def _send_generic(channel, type_, title, msg, ts):
@@ -234,6 +258,7 @@ SENDERS = {
     'pushover':   _send_pushover,
     'pushbullet': _send_pushbullet,
     'telegram':   _send_telegram,
+    'unifiedpush': _send_unifiedpush,
 }
 
 

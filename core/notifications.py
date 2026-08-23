@@ -210,7 +210,7 @@ def flush_queue(channel_id=None, force=False) -> int:
             report = build_report(items, held.get('dropped', 0))
             worst = max(items, key=lambda r: SEVERITY_RANK.get(r.get('type'), 0))
             try:
-                _deliver(ch, worst.get('type', 'info'), report, items[-1]['ts'])
+                _deliver(ch, worst.get('type', 'info'), report, items[-1]['ts'], '')
                 sent += 1
             except Exception:
                 logger.exception("Queue flush delivery raised")
@@ -253,12 +253,13 @@ def _wants(channel: dict, type_: str, category: str) -> bool:
     return SEVERITY_RANK.get(type_, 0) >= floor
 
 
-def _deliver(channel: dict, type_: str, msg: str, ts: str):
+def _deliver(channel: dict, type_: str, msg: str, ts: str, category: str = 'config'):
     missing = providers.missing_fields(channel)
     if missing:
         logger.warning(f"Channel {channel.get('name')} is missing {', '.join(missing)}")
         return
-    ok, err = providers.send(channel, type_, 'Traefik Manager', msg, ts)
+    source = CATEGORY_LABELS.get(category, '') or 'Traefik Manager'
+    ok, err = providers.send(channel, type_, source, msg, ts)
     if not ok:
         logger.warning(f"Channel {channel.get('name')} delivery failed: {err}")
 
@@ -281,7 +282,7 @@ def _fire_webhook(type_: str, msg: str, ts: str, category: str = 'config'):
             if ch.get('digest', 'immediate') != 'immediate':
                 queue_add(ch.get('id', ''), type_, msg, ts, category)
                 continue
-            _deliver(ch, type_, msg, ts)
+            _deliver(ch, type_, msg, ts, category)
         except Exception:
             logger.exception("Channel delivery raised")
 
