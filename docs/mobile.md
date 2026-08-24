@@ -141,7 +141,11 @@ Every certificate from your resolvers, with domains and expiry. Search, copy the
 
 ### Plugins
 
-The plugins declared in your static config, with their module name and version. Search, copy a module name, and see which middlewares reference each plugin - or that none do. Read-only; install plugins from the web UI.
+The plugins declared in your static config, with their module name and version. Search, copy a module name, and see which middlewares reference each plugin - or that none do.
+
+Install one with **+**: paste the static config snippet from the plugin's page, paste and edit the middleware snippet, and choose the file the middleware is written to. Existing plugins can be renamed, repointed at another module, or pinned to a different version, and removed. Each of those writes the static config on whichever server is selected, host or agent.
+
+Nothing reaches Traefik until it restarts, so the tab says so and offers **Restart now**.
 
 ### Backups
 
@@ -225,6 +229,7 @@ Both resize freely and re-flow to fit.
 | Authentication | Login status, and the API keys registered on the server |
 | Notifications | Push to this device, the notification channels, and the history (see [Notifications](#notifications)) |
 | Appearance and security | See below |
+| Static config | The raw `traefik.yml`, and the restart that applies it (see [Static config](#static-config)) |
 | Diagnostics | See below |
 | About | Versions, and the open source licences |
 
@@ -240,6 +245,18 @@ Both resize freely and re-flow to fit.
 | Require unlock | Gates the app behind biometrics or your device PIN |
 
 Everything here except the dashboard layout is stored on the device only.
+
+### Static config
+
+**Settings - Static config** edits Traefik's own `traefik.yml` as text, for the server currently selected.
+
+The file is read whole and written whole. Nothing is written until you press **Save**, and while there are unsaved changes the screen says so and offers **Discard** to reload from the server. The server parses the YAML before writing and refuses anything that will not load, so a syntax error comes back as an error rather than a broken Traefik.
+
+After a save, Traefik is still running the previous config until it restarts, which the screen says with a **Restart Traefik** button.
+
+::: warning
+A valid file can still be a broken one. Removing an entry point or disabling the Traefik API will parse cleanly and take your setup down. A backup is taken before every save and can be restored from Backups.
+:::
 
 ### Diagnostics
 
