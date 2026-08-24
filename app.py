@@ -3030,11 +3030,47 @@ def api_notifications_log():
 @csrf_protect
 @login_required
 def api_notifications_delete():
-    ts = (request.get_json(silent=True) or {}).get('ts', '')
+    data = request.get_json(silent=True) or {}
+    if 'id' in data:
+        if not _noti.delete_notification_by_id(data.get('id')):
+            return jsonify({'ok': False, 'message': 'Notification not found'}), 404
+        return jsonify({'ok': True})
+    ts = data.get('ts', '')
     if not ts:
-        return jsonify({'ok': False, 'message': 'Missing ts'}), 400
+        return jsonify({'ok': False, 'message': 'Missing id or ts'}), 400
     delete_notification(ts)
     return jsonify({'ok': True})
+
+
+@app.route('/api/notifications/read', methods=['POST'])
+@csrf_protect
+@login_required
+def api_notifications_read():
+    data = request.get_json(silent=True) or {}
+    if data.get('all'):
+        marker = _noti.highest_id()
+    else:
+        try:
+            marker = int(data.get('id'))
+        except (TypeError, ValueError):
+            return jsonify({'ok': False, 'message': 'Missing id or all'}), 400
+    s = load_settings()
+    save_settings(
+        domains=s['domains'], cert_resolver=s['cert_resolver'],
+        traefik_api_url=s['traefik_api_url'], auth_enabled=s['auth_enabled'],
+        password_hash=s['password_hash'], visible_tabs=s['visible_tabs'],
+        notifications_read_until=max(0, marker),
+    )
+    return jsonify({'ok': True, 'read_until': max(0, marker)})
+
+
+@app.route('/api/notifications/state')
+@login_required
+def api_notifications_state():
+    entries = _noti.get_notifications()
+    marker  = int(load_settings().get('notifications_read_until', 0) or 0)
+    unread  = sum(1 for e in entries if int(e.get('id', 0) or 0) > marker)
+    return jsonify({'read_until': marker, 'count': len(entries), 'unread': unread})
 
 @app.route('/api/notifications/clear', methods=['POST'])
 @csrf_protect

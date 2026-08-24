@@ -1034,7 +1034,7 @@ function _initMobileFilterBars() {
 }
 
 let _notifData       = [];
-let _notifLastRead   = parseInt(localStorage.getItem('notifLastRead') || '0', 10);
+let _notifReadUntil  = parseInt(localStorage.getItem('notifReadUntil') || '0', 10);
 let _notifPanelOpen  = false;
 
 const _NOTIF_ICONS = {
@@ -1057,10 +1057,13 @@ async function fetchNotifications() {
         const res  = await fetch('/api/notifications');
         if (!res.ok) return;
         _notifData = await res.json();
-        if (_notifLastRead > _notifData.length) {
-            _notifLastRead = _notifData.length;
-            localStorage.setItem('notifLastRead', _notifLastRead);
-        }
+        try {
+            const st = await (await fetch('/api/notifications/state')).json();
+            if (typeof st.read_until === 'number') {
+                _notifReadUntil = st.read_until;
+                localStorage.setItem('notifReadUntil', _notifReadUntil);
+            }
+        } catch (e) {}
         _renderNotifPanel();
         _syncBrowserNotifs();
     } catch(e) {}
@@ -1072,7 +1075,7 @@ function _renderNotifPanel() {
     const markReadBtn = document.getElementById('notifMarkRead');
     if (!list || !badge) return;
 
-    const unreadCount = _notifData.filter((_, i) => i < (_notifData.length - _notifLastRead)).length;
+    const unreadCount = _notifData.filter(n => (n.id || 0) > _notifReadUntil).length;
     const hasUnread = unreadCount > 0;
 
     badge.classList.toggle('hidden', !hasUnread);
@@ -1088,7 +1091,7 @@ function _renderNotifPanel() {
     }
 
     list.innerHTML = _notifData.map((n, i) => {
-        const isUnread = i < (_notifData.length - _notifLastRead);
+        const isUnread = (n.id || 0) > _notifReadUntil;
         const type  = n.type || 'info';
         const icon  = _NOTIF_ICONS[type] || 'ph-info';
         return `<div class="notif-item${isUnread ? ' unread' : ''}">
@@ -1097,7 +1100,7 @@ function _renderNotifPanel() {
                 <div class="notif-msg">${_esc(n.msg)}</div>
                 <div class="notif-ts">${_notifRelTime(n.ts)}</div>
             </div>
-            <button class="notif-delete-btn" onclick="deleteNotification('${_esc(n.ts)}')" title="Dismiss"><i class="ph-bold ph-x"></i></button>
+            <button class="notif-delete-btn" onclick="deleteNotification('${_esc(n.ts)}', ${Number(n.id) || 0})" title="Dismiss"><i class="ph-bold ph-x"></i></button>
         </div>`;
     }).join('');
 }
@@ -1127,22 +1130,27 @@ function toggleNotifPanel() {
     }
 }
 
-function markNotifsRead() {
-    _notifLastRead = _notifData.length;
-    localStorage.setItem('notifLastRead', _notifLastRead);
+async function markNotifsRead() {
+    _notifReadUntil = Math.max(_notifReadUntil, ..._notifData.map(n => n.id || 0), 0);
+    localStorage.setItem('notifReadUntil', _notifReadUntil);
     _renderNotifPanel();
+    try {
+        await fetch('/api/notifications/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
+            body: JSON.stringify({ all: true }),
+        });
+    } catch (e) {}
 }
 
-async function deleteNotification(ts) {
+async function deleteNotification(ts, id) {
     try {
         await fetch('/api/notifications/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
-            body: JSON.stringify({ ts })
+            body: JSON.stringify(id ? { id } : { ts })
         });
         await fetchNotifications();
-        if (_notifLastRead > 0) _notifLastRead = Math.max(0, _notifLastRead - 1);
-        localStorage.setItem('notifLastRead', _notifLastRead);
         _renderNotifPanel();
     } catch(e) {}
 }
@@ -1154,8 +1162,6 @@ async function clearAllNotifications() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({})
         });
-        _notifLastRead = 0;
-        localStorage.setItem('notifLastRead', _notifLastRead);
         await fetchNotifications();
     } catch(e) {}
 }

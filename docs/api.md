@@ -834,21 +834,71 @@ Delete the local clone. The next push re-initialises it. Use this when the repos
 
 ### `GET /api/notifications`
 
-List stored notifications, newest first. The last 200 are kept.
+List stored notifications, newest first. The last 200 are kept. The response is a
+plain array, not an object.
 
 ```json
-[{ "ts": "2026-04-13 20:25:03", "type": "route_saved", "msg": "Route my-app saved" }]
+[{ "id": 412, "at": 1776112503, "ts": "2026-04-13 20:25:03",
+   "type": "success", "msg": "Route my-app saved", "category": "config" }]
 ```
+
+| Field | Meaning |
+|---|---|
+| `id` | Stable, increasing, never reused. Use it to delete or to mark read |
+| `at` | Unix epoch seconds, UTC. Convert to the reader's own timezone |
+| `ts` | Server-local time as a string, kept for older clients |
+| `category` | `config`, `backup`, `security`, `traefik`, `certs`, `crowdsec`, `agent`, `update` |
+
+::: tip Added in v1.12.0
+`id`, `at` and `category` are new. Rows written by an earlier version are given an
+`id` and an `at` the first time the file is read; a `ts` that will not parse gets
+`at: 0` rather than being dropped.
+:::
 
 ---
 
 ### `POST /api/notifications/delete`
 
-Delete a single notification by timestamp.
+Delete a single notification. Prefer `id`, which removes exactly that row.
+
+```json
+{ "id": 412 }
+```
+
+`ts` is still accepted and behaves as it always has, removing the first row with
+that timestamp. Because `ts` is only second-resolution, two notifications logged
+in the same second cannot be told apart that way.
 
 ```json
 { "ts": "2026-04-13 20:25:03" }
 ```
+
+Returns `404` when no row carries that `id`.
+
+---
+
+### `POST /api/notifications/read`
+
+Set the shared read marker, so the web bell and every phone agree on what has
+been read. Send an `id`, or `all` to mark everything read.
+
+```json
+{ "id": 412 }
+{ "all": true }
+```
+
+---
+
+### `GET /api/notifications/state`
+
+The read marker and what is still unread.
+
+```json
+{ "read_until": 412, "count": 200, "unread": 4 }
+```
+
+Counting unread from the array length breaks once the 200-entry cap is reached,
+because the length stops changing. Use this instead.
 
 ---
 

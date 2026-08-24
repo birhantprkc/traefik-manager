@@ -57,22 +57,66 @@ def _file_lock():
                 pass
 
 
-def _read_file():
+_next_id = 1
+
+
+def _epoch_of(ts):
+    """Unix seconds for a stored local-time stamp, 0 when it will not parse."""
+    try:
+        return int(time.mktime(time.strptime(str(ts), "%Y-%m-%d %H:%M:%S")))
+    except Exception:
+        return 0
+
+
+def _backfill(entries):
+    """Give pre-1.12 rows an id and an at, in place, preserving their order."""
+    nxt = max((e['id'] for e in entries
+               if isinstance(e.get('id'), int) and e['id'] > 0), default=0) + 1
+    for e in entries:
+        if not isinstance(e.get('id'), int) or e['id'] <= 0:
+            e['id'] = nxt
+            nxt += 1
+        if not isinstance(e.get('at'), int):
+            e['at'] = _epoch_of(e.get('ts'))
+    return entries
+
+
+def _read_state():
+    """Return (entries, next_id). Accepts the pre-1.12 bare list on disk."""
     try:
         with open(env.NOTIFICATIONS_PATH, 'r') as f:
-            data = SafeYAML(typ='safe').load(f) or []
-        return [e for e in data if isinstance(e, dict)]
+            data = SafeYAML(typ='safe').load(f)
     except Exception:
-        return []
+        return [], 1
+    if isinstance(data, dict):
+        raw   = data.get('items') or []
+        saved = data.get('next_id')
+    else:
+        raw   = data or []
+        saved = None
+    entries = _backfill([e for e in raw if isinstance(e, dict)])
+    highest = max((e['id'] for e in entries), default=0) + 1
+    if isinstance(saved, int) and saved > 0:
+        return entries, max(saved, highest)
+    return entries, highest
 
 
-def _write_file(entries):
+def _read_file():
+    return _read_state()[0]
+
+
+def _write_file(entries, next_id=None):
     from core.config import _replace_or_copy
+    global _next_id
+    if next_id is None:
+        next_id = max(_next_id,
+                      max((e.get('id', 0) for e in entries), default=0) + 1)
+    _next_id = next_id
     path = env.NOTIFICATIONS_PATH
     tmp  = f"{path}.tmp.{os.getpid()}"
     try:
         with open(tmp, 'w') as f:
-            SafeYAML(typ='safe').dump(list(entries), f)
+            SafeYAML(typ='safe').dump({'next_id': next_id, 'items': list(entries)}, f)
         _replace_or_copy(tmp, path)
     finally:
         try:
@@ -324,21 +368,45 @@ def get_notifications():
 
 def delete_notification(ts):
     with _notif_lock, _file_lock():
-        entries = _read_file()
+        entries, next_id = _read_state()
         for i, entry in enumerate(entries):
             if entry.get('ts') == ts:
                 del entries[i]
                 break
-        _write_file(entries)
+        _write_file(entries, next_id)
         _sync(entries)
+    return True
+
+
+def delete_notification_by_id(nid):
+    """Remove exactly one row. False when no row carries that id."""
+    try:
+        nid = int(nid)
+    except (TypeError, ValueError):
+        return False
+    with _notif_lock, _file_lock():
+        entries, next_id = _read_state()
+        keep = [e for e in entries if e.get('id') != nid]
+        if len(keep) == len(entries):
+            _sync(entries)
+            return False
+        _write_file(keep, next_id)
+        _sync(keep)
     return True
 
 
 def clear_notifications():
     with _notif_lock, _file_lock():
-        _write_file([])
+        _, next_id = _read_state()
+        _write_file([], next_id)
         _sync([])
     return True
+
+
+def highest_id():
+    with _notif_lock, _file_lock():
+        entries, _ = _read_state()
+        return max((e.get('id', 0) for e in entries), default=0)
 
 
 def add_notification(type_, msg, category='config', webhook=True):
@@ -347,16 +415,18 @@ def add_notification(type_, msg, category='config', webhook=True):
         return False
     now   = time.time()
     entry = {'ts': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
-             'type': type_, 'msg': msg, 'category': category}
+             'type': type_, 'msg': msg, 'category': category,
+             'at': int(now)}
     try:
         with _notif_lock, _file_lock():
-            entries = _read_file()
+            entries, next_id = _read_state()
             if _recently_logged(entries, msg, now):
                 _sync(entries)
                 return False
+            entry['id'] = next_id
             entries.append(entry)
             entries = entries[-MAX_ENTRIES:]
-            _write_file(entries)
+            _write_file(entries, next_id + 1)
             _sync(entries)
     except Exception:
         logger.exception("Failed to store notification")

@@ -1761,7 +1761,7 @@ paths:
     post:
       tags: [Notifications]
       summary: Delete notification
-      description: Delete a single notification by timestamp.
+      description: Delete a single notification. Prefer id, which removes exactly that row. ts is still accepted.
       requestBody:
         required: true
         content:
@@ -1777,6 +1777,48 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/OkResponse" }
+
+  /api/notifications/read:
+    post:
+      tags: [Notifications]
+      summary: Set the shared read marker
+      description: Marks notifications read up to an id, or all of them. Shared by the web bell and the mobile app.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:  { type: integer, example: 412 }
+                all: { type: boolean, example: true }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:         { type: boolean }
+                  read_until: { type: integer, example: 412 }
+
+  /api/notifications/state:
+    get:
+      tags: [Notifications]
+      summary: Read marker and unread count
+      description: Unread cannot be derived from the array length once the 200 entry cap is reached.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  read_until: { type: integer, example: 412 }
+                  count:      { type: integer, example: 200 }
+                  unread:     { type: integer, example: 4 }
 
   /api/notifications/clear:
     post:

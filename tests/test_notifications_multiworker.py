@@ -39,8 +39,11 @@ def test_concurrent_workers_do_not_clobber_each_other(tmp_path):
         assert p.wait(timeout=60) == 0
 
     with open(notif) as f:
-        entries = SafeYAML(typ='safe').load(f) or []
+        data = SafeYAML(typ='safe').load(f) or []
+    entries = data.get('items', []) if isinstance(data, dict) else data
     msgs = {e['msg'] for e in entries}
+    ids  = [e['id'] for e in entries]
+    assert len(ids) == len(set(ids)), f'concurrent workers reused an id: {sorted(ids)}'
     expected = {f'{w}-{i}' for w in ('A', 'B') for i in range(3)}
     missing = expected - msgs
     assert not missing, f'lost notifications from a concurrent worker: {sorted(missing)}'

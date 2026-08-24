@@ -199,6 +199,7 @@ def load_settings() -> dict:
         'geoip_enabled':        False,
         'geoip_db_path':        '',
         'notification_channels': [],
+        'notifications_read_until': 0,
         'webhook_url':          '',
         'webhook_type':         'discord',
         'webhook_username':     '',
@@ -344,6 +345,11 @@ def load_settings() -> dict:
             merged['geoip_enabled'] = bool(data['geoip_enabled'])
         if 'geoip_db_path' in data:
             merged['geoip_db_path'] = str(data['geoip_db_path']).strip()
+        if 'notifications_read_until' in data:
+            try:
+                merged['notifications_read_until'] = max(0, int(data['notifications_read_until']))
+            except (TypeError, ValueError):
+                merged['notifications_read_until'] = 0
         if 'notification_channels' in data and isinstance(data['notification_channels'], list):
             merged['notification_channels'] = _parse_channels(data['notification_channels'])
         elif str(data.get('webhook_url', '')).strip():
@@ -426,7 +432,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
                   oidc_allowed_emails=None, oidc_allowed_groups=None,
                   oidc_allow_any_authenticated=None,
                   oidc_auto_login=None,
-                  notification_channels=None,
+                  notification_channels=None, notifications_read_until=None,
                   oidc_groups_claim=None, webhook_url=None, webhook_type=None,
                   webhook_username=None, webhook_password=None,
                   crowdsec_lapi_url=None, crowdsec_api_key=None,
@@ -504,6 +510,8 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         oidc_auto_login = _cur.get('oidc_auto_login', False)
     if notification_channels is None:
         notification_channels = _cur.get('notification_channels', [])
+    if notifications_read_until is None:
+        notifications_read_until = _cur.get('notifications_read_until', 0)
     if webhook_url is None:
         webhook_url = _cur.get('webhook_url', '')
     if webhook_type is None:
@@ -594,6 +602,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'geoip_db_path':        str(geoip_db_path or '').strip(),
         'oidc_groups_claim':    oidc_groups_claim,
         'notification_channels': _dump_channels(notification_channels),
+        'notifications_read_until': int(notifications_read_until or 0),
         'webhook_url':          webhook_url,
         'webhook_type':         webhook_type,
         'webhook_username':     webhook_username,
