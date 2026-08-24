@@ -17,6 +17,7 @@ TM stores some data in separate files alongside `manager.yml` in the same config
 | `templates.yml`           | Custom middleware templates created from the Middlewares tab toolbar                                                            |
 | `notifications.yml`       | Recent notification history, capped at the 200 newest entries                                                                   |
 | `notifications.yml.lock`  | Empty lock file that keeps the workers from overwriting each other's notifications. Safe to delete while TM is stopped          |
+| `notifications.yml.next_id` | The next notification id, so ids are never reused after a clear. Safe to delete while TM is stopped                            |
 | `dashboard.yml`           | Dashboard custom groups and per-card overrides, kept per server                                                                 |
 | `.secret_key`, `.otp_key` | Auto-generated session key and the Fernet key for every encrypted field below. Lose `.otp_key` and those secrets are unreadable |
 

@@ -57,9 +57,6 @@ def _file_lock():
                 pass
 
 
-_next_id = 1
-
-
 def _epoch_of(ts):
     """Unix seconds for a stored local-time stamp, 0 when it will not parse."""
     try:
@@ -81,24 +78,59 @@ def _backfill(entries):
     return entries
 
 
+def _counter_path():
+    return env.NOTIFICATIONS_PATH + '.next_id'
+
+
+def _read_counter():
+    try:
+        with open(_counter_path(), 'r') as f:
+            return int((f.read() or '0').strip())
+    except Exception:
+        return 0
+
+
+def _write_counter(next_id):
+    path = _counter_path()
+    tmp  = f"{path}.tmp.{os.getpid()}"
+    try:
+        with open(tmp, 'w') as f:
+            f.write(str(int(next_id)))
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            with open(path, 'w') as f:
+                f.write(str(int(next_id)))
+        except Exception:
+            logger.exception("Failed to persist the notification id counter")
+    finally:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+
+
 def _read_state():
-    """Return (entries, next_id). Accepts the pre-1.12 bare list on disk."""
+    """Return (entries, next_id).
+
+    The file stays a plain list so an older build can still read it. The
+    counter lives beside it, because a cleared list cannot say what the next
+    id should be and reusing one a client has already seen is worse than an
+    extra file.
+    """
     try:
         with open(env.NOTIFICATIONS_PATH, 'r') as f:
             data = SafeYAML(typ='safe').load(f)
     except Exception:
-        return [], 1
+        data = []
     if isinstance(data, dict):
-        raw   = data.get('items') or []
-        saved = data.get('next_id')
+        raw = data.get('items') or []
     else:
-        raw   = data or []
-        saved = None
+        raw = data or []
     entries = _backfill([e for e in raw if isinstance(e, dict)])
     highest = max((e['id'] for e in entries), default=0) + 1
-    if isinstance(saved, int) and saved > 0:
-        return entries, max(saved, highest)
-    return entries, highest
+    return entries, max(_read_counter(), highest)
 
 
 def _read_file():
@@ -107,16 +139,15 @@ def _read_file():
 
 def _write_file(entries, next_id=None):
     from core.config import _replace_or_copy
-    global _next_id
     if next_id is None:
-        next_id = max(_next_id,
+        next_id = max(_read_counter(),
                       max((e.get('id', 0) for e in entries), default=0) + 1)
-    _next_id = next_id
+    _write_counter(next_id)
     path = env.NOTIFICATIONS_PATH
     tmp  = f"{path}.tmp.{os.getpid()}"
     try:
         with open(tmp, 'w') as f:
-            SafeYAML(typ='safe').dump({'next_id': next_id, 'items': list(entries)}, f)
+            SafeYAML(typ='safe').dump(list(entries), f)
         _replace_or_copy(tmp, path)
     finally:
         try:
@@ -334,13 +365,6 @@ def _fire_webhook(type_: str, msg: str, ts: str, category: str = 'config'):
 def _load_notifications():
     with _notif_lock, _file_lock():
         _sync(_read_file())
-
-def _save_notifications_bg():
-    try:
-        with _notif_lock, _file_lock():
-            _write_file(list(_notifications))
-    except Exception:
-        logger.exception("Failed to save notifications")
 
 DEDUPE_WINDOW = 8
 

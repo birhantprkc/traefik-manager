@@ -152,6 +152,45 @@ Three tabs: **Dynamic**, **Static** and **Git**.
 - After restoring a static backup the screen tells you Traefik is still running the old config, and offers **Restart Traefik**
 - The Git tab shows commit history with the changed files, pushes on demand, and restores from a commit
 
+### Notifications
+
+Channels, matching **Settings - Notifications** in the web UI. Every enabled channel gets its own copy of an event, filtered by the categories, minimum severity, digest and quiet hours set on it.
+
+| Action | Where |
+|---|---|
+| Add a channel | The **+** button, then pick a type and fill in its fields |
+| Edit filters | The pencil on a channel |
+| Send a test | The paper plane on a channel, or **Test** in the editor |
+| Remove | The bin on a channel |
+
+Stored secrets read back masked. Leave a masked field alone and it is kept; clear it and it is removed.
+
+Servers older than 1.12.0 have no channels, and the screen shows the single webhook those versions take instead.
+
+#### Push to this device
+
+**Push to this device** delivers events to the phone through [UnifiedPush](https://unifiedpush.org).
+
+1. Install a UnifiedPush distributor, the app that holds the connection and hands out endpoints. Any from the [distributor list](https://unifiedpush.org/users/distributors/) works:
+
+   | Distributor | Backed by |
+   |---|---|
+   | ntfy | An ntfy server, self-hosted or ntfy.sh |
+   | NextPush | Your Nextcloud |
+   | Sunup | Mozilla's autopush, self-hostable |
+   | Conversations | Your XMPP account |
+
+2. Turn on **Push to this device** and allow notifications.
+3. The app registers, then creates its own channel pointing at the endpoint it was given.
+
+That channel appears in the list as a **Mobile app** channel marked **this device**, and its filters can be edited like any other, so the phone can take errors only while a Discord channel takes everything. Turning the toggle off removes it. Each notification is titled with the category it came from.
+
+Without a distributor installed the toggle stays off, and the app says so rather than polling in the background.
+
+::: warning
+Traefik Manager posts to the endpoint in plain text. On a self-hosted ntfy that is your own server; on a shared one the operator can read the message. Notifications are also truncated at 4096 bytes.
+:::
+
 ### Servers and agents
 
 The server switcher sits at the top of the drawer, and the same list is under **Settings → Servers**. Switch between the host and any registered TMA agent, each with a live health indicator. Every screen then reflects that server's Traefik instance, and the destinations change to match its enabled tabs.
@@ -184,7 +223,7 @@ Both resize freely and re-flow to fit.
 | Traefik connection | How this device reaches the server, plus domains, certificate resolvers and the direct Traefik API URL, with a **Test connection** button |
 | Servers | The server list, and the compose snippet for a new agent (see [Servers and agents](#servers-and-agents)) |
 | Authentication | Login status, and the API keys registered on the server |
-| Notifications | Webhook delivery, a test send, and the notification history |
+| Notifications | Push to this device, the notification channels, and the history (see [Notifications](#notifications)) |
 | Appearance and security | See below |
 | Diagnostics | See below |
 | About | Versions, and the open source licences |
@@ -249,14 +288,15 @@ With this split-route pattern, keep Traefik Manager's built-in auth **enabled** 
 
 | | |
 |---|---|
-| Traefik Manager (server) | **v1.10.1 or higher** |
+| Traefik Manager (server) | **v1.10.1 or higher**, v1.12.0 for notification channels and push |
 | Android | 13+ (API 33) |
+| Push (optional) | A UnifiedPush distributor, such as the ntfy app |
 
 ---
 
 ## Tech Stack
 
-Version 2.x is native Android: Kotlin 2.4, Jetpack Compose with Material 3 Expressive, Hilt, Retrofit 3 with kotlinx.serialization, DataStore for storage, and Glance with WorkManager for the widgets. Release builds are minified and resource-shrunk with R8.
+Version 2.x is native Android: Kotlin 2.4, Jetpack Compose with Material 3 Expressive, Hilt, Retrofit 3 with kotlinx.serialization, DataStore for storage, Glance with WorkManager for the widgets, and UnifiedPush for push. Release builds are minified and resource-shrunk with R8.
 
 Version 1.x was built with Expo SDK 53 / React Native 0.79, and is still available on the `v1` branch.
 

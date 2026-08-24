@@ -29,17 +29,17 @@ The setup wizard creates the first channel for you: pick a type, fill in its fie
 
 ## Types
 
-| Type | Needs |
-|---|---|
-| Discord | Webhook URL |
-| Slack | Incoming webhook URL |
-| ntfy | Topic URL, optional username and password |
-| Generic JSON | Endpoint URL, optional username and password |
-| Gotify | Server URL, app token |
-| Pushover | App token, user key |
-| Pushbullet | Access token |
-| Telegram | Bot token, chat ID |
-| Mobile app | Registered by the Traefik Manager Android app. Do not create it by hand |
+| Type         | Needs                                                                   |
+| --------------| -------------------------------------------------------------------------|
+| Discord      | Webhook URL                                                             |
+| Slack        | Incoming webhook URL                                                    |
+| ntfy         | Topic URL, optional username and password                               |
+| Generic JSON | Endpoint URL, optional username and password                            |
+| Gotify       | Server URL, app token                                                   |
+| Pushover     | App token, user key                                                     |
+| Pushbullet   | Access token                                                            |
+| Telegram     | Bot token, chat ID                                                      |
+| Mobile app   | Registered by the Traefik Manager Android app. Do not create it by hand |
 
 ### Discord
 

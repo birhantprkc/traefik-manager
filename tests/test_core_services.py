@@ -62,7 +62,6 @@ def test_agent_by_id_returns_none_for_unknown():
 
 def test_notifications_survive_a_reload(app_module):
     notifications.add_notification('info', 'persisted-entry')
-    notifications._save_notifications_bg()
     assert os.path.exists(env.NOTIFICATIONS_PATH)
     notifications._notifications.clear()
     notifications._load_notifications()

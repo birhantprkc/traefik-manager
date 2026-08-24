@@ -105,3 +105,36 @@ def test_read_marker_round_trips(client, app_module):
     state = client.get('/api/notifications/state').get_json()
     assert state['read_until'] == rows[1]['id']
     assert state['unread'] == 1
+
+
+def test_the_file_stays_a_plain_list_for_older_builds(app_module):
+    from ruamel.yaml import YAML
+    import core.env as env
+    _reset()
+    N.add_notification('info', 'downgrade check', webhook=False)
+    with open(env.NOTIFICATIONS_PATH) as f:
+        data = YAML(typ='safe').load(f)
+    assert isinstance(data, list), 'a 1.11 build reads this file as a list'
+    legacy = [e for e in data if isinstance(e, dict)]
+    assert len(legacy) == 1, 'the pre-1.12 reader must still see the rows'
+    assert legacy[0]['msg'] == 'downgrade check'
+
+
+def test_the_counter_survives_a_clear_via_the_sidecar(app_module):
+    _reset()
+    N.add_notification('info', 'before', webhook=False)
+    top = N.highest_id()
+    N.clear_notifications()
+    assert N._read_counter() > top, 'the sidecar must outlive an emptied list'
+    N.add_notification('info', 'after', webhook=False)
+    assert N.get_notifications()[0]['id'] > top
+
+
+def test_a_missing_counter_falls_back_to_the_highest_id(app_module, tmp_path, monkeypatch):
+    import core.env as env
+    path = tmp_path / 'notifications.yml'
+    path.write_text('- {id: 40, at: 0, ts: "x", type: info, msg: forty}\n')
+    monkeypatch.setattr(env, 'NOTIFICATIONS_PATH', str(path))
+    assert N._read_counter() == 0, 'no sidecar present'
+    entries, next_id = N._read_state()
+    assert next_id == 41, 'derived from the rows when the counter is gone'

@@ -170,7 +170,6 @@ create_backup                = _back.create_backup
 _send_webhook                = _noti._send_webhook
 _fire_webhook                = _noti._fire_webhook
 _load_notifications          = _noti._load_notifications
-_save_notifications_bg       = _noti._save_notifications_bg
 get_notifications            = _noti.get_notifications
 delete_notification          = _noti.delete_notification
 clear_notifications          = _noti.clear_notifications
