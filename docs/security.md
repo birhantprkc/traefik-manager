@@ -10,7 +10,7 @@ Traefik Manager is designed to run behind a reverse proxy on a trusted network. 
 
 ### Password
 
-The login password is hashed with **bcrypt at cost 12** before storage in `manager.yml`. The plaintext password is never written to disk.
+The login password is hashed with **bcrypt at cost 12** before storage in `manager.yml`. The plaintext password is never written to disk. Passwords must be at least 8 characters and at most 72 bytes, which is the bcrypt limit - accented and non-Latin characters take more than one byte each.
 
 Login POSTs are rate-limited to **5 per minute per IP**, successful or not.
 

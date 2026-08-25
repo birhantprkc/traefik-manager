@@ -371,6 +371,15 @@ def _detect_setup_self_route() -> tuple[str, str]:
     return _detect_self_route_from_own_labels()
 
 
+def _password_error(pw: str, label: str = 'Password') -> str | None:
+    if len(pw) < 8:
+        return label + ' must be at least 8 characters.'
+    if len(pw.encode('utf-8')) > 72:
+        return (label + ' must be 72 bytes or fewer, which is the bcrypt limit. '
+                'Accented and non-Latin characters take more than one byte each.')
+    return None
+
+
 def _hash_password(plaintext: str) -> str:
     import bcrypt
     return bcrypt.hashpw(plaintext.encode(), bcrypt.gensalt(rounds=12)).decode()
@@ -669,10 +678,8 @@ def setup():
         _check_csrf()
         new_pw  = request.form.get('password', '')
         confirm = request.form.get('confirm', '')
-        err = None
-        if len(new_pw) < 8:
-            err = 'Password must be at least 8 characters.'
-        elif new_pw != confirm:
+        err = _password_error(new_pw)
+        if not err and new_pw != confirm:
             err = 'Passwords do not match.'
         if err:
             return render_template('login.html', setup_mode=True, reset_mode=True,
@@ -730,6 +737,7 @@ def setup():
                                if not notify_fields[f]]
 
         domains = [d.strip() for d in domains_raw.split(',') if d.strip()]
+        pw_error = None if temp_password_mode else _password_error(pw)
 
         if not domains:
             error = 'Enter at least one domain.'
@@ -737,8 +745,8 @@ def setup():
             error = 'Enter the Traefik API URL.'
         elif not _safe_api_url(traefik_api_url):
             error = 'Traefik API URL must start with http:// or https://'
-        elif not temp_password_mode and len(pw) < 8:
-            error = 'Password must be at least 8 characters.'
+        elif pw_error:
+            error = pw_error
         elif not temp_password_mode and pw != confirm:
             error = 'Passwords do not match.'
         elif notify_wanted and notify_kind not in _settings.CHANNEL_KINDS:
@@ -897,11 +905,10 @@ def force_change_password():
         _check_csrf()
         new_pw  = request.form.get('new_password', '')
         confirm = request.form.get('confirm_password', '')
-        if len(new_pw) < 8:
-            error = 'Password must be at least 8 characters.'
-        elif new_pw != confirm:
+        error = _password_error(new_pw)
+        if not error and new_pw != confirm:
             error = 'Passwords do not match.'
-        else:
+        if not error:
             save_settings(
                 domains=settings['domains'],
                 cert_resolver=settings['cert_resolver'],
@@ -956,12 +963,9 @@ def reset_password_cli(disable_otp, prompt_pw, from_stdin, password_opt):
     if explicit:
         if not password:
             raise click.ClickException('Password must not be empty.')
-        if len(password) < 8:
-            raise click.ClickException('Password must be at least 8 characters.')
-        if len(password.encode('utf-8')) > 72:
-            raise click.ClickException(
-                'Password must be 72 bytes or fewer, which is the bcrypt limit. '
-                'Accented and non-Latin characters take more than one byte each.')
+        pw_error = _password_error(password)
+        if pw_error:
+            raise click.ClickException(pw_error)
         if os.environ.get('ADMIN_PASSWORD', '').strip():
             raise click.ClickException(
                 'ADMIN_PASSWORD is set, and it overrides the stored password. '
@@ -1005,8 +1009,9 @@ def api_change_password():
     new_pw      = (data or {}).get('new_password', '')
     confirm_pw  = (data or {}).get('confirm_password', '')
 
-    if len(new_pw) < 8:
-        return jsonify({'error': 'New password must be at least 8 characters.'}), 400
+    pw_error = _password_error(new_pw, 'New password')
+    if pw_error:
+        return jsonify({'error': pw_error}), 400
     if new_pw != confirm_pw:
         return jsonify({'error': 'Passwords do not match.'}), 400
 

@@ -1019,7 +1019,7 @@ field, without attempting delivery. A delivery failure returns `200` with `ok: f
 
 ### `POST /api/auth/change-password`
 
-Change the login password. Rate-limited to 10/min. The new password must be at least 8 characters. `403` if `current_password` is wrong.
+Change the login password. Rate-limited to 10/min. The new password must be at least 8 characters and at most 72 bytes, which is the bcrypt limit. `403` if `current_password` is wrong.
 
 ```json
 { "current_password": "...", "new_password": "...", "confirm_password": "..." }
