@@ -101,6 +101,14 @@ def test_prompt_asks_twice_and_sets_the_password(runner):
     assert NEW_PASSWORD not in result.output
 
 
+def test_prompt_rejects_a_mismatched_confirmation(runner):
+    before = _manager_bytes()
+    result = _run(runner, '--prompt', input=NEW_PASSWORD + '\nsomething-else\n')
+    assert result.exit_code != 0
+    assert 'do not match' in _stderr(result) + result.output
+    assert _manager_bytes() == before
+
+
 def test_password_option_sets_the_password_and_warns_on_stderr(runner):
     result = _run(runner, '--password', NEW_PASSWORD)
     assert result.exit_code == 0, result.output
@@ -156,6 +164,20 @@ def test_otp_is_preserved_when_the_flag_is_absent(runner):
 def test_a_short_password_is_rejected_and_nothing_is_written(runner, args, stdin):
     before = open(SETTINGS_PATH).read()
     result = _run(runner, *args, input=stdin)
+    assert result.exit_code != 0
+    assert 'at least 8 characters' in _stderr(result)
+    assert open(SETTINGS_PATH).read() == before
+
+
+def test_exactly_eight_characters_is_accepted(runner):
+    result = _run(runner, '--stdin', input='eightchr\n')
+    assert result.exit_code == 0, result.output
+    assert bcrypt.checkpw(b'eightchr', _raw()['password_hash'].encode())
+
+
+def test_seven_characters_is_rejected_and_nothing_is_written(runner):
+    before = open(SETTINGS_PATH).read()
+    result = _run(runner, '--stdin', input='sevench\n')
     assert result.exit_code != 0
     assert 'at least 8 characters' in _stderr(result)
     assert open(SETTINGS_PATH).read() == before
@@ -236,11 +258,17 @@ def test_stdin_takes_the_first_line_only(runner):
     assert bcrypt.checkpw(b'goodpassword', _raw()['password_hash'].encode())
 
 
+def test_a_byte_order_mark_on_stdin_is_not_part_of_the_password(runner):
+    result = _run(runner, '--stdin', input=b'\xef\xbb\xbf' + NEW_PASSWORD.encode() + b'\n')
+    assert result.exit_code == 0, result.output
+    assert bcrypt.checkpw(NEW_PASSWORD.encode(), _raw()['password_hash'].encode())
+
+
 def test_non_utf8_on_stdin_is_rejected_cleanly(runner):
     before = _manager_bytes()
     result = _run(runner, '--stdin', input=b'pass\xffword\n')
     assert result.exit_code != 0
-    assert 'UnicodeDecodeError' not in (result.output or '')
+    assert 'not valid UTF-8' in _stderr(result) + result.output
     assert _manager_bytes() == before
 
 
@@ -265,3 +293,42 @@ def test_setup_complete_false_is_preserved(runner, app_module):
     result = _run(runner, '--password', 'chosenpassword')
     assert result.exit_code == 0, result.output
     assert _raw()['setup_complete'] is False
+
+
+def test_stdin_returns_without_waiting_for_the_stream_to_close(runner):
+    """The command must act on the password line, not on the pipe closing.
+
+    subprocess.communicate closes stdin, which would supply the very EOF this
+    is checking for, so the pipe is deliberately held open and only wait is used.
+    """
+    import os
+    import subprocess
+    import sys
+    from conftest import SETTINGS_PATH
+
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env = dict(os.environ)
+    env.update({'FLASK_APP': 'app.py', 'SETTINGS_PATH': str(SETTINGS_PATH),
+                'PYTHONPATH': repo})
+    proc = subprocess.Popen(
+        [sys.executable, '-m', 'flask', 'reset-password', '--stdin'],
+        cwd=repo, env=env, stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
+    try:
+        proc.stdin.write('a-brand-new-password\n')
+        proc.stdin.flush()
+        try:
+            proc.wait(timeout=25)
+        except subprocess.TimeoutExpired:
+            raise AssertionError(
+                'reset-password --stdin waited for the stream to close instead of '
+                'the password line, so any caller that inherits a terminal on '
+                'stdin hangs with no prompt and no output')
+        assert proc.returncode == 0
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        try:
+            proc.stdin.close()
+        except Exception:
+            pass

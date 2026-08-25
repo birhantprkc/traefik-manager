@@ -10,16 +10,16 @@ You don't normally need to edit this file by hand - all settings are managed thr
 
 TM stores some data in separate files alongside `manager.yml` in the same config directory:
 
-| File                      | Contents                                                                                                                        |
-| ---------------------------| ---------------------------------------------------------------------------------------------------------------------------------|
-| `manager.yml`             | All TM settings - auth, domains, tabs, webhooks, OIDC, git backup, CrowdSec, disabled routes                                    |
-| `agents.yml`              | Remote agent registrations (encrypted API keys). Auto-created and migrated from `manager.yml` on first start after v1.5.0       |
-| `templates.yml`           | Custom middleware templates created from the Middlewares tab toolbar                                                            |
-| `notifications.yml`       | Recent notification history, capped at the 200 newest entries                                                                   |
-| `notifications.yml.lock`  | Empty lock file that keeps the workers from overwriting each other's notifications. Safe to delete while TM is stopped          |
-| `notifications.yml.next_id` | The next notification id, so ids are never reused after a clear. Safe to delete while TM is stopped                            |
-| `dashboard.yml`           | Dashboard custom groups and per-card overrides, kept per server                                                                 |
-| `.secret_key`, `.otp_key` | Auto-generated session key and the Fernet key for every encrypted field below. Lose `.otp_key` and those secrets are unreadable |
+| File                        | Contents                                                                                                                        |
+| -----------------------------| ---------------------------------------------------------------------------------------------------------------------------------|
+| `manager.yml`               | All TM settings - auth, domains, tabs, webhooks, OIDC, git backup, CrowdSec, disabled routes                                    |
+| `agents.yml`                | Remote agent registrations (encrypted API keys). Auto-created and migrated from `manager.yml` on first start after v1.5.0       |
+| `templates.yml`             | Custom middleware templates created from the Middlewares tab toolbar                                                            |
+| `notifications.yml`         | Recent notification history, capped at the 200 newest entries                                                                   |
+| `notifications.yml.lock`    | Empty lock file that keeps the workers from overwriting each other's notifications. Safe to delete while TM is stopped          |
+| `notifications.yml.next_id` | The next notification id, so ids are never reused after a clear. Safe to delete while TM is stopped                             |
+| `dashboard.yml`             | Dashboard custom groups and per-card overrides, kept per server                                                                 |
+| `.secret_key`, `.otp_key`   | Auto-generated session key and the Fernet key for every encrypted field below. Lose `.otp_key` and those secrets are unreadable |
 
 None of these need to be edited by hand. Back up the entire config directory to preserve all TM state.
 
@@ -189,7 +189,7 @@ python3 -c "import bcrypt; print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()
 
 **Type:** boolean - **Default:** `false`
 
-When `true`, the user is redirected to a forced password-change screen after login. Set automatically by the CLI reset command.
+When `true`, the user is redirected to a forced password-change screen after login. Set automatically by the CLI reset command when run with no password option.
 
 ---
 
@@ -199,7 +199,7 @@ When `true`, the user is redirected to a forced password-change screen after log
 
 When `true`, opening Traefik Manager asks for a new password and nothing else - the setup wizard is
 skipped and the rest of `manager.yml` is left alone. Clears itself once the password is set. Set by the
-CLI reset command, or by hand to recover from a lost password (see
+CLI reset command when run with no password option, or by hand to recover from a lost password (see
 [Reset Password](/reset-password#method-2-manual-reset-via-manager-yml)).
 
 ---

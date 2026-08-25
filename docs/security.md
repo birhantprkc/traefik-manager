@@ -14,7 +14,7 @@ The login password is hashed with **bcrypt at cost 12** before storage in `manag
 
 Login POSTs are rate-limited to **5 per minute per IP**, successful or not.
 
-While [`ADMIN_PASSWORD`](env-vars.md#admin-password) is set, login compares that plaintext value instead of the stored hash, and 2FA, the in-UI password change and `flask reset-password` all have no effect.
+While [`ADMIN_PASSWORD`](env-vars.md#admin-password) is set, login compares that plaintext value instead of the stored hash, and 2FA and the in-UI password change have no effect. `flask reset-password` with `--prompt`, `--stdin` or `--password` exits with an error and writes nothing; with no password option it still writes a temporary password, which login then ignores.
 
 ### Session management
 

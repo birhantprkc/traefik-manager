@@ -942,7 +942,7 @@ def reset_password_cli(disable_otp, prompt_pw, from_stdin, password_opt):
                                 default='', show_default=False)
     elif from_stdin:
         try:
-            raw = click.get_binary_stream('stdin').read().decode('utf-8')
+            raw = click.get_binary_stream('stdin').readline().decode('utf-8-sig')
         except UnicodeDecodeError:
             raise click.ClickException('The password on standard input is not valid UTF-8.')
         password = raw.split('\n', 1)[0].rstrip('\r')

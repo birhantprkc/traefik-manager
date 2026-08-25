@@ -348,11 +348,11 @@
         <details class="reset-hint">
             <summary><i class="ph-bold ph-lock-key" style="font-size:11px"></i> Reset password</summary>
             <div class="reset-hint-body">
-                Run this command to generate a new temporary password, then log in with it:
-                <code>docker exec -it traefik-manager flask reset-password</code>
-                <code>podman exec -it traefik-manager flask reset-password</code>
-                <code>flask reset-password</code>
-                The new password is printed to the terminal. You'll be prompted to set a permanent one on next login.
+                Run this command and enter a new password when asked:
+                <code>docker exec -it traefik-manager flask reset-password --prompt</code>
+                <code>podman exec -it traefik-manager flask reset-password --prompt</code>
+                <code>flask reset-password --prompt</code>
+                The password is not printed back. Log in with it straight away.
             </div>
         </details>
         {% endif %}

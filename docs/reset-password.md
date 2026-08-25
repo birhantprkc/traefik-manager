@@ -14,7 +14,9 @@ This page covers all methods for recovering access to Traefik Manager. All of th
 | `--stdin` | Scripts and automation |
 | `--password TEXT` | One-off scripted calls. Visible in `ps` output and shell history, so prefer `--stdin` |
 
-Minimum 8 characters. Pass only one of the three. Nothing is written if the password is rejected.
+Minimum 8 characters, maximum 72 bytes - the bcrypt limit. Accented and non-Latin characters take more than one byte each, so a passphrase can pass 72 bytes at well under 72 characters.
+
+Pass only one of the three. Nothing is written if the password is rejected. All three refuse to run while [`ADMIN_PASSWORD`](env-vars.md#admin-password) is set - change or unset that variable instead.
 
 :::tabs
 == Docker
@@ -52,7 +54,9 @@ SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
 
 From a script:
 ```bash
-printf '%s' "$NEW_PASSWORD" | SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
+cd /opt/traefik-manager
+printf '%s' "$NEW_PASSWORD" | sudo -u traefik-manager \
+  env SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
   venv/bin/flask reset-password --stdin
 ```
 :::
