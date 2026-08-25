@@ -1289,11 +1289,13 @@ function renderLogs() {
         all: _logParsed.map(o => o.e).filter(Boolean), facetDead: facetDead
     });
 
-    _logRows = visible.map(o => o.e);
+    const feed = visible.slice().reverse();
+
+    _logRows = feed.map(o => o.e);
 
     const statusColor = s => !s ? 'var(--muted)' : s >= 500 ? 'var(--red)' : s >= 400 ? 'var(--yellow)' : 'var(--green)';
 
-    const cards = visible.map(({ raw, e }, i) => {
+    const cards = feed.map(({ raw, e }, i) => {
         if (!e) {
             return '<div class="sig-ep-row lg-raw" data-health="idle" title="' + _esc('No access log format matched this line') + '">'
                 + '<span class="sig-ep-id"><span class="sig-ep-name">' + _esc(raw) + '</span></span>'
