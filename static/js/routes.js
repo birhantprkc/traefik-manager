@@ -565,11 +565,12 @@ async function saveRouteAjax(event) {
         }
         if (_activeAgent) fd.append('agent_id', _activeAgent.id);
         const res = await fetch(form.action, { method:'POST', headers:{'X-Requested-With':'fetch'}, body: fd });
+        if (!res.ok) { showToast(await _errText(res, 'Error saving route'), 'error'); return; }
         const json = await res.json();
-        showToast(json.message, json.ok ? 'success' : 'error');
+        showToast(json.message || json.error || 'Error saving route', json.ok ? 'success' : 'error');
         if (json.ok) { closeModal(); refreshRoutes(); fetchNotifications(); if (typeof window.rmInvalidateData === 'function') window.rmInvalidateData(); setTimeout(fetchNotifications, 8000); }
     } catch(e) {
-        showToast('Error saving route', 'error');
+        showToast(_netErrText(e, 'Error saving route'), 'error');
     } finally {
         btn.disabled = false;
     }
@@ -585,10 +586,11 @@ async function deleteRoute(id, configFile) {
     if (_activeAgent) data.append('agent_id', _activeAgent.id);
     try {
         const res = await fetch('/delete/' + encodeURIComponent(id), { method:'POST', headers:{'X-Requested-With':'fetch'}, body: data });
+        if (!res.ok) { showToast(await _errText(res, 'Error deleting route'), 'error'); return; }
         const json = await res.json();
-        showToast(json.message, json.ok ? 'success' : 'error');
+        showToast(json.message || json.error || 'Error deleting route', json.ok ? 'success' : 'error');
         if (json.ok) { refreshRoutes(); fetchNotifications(); if (typeof window.rmInvalidateData === 'function') window.rmInvalidateData(); }
-    } catch(e) { showToast('Error deleting route', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Error deleting route'), 'error'); }
 }
 
 async function toggleRoute(id, currentlyEnabled, silent = false) {
@@ -600,14 +602,18 @@ async function toggleRoute(id, currentlyEnabled, silent = false) {
             headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '', 'Content-Type': 'application/json' },
             body: JSON.stringify({ enable: !currentlyEnabled, agent_id: _activeAgent ? _activeAgent.id : '', csrf_token: document.querySelector('meta[name="csrf-token"]')?.content || '' })
         });
+        if (!res.ok) {
+            if (!silent) showToast(await _errText(res, 'Failed to toggle route'), 'error');
+            return;
+        }
         const json = await res.json();
         if (json.ok) {
             if (!silent) { showToast(currentlyEnabled ? 'Route disabled.' : 'Route enabled.', 'success'); refreshRoutes(); }
             if (typeof window.rmInvalidateData === 'function') window.rmInvalidateData();
         } else {
-            if (!silent) showToast(json.message || 'Failed to toggle route.', 'error');
+            if (!silent) showToast(json.message || json.error || 'Failed to toggle route.', 'error');
         }
-    } catch(e) { if (!silent) showToast('Error toggling route.', 'error'); }
+    } catch(e) { if (!silent) showToast(_netErrText(e, 'Error toggling route'), 'error'); }
 }
 
 async function refreshRoutes() {
@@ -618,7 +624,10 @@ async function refreshRoutes() {
         } else {
             res = await fetch('/api/routes');
         }
-        if (!res.ok) throw new Error('routes ' + res.status);
+        if (!res.ok) {
+            showToast(await _errText(res, 'Could not load routes'), 'error');
+            return;
+        }
         const data = await res.json();
         if (data.services) window._tmServices = data.services;
         renderRouteGrid(data.apps || []);
@@ -627,7 +636,7 @@ async function refreshRoutes() {
         _renderConfigErrorBanner(data.configErrors || []);
     } catch(e) {
         console.error('refreshRoutes failed:', e);
-        showToast('Could not load routes. Check the connection and try again.', 'error');
+        showToast(_netErrText(e, 'Could not load routes'), 'error');
     }
 }
 
@@ -1748,7 +1757,7 @@ async function bulkDelete() {
     if (!ids.length) return;
     if (!await _confirm(`Delete ${ids.length} route${ids.length > 1 ? 's' : ''}? This removes them from the config files and stops serving them.`, 'Bulk Delete', 'Delete', 'DELETE')) return;
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-    let failed = 0;
+    let failed = 0, firstErr = '';
     for (const id of ids) {
         const card = document.querySelector(`.route-card[data-routekey="${CSS.escape(id)}"]`);
         const cf   = card?.dataset.configfile || '';
@@ -1758,11 +1767,19 @@ async function bulkDelete() {
         if (_activeAgent) data.append('agent_id', _activeAgent.id);
         try {
             const res  = await fetch('/delete/' + encodeURIComponent(id), { method:'POST', headers:{'X-Requested-With':'fetch'}, body: data });
+            if (!res.ok) {
+                failed++;
+                if (!firstErr) firstErr = await _errText(res, 'Route could not be deleted');
+                continue;
+            }
             const json = await res.json();
-            if (!res.ok || !json.ok) failed++;
-        } catch(e) { failed++; }
+            if (!json.ok) {
+                failed++;
+                if (!firstErr) firstErr = json.message || json.error || '';
+            }
+        } catch(e) { failed++; if (!firstErr) firstErr = _netErrText(e, 'Route could not be deleted'); }
     }
-    if (failed) showToast(`${failed} of ${ids.length} route${ids.length > 1 ? 's' : ''} could not be deleted.`, 'error');
+    if (failed) showToast(`${failed} of ${ids.length} route${ids.length > 1 ? 's' : ''} could not be deleted.` + (firstErr ? ' ' + firstErr : ''), 'error');
     else showToast(`Deleted ${ids.length} route${ids.length > 1 ? 's' : ''}.`, 'success');
     _bulkSelected.clear(); updateBulkBar(); refreshRoutes(); fetchNotifications();
     if (typeof window.rmInvalidateData === 'function') window.rmInvalidateData();

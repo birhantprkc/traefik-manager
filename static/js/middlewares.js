@@ -74,14 +74,15 @@ async function generateDigestAuth() {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     try {
         const res  = await fetch('/api/tools/digestauth', { method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token': csrf}, body: JSON.stringify({username: user, realm, password: pass}) });
+        if (!res.ok) { showToast(await _errText(res, 'Error generating hash'), 'error'); return; }
         const json = await res.json();
-        if (!json.ok) { showToast(json.error || 'Failed', 'error'); return; }
+        if (!json.ok) { showToast(json.error || json.message || 'Error generating hash', 'error'); return; }
         const ta = document.getElementById('wizDaUsers');
         if (ta) ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + json.hash;
         document.getElementById('wizDaGenUser').value = '';
         document.getElementById('wizDaGenRealm').value = '';
         document.getElementById('wizDaGenPass').value = '';
-    } catch(e) { showToast('Error generating hash', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Error generating hash'), 'error'); }
 }
 
 async function generateHtpasswd() {
@@ -91,13 +92,14 @@ async function generateHtpasswd() {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     try {
         const res  = await fetch('/api/tools/htpasswd', { method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token': csrf}, body: JSON.stringify({username: user, password: pass}) });
+        if (!res.ok) { showToast(await _errText(res, 'Error generating hash'), 'error'); return; }
         const json = await res.json();
-        if (!json.ok) { showToast(json.error || 'Failed', 'error'); return; }
+        if (!json.ok) { showToast(json.error || json.message || 'Error generating hash', 'error'); return; }
         const ta = document.getElementById('wizBaUsers');
         if (ta) ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + json.hash;
         document.getElementById('wizBaGenUser').value = '';
         document.getElementById('wizBaGenPass').value = '';
-    } catch(e) { showToast('Error generating hash', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Error generating hash'), 'error'); }
 }
 
 function setMwMode(mode) {
@@ -410,11 +412,12 @@ async function saveMwAjax(event) {
         const fd = new FormData(form);
         if (_activeAgent) fd.append('agent_id', _activeAgent.id);
         const res = await fetch(form.action, { method:'POST', headers:{'X-Requested-With':'fetch'}, body: fd });
+        if (!res.ok) { showToast(await _errText(res, 'Error saving middleware'), 'error'); return; }
         const json = await res.json();
-        showToast(json.message, json.ok ? 'success' : 'error');
+        showToast(json.message || json.error || 'Error saving middleware', json.ok ? 'success' : 'error');
         if (json.ok) { closeMwModal(); _cachedMiddlewares = null; refreshRoutes(); fetchNotifications(); if (typeof window.rmInvalidateData === 'function') window.rmInvalidateData(); setTimeout(fetchNotifications, 8000); }
     } catch(e) {
-        showToast('Error saving middleware', 'error');
+        showToast(_netErrText(e, 'Error saving middleware'), 'error');
     } finally {
         btn.disabled = false;
     }
@@ -428,10 +431,11 @@ async function deleteMw(name, configFile) {
     if (_activeAgent) data.append('agent_id', _activeAgent.id);
     try {
         const res = await fetch('/delete-middleware/' + encodeURIComponent(name), { method:'POST', headers:{'X-Requested-With':'fetch'}, body: data });
+        if (!res.ok) { showToast(await _errText(res, 'Error deleting middleware'), 'error'); return; }
         const json = await res.json();
-        showToast(json.message, json.ok ? 'success' : 'error');
+        showToast(json.message || json.error || 'Error deleting middleware', json.ok ? 'success' : 'error');
         if (json.ok) { _cachedMiddlewares = null; refreshRoutes(); fetchNotifications(); if (typeof window.rmInvalidateData === 'function') window.rmInvalidateData(); }
-    } catch(e) { showToast('Error deleting middleware', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Error deleting middleware'), 'error'); }
 }
 
 function _tmMwIcon(mw) {
@@ -758,10 +762,17 @@ async function refreshPluginsTab() {
         const availP = _activeAgent
             ? agentFetch('/api/static/status').then(r => r.json()).then(d => ({ available: d.configured === true })).catch(() => ({ available: false }))
             : fetch('/api/static/available').then(r => r.json());
-        const [res, avail] = await Promise.all([
-            agentFetch('/api/traefik/plugins').then(r => r.json()),
+        const [pluginsRes, avail] = await Promise.all([
+            agentFetch('/api/traefik/plugins'),
             availP,
         ]);
+        if (!pluginsRes.ok) {
+            const why = await _errText(pluginsRes, 'Could not load plugin data');
+            container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>${_esc(why)}</p></div>`;
+            setTabCount('plugins', '0');
+            return;
+        }
+        const res = await pluginsRes.json();
         _pluginCanManage = avail.available === true;
         const addBtn = document.getElementById('pluginAddBtnWrap');
         if (addBtn) addBtn.style.display = _pluginCanManage ? 'flex' : 'none';
@@ -818,7 +829,7 @@ async function refreshPluginsTab() {
             renderPluginCards();
         }).catch(() => {});
     } catch(e) {
-        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>Could not load plugin data</p></div>`;
+        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>${_esc(_netErrText(e, 'Could not load plugin data'))}</p></div>`;
     }
 }
 
@@ -949,8 +960,9 @@ async function savePlugin() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ static_yaml: staticYaml, middleware_yaml: mwYaml, middleware_file: _pluginMwFileChoice(), server: _activeAgent ? _activeAgent.id : '' }),
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to install plugin'), 'error'); return; }
         const data = await res.json();
-        if (!data.ok) { showToast(data.error || 'Failed to install plugin', 'error'); return; }
+        if (!data.ok) { showToast(data.error || data.message || 'Failed to install plugin', 'error'); return; }
         closePluginForm();
         const banner = document.getElementById('pluginRestartBanner');
         const detail = document.getElementById('pluginRestartBannerDetail');
@@ -986,7 +998,15 @@ function _pluginMwFileChoice() {
 
 async function _pluginSectionWrite(body) {
     if (_activeAgent) {
-        const cur = await agentFetch('/api/static').then(r => r.json()).catch(() => null);
+        let cur = null;
+        try {
+            const curRes = await agentFetch('/api/static');
+            if (!curRes.ok) { showToast(await _errText(curRes, 'Cannot read the agent static config'), 'error'); return null; }
+            cur = await curRes.json();
+        } catch (e) {
+            showToast(_netErrText(e, 'Cannot read the agent static config'), 'error');
+            return null;
+        }
         if (!cur || cur.content === undefined) { showToast('Cannot read the agent static config', 'error'); return null; }
         body.current_raw = cur.content;
     }
@@ -995,13 +1015,15 @@ async function _pluginSectionWrite(body) {
         headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
         body: JSON.stringify(body),
     });
+    if (!r1.ok) { showToast(await _errText(r1, 'Could not update the static config'), 'error'); return null; }
     const d1 = await r1.json();
-    if (!d1.ok) { showToast(d1.error || 'Failed', 'error'); return null; }
+    if (!d1.ok) { showToast(d1.error || d1.message || 'Could not update the static config', 'error'); return null; }
     const r2 = _activeAgent
         ? await agentFetch('/api/static', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: d1.raw }) })
         : await fetch('/api/static/config', { method: 'POST', headers: { 'Content-Type': 'application/json', ..._csrfHeaders() }, body: JSON.stringify({ content: d1.raw }) });
+    if (!r2.ok) { showToast(await _errText(r2, 'Failed to save the static config'), 'error'); return null; }
     const d2 = await r2.json();
-    if (!d2.ok) { showToast(d2.error || 'Failed to save', 'error'); return null; }
+    if (!d2.ok) { showToast(d2.error || d2.message || 'Failed to save the static config', 'error'); return null; }
     return d1;
 }
 

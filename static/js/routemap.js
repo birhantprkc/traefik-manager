@@ -10,6 +10,7 @@ let _rmStatusBlind = true;
 let _rmAllEps    = {};
 let _rmDataLoaded = false;
 let _rmLoadedAt   = 0;
+let _rmLoadErr    = '';
 const RM_DATA_TTL = 30000;
 
 window.rmGetCustomGroups = function() { return _rmConfig.custom_groups || []; };
@@ -69,6 +70,7 @@ function _rmStatusMap(rows, build) {
 window.rmEnsureData = async function(force, opts) {
     const wantSvc = !!(opts && opts.services);
     if (_rmDataLoaded && !force && (Date.now() - _rmLoadedAt) < RM_DATA_TTL && (!wantSvc || _rmSvcLoaded)) return true;
+    _rmLoadErr = '';
     try {
         const routeUrl = _activeAgent
             ? '/api/agents/' + _activeAgent.id + '/routes'
@@ -80,7 +82,10 @@ window.rmEnsureData = async function(force, opts) {
             agentFetch('/api/traefik/routers').catch(() => null),
             wantSvc ? agentFetch('/api/traefik/services').catch(() => null) : null
         ]);
-        if (!routeRes.ok) throw new Error('routes ' + routeRes.status);
+        if (!routeRes.ok) {
+            _rmLoadErr = await _errText(routeRes, 'Could not load route map data');
+            throw new Error(_rmLoadErr);
+        }
         const routeData = await routeRes.json();
         _rmAllRoutes = (routeData.apps || []).map(r => ({
             ...r,
@@ -126,6 +131,7 @@ window.rmEnsureData = async function(force, opts) {
             }
         } catch(_) {}
     } catch(e) {
+        if (!_rmLoadErr) _rmLoadErr = _netErrText(e, 'Could not load route map data');
         _rmAllRoutes    = [];
         _rmAllEps       = {};
         _rmRouterStatus = {};
@@ -406,10 +412,10 @@ window.refreshRoutemapTab = async function(force) {
     document.getElementById('rmLoading').classList.add('hidden');
     if (!ok) {
         if (!_rmDrawn) {
-            showToast('Could not load route map data. Retrying on next open.', 'error');
+            showToast((_rmLoadErr || 'Could not load route map data').replace(/\.?$/, '.') + ' Retrying on next open.', 'error');
             return;
         }
-        showToast('Could not refresh the route map - showing the last data.', 'error');
+        showToast((_rmLoadErr || 'Could not refresh the route map').replace(/\.?$/, '.') + ' Showing the last data.', 'error');
     }
     _rmDrawn = true;
     rmRenderProviderFilters();

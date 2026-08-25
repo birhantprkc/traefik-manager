@@ -397,6 +397,29 @@ function _dCount(n) {
     return `<span class="d-n">${n}</span>`;
 }
 
+async function _errText(res, fallback) {
+    if (res && res.status === 502) return 'Cannot reach the agent. Check that it is running and reachable.';
+    if (res && res.status === 401) return 'Session expired. Sign in again.';
+    if (res && res.status === 403) return 'Not allowed. Your session may have expired.';
+    if (res && res.status === 404) return fallback + ' (not found)';
+    try {
+        const data = await res.json();
+        const detail = data.error || data.message;
+        if (detail) return String(detail).slice(0, 300);
+    } catch (e) {}
+    return res && res.status ? `${fallback} (HTTP ${res.status})` : fallback;
+}
+
+
+function _netErrText(err, fallback) {
+    const msg = String((err && err.message) || err || '');
+    if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
+        return 'No response from Traefik Manager. Check that it is still running.';
+    }
+    return msg ? `${fallback}: ${msg.slice(0, 200)}` : fallback;
+}
+
+
 function _esc(s) {
     return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }

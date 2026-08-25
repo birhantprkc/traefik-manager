@@ -19,12 +19,15 @@ async function _fixSelfRouteEp(fixEp) {
             headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'X-CSRF-Token': token },
             body: JSON.stringify({ domain: sr.domain, service_url: sr.service_url, router_name: sr.router_name || 'traefik-manager', entry_point: fixEp })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to update self-route'), 'error'); return; }
         const json = await res.json();
         if (json.ok) {
             document.getElementById('selfRouteEpWarning')?.remove();
             showToast('Self-route entrypoint updated to ' + fixEp);
+        } else {
+            showToast(json.error || json.message || 'Failed to update self-route', 'error');
         }
-    } catch(e) { showToast('Failed to update self-route', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Failed to update self-route'), 'error'); }
 }
 
 function loadTabTogglesIntoModal() {
@@ -106,6 +109,7 @@ async function generateApiKey() {
             headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': token, 'Content-Type': 'application/json' },
             body: JSON.stringify({ device_name: deviceName })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to generate key.'), 'error'); return; }
         const json = await res.json();
         if (json.ok) {
             hideAddApiKeyForm();
@@ -114,9 +118,9 @@ async function generateApiKey() {
             showToast('API key generated. Copy it now.', 'success');
             loadApiKeyStatus();
         } else {
-            showToast(json.error || 'Failed to generate key.', 'error');
+            showToast(json.error || json.message || 'Failed to generate key.', 'error');
         }
-    } catch(e) { showToast('Error generating key.', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Failed to generate key.'), 'error'); }
 }
 
 async function revokeApiKey(preview) {
@@ -128,12 +132,15 @@ async function revokeApiKey(preview) {
             headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': token, 'Content-Type': 'application/json' },
             body: JSON.stringify({ preview })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to revoke key.'), 'error'); return; }
         const json = await res.json();
         if (json.ok) {
             showToast('API key revoked.', 'success');
             loadApiKeyStatus();
+        } else {
+            showToast(json.error || json.message || 'Failed to revoke key.', 'error');
         }
-    } catch(e) { showToast('Error revoking key.', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Failed to revoke key.'), 'error'); }
 }
 
 function copyApiKey() {
@@ -179,6 +186,7 @@ async function saveSelfRoute() {
             headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'X-CSRF-Token': token },
             body: JSON.stringify({ domain, service_url: serviceUrl, router_name: _selfRouteRouterName, entry_point: entryPoint })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Could not save the self route.'), 'error'); return; }
         const json = await res.json();
         if (json.ok) {
             const notice    = document.getElementById('selfRouteSavedNotice');
@@ -186,8 +194,10 @@ async function saveSelfRoute() {
             if (notice) { notice.classList.remove('hidden'); setTimeout(() => notice.classList.add('hidden'), 2500); }
             if (deleteBtn) deleteBtn.classList.toggle('hidden', !domain);
             showToast(domain ? 'Self route saved.' : 'Self route removed.', 'success');
+        } else {
+            showToast(json.error || json.message || 'Could not save the self route.', 'error');
         }
-    } catch(e) { showToast('Error saving self route.', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Could not save the self route.'), 'error'); }
 }
 
 async function deleteSelfRoute() {

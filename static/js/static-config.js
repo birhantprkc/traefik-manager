@@ -293,6 +293,7 @@ async function saveStaticConfig() {
             ? () => agentFetch('/api/static', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })
             : () => fetch('/api/static/config', { method: 'POST', headers: { 'Content-Type': 'application/json', ..._csrfHeaders() }, body: JSON.stringify({ content }) });
         const res  = await fetchFn();
+        if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             _staticRawContent = content;
@@ -311,10 +312,10 @@ async function saveStaticConfig() {
                 if (d2.parsed) _renderStaticSections(d2.parsed);
             } catch(e) {}
         } else {
-            showToast(data.error || 'Save failed', 'error');
+            showToast(data.error || data.message || 'Save failed', 'error');
         }
     } catch(e) {
-        showToast('Save failed', 'error');
+        showToast(_netErrText(e, 'Save failed'), 'error');
     }
 }
 
@@ -357,13 +358,14 @@ async function openRouteYamlEditor(id) {
     if (title) title.textContent = `Raw YAML - ${name}`;
     try {
         const res  = await agentFetch(`/api/routes/${encodeURIComponent(id)}/raw`);
+        if (!res.ok) { showToast(await _errText(res, 'Failed to load route YAML'), 'error'); return; }
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
         const overlay = document.getElementById('routeYamlPopout');
         if (overlay) overlay.style.display = 'flex';
         _initRouteYamlMonaco(data.raw || '');
     } catch(e) {
-        showToast('Failed to load route YAML', 'error');
+        showToast(_netErrText(e, 'Failed to load route YAML'), 'error');
     }
 }
 
@@ -380,16 +382,17 @@ async function saveRouteYaml() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ content }),
         });
+        if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             closeRouteYamlEditor();
             refreshRoutes();
             fetchNotifications();
         } else {
-            showToast(data.error || 'Save failed', 'error');
+            showToast(data.error || data.message || 'Save failed', 'error');
         }
     } catch(e) {
-        showToast('Save failed', 'error');
+        showToast(_netErrText(e, 'Save failed'), 'error');
     }
 }
 
@@ -453,7 +456,7 @@ async function triggerTraefikRestart() {
             _waitForReconnect(true);
         } else {
             _hideRestartOverlay();
-            showToast(data.error || 'Restart failed', 'error');
+            showToast(data.error || data.message || ('Restart failed (HTTP ' + res.status + ')'), 'error');
         }
     } catch(e) {
         _hideStaticRestartBanner();
@@ -657,8 +660,9 @@ async function _applyStaticSectionChange(body) {
         headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
         body: JSON.stringify({ ...body, current_raw: _staticRawContent }),
     });
+    if (!res.ok) { showToast(await _errText(res, 'Could not update the static config'), 'error'); return; }
     const data = await res.json();
-    if (!data.ok) { showToast(data.error || 'Failed', 'error'); return; }
+    if (!data.ok) { showToast(data.error || data.message || 'Could not update the static config', 'error'); return; }
     _staticParsedData = data.parsed || {};
     _staticRawContent = data.raw || '';
     _renderStaticSections(_staticParsedData);
@@ -704,14 +708,14 @@ async function submitStaticSection(section) {
     try {
         await _applyStaticSectionChange({ action, section, name, old_name, data: payload });
         closeStaticForm(section);
-    } catch(e) { showToast('Request failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Could not update the static config'), 'error'); }
 }
 
 async function removeStaticItem(section, name) {
     if (!await _confirm(`Remove "${name}"?`, 'Remove Item', 'Remove')) return;
     try {
         await _applyStaticSectionChange({ action: 'remove', section, name, data: {} });
-    } catch(e) { showToast('Request failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Could not update the static config'), 'error'); }
 }
 
 function _scFile(path) {
@@ -1446,7 +1450,7 @@ async function submitStaticProvider() {
     try {
         await _applyStaticSectionChange({ action, section: 'providers', name: type, old_name, data: { yaml_config } });
         closeStaticForm('providers');
-    } catch(e) { showToast('Request failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Could not update the static config'), 'error'); }
 }
 
 async function saveStaticSingleSection(section) {
@@ -1516,7 +1520,7 @@ async function saveStaticSingleSection(section) {
         await _applyStaticSectionChange({ action: 'set', section, name: '', data });
         const save = document.querySelector(`.sc-save[data-sc-save="${section}"]`);
         if (save) save.style.display = 'none';
-    } catch(e) { showToast('Request failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Could not update the static config'), 'error'); }
 }
 
 function _buildStaticTabHTML() {
@@ -2239,7 +2243,8 @@ async function _loadStaticFromDisk() {
             if (bar) bar.style.display = 'none';
             const acts = document.querySelector('#tab-static .fb-secondary');
             if (acts) acts.style.display = 'none';
-            wrapper.innerHTML = (!_activeAgent && typeof _emptyMountState === 'function')
+            const notMounted = res.ok || res.status === 404;
+            wrapper.innerHTML = (!_activeAgent && notMounted && typeof _emptyMountState === 'function')
                 ? _emptyMountState({
                     icon: 'ph-sliders',
                     title: 'traefik.yml not mounted',
@@ -2278,7 +2283,7 @@ async function _loadStaticFromDisk() {
     } catch(e) {
         wrapper.innerHTML = `<div class="text-center py-16" style="color:var(--muted)">
             <i class="ph-light ph-warning-circle text-4xl block mb-3 opacity-40"></i>
-            <p>Failed to load static config</p></div>`;
+            <p>${_esc(_netErrText(e, 'Failed to load static config'))}</p></div>`;
     }
 }
 
@@ -2474,8 +2479,9 @@ function closeTrustedIpsModal() {
 async function _tipInspect() {
     try {
         const res = await fetch('/api/static/trusted-ips/preview', { method: 'POST', headers: { 'Content-Type': 'application/json', ..._csrfHeaders() }, body: JSON.stringify({ current_raw: _tipBaseRaw() }) });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to read static config'), 'error'); closeTrustedIpsModal(); return; }
         const d = await res.json();
-        if (!res.ok || d.error) { showToast(d.error || 'Failed to read static config', 'error'); closeTrustedIpsModal(); return; }
+        if (d.error) { showToast(d.error, 'error'); closeTrustedIpsModal(); return; }
         _tipData = d;
         const sel = document.getElementById('tipEntrypoint');
         if (!d.entrypoints.length) {
@@ -2486,7 +2492,7 @@ async function _tipInspect() {
         const cf = document.getElementById('tipCfLabel');
         if (cf) cf.textContent = `Cloudflare edge ranges (${(d.cloudflare_ranges || []).length}, captured ${d.cloudflare_captured})`;
         _tipRenderCurrent();
-    } catch (e) { showToast('Failed to read static config', 'error'); closeTrustedIpsModal(); }
+    } catch (e) { showToast(_netErrText(e, 'Failed to read static config'), 'error'); closeTrustedIpsModal(); }
 }
 
 function _tipRenderCurrent() {
@@ -2518,11 +2524,12 @@ async function tipPreview() {
     if (!cloudflare && !priv && !custom.trim()) { showToast('Select at least one source', 'error'); return; }
     try {
         const res = await fetch('/api/static/trusted-ips/preview', { method: 'POST', headers: { 'Content-Type': 'application/json', ..._csrfHeaders() }, body: JSON.stringify({ current_raw: _tipBaseRaw(), entrypoint, cloudflare, private: priv, custom_cidrs: custom }) });
+        if (!res.ok) { showToast(await _errText(res, 'Preview failed'), 'error'); return; }
         const d = await res.json();
-        if (!res.ok || d.error) { showToast(d.error || 'Preview failed', 'error'); return; }
+        if (d.error) { showToast(d.error, 'error'); return; }
         if (_tipData) _tipData.preview = d;
         _tipRenderPreview(d);
-    } catch (e) { showToast('Preview failed', 'error'); }
+    } catch (e) { showToast(_netErrText(e, 'Preview failed'), 'error'); }
 }
 
 function _tipRenderPreview(d) {

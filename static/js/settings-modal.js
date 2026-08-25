@@ -7,24 +7,26 @@ async function createAndLoadStaticBackup() {
     if (typeof _activeAgent !== 'undefined' && _activeAgent) {
         try {
             const res  = await _backupFetch('/api/backups', { method: 'POST' });
+            if (!res.ok) { showToast(await _errText(res, 'Backup failed'), 'error'); return; }
             const data = await res.json();
             if (data.ok) { showToast('Backup created on ' + _activeAgent.name, 'success'); loadBackups(); }
-            else showToast(data.error || 'Backup failed', 'error');
-        } catch(e) { showToast('Backup failed', 'error'); }
+            else showToast(data.error || data.message || 'Backup failed', 'error');
+        } catch(e) { showToast(_netErrText(e, 'Backup failed'), 'error'); }
         return;
     }
     const btn = document.querySelector('[onclick="createAndLoadStaticBackup()"]');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ph-light ph-spinner-gap animate-spin"></i> Creating…'; }
     try {
         const res  = await fetch('/api/static/backup/create', { method: 'POST', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Backup failed'), 'error'); return; }
         const data = await res.json();
         if (data.success) {
             showToast('Static config backup created', 'success');
             loadBackups();
         } else {
-            showToast('Backup failed: ' + (data.error || 'Unknown'), 'error');
+            showToast('Backup failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
         }
-    } catch(e) { showToast('Backup failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Backup failed'), 'error'); }
     finally {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-plus"></i> Create Backup'; }
     }
@@ -84,14 +86,15 @@ async function saveGitHostAgent() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ git_host_backup: _gitHostAgentOn, git_host_branch: branch }),
         });
+        if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
-        if (!res.ok || data.error) { showToast(data.error || 'Save failed', 'error'); return; }
+        if (data.error) { showToast(data.error, 'error'); return; }
         _activeAgent.git_host_backup = _gitHostAgentOn;
         _activeAgent.git_host_branch = branch;
         showToast('Git settings saved', 'success');
         loadGitTab();
     } catch (e) {
-        showToast('Save failed', 'error');
+        showToast(_netErrText(e, 'Save failed'), 'error');
     }
 }
 
@@ -159,6 +162,10 @@ async function loadGitCommits() {
     list.innerHTML = `<div class="text-center py-4" style="color:var(--muted)"><i class="ph-light ph-spinner-gap animate-spin text-xl block mb-1"></i></div>`;
     try {
         const res     = await _gitFetch('/api/backup/git/commits');
+        if (!res.ok) {
+            list.innerHTML = `<p class="text-xs" style="color:var(--red)">${_esc(await _errText(res, 'Failed to load commits'))}</p>`;
+            return;
+        }
         const commits = await res.json();
         if (!commits.length) {
             list.innerHTML = `<div class="text-center py-6" style="color:var(--muted)"><i class="ph-light ph-git-commit text-3xl block mb-2 opacity-30"></i><p class="text-xs">No commits yet</p></div>`;
@@ -183,7 +190,7 @@ async function loadGitCommits() {
                 </div>
             </div>`).join('');
     } catch(e) {
-        list.innerHTML = `<p class="text-xs" style="color:var(--red)">Failed to load commits</p>`;
+        list.innerHTML = `<p class="text-xs" style="color:var(--red)">${_esc(_netErrText(e, 'Failed to load commits'))}</p>`;
     }
 }
 
@@ -204,6 +211,7 @@ async function saveGitBackupSettings() {
         };
         if (token) payload.git_backup_token = token;
         const res  = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', ..._csrfHeaders() }, body: JSON.stringify(payload) });
+        if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
         if (data.success) {
             showToast('Git settings saved', 'success');
@@ -211,9 +219,9 @@ async function saveGitBackupSettings() {
             const tokenSet = document.getElementById('gitTokenSet');
             if (tokenSet && token) tokenSet.style.display = '';
         } else {
-            showToast('Save failed: ' + (data.error || 'Unknown'), 'error');
+            showToast('Save failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
         }
-    } catch(e) { showToast('Save failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Save failed'), 'error'); }
     finally {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-floppy-disk"></i> Save Git Settings'; }
     }
@@ -231,14 +239,15 @@ async function gitTestConnection() {
         const token = !isAgent && document.getElementById('gitBackupToken')?.value || '';
         if (token) payload.token = token;
         const res  = await _backupFetch('/api/backup/git/test', { method: 'POST', headers: { 'Content-Type': 'application/json', ..._csrfHeaders() }, body: JSON.stringify(payload) });
+        if (!res.ok) { showToast(await _errText(res, 'Connection test failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             showToast('Connection successful', 'success');
         } else {
-            showToast('Connection failed: ' + (data.error || 'Could not reach repository'), 'error');
+            showToast('Connection failed: ' + (data.error || data.message || 'Could not reach repository'), 'error');
         }
     } catch(e) {
-        showToast('Connection test failed', 'error');
+        showToast(_netErrText(e, 'Connection test failed'), 'error');
     }
     finally {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-plugs-connected text-xs"></i> Test'; }
@@ -256,6 +265,7 @@ async function gitPushNow() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ message }),
         });
+        if (!res.ok) { showToast(await _errText(res, 'Push failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             showToast('Pushed successfully', 'success');
@@ -263,11 +273,11 @@ async function gitPushNow() {
             loadGitStatus();
             loadGitCommits();
         } else {
-            showToast('Push failed: ' + (data.error || 'Unknown'), 'error');
+            showToast('Push failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
         }
         if (typeof fetchNotifications === 'function') fetchNotifications();
     } catch(e) {
-        showToast('Push failed', 'error');
+        showToast(_netErrText(e, 'Push failed'), 'error');
     }
     finally {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-cloud-arrow-up text-xs"></i> Push Now'; }
@@ -280,6 +290,7 @@ async function gitResetRepo() {
     if (btn) { btn.disabled = true; }
     try {
         const res  = await _gitFetch('/api/backup/git/repo', { method: 'DELETE', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Reset failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             showToast('Repository reset - push again to re-initialize', 'success');
@@ -287,9 +298,9 @@ async function gitResetRepo() {
             loadGitCommits();
             if (typeof fetchNotifications === 'function') fetchNotifications();
         } else {
-            showToast('Reset failed: ' + (data.error || 'Unknown'), 'error');
+            showToast('Reset failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
         }
-    } catch(e) { showToast('Reset failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Reset failed'), 'error'); }
     finally {
         if (btn) { btn.disabled = false; }
     }
@@ -300,25 +311,27 @@ async function gitRestoreCommit(sha, shaShort) {
                         'Git Restore', 'Restore', 'RESTORE')) return;
     try {
         const res  = await _gitFetch(`/api/backup/git/restore/${sha}`, { method: 'POST', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Restore failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             showToast('Restored successfully', 'success');
             closeSettingsModal();
             setTimeout(() => location.reload(), 1500);
         } else {
-            showToast('Restore failed: ' + (data.error || 'Unknown'), 'error');
+            showToast('Restore failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
         }
-    } catch(e) { showToast('Restore failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Restore failed'), 'error'); }
 }
 
 async function gitViewDiff(sha) {
     try {
         const res  = await _gitFetch(`/api/backup/git/commit/${sha}/diff`);
+        if (!res.ok) { showToast(await _errText(res, 'Failed to load diff'), 'error'); return; }
         const data = await res.json();
         if (data.error) { showToast('Diff error: ' + data.error, 'error'); return; }
         if (!data.files || !data.files.length) { showToast('No changes in this commit', 'info'); return; }
         if (typeof openGitDiffPopout === 'function') openGitDiffPopout(sha, data.files);
-    } catch(e) { showToast('Failed to load diff: ' + (e.message || e), 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Failed to load diff'), 'error'); }
 }
 
 function bool(v) { return v === true || v === 1 || v === 'true'; }
@@ -612,15 +625,16 @@ async function changePassword() {
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token'] },
             body: JSON.stringify({ current_password: current, new_password: newPw, confirm_password: confirm })
         });
+        if (!res.ok) return show(await _errText(res, 'Failed to update password'), false);
         const data = await res.json();
         if (data.success) {
             show('Password updated successfully.', true);
             ['pwCurrent','pwNew','pwConfirm'].forEach(id => document.getElementById(id).value = '');
         } else {
-            show(data.error || 'Failed to update password.', false);
+            show(data.error || data.message || 'Failed to update password.', false);
         }
     } catch(e) {
-        show('Request failed.', false);
+        show(_netErrText(e, 'Request failed'), false);
     }
 }
 
@@ -660,13 +674,14 @@ async function setAuthExternalAck(on) {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ auth_external_ack: !!on }),
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to update'), 'error'); return; }
         const data = await res.json();
-        if (!res.ok || !data.success) { showToast(data.error || 'Failed to update.', 'error'); return; }
+        if (!data.success) { showToast(data.error || data.message || 'Failed to update.', 'error'); return; }
         _paintAuthState(true, !!on);
         const banner = document.getElementById('noAuthBanner');
         if (banner) banner.style.display = on ? 'none' : '';
         showToast(on ? 'Warning hidden. Traefik Manager still does not authenticate anyone.' : 'Warning restored.', 'success');
-    } catch (e) { showToast('Request failed.', 'error'); }
+    } catch (e) { showToast(_netErrText(e, 'Request failed'), 'error'); }
 }
 
 async function toggleAuth() {
@@ -696,6 +711,7 @@ async function toggleAuth() {
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token'] },
             body: JSON.stringify({ auth_enabled: newState })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to update auth'), 'error'); return; }
         const data = await res.json();
         if (data.success) {
             if (data.reauth_required) return _redirectToLoginAfterAuthEnable('Authentication enabled');
@@ -706,10 +722,10 @@ async function toggleAuth() {
             _paintAuthState(false, false);
             showToast(`Authentication ${newState ? 'enabled' : 'disabled'}.`, 'success');
         } else {
-            showToast(data.error || 'Failed to update auth.', 'error');
+            showToast(data.error || data.message || 'Failed to update auth.', 'error');
         }
     } catch(e) {
-        showToast('Request failed.', 'error');
+        showToast(_netErrText(e, 'Request failed'), 'error');
     }
 }
 
@@ -787,6 +803,10 @@ async function loadChannelsList() {
     document.getElementById('channelEditView').style.display = 'none';
     try {
         const res  = await fetch('/api/notifications/channels');
+        if (!res.ok) {
+            body.innerHTML = `<div class="text-center py-6 text-xs" style="color:var(--red)">${_esc(await _errText(res, 'Failed to load channels'))}</div>`;
+            return;
+        }
         const data = await res.json();
         _channels = data.channels || [];
         if (!_channels.length) {
@@ -816,7 +836,7 @@ async function loadChannelsList() {
             </div>`;
         }).join('');
     } catch(e) {
-        body.innerHTML = `<div class="text-center py-6 text-xs" style="color:var(--red)">Failed to load channels</div>`;
+        body.innerHTML = `<div class="text-center py-6 text-xs" style="color:var(--red)">${_esc(_netErrText(e, 'Failed to load channels'))}</div>`;
     }
 }
 
@@ -981,13 +1001,14 @@ async function _persistChannel() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify(payload)
         });
+        if (!res.ok) { _channelError(await _errText(res, 'Failed to save channel')); return null; }
         const data = await res.json();
-        if (data.error || !res.ok) { _channelError(data.error || 'Failed to save channel'); return null; }
+        if (data.error) { _channelError(data.error); return null; }
         const id = (data.channel && data.channel.id) || data.id || _chEditId;
         _chEditId = id;
         return id;
     } catch(e) {
-        _channelError('Request failed');
+        _channelError(_netErrText(e, 'Failed to save channel'));
         return null;
     }
 }
@@ -1006,8 +1027,9 @@ async function _sendChannelTest(id) {
     const res  = await fetch('/api/notifications/channels/' + encodeURIComponent(id) + '/test', {
         method: 'POST', headers: _csrfHeaders()
     });
+    if (!res.ok) return { ok: false, error: await _errText(res, 'Test message could not be sent') };
     const data = await res.json();
-    return { ok: !data.error && res.ok, error: data.error || 'Failed.' };
+    return { ok: !data.error, error: data.error || 'Test message could not be sent.' };
 }
 
 async function testChannel() {
@@ -1025,7 +1047,7 @@ async function testChannel() {
         out.textContent   = result.ok ? 'Delivered.' : result.error;
     } catch(e) {
         out.style.color = 'var(--red)';
-        out.textContent = 'Request failed.';
+        out.textContent = _netErrText(e, 'Test message could not be sent');
     }
     btn.disabled = false;
 }
@@ -1035,7 +1057,7 @@ async function testChannelRow(id) {
         const result = await _sendChannelTest(id);
         showToast(result.ok ? 'Test message delivered' : result.error, result.ok ? 'success' : 'error');
     } catch(e) {
-        showToast('Test failed', 'error');
+        showToast(_netErrText(e, 'Test failed'), 'error');
     }
 }
 
@@ -1050,10 +1072,11 @@ async function toggleChannelEnabled(id) {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ ...ch, enabled: !ch.enabled })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to update channel'), 'error'); loadChannelsList(); return; }
         const data = await res.json();
-        if (data.error || !res.ok) showToast(data.error || 'Failed to update channel', 'error');
+        if (data.error) showToast(data.error, 'error');
     } catch(e) {
-        showToast('Request failed', 'error');
+        showToast(_netErrText(e, 'Failed to update channel'), 'error');
     }
     loadChannelsList();
 }
@@ -1067,12 +1090,13 @@ async function deleteChannel(id) {
     if (!await _confirm(warning, 'Remove Channel', 'Remove')) return;
     try {
         const res  = await fetch('/api/notifications/channels/' + encodeURIComponent(id), { method: 'DELETE', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to remove channel'), 'error'); return; }
         const data = await res.json();
-        if (data.error || !res.ok) { showToast(data.error || 'Failed to remove channel', 'error'); return; }
+        if (data.error) { showToast(data.error, 'error'); return; }
         showToast('Channel removed', 'success');
         loadChannelsList();
     } catch(e) {
-        showToast('Request failed', 'error');
+        showToast(_netErrText(e, 'Failed to remove channel'), 'error');
     }
 }
 
@@ -1150,36 +1174,40 @@ async function toggleGeoip() {
     const tog = document.getElementById('toggle-geoip');
     if (tog) tog.classList.toggle('on', _geoipEnabledState);
     try {
-        const sv = await fetch('/api/settings/geoip', {
+        const svRes = await fetch('/api/settings/geoip', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ geoip_enabled: _geoipEnabledState })
-        }).then(r => r.json());
-        if (!sv || sv.success === false) throw new Error();
+        });
+        if (!svRes.ok) throw new Error(await _errText(svRes, 'Failed to save'));
+        const sv = await svRes.json();
+        if (!sv || sv.success === false) throw new Error((sv && (sv.error || sv.message)) || '');
         if (typeof _geoStatusLoaded !== 'undefined') { try { await loadGeoStatus(true); } catch(_) {} }
         if (_geoipEnabledState) {
             const r = await fetch('/api/geoip/status').then(r => r.json());
             if (!r.available) { showToast('Geolocation on - downloading database...', 'info'); updateGeoipDb(); }
         }
         loadGeoipSettings();
-    } catch(_) {
+    } catch(e) {
         _geoipEnabledState = !_geoipEnabledState;
         if (tog) tog.classList.toggle('on', _geoipEnabledState);
-        showToast('Failed to save', 'error');
+        showToast(_netErrText(e, 'Failed to save'), 'error');
     }
 }
 
 async function updateGeoipDb(btn) {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ph-bold ph-spinner-gap animate-spin text-xs"></i> Downloading...'; }
     try {
-        const r = await fetch('/api/geoip/update', { method: 'POST', headers: _csrfHeaders() }).then(r => r.json());
+        const res = await fetch('/api/geoip/update', { method: 'POST', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Download failed'), 'error'); return; }
+        const r = await res.json();
         if (r.success) {
             showToast(`GeoIP database updated (DB-IP ${r.db_month})`, 'success');
             if (typeof _geoStatusLoaded !== 'undefined') { _geoStatusLoaded = false; try { await loadGeoStatus(true); } catch(_) {} }
         } else {
-            showToast(r.error || 'Download failed', 'error');
+            showToast(r.error || r.message || 'Download failed', 'error');
         }
-    } catch(_) { showToast('Download failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Download failed'), 'error'); }
     finally { if (btn) btn.disabled = false; loadGeoipSettings(); }
 }
 
@@ -1210,6 +1238,7 @@ async function saveSettings() {
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
             body: JSON.stringify({ domains, cert_resolver: resolver, traefik_api_url: apiUrl, acme_json_path: acmeJsonPath, access_log_path: accessLogPath, static_config_path: staticConfigPath, webhook_url: webhookUrl, webhook_type: webhookType, webhook_username: webhookUsername, webhook_password: webhookPassword, crowdsec_lapi_url: crowdsecLapiUrl, crowdsec_api_key: crowdsecApiKey, crowdsec_machine_id: crowdsecMachineId, crowdsec_machine_password: crowdsecMachinePassword, crowdsec_client_cert: crowdsecClientCert, crowdsec_client_key: crowdsecClientKey, crowdsec_ca_cert: crowdsecCaCert, traefik_api_user: traefikApiUser, traefik_api_password: traefikApiPassword })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to save settings'), 'error'); return; }
         const data = await res.json();
         if (data.success) {
             document.getElementById('settingsSavedNotice').classList.remove('hidden');
@@ -1237,10 +1266,10 @@ async function saveSettings() {
             }
             setTimeout(() => document.getElementById('settingsSavedNotice').classList.add('hidden'), 3000);
         } else {
-            showToast(data.error || 'Failed to save settings', 'error');
+            showToast(data.error || data.message || 'Failed to save settings', 'error');
         }
     } catch(e) {
-        showToast('Failed to save settings', 'error');
+        showToast(_netErrText(e, 'Failed to save settings'), 'error');
     }
 }
 
@@ -1285,7 +1314,7 @@ async function testTraefikApi() {
             result.style.color = 'var(--red)';
         }
     } catch(e) {
-        result.textContent = '✗ Connection failed';
+        result.textContent = '✗ ' + _netErrText(e, 'Connection failed');
         result.style.color = 'var(--red)';
     }
 }
@@ -1344,13 +1373,13 @@ async function loadBackups() {
     if (staticList) staticList.innerHTML = spinner;
     try {
         const res  = await _backupFetch('/api/backups');
-        const raw  = await res.json();
         if (!res.ok) {
-            const msg = raw.error || `Error ${res.status}`;
+            const msg = await _errText(res, 'Could not load backups');
             if (routesList) routesList.innerHTML = `<p class="text-sm px-1" style="color:var(--red)">${_esc(msg)}</p>`;
             if (staticList) staticList.innerHTML = '';
             return;
         }
+        const raw     = await res.json();
         const rawArr  = Array.isArray(raw) ? raw : (raw.backups || []);
         const oldAgent = isAgent && rawArr.length > 0 && !rawArr.some(b => b.kind);
         const kindOf  = b => b.kind || (/^traefik\.ya?ml\.\d{8}_\d{6}\.bak$/.test(b.name) ? 'static' : 'routes');
@@ -1366,8 +1395,9 @@ async function loadBackups() {
             switchBackupTab('routes', document.getElementById('backup-tab-routes'));
         }
     } catch (e) {
-        if (routesList) routesList.innerHTML = `<p class="text-sm px-1" style="color:var(--red)">Failed to load backups</p>`;
-        if (staticList) staticList.innerHTML = `<p class="text-sm px-1" style="color:var(--red)">Failed to load backups</p>`;
+        const msg = _esc(_netErrText(e, 'Failed to load backups'));
+        if (routesList) routesList.innerHTML = `<p class="text-sm px-1" style="color:var(--red)">${msg}</p>`;
+        if (staticList) staticList.innerHTML = `<p class="text-sm px-1" style="color:var(--red)">${msg}</p>`;
     }
 }
 
@@ -1387,9 +1417,9 @@ async function saveBackupKeepCount(sourceId) {
             body: JSON.stringify({ backup_keep_count: n }),
         });
         if (res.ok) showToast('Retention saved', 'success');
-        else        showToast('Failed to save retention', 'error');
+        else        showToast(await _errText(res, 'Failed to save retention'), 'error');
     } catch (e) {
-        showToast('Failed to save retention', 'error');
+        showToast(_netErrText(e, 'Failed to save retention'), 'error');
     }
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-floppy-disk"></i> Save'; }
 }
@@ -1399,15 +1429,16 @@ async function createAndLoadBackups() {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ph-light ph-spinner-gap animate-spin"></i> Creating…'; }
     try {
         const res  = await _backupFetch('/api/backup/create', { method: 'POST', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Backup failed'), 'error'); return; }
         const data = await res.json();
         if (data.success || data.ok) {
             const n = data.count || 1;
             showToast(`Backup created (${n} file${n > 1 ? 's' : ''})`, 'success');
             loadBackups();
         } else {
-            showToast('Backup failed: ' + (data.error || 'Unknown'), 'error');
+            showToast('Backup failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
         }
-    } catch(e) { showToast('Backup failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Backup failed'), 'error'); }
     finally {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-plus"></i> Create Backup'; }
     }
@@ -1418,16 +1449,17 @@ async function restoreBackup(name) {
                         'Restore Backup', 'Restore', 'RESTORE')) return;
     try {
         const res  = await _backupFetch(`/api/restore/${encodeURIComponent(name)}`, { method: 'POST', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Restore failed'), 'error'); return; }
         const data = await res.json();
         if (data.success || data.ok) {
             showToast('Backup restored successfully!', 'success');
             closeSettingsModal();
             setTimeout(() => location.reload(), 1500);
         } else {
-            showToast('Restore failed: ' + data.error, 'error');
+            showToast('Restore failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
         }
     } catch (e) {
-        showToast('Restore failed', 'error');
+        showToast(_netErrText(e, 'Restore failed'), 'error');
     }
 }
 
@@ -1435,10 +1467,11 @@ async function deleteBackup(name) {
     if (!await _confirm(`Delete backup "${name}"?`, 'Delete Backup', 'Delete')) return;
     try {
         const res  = await _backupFetch(`/api/backup/delete/${encodeURIComponent(name)}`, { method: 'POST', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Delete failed'), 'error'); return; }
         const data = await res.json();
         if (data.success || data.ok) { showToast('Backup deleted', 'success'); loadBackups(); }
-        else showToast('Delete failed: ' + data.error, 'error');
-    } catch(e) { showToast('Delete failed', 'error'); }
+        else showToast('Delete failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
+    } catch(e) { showToast(_netErrText(e, 'Delete failed'), 'error'); }
 }
 
 function formatBytes(bytes) {
@@ -1786,14 +1819,16 @@ async function otpToggleFlow() {
         if (!await _confirm('Disable two-factor authentication?', 'Disable 2FA', 'Disable')) return;
         try {
             const res  = await fetch('/api/auth/otp/disable', { method: 'POST', headers: _csrfHeaders() });
+            if (!res.ok) { showToast(await _errText(res, 'Could not disable 2FA'), 'error'); return; }
             const data = await res.json();
             if (data.success) { showToast('2FA disabled', 'success'); loadOtpStatus(); }
-            else showToast(data.error || 'Failed', 'error');
-        } catch(e) { showToast('Request failed', 'error'); }
+            else showToast(data.error || data.message || 'Could not disable 2FA', 'error');
+        } catch(e) { showToast(_netErrText(e, 'Could not disable 2FA'), 'error'); }
         return;
     }
     try {
         const res  = await fetch('/api/auth/otp/setup', { method: 'POST', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to start 2FA setup'), 'error'); return; }
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
 
@@ -1815,7 +1850,7 @@ async function otpToggleFlow() {
         document.getElementById('otpVerifyCode').value = '';
         const msg = document.getElementById('otpSetupMsg');
         if (msg) msg.classList.add('hidden');
-    } catch(e) { showToast('Failed to start 2FA setup', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Failed to start 2FA setup'), 'error'); }
 }
 
 async function otpConfirmEnable() {
@@ -1835,6 +1870,7 @@ async function otpConfirmEnable() {
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token'] },
             body: JSON.stringify({ code })
         });
+        if (!res.ok) return show(await _errText(res, 'Could not enable 2FA'), false);
         const data = await res.json();
         if (data.success) {
             show('2FA enabled successfully!', true);
@@ -1842,7 +1878,7 @@ async function otpConfirmEnable() {
         } else {
             show(data.error || 'Invalid code. Try again.', false);
         }
-    } catch(e) { show('Request failed.', false); }
+    } catch(e) { show(_netErrText(e, 'Could not enable 2FA'), false); }
 }
 
 function otpCancelSetup() {
@@ -1894,14 +1930,15 @@ async function oidcToggleEnabled() {
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
             body: JSON.stringify({ oidc_enabled: !isOn, oidc_provider_url: url, oidc_client_id: id, oidc_client_secret: sec, oidc_display_name: disp, oidc_allowed_emails: ae, oidc_allowed_groups: ag, oidc_groups_claim: gc, oidc_allow_any_authenticated: any, oidc_auto_login: auto })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to update OIDC'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             if (data.reauth_required) return _redirectToLoginAfterAuthEnable('OIDC enabled');
             loadOidcStatus();
         } else {
-            showToast(data.error || 'Failed to update OIDC', 'error');
+            showToast(data.error || data.message || 'Failed to update OIDC', 'error');
         }
-    } catch(e) { showToast('Failed to update OIDC', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Failed to update OIDC'), 'error'); }
 }
 
 function _redirectToLoginAfterAuthEnable(what) {
@@ -1927,6 +1964,7 @@ async function saveOidcConfig() {
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
             body: JSON.stringify({ oidc_enabled: isOn, oidc_provider_url: url, oidc_client_id: id, oidc_client_secret: sec, oidc_display_name: disp, oidc_allowed_emails: ae, oidc_allowed_groups: ag, oidc_groups_claim: gc, oidc_allow_any_authenticated: any, oidc_auto_login: auto })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to save OIDC config'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             if (data.reauth_required) return _redirectToLoginAfterAuthEnable('OIDC saved');
@@ -1934,9 +1972,9 @@ async function saveOidcConfig() {
             if (msg) { msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 2500); }
             loadOidcStatus();
         } else {
-            showToast(data.error || 'Failed to save OIDC config', 'error');
+            showToast(data.error || data.message || 'Failed to save OIDC config', 'error');
         }
-    } catch(e) { showToast('Failed to save OIDC config', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Failed to save OIDC config'), 'error'); }
 }
 
 async function testOidcProvider() {
@@ -1958,7 +1996,7 @@ async function testOidcProvider() {
             result.style.color = data.ok ? 'var(--green)' : 'var(--red)';
         }
     } catch(e) {
-        if (result) { result.textContent = 'Request failed'; result.style.color = 'var(--red)'; }
+        if (result) { result.textContent = _netErrText(e, 'Request failed'); result.style.color = 'var(--red)'; }
     }
 }
 
@@ -1976,6 +2014,10 @@ async function loadAgentsList() {
     document.getElementById('agentKeysView').style.display    = 'none';
     try {
         const res  = await fetch('/api/agents');
+        if (!res.ok) {
+            body.innerHTML = `<div class="text-center py-6 text-xs" style="color:var(--red)">${_esc(await _errText(res, 'Failed to load agents'))}</div>`;
+            return;
+        }
         const data = await res.json();
         const agents = data.agents || [];
         if (!agents.length) {
@@ -2005,7 +2047,7 @@ async function loadAgentsList() {
         agents.forEach(a => pingAgent(a.id, a.url));
         updateServerSwitcher(agents);
     } catch(e) {
-        body.innerHTML = `<div class="text-center py-6 text-xs" style="color:var(--red)">Failed to load agents</div>`;
+        body.innerHTML = `<div class="text-center py-6 text-xs" style="color:var(--red)">${_esc(_netErrText(e, 'Failed to load agents'))}</div>`;
     }
 }
 
@@ -2032,6 +2074,10 @@ async function loadAgentKeys() {
     list.innerHTML = '<div class="text-xs" style="color:var(--muted)">Loading...</div>';
     try {
         const res  = await fetch('/api/agents/proxy/' + _keysAgentId + '/keys', { headers: _csrfHeaders() });
+        if (!res.ok) {
+            list.innerHTML = `<div class="text-xs" style="color:var(--red)">${_esc(await _errText(res, 'Failed to load keys'))}</div>`;
+            return;
+        }
         const data = await res.json();
         const keys = data.keys || [];
         if (!keys.length) {
@@ -2047,7 +2093,7 @@ async function loadAgentKeys() {
                 <div class="sc-set-v"><button onclick="deleteAgentKey('${_keysAgentId}','${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button></div>
             </div>`).join('');
     } catch(e) {
-        list.innerHTML = '<div class="text-xs" style="color:var(--red)">Failed to load keys</div>';
+        list.innerHTML = `<div class="text-xs" style="color:var(--red)">${_esc(_netErrText(e, 'Failed to load keys'))}</div>`;
     }
 }
 
@@ -2079,15 +2125,16 @@ async function createAgentKey() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ name })
         });
+        if (!res.ok) { errEl.textContent = await _errText(res, 'Failed to create key'); errEl.style.display = ''; btn.disabled = false; btn.textContent = 'Create'; return; }
         const data = await res.json();
-        if (!data.ok) { errEl.textContent = data.error || 'Failed to create key'; errEl.style.display = ''; btn.disabled = false; btn.textContent = 'Create'; return; }
+        if (!data.ok) { errEl.textContent = data.error || data.message || 'Failed to create key'; errEl.style.display = ''; btn.disabled = false; btn.textContent = 'Create'; return; }
         document.getElementById('agentKeyNewValue').textContent = data.key;
         document.getElementById('agentKeyNewDisplay').style.display = 'flex';
         btn.textContent = 'Done';
         btn.onclick = () => { hideAddKeyForm(); loadAgentKeys(); btn.onclick = createAgentKey; };
         btn.disabled = false;
     } catch(e) {
-        errEl.textContent = 'Request failed'; errEl.style.display = '';
+        errEl.textContent = _netErrText(e, 'Failed to create key'); errEl.style.display = '';
         btn.disabled = false; btn.textContent = 'Create';
     }
 }
@@ -2101,10 +2148,11 @@ async function deleteAgentKey(agentId, keyId, keyName) {
     if (!await _confirm(`Revoke key "${keyName}"? Any client using it will lose access immediately.`, 'Revoke Key', 'Revoke')) return;
     try {
         const res  = await fetch('/api/agents/proxy/' + agentId + '/keys/' + keyId, { method: 'DELETE', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Revoke failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) { showToast('Key revoked', 'success'); loadAgentKeys(); }
-        else showToast('Revoke failed: ' + (data.error || 'Unknown'), 'error');
-    } catch(e) { showToast('Revoke failed', 'error'); }
+        else showToast('Revoke failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
+    } catch(e) { showToast(_netErrText(e, 'Revoke failed'), 'error'); }
 }
 
 async function loadActiveAgentKeys() {
@@ -2117,6 +2165,10 @@ async function loadActiveAgentKeys() {
     list.innerHTML = '<div class="text-xs" style="color:var(--muted)">Loading...</div>';
     try {
         const res  = await fetch('/api/agents/proxy/' + _activeAgent.id + '/keys', { headers: _csrfHeaders() });
+        if (!res.ok) {
+            list.innerHTML = `<div class="text-xs" style="color:var(--red)">${_esc(await _errText(res, 'Failed to load keys'))}</div>`;
+            return;
+        }
         const data = await res.json();
         const keys = data.keys || [];
         if (!keys.length) {
@@ -2132,7 +2184,7 @@ async function loadActiveAgentKeys() {
                 <div class="sc-set-v"><button onclick="deleteActiveAgentKey('${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button></div>
             </div>`).join('');
     } catch(e) {
-        list.innerHTML = '<div class="text-xs" style="color:var(--red)">Failed to load keys</div>';
+        list.innerHTML = `<div class="text-xs" style="color:var(--red)">${_esc(_netErrText(e, 'Failed to load keys'))}</div>`;
     }
 }
 
@@ -2166,14 +2218,15 @@ async function createActiveAgentKey() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ name })
         });
+        if (!res.ok) { errEl.textContent = await _errText(res, 'Failed to create key'); errEl.style.display = ''; btn.disabled = false; btn.textContent = 'Create'; return; }
         const data = await res.json();
-        if (!data.ok) { errEl.textContent = data.error || 'Failed'; errEl.style.display = ''; btn.disabled = false; btn.textContent = 'Create'; return; }
+        if (!data.ok) { errEl.textContent = data.error || data.message || 'Failed to create key'; errEl.style.display = ''; btn.disabled = false; btn.textContent = 'Create'; return; }
         document.getElementById('activeAgentKeyNewValue').textContent = data.key;
         document.getElementById('activeAgentKeyNewDisplay').style.display = 'flex';
         btn.textContent = 'Done'; btn.disabled = false;
         btn.onclick = () => { hideActiveAgentAddKeyForm(); loadActiveAgentKeys(); btn.onclick = createActiveAgentKey; };
     } catch(e) {
-        errEl.textContent = 'Request failed'; errEl.style.display = '';
+        errEl.textContent = _netErrText(e, 'Failed to create key'); errEl.style.display = '';
         btn.disabled = false; btn.textContent = 'Create';
     }
 }
@@ -2188,10 +2241,11 @@ async function deleteActiveAgentKey(keyId, keyName) {
     if (!await _confirm(`Revoke key "${keyName}"? Any client using it will lose access immediately.`, 'Revoke Key', 'Revoke')) return;
     try {
         const res  = await fetch('/api/agents/proxy/' + _activeAgent.id + '/keys/' + keyId, { method: 'DELETE', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Revoke failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) { showToast('Key revoked', 'success'); loadActiveAgentKeys(); }
-        else showToast('Revoke failed: ' + (data.error || 'Unknown'), 'error');
-    } catch(e) { showToast('Revoke failed', 'error'); }
+        else showToast('Revoke failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
+    } catch(e) { showToast(_netErrText(e, 'Revoke failed'), 'error'); }
 }
 
 async function pingAgent(id, url) {
@@ -2230,10 +2284,11 @@ function inlineEditAgent(id, field, currentValue) {
         if (!newVal || newVal === currentValue) { loadAgentsList(); return; }
         try {
             const res  = await fetch('/api/agents/' + id, { method: 'PUT', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ [field]: newVal }) });
+            if (!res.ok) { showToast(await _errText(res, 'Update failed'), 'error'); loadAgentsList(); return; }
             const data = await res.json();
             if (data.ok) { showToast(`Agent ${isName ? 'renamed' : 'URL updated'}`, 'success'); updateServerSwitcher(); }
-            else { showToast(`Update failed: ${data.error || 'Unknown'}`, 'error'); }
-        } catch(e) { showToast('Update failed', 'error'); }
+            else { showToast(`Update failed: ${data.error || data.message || 'the server did not say why'}`, 'error'); }
+        } catch(e) { showToast(_netErrText(e, 'Update failed'), 'error'); }
         loadAgentsList();
     };
     pencilBtn.onclick = submit;
@@ -2245,10 +2300,11 @@ async function deleteAgent(id, name) {
     if (!await _confirm(`Remove agent "${name}"? This only removes it from TM settings - the agent service on the remote server is unaffected.`, 'Remove Agent', 'Remove')) return;
     try {
         const res  = await fetch('/api/agents/' + id, { method: 'DELETE', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Remove failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) { showToast('Agent removed', 'success'); loadAgentsList(); }
-        else showToast('Remove failed: ' + (data.error || 'Unknown'), 'error');
-    } catch(e) { showToast('Remove failed', 'error'); }
+        else showToast('Remove failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
+    } catch(e) { showToast(_netErrText(e, 'Remove failed'), 'error'); }
 }
 
 function startAddAgent() {
@@ -2395,14 +2451,15 @@ async function agentWizStep1Next() {
     btn.disabled = true; btn.innerHTML = '<i class="ph-light ph-spinner-gap animate-spin text-xs"></i> Creating…';
     try {
         const res  = await fetch('/api/agents', { method: 'POST', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ name, url }) });
+        if (!res.ok) { err.textContent = await _errText(res, 'Failed to create agent'); err.style.display = ''; return; }
         const data = await res.json();
-        if (!data.ok) { err.textContent = data.error || 'Failed to create agent'; err.style.display = ''; return; }
+        if (!data.ok) { err.textContent = data.error || data.message || 'Failed to create agent'; err.style.display = ''; return; }
         _agentWizId  = data.agent.id;
         _agentWizKey = data.agent.api_key_raw;
         document.getElementById('agentWizKeyDisplay').textContent = _agentWizKey;
         err.style.display = 'none';
         showAgentWizStep(2);
-    } catch(e) { err.textContent = 'Request failed'; err.style.display = ''; }
+    } catch(e) { err.textContent = _netErrText(e, 'Failed to create agent'); err.style.display = ''; }
     finally { btn.disabled = false; btn.innerHTML = 'Continue <i class="ph-bold ph-caret-right text-xs"></i>'; }
 }
 
@@ -2416,10 +2473,11 @@ async function agentWizStep3Save() {
     const cfg = buildAgentCfgPayload();
     try {
         const res  = await fetch('/api/agents/' + _agentWizId, { method: 'PUT', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
+        if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) showToast('Agent config saved', 'success');
-        else showToast('Save failed: ' + (data.error || 'Unknown'), 'error');
-    } catch(e) { showToast('Save failed', 'error'); }
+        else showToast('Save failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
+    } catch(e) { showToast(_netErrText(e, 'Save failed'), 'error'); }
 }
 
 async function agentWizDone() {
@@ -2455,8 +2513,9 @@ async function rotateAgentKey() {
             method: 'POST', headers: { ..._csrfHeaders() }
         });
         let data = {};
-        try { data = await res.json(); } catch(je) { throw new Error('HTTP ' + res.status + ' - invalid response'); }
-        if (!res.ok || !data.api_key_raw) throw new Error(data.error || ('HTTP ' + res.status));
+        try { data = await res.json(); } catch(je) { data = {}; }
+        if (!res.ok) throw new Error(data.error || data.message || await _errText(res, 'Rotation failed'));
+        if (!data.api_key_raw) throw new Error(data.error || data.message || 'The server did not return a new key.');
         _agentWizKey = data.api_key_raw;
         document.getElementById('agentRotatedKeyText').textContent = _agentWizKey;
         document.getElementById('agentRotatedKeyDisplay').style.display = '';
@@ -2466,7 +2525,7 @@ async function rotateAgentKey() {
     } catch(e) {
         btn.disabled = false;
         btn.innerHTML = '<i class="ph-bold ph-arrows-clockwise text-xs"></i> Rotate Key';
-        showToast(e.message || 'Rotation failed', 'error');
+        showToast(_netErrText(e, 'Rotation failed'), 'error');
     }
 }
 
@@ -2673,6 +2732,10 @@ async function loadTemplatesList() {
     if (!listEl) return;
     try {
         const res  = await fetch('/api/mw/templates');
+        if (!res.ok) {
+            listEl.innerHTML = `<div class="text-center py-10 text-xs" style="color:var(--red)">${_esc(await _errText(res, 'Could not load templates'))}</div>`;
+            return;
+        }
         const data = await res.json();
         const templates = data.templates || [];
         if (templates.length === 0) {
@@ -2694,7 +2757,7 @@ async function loadTemplatesList() {
                 </div>
             </div>`).join('');
     } catch(e) {
-        listEl.innerHTML = `<div class="text-xs py-4 text-center" style="color:var(--muted)">Failed to load templates</div>`;
+        listEl.innerHTML = `<div class="text-xs py-4 text-center" style="color:var(--muted)">${_esc(_netErrText(e, 'Failed to load templates'))}</div>`;
     }
 }
 
@@ -2749,15 +2812,16 @@ async function saveTemplate() {
                 body: JSON.stringify({ name, yaml })
             });
         }
+        if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             showToast(_editingTemplateId ? 'Template updated' : 'Template created', 'success');
             closeTemplateEditor();
             if (typeof _loadCustomMwTemplates === 'function') _loadCustomMwTemplates();
         } else {
-            showToast(data.error || 'Save failed', 'error');
+            showToast(data.error || data.message || 'Save failed', 'error');
         }
-    } catch(e) { showToast('Request failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Save failed'), 'error'); }
 }
 
 async function deleteTemplate(id) {
@@ -2767,15 +2831,16 @@ async function deleteTemplate(id) {
     if (!ok) return;
     try {
         const res  = await fetch('/api/mw/templates/' + id, { method: 'DELETE', headers: _csrfHeaders() });
+        if (!res.ok) { showToast(await _errText(res, 'Delete failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             showToast('Template deleted', 'success');
             loadTemplatesList();
             if (typeof _loadCustomMwTemplates === 'function') _loadCustomMwTemplates();
         } else {
-            showToast(data.error || 'Delete failed', 'error');
+            showToast(data.error || data.message || 'Delete failed', 'error');
         }
-    } catch(e) { showToast('Request failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Delete failed'), 'error'); }
 }
 
 const SETTINGS_SEARCH_FIELDS = '.sc-set-n, .sc-set-d, .settings-section-label, .tab-toggle-row > span, label';

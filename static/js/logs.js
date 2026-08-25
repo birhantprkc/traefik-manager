@@ -74,7 +74,19 @@ async function refreshLogs(silent) {
     const keepScroll = silent ? (_lgScrollEl() || {}).scrollTop || 0 : 0;
     if (!silent) container.innerHTML = `<div class="text-center py-16" style="color:var(--muted)"><i class="ph-light ph-spinner-gap text-4xl block mb-3 animate-spin opacity-40"></i><p>Loading logs...</p></div>`;
     try {
-        const res = await agentFetch(`/api/traefik/logs?lines=${_currentLogLines}`).then(r => r.json());
+        const logRes = await agentFetch(`/api/traefik/logs?lines=${_currentLogLines}`);
+        if (!logRes.ok) {
+            if (stats) stats.style.display = 'none';
+            _lgLoadError = await _errText(logRes, 'Failed to load logs');
+            container.innerHTML = `<div class="text-center py-16" style="color:var(--muted)">
+                <i class="ph-light ph-plugs text-4xl block mb-3 opacity-40"></i>
+                <p class="font-medium">Failed to load logs</p>
+                <p class="text-xs mt-1 font-mono">${_esc(_lgLoadError)}</p>
+                <button onclick="refreshLogs()" class="proto-btn text-xs px-3 py-1.5 mt-4"><i class="ph-bold ph-arrows-clockwise mr-1"></i>Retry</button>
+            </div>`;
+            return;
+        }
+        const res = await logRes.json();
         if (res.error) {
             if (stats) stats.style.display = 'none';
             container.innerHTML = _emptyMountState({
@@ -108,7 +120,7 @@ async function refreshLogs(silent) {
         }
     } catch (err) {
         if (stats) stats.style.display = 'none';
-        _lgLoadError = (err && err.message) ? String(err.message) : 'unknown error';
+        _lgLoadError = _netErrText(err, 'Log request failed');
         container.innerHTML = `<div class="text-center py-16" style="color:var(--muted)">
             <i class="ph-light ph-plugs text-4xl block mb-3 opacity-40"></i>
             <p class="font-medium">Failed to load logs</p>
