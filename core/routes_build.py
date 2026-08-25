@@ -178,6 +178,23 @@ def _decode_headers_middleware(body) -> dict | None:
         return None
     return toggles
 
+def _server_field(servers, key, default='N/A'):
+    """The first server's address or url.
+
+    Traefik wants a list of mappings, but a bare string is easy to write by
+    hand and Traefik rejects the file rather than the entry. Reading it as a
+    string keeps one malformed service from taking down the whole tab.
+    """
+    if not servers:
+        return default
+    first = servers[0]
+    if isinstance(first, dict):
+        return first.get(key, default)
+    if isinstance(first, str) and first.strip():
+        return first.strip()
+    return default
+
+
 def _to_list(val, default=None):
     if val is None:
         return default if default is not None else []
@@ -213,7 +230,7 @@ def _build_apps(config, config_file='', extra_http_svcs=None, extra_tcp_svcs=Non
             lb = cfg_mod.as_dict(cfg_mod.as_dict(http_svcs[svc_key]).get('loadBalancer'))
             servers = lb.get('servers', [])
             if servers:
-                target_url = servers[0].get('url', 'Unknown')
+                target_url = _server_field(servers, 'url', 'Unknown')
         if target_url == 'N/A' and api_svc_urls:
             target_url = api_svc_urls.get(f'http:{svc_key}', 'N/A')
         app_id = f"{config_file}::{rname}" if (env.MULTI_CONFIG and config_file) else rname
@@ -257,7 +274,7 @@ def _build_apps(config, config_file='', extra_http_svcs=None, extra_tcp_svcs=Non
         if svc_key in tcp_svcs:
             servers = cfg_mod.as_dict(cfg_mod.as_dict(tcp_svcs[svc_key]).get('loadBalancer')).get('servers', [])
             if servers:
-                target = servers[0].get('address', 'N/A')
+                target = _server_field(servers, 'address')
         if target == 'N/A' and api_svc_urls:
             target = api_svc_urls.get(f'tcp:{svc_key}', 'N/A')
         app_id = f"{config_file}::{rname}" if (env.MULTI_CONFIG and config_file) else rname
@@ -286,7 +303,7 @@ def _build_apps(config, config_file='', extra_http_svcs=None, extra_tcp_svcs=Non
         if svc_key in udp_svcs:
             servers = cfg_mod.as_dict(cfg_mod.as_dict(udp_svcs[svc_key]).get('loadBalancer')).get('servers', [])
             if servers:
-                target = servers[0].get('address', 'N/A')
+                target = _server_field(servers, 'address')
         if target == 'N/A' and api_svc_urls:
             target = api_svc_urls.get(f'udp:{svc_key}', 'N/A')
         app_id = f"{config_file}::{rname}" if (env.MULTI_CONFIG and config_file) else rname
@@ -332,7 +349,7 @@ def _traefik_service_url_map(all_services: dict = None):
         for svc in all_services.get(proto, []):
             key = cfg_mod.svc_key(svc.get('name', ''))
             servers = svc.get('loadBalancer', {}).get('servers', [])
-            if servers and addr_key in servers[0]:
+            if servers and isinstance(servers[0], dict) and addr_key in servers[0]:
                 url_map[f'{proto}:{key}'] = servers[0][addr_key]
     return url_map
 
@@ -452,7 +469,7 @@ def _build_all_apps(include_external=True, include_internal=False):
         cf       = rdata.get('configFile', '')
         if proto == 'http':
             servers    = svc.get('loadBalancer', {}).get('servers', [])
-            target_url = servers[0].get('url', 'N/A') if servers else 'N/A'
+            target_url = _server_field(servers, 'url')
             all_apps.append({'id': route_id, 'name': rname, 'rule': router.get('rule', ''),
                              'service_name': svc_name, 'target': target_url,
                              'middlewares': router.get('middlewares', []),
@@ -463,7 +480,7 @@ def _build_all_apps(include_external=True, include_internal=False):
                              'configFile': cf, 'provider': 'file', 'entrypointMiddlewares': []})
         elif proto == 'tcp':
             servers = svc.get('loadBalancer', {}).get('servers', [])
-            target  = servers[0].get('address', 'N/A') if servers else 'N/A'
+            target  = _server_field(servers, 'address')
             all_apps.append({'id': route_id, 'name': rname, 'rule': router.get('rule', ''),
                              'service_name': svc_name, 'target': target,
                              'middlewares': router.get('middlewares', []), 'entryPoints': router.get('entryPoints', []),
@@ -472,7 +489,7 @@ def _build_all_apps(include_external=True, include_internal=False):
                              'configFile': cf, 'provider': 'file'})
         else:
             servers = svc.get('loadBalancer', {}).get('servers', [])
-            target  = servers[0].get('address', 'N/A') if servers else 'N/A'
+            target  = _server_field(servers, 'address')
             all_apps.append({'id': route_id, 'name': rname, 'rule': '',
                              'service_name': svc_name, 'target': target,
                              'middlewares': [], 'entryPoints': router.get('entryPoints', []),
