@@ -938,6 +938,16 @@ function cycleTheme() {
 }
 applyTheme('{{ default_theme }}' || localStorage.getItem(THEME_KEY) || 'dark');
 
+function _passwordError(pw, label) {
+    label = label || 'Password';
+    if (pw.length < 8) return label + ' must be at least 8 characters.';
+    if (new TextEncoder().encode(pw).length > 72) {
+        return label + ' must be 72 bytes or fewer, which is the bcrypt limit. '
+             + 'Accented and non-Latin characters take more than one byte each.';
+    }
+    return null;
+}
+
 {% if setup_mode and not reset_mode %}
 
 const TEMP_PW_MODE = {{ 'true' if temp_password_mode else 'false' }};
@@ -1100,8 +1110,9 @@ function checkPwMatch() {
     const hint    = document.getElementById('pwMatchHint');
     const btn     = document.getElementById('wzNext');
     if (!pw && !confirm) { hint.style.display = 'none'; btn.disabled = true; return; }
-    if (pw.length > 0 && pw.length < 8) {
-        hint.textContent = 'Password must be at least 8 characters.';
+    const pwErr = _passwordError(pw);
+    if (pw.length > 0 && pwErr) {
+        hint.textContent = pwErr;
         hint.style.color = 'var(--red)'; hint.style.display = 'block';
         btn.disabled = true; return;
     }
@@ -1110,7 +1121,7 @@ function checkPwMatch() {
         hint.style.color = 'var(--red)'; hint.style.display = 'block';
         btn.disabled = true; return;
     }
-    if (pw.length >= 8 && pw === confirm) {
+    if (!pwErr && pw === confirm) {
         hint.textContent = '✓ Passwords match';
         hint.style.color = 'var(--green)'; hint.style.display = 'block';
         btn.disabled = false; return;
@@ -1261,7 +1272,8 @@ function submitSetup() {
     if (!TEMP_PW_MODE) {
         const pw      = document.getElementById('s_password').value;
         const confirm = document.getElementById('s_confirm').value;
-        if (pw.length < 8)  { showError('Password must be at least 8 characters.'); return; }
+        const pwErr = _passwordError(pw);
+        if (pwErr)          { showError(pwErr); return; }
         if (pw !== confirm) { showError('Passwords do not match.'); return; }
         document.getElementById('f_password').value = pw;
         document.getElementById('f_confirm').value  = confirm;
@@ -1282,8 +1294,9 @@ function checkForcePwMatch() {
     const hint    = document.getElementById('forcePwHint');
     const btn     = document.getElementById('forceSubmitBtn');
     if (!pw && !confirm) { hint.style.display = 'none'; btn.disabled = true; return; }
-    if (pw.length > 0 && pw.length < 8) {
-        hint.textContent = 'Password must be at least 8 characters.';
+    const pwErr = _passwordError(pw);
+    if (pw.length > 0 && pwErr) {
+        hint.textContent = pwErr;
         hint.style.color = 'var(--red)'; hint.style.display = 'block';
         btn.disabled = true; return;
     }
@@ -1292,7 +1305,7 @@ function checkForcePwMatch() {
         hint.style.color = 'var(--red)'; hint.style.display = 'block';
         btn.disabled = true; return;
     }
-    if (pw.length >= 8 && pw === confirm) {
+    if (!pwErr && pw === confirm) {
         hint.textContent = '✓ Passwords match';
         hint.style.color = 'var(--green)'; hint.style.display = 'block';
         btn.disabled = false; return;

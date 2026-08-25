@@ -616,7 +616,8 @@ async function changePassword() {
     };
 
     if (!current || !newPw || !confirm) return show('Please fill in all fields.', false);
-    if (newPw.length < 8)              return show('New password must be at least 8 characters.', false);
+    const pwErr = _passwordError(newPw, 'New password');
+    if (pwErr)                         return show(pwErr, false);
     if (newPw !== confirm)             return show('Passwords do not match.', false);
 
     try {

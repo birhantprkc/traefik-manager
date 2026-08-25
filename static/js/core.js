@@ -411,6 +411,17 @@ async function _errText(res, fallback) {
 }
 
 
+function _passwordError(pw, label) {
+    label = label || 'Password';
+    if (pw.length < 8) return label + ' must be at least 8 characters.';
+    if (new TextEncoder().encode(pw).length > 72) {
+        return label + ' must be 72 bytes or fewer, which is the bcrypt limit. '
+             + 'Accented and non-Latin characters take more than one byte each.';
+    }
+    return null;
+}
+
+
 function _netErrText(err, fallback) {
     const msg = String((err && err.message) || err || '');
     if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
