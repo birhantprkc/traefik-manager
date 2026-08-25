@@ -1,12 +1,71 @@
 # Reset Password
 
-This page covers all methods for recovering access to Traefik Manager.
+This page covers all methods for recovering access to Traefik Manager. All of them need shell or file access to the host.
 
 ---
 
 ## Method 1 - CLI reset (recommended)
 
-This is the fastest method when you can exec into the container.
+### Set your own password
+
+| Option | Use it for |
+|---|---|
+| `--prompt` | Typing the password yourself. Asked twice, never echoed |
+| `--stdin` | Scripts and automation |
+| `--password TEXT` | One-off scripted calls. Visible in `ps` output and shell history, so prefer `--stdin` |
+
+Minimum 8 characters. Pass only one of the three. Nothing is written if the password is rejected.
+
+:::tabs
+== Docker
+```bash
+docker exec -it traefik-manager flask reset-password --prompt
+```
+
+From a script:
+```bash
+printf '%s' "$NEW_PASSWORD" | docker exec -i traefik-manager flask reset-password --stdin
+```
+
+== Podman
+```bash
+podman exec -it traefik-manager flask reset-password --prompt
+```
+
+From a script:
+```bash
+printf '%s' "$NEW_PASSWORD" | podman exec -i traefik-manager flask reset-password --stdin
+```
+
+== Unraid
+Open the Unraid dashboard → Docker tab → click the Traefik Manager icon → **Console**, then run:
+```bash
+flask reset-password --prompt
+```
+
+== Linux (native)
+```bash
+cd /opt/traefik-manager
+SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
+  venv/bin/flask reset-password --prompt
+```
+
+From a script:
+```bash
+printf '%s' "$NEW_PASSWORD" | SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
+  venv/bin/flask reset-password --stdin
+```
+:::
+
+The password is confirmed but not printed back. Log in with it straight away: no forced change screen, and `/setup` stays closed.
+
+::: info Lost your authenticator too?
+Two-factor authentication is **preserved** by default. Add `--disable-otp` to any form of the command to reset the password and turn 2FA off in one step, then re-enable it from **Settings → Authentication → Password & 2FA**.
+:::
+
+### Temporary password
+
+Run the command with no password option. A random password is printed to the terminal, and on your next login you are sent to a forced password-change screen before you reach the dashboard.
 
 :::tabs
 == Docker
@@ -33,14 +92,8 @@ SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
 ```
 :::
 
-A new temporary password is printed to the terminal. On your next login you are sent to a forced password-change screen before you reach the dashboard.
-
-::: info Lost your authenticator too?
-Two-factor authentication is **preserved** by default. Add `--disable-otp` to the same command to reset the password and turn 2FA off in one step, then re-enable it from **Settings → Authentication → Password & 2FA**.
-:::
-
-::: warning
-The reset also sets `setup_password_reset: true` in `manager.yml`, which leaves the `/setup` page open to anyone who can reach Traefik Manager. Only setting a password on that page clears the flag - the forced-change screen does not. So either set your new password at `https://your-traefik-manager.example.com/setup`, or remove the key from `manager.yml` afterwards and restart.
+::: warning Temporary passwords only
+This form also sets `setup_password_reset: true` in `manager.yml`, which leaves the `/setup` page open to anyone who can reach Traefik Manager. Only setting a password on that page clears the flag - the forced-change screen does not. So either set your new password at `https://your-traefik-manager.example.com/setup`, or remove the key from `manager.yml` afterwards and restart. `--prompt`, `--stdin` and `--password` never set the flag.
 :::
 
 ---
@@ -49,37 +102,78 @@ The reset also sets `setup_password_reset: true` in `manager.yml`, which leaves 
 
 Use this if you cannot exec into the container (e.g. the container won't start).
 
-**1. Open `manager.yml`** in your config volume:
-
-```bash
-nano /path/to/traefik-manager/config/manager.yml
-```
-
-**2. Add the reset flag:**
+**1. Add the reset flag** to `manager.yml`:
 
 ```yaml
 setup_password_reset: true
 ```
 
-**3. Restart:**
+**2. Restart:**
 
+:::tabs
+== Docker
 ```bash
+nano /path/to/traefik-manager/config/manager.yml
 docker compose restart traefik-manager
 ```
 
-**4. Open `/setup`** (`https://your-traefik-manager.example.com/setup`). You are asked for a new password and nothing else. Setting it clears the flag and signs you in.
+== Podman
+```bash
+nano /path/to/traefik-manager/config/manager.yml
+podman restart traefik-manager
+```
+
+== Unraid
+```bash
+nano /mnt/user/appdata/traefik-manager/config/manager.yml
+```
+Then Docker tab → click the Traefik Manager icon → **Restart**.
+
+== Linux (native)
+```bash
+nano /var/lib/traefik-manager/manager.yml
+systemctl restart traefik-manager
+```
+:::
+
+**3. Open `/setup`** (`https://your-traefik-manager.example.com/setup`). You are asked for a new password and nothing else. Setting it clears the flag and signs you in.
 
 ::: warning
 While the flag is set, anyone who can reach Traefik Manager can set the password. Restart, set the new password, and confirm you are signed in.
 :::
 
-## Method 3 - Pre-set a known password
+---
 
-To set a specific password instead of the auto-generated one, generate a bcrypt hash and write it directly to `manager.yml`:
+## Method 3 - Write a password hash into manager.yml
 
+Use this if you cannot run the CLI at all. Generate a bcrypt hash:
+
+:::tabs
+== Docker
 ```bash
-python3 -c "import bcrypt; print(bcrypt.hashpw(b'yournewpassword', bcrypt.gensalt()).decode())"
+docker run --rm ghcr.io/chr0nzz/traefik-manager:latest \
+  python3 -c "import bcrypt; print(bcrypt.hashpw(b'yournewpassword', bcrypt.gensalt()).decode())"
 ```
+
+== Podman
+```bash
+podman run --rm ghcr.io/chr0nzz/traefik-manager:latest \
+  python3 -c "import bcrypt; print(bcrypt.hashpw(b'yournewpassword', bcrypt.gensalt()).decode())"
+```
+
+== Unraid
+Open a terminal from the Unraid dashboard, then run:
+```bash
+docker run --rm ghcr.io/chr0nzz/traefik-manager:latest \
+  python3 -c "import bcrypt; print(bcrypt.hashpw(b'yournewpassword', bcrypt.gensalt()).decode())"
+```
+
+== Linux (native)
+```bash
+cd /opt/traefik-manager
+venv/bin/python3 -c "import bcrypt; print(bcrypt.hashpw(b'yournewpassword', bcrypt.gensalt()).decode())"
+```
+:::
 
 Update `manager.yml`:
 

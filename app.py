@@ -922,9 +922,51 @@ def force_change_password():
 @app.cli.command('reset-password')
 @click.option('--disable-otp', is_flag=True, default=False,
               help='Also disable two-factor authentication (use if TOTP app is lost).')
-def reset_password_cli(disable_otp):
+@click.option('--prompt', 'prompt_pw', is_flag=True, default=False,
+              help='Ask for the new password twice instead of generating a temporary one.')
+@click.option('--stdin', 'from_stdin', is_flag=True, default=False,
+              help='Read the new password from standard input.')
+@click.option('--password', 'password_opt', default=None,
+              help='Set the new password directly. Prefer --stdin for scripts.')
+def reset_password_cli(disable_otp, prompt_pw, from_stdin, password_opt):
 
-    password = secrets.token_urlsafe(16)
+    given = [name for name, used in (('--prompt', prompt_pw),
+                                     ('--stdin', from_stdin),
+                                     ('--password', password_opt is not None)) if used]
+    if len(given) > 1:
+        raise click.ClickException('Use only one of %s.' % ', '.join(given))
+
+    explicit = bool(given)
+    if prompt_pw:
+        password = click.prompt('New password', hide_input=True, confirmation_prompt=True,
+                                default='', show_default=False)
+    elif from_stdin:
+        try:
+            raw = click.get_binary_stream('stdin').read().decode('utf-8')
+        except UnicodeDecodeError:
+            raise click.ClickException('The password on standard input is not valid UTF-8.')
+        password = raw.split('\n', 1)[0].rstrip('\r')
+    elif password_opt is not None:
+        click.echo('Warning: --password is visible in ps output and shell history. '
+                   'Use --stdin instead for scripts.', err=True)
+        password = password_opt
+    else:
+        password = secrets.token_urlsafe(16)
+
+    if explicit:
+        if not password:
+            raise click.ClickException('Password must not be empty.')
+        if len(password) < 8:
+            raise click.ClickException('Password must be at least 8 characters.')
+        if len(password.encode('utf-8')) > 72:
+            raise click.ClickException(
+                'Password must be 72 bytes or fewer, which is the bcrypt limit. '
+                'Accented and non-Latin characters take more than one byte each.')
+        if os.environ.get('ADMIN_PASSWORD', '').strip():
+            raise click.ClickException(
+                'ADMIN_PASSWORD is set, and it overrides the stored password. '
+                'Change or unset that variable instead, or this password will not work.')
+
     settings = load_settings()
     save_settings(
         domains=settings['domains'],
@@ -933,18 +975,22 @@ def reset_password_cli(disable_otp):
         auth_enabled=settings.get('auth_enabled', True),
         password_hash=_hash_password(password),
         visible_tabs=settings['visible_tabs'],
-        must_change_password=True,
-        setup_password_reset=True,
+        must_change_password=False if explicit else True,
+        setup_password_reset=False if explicit else True,
         setup_complete=settings.get('setup_complete', True),
         otp_secret='' if disable_otp else None,
         otp_enabled=False if disable_otp else None,
     )
     print("=" * 60)
     print("TRAEFIK MANAGER - PASSWORD RESET")
-    print(f"New temporary password: {password}")
+    if explicit:
+        print("New password set. It is not shown here.")
+    else:
+        print(f"New temporary password: {password}")
     if disable_otp:
         print("Two-factor authentication has been DISABLED.")
-    print("You will be required to change it on next login.")
+    if not explicit:
+        print("You will be required to change it on next login.")
     print("=" * 60)
 
 
