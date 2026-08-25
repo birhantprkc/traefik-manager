@@ -4,7 +4,21 @@ This page covers all methods for recovering access to Traefik Manager. All of th
 
 ---
 
-## Method 1 - CLI reset (recommended)
+## Method 1 - tm CLI (recommended)
+
+If the stack was installed with [tm](traefik-stack.md), one command covers every install type. It works out where Traefik Manager keeps its settings, and runs the reset below as the user that owns them.
+
+```bash
+tm password reset
+```
+
+You are asked for the new password twice, hidden, and can log in with it straight away. Add `--disable-otp` if you have also lost your authenticator, `--stdin` to pipe it from a script, or `--random` for a temporary password instead.
+
+Needs Traefik Manager v1.12.0 or newer. On older versions `tm` says so and points you at `--random`.
+
+---
+
+## Method 2 - Flask CLI
 
 ### Set your own password
 
@@ -102,7 +116,7 @@ This form also sets `setup_password_reset: true` in `manager.yml`, which leaves 
 
 ---
 
-## Method 2 - Manual reset via manager.yml
+## Method 3 - Manual reset via manager.yml
 
 Use this if you cannot exec into the container (e.g. the container won't start).
 
@@ -148,7 +162,7 @@ While the flag is set, anyone who can reach Traefik Manager can set the password
 
 ---
 
-## Method 3 - Write a password hash into manager.yml
+## Method 4 - Write a password hash into manager.yml
 
 Use this if you cannot run the CLI at all. Generate a bcrypt hash:
 
