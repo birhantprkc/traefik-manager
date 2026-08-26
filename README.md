@@ -172,6 +172,17 @@ Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for reporting 
 
 Thanks as well to everyone who has opened an issue or a discussion - several features started as a question from someone running into something unexpected.
 
+## Star History
+
+<div align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/chr0nzz/chr0nzz/main/profile/star-history-traefik-manager-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/chr0nzz/chr0nzz/main/profile/star-history-traefik-manager-light.svg" />
+  <img src="https://raw.githubusercontent.com/chr0nzz/chr0nzz/main/profile/star-history-traefik-manager-dark.svg" alt="star history" />
+</picture>
+</div>
+
+
 ## License
 
 [GPL-3.0](LICENSE)
