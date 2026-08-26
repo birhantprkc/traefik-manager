@@ -1508,11 +1508,12 @@ async function cloneRoute(btn) {
     }
     if (proto === 'http') {
         _applyHttpRuleToForm(app.rule || '');
+        const _cloneComposite = !!app.serviceType && app.serviceType !== 'loadBalancer';
         const targetScheme = (app.target || '').startsWith('https://') ? 'https' : 'http';
-        let target = (app.target || '').replace('http://','').replace('https://','');
+        let target = _cloneComposite ? '' : (app.target || '').replace('http://','').replace('https://','');
         const parts = target.split(':');
         document.getElementById('targetIp').value = parts[0] || '';
-        document.getElementById('targetPort').value = parts[1] || '80';
+        document.getElementById('targetPort').value = _cloneComposite ? '' : (parts[1] || '80');
         const _ownedHdr = (app.headersPreset && app.headersPreset.owned) ? app.name + '-headers' : null;
         await _initMiddlewareChips((app.middlewares || []).filter(m => m !== _ownedHdr));
         _applyHeadersPreset(app.headersPreset);
@@ -2037,7 +2038,7 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints, 
 
     const svcRows = [
         ['Status', svcStatus !== '-' ? _dState(svcStatus === 'enabled' ? 'Enabled' : svcStatus) : '-', svcStatus !== '-'],
-        ['Type', 'Load Balancer', false],
+        ['Type', app.serviceType && app.serviceType !== 'loadBalancer' ? app.serviceType : 'Load Balancer', false],
         ['Pass Host Header', svcPassHostHeader, false],
         ...(app.containerAddr ? [['Container', app.containerAddr, false]] : []),
         ...svcServerRows,

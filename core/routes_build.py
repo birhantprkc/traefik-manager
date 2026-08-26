@@ -206,7 +206,7 @@ def _to_list(val, default=None):
 
 def _service_type(svc_def) -> str:
     if isinstance(svc_def, dict):
-        for t in ('weighted', 'mirroring', 'failover'):
+        for t in ('weighted', 'mirroring', 'failover', 'highestRandomWeight'):
             if t in svc_def:
                 return t
     return 'loadBalancer'

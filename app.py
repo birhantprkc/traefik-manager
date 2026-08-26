@@ -4082,16 +4082,65 @@ def _headers_toggles_from_form(form) -> dict:
     }
 
 
+def _composite_children(svc_def) -> list:
+    if not isinstance(svc_def, dict):
+        return []
+    names = []
+    for key in ('weighted', 'highestRandomWeight'):
+        block = svc_def.get(key)
+        if isinstance(block, dict):
+            for child in (block.get('services') or []):
+                if isinstance(child, dict):
+                    names.append(child.get('name', ''))
+    mirroring = svc_def.get('mirroring')
+    if isinstance(mirroring, dict):
+        names.append(mirroring.get('service', ''))
+        for mirror in (mirroring.get('mirrors') or []):
+            if isinstance(mirror, dict):
+                names.append(mirror.get('name', ''))
+    failover = svc_def.get('failover')
+    if isinstance(failover, dict):
+        names.append(failover.get('service', ''))
+        names.append(failover.get('fallback', ''))
+    return [n for n in names if isinstance(n, str) and n]
+
+
+def _service_in_disabled_snapshots(target: str, exclude_router: str) -> bool:
+    try:
+        disabled = load_settings().get('disabled_routes', {}) or {}
+    except Exception:
+        return False
+    for key, snap in disabled.items():
+        if not isinstance(snap, dict):
+            continue
+        if str(key).split('::')[-1] == exclude_router:
+            continue
+        router = snap.get('router')
+        if isinstance(router, dict) and _svc_key(router.get('service', '')) == target:
+            return True
+        for child in _composite_children(snap.get('service')):
+            if _svc_key(child) == target:
+                return True
+    return False
+
+
 def _service_shared(config: dict, svc_name: str, exclude_router: str) -> bool:
     target = _svc_key(svc_name)
     for sec in ('http', 'tcp', 'udp'):
-        routers = (config.get(sec) or {}).get('routers') or {}
+        sec_cfg = config.get(sec) or {}
+        routers = sec_cfg.get('routers') or {}
         for rn, rd in routers.items():
             if rn == exclude_router or not isinstance(rd, dict):
                 continue
             if _svc_key(rd.get('service', '')) == target:
                 return True
-    return False
+        for sn, sd in (sec_cfg.get('services') or {}).items():
+            if _svc_key(sn) == target:
+                continue
+            for child in _composite_children(sd):
+                if _svc_key(child) == target:
+                    return True
+    return _service_in_disabled_snapshots(target, exclude_router)
 
 
 def _disabled_key(disabled, full_id, plain_id, prefix=''):
@@ -4144,7 +4193,8 @@ def _toggle_route(route_id: str, enable: bool):
         config      = load_config(target_path)
         config.setdefault(proto, {}).setdefault('routers', {})[rname] = router
         if svc_cf == cf or not svc_cf:
-            config.setdefault(proto, {}).setdefault('services', {})[svc_name] = svc
+            if svc:
+                config.setdefault(proto, {}).setdefault('services', {})[svc_name] = svc
             create_backup(target_path)
             save_config(_strip_empty_sections(config), target_path)
         else:
@@ -4152,7 +4202,8 @@ def _toggle_route(route_id: str, enable: bool):
             save_config(_strip_empty_sections(config), target_path)
             svc_path   = _resolve_or_fallback(svc_cf)
             svc_config = load_config(svc_path)
-            svc_config.setdefault(proto, {}).setdefault('services', {})[svc_name] = svc
+            if svc:
+                svc_config.setdefault(proto, {}).setdefault('services', {})[svc_name] = svc
             create_backup(svc_path)
             save_config(_strip_empty_sections(svc_config), svc_path)
     else:
@@ -5046,7 +5097,7 @@ def save_entry():
             _new_dkey = f"agent_{agent_id}::{_new_rid}" if agent else _new_rid
             disabled[_new_dkey] = {'protocol': protocol, 'router': _kept_router,
                                    'service': _kept_svc, 'configFile': cfg_filename}
-            save_settings(disabled_routes=disabled)
+            _save_disabled_routes(load_settings(), disabled)
         if agent:
             _agent_write_config(agent, cfg_filename, config)
             threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'route save'), daemon=True).start()

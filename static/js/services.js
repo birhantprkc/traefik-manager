@@ -152,6 +152,7 @@ function renderServicesTable() {
         if (s.mirroring)    return 'mirroring';
         if (s.failover)     return 'failover';
         if (s.weighted)     return 'weighted';
+        if (s.highestRandomWeight) return 'highestrandomweight';
         return null;
     };
 
@@ -315,7 +316,7 @@ function openSvcDetail(idx) {
     document.getElementById('svcDetailTitle').textContent = (s.name || '').split('@')[0];
 
     const provider = (s.name || '').includes('@') ? s.name.split('@').pop() : 'file';
-    const type = s.loadBalancer ? 'loadbalancer' : s.mirroring ? 'mirroring' : s.weighted ? 'weighted' : s.failover ? 'failover' : '-';
+    const type = s.loadBalancer ? 'loadbalancer' : s.mirroring ? 'mirroring' : s.weighted ? 'weighted' : s.failover ? 'failover' : s.highestRandomWeight ? 'highestrandomweight' : '-';
     const status = s.status || 'unknown';
     const stKind = status === 'enabled' ? ['status-online', 'd-on', 'Success']
                  : status === 'disabled' || status === 'error' ? ['status-offline', 'd-bad', 'Error']
@@ -324,7 +325,8 @@ function openSvcDetail(idx) {
 
     const lb = s.loadBalancer || {};
     const servers = lb.servers || [];
-    const passHostHeader = lb.passHostHeader !== undefined ? String(lb.passHostHeader) : 'true';
+    const passHostHeader = !s.loadBalancer ? '-'
+                         : lb.passHostHeader !== undefined ? String(lb.passHostHeader) : 'true';
 
     
     const serversHtml = servers.length > 0 ? `
