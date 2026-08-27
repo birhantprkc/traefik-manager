@@ -529,6 +529,7 @@ threading.Thread(target=_geoip_autoupdate_loop, daemon=True).start()
 _monitor.register('crowdsec', _crowd.CS_ALERT_INTERVAL,
                   lambda: _crowd.check_local_alerts(_crowd.CS_ALERT_WINDOW))
 _monitor.register('updates', _updates.UPDATE_INTERVAL, _updates.check_updates)
+_monitor.register('notify-flush', _noti.FLUSH_INTERVAL, _noti.flush_due)
 _monitor.start()
 
 _SILENT_PREFIXES = (

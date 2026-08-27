@@ -227,7 +227,8 @@ def queue_add(channel_id, type_, msg, ts, category):
         return
     with _notif_lock, _file_lock():
         q = _queue_read()
-        held = q.setdefault(channel_id, {'items': [], 'dropped': 0})
+        held = q.setdefault(channel_id, {'items': [], 'dropped': 0, 'started': time.time()})
+        held.setdefault('started', time.time())
         if len(held['items']) >= QUEUE_MAX:
             held['dropped'] = held.get('dropped', 0) + 1
         else:
@@ -258,6 +259,30 @@ def build_report(items, dropped=0) -> str:
     return f"Summary {span}\n" + "\n".join(lines)
 
 
+DIGEST_SECONDS = {'hourly': 3600, 'daily': 86400}
+FLUSH_INTERVAL = 60
+
+
+def _digest_due(ch, held, now=None) -> bool:
+    """False while a hourly or daily channel is still inside its window."""
+    period = DIGEST_SECONDS.get(str(ch.get('digest', 'immediate')).strip().lower())
+    if not period:
+        return True
+    started = held.get('started')
+    if not isinstance(started, (int, float)):
+        return True
+    return ((now if now is not None else time.time()) - started) >= period
+
+
+def flush_due():
+    """Monitor hook: deliver reports whose digest or quiet window has ended."""
+    try:
+        flush_queue()
+    except Exception:
+        logger.exception("Queue flush failed")
+    return []
+
+
 def flush_queue(channel_id=None, force=False) -> int:
     """Send one collapsed report per channel whose window has ended."""
     try:
@@ -278,6 +303,8 @@ def flush_queue(channel_id=None, force=False) -> int:
             if not force and _in_quiet_hours(ch.get('quiet_hours', '')):
                 continue
             held = q.get(cid) or {}
+            if not force and not _digest_due(ch, held):
+                continue
             items = held.get('items') or []
             if not items:
                 del q[cid]

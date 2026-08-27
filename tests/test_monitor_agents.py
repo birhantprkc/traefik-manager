@@ -212,7 +212,8 @@ def test_one_broken_agent_does_not_stop_the_next_one(mon, monkeypatch):
     assert [m for _, m, c in raised if c == 'certs'] == [
         'VPS Two: Certificate for two.example.com (le) expires in 2 day(s)'], raised
     assert fleet.paths('vps2') == ['/health', '/api/traefik/certs',
-                                   '/api/traefik/overview', '/api/crowdsec/alerts'], fleet.calls
+                                   '/api/traefik/overview', '/api/crowdsec/alerts',
+                                   '/api/traefik/version'], fleet.calls
     assert [m for _, m, c in raised if c == 'traefik'] == [
         'VPS One: Traefik API is unreachable'], raised
 

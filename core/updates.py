@@ -74,6 +74,22 @@ def _update_alert(key, product, current, latest, seen):
     return ('info', f"{product} v{latest} is available - update now", 'update')
 
 
+def _latest_cached(repo, cache) -> str:
+    if repo not in cache:
+        cache[repo] = latest_release(repo)
+    return cache[repo]
+
+
+def agent_traefik_version(agent) -> str:
+    """Version an agent's Traefik reports, empty when the agent cannot be reached."""
+    try:
+        info = monitor_mod._agent_json(agent, '/api/traefik/version')
+    except Exception as e:
+        logger.debug(f"Traefik version check failed for agent {agent.get('name', '')}: {e}")
+        return ''
+    return _strip_v(info.get('Version')) if isinstance(info, dict) else ''
+
+
 def check_updates(seen: dict = None) -> list:
     """Announce a newer Traefik Manager or Traefik release once per version.
 
@@ -82,13 +98,26 @@ def check_updates(seen: dict = None) -> list:
     """
     if seen is None:
         seen = monitor_mod._section('updates')
+    cache  = {}
     raised = []
     for key, product, repo, current in (
             ('manager', 'Traefik Manager', env.GITHUB_REPO,   env.APP_VERSION),
             ('traefik', 'Traefik',         TRAEFIK_REPO,      running_traefik_version())):
         if not current:
             continue
-        alert = _update_alert(key, product, current, latest_release(repo), seen)
+        alert = _update_alert(key, product, current, _latest_cached(repo, cache), seen)
+        if alert:
+            raised.append(alert)
+    for agent in monitor_mod._agents():
+        agent_id = str(agent.get('id') or '')
+        if not agent_id or not monitor_mod._agent_reachable(agent):
+            continue
+        current = agent_traefik_version(agent)
+        if not current:
+            continue
+        name  = str(agent.get('name') or agent_id)
+        alert = _update_alert(f"traefik:{agent_id}", f"Traefik on {name}", current,
+                              _latest_cached(TRAEFIK_REPO, cache), seen)
         if alert:
             raised.append(alert)
     return raised

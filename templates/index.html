@@ -567,7 +567,6 @@ function _updateServerSwitcherList(agents) {
     agents.forEach(a => _agentRegistry[a.id] = a);
     _agentList = agents;
     _renderServerSwitcherList(true);
-    if (typeof checkAgentTraefikUpdates === 'function') checkAgentTraefikUpdates();
 }
 
 function switchServer(agentId) {
