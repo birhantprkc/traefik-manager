@@ -1808,10 +1808,13 @@ def api_static_section_update():
                 else:
                     http_blk.pop('redirections', None)
                 uhs = str(payload.get('underscore_headers', '')).strip().lower()
+                hdr_key = str(payload.get('headers_strategy_key', '')).strip()
+                if hdr_key not in ('aliasHeadersStrategy', 'underscoreHeadersStrategy'):
+                    hdr_key = 'underscoreHeadersStrategy'
+                http_blk.pop('aliasHeadersStrategy', None)
+                http_blk.pop('underscoreHeadersStrategy', None)
                 if uhs in ('delete', 'reject'):
-                    http_blk['underscoreHeadersStrategy'] = uhs
-                else:
-                    http_blk.pop('underscoreHeadersStrategy', None)
+                    http_blk[hdr_key] = uhs
                 mws = [m for m in re.split(r'[\s,]+', str(payload.get('middlewares', ''))) if m]
                 if mws:
                     http_blk['middlewares'] = mws
