@@ -202,13 +202,29 @@ def _load_or_create_secret_key() -> bytes:
         if len(key) >= 32:
             return key
     key = secrets.token_hex(32).encode()
-    os.makedirs(os.path.dirname(_SECRET_KEY_PATH), exist_ok=True)
-    with open(_SECRET_KEY_PATH, 'wb') as f:
+    key_dir = os.path.dirname(_SECRET_KEY_PATH)
+    os.makedirs(key_dir, exist_ok=True)
+    tmp = os.path.join(key_dir, '.secret_key.%d.tmp' % os.getpid())
+    with open(tmp, 'wb') as f:
         f.write(key)
     try:
-        os.chmod(_SECRET_KEY_PATH, 0o600)
+        os.chmod(tmp, 0o600)
     except OSError:
         pass
+    try:
+        os.link(tmp, _SECRET_KEY_PATH)
+    except FileExistsError:
+        existing = open(_SECRET_KEY_PATH, 'rb').read().strip()
+        if len(existing) >= 32:
+            key = existing
+    except OSError:
+        with open(_SECRET_KEY_PATH, 'wb') as f:
+            f.write(key)
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
     return key
 
 app.secret_key = _load_or_create_secret_key()

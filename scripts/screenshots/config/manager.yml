@@ -19,8 +19,47 @@ self_route:
   domain: manager.example.com
   router_name: traefik-manager
   entry_point: websecure
-webhook_url: https://discord.com/api/webhooks/1289443127755audits/aBcDeFgHiJkLmNoPqRsTuVwXyZ
-webhook_type: discord
+notification_channels:
+  - id: ch-discord
+    name: Homelab Alerts
+    kind: discord
+    enabled: true
+    url: https://discord.com/api/webhooks/1289443127755audits/aBcDeFgHiJkLmNoPqRsTuVwXyZ
+    categories: [config, backup, traefik, certs, agent, update]
+    min_severity: info
+    digest: immediate
+    quiet_hours: ''
+    break_through: false
+  - id: ch-ntfy
+    name: Security
+    kind: ntfy
+    enabled: true
+    url: https://ntfy.sh/homelab-security
+    categories: [security, crowdsec]
+    min_severity: warning
+    digest: hourly
+    quiet_hours: 23:00-07:00
+    break_through: true
+  - id: ch-unifiedpush
+    name: Pixel 9 Pro
+    kind: unifiedpush
+    enabled: true
+    url: https://ntfy.sh/up9f3a2b7c4d1e5f6a
+    categories: [certs, agent]
+    min_severity: warning
+    digest: daily
+    quiet_hours: ''
+    break_through: false
+  - id: ch-oncall
+    name: On-call
+    kind: slack
+    enabled: false
+    url: https://hooks.slack.com/services/T024BE7LD/B01UJKLM9/aBcDeFgHiJkLmNoPqRsT
+    categories: [security, traefik, crowdsec]
+    min_severity: error
+    digest: immediate
+    quiet_hours: ''
+    break_through: false
 api_keys:
   - name: Pixel 9 Pro
     hash: $2b$12$KIXQ1u3JZ0m1sYq3s1x0iuJ7f0h0lS2GkQ0oJ4nZ2pQ8uV1cX3aWm

@@ -70,6 +70,24 @@ async function capture(theme) {
     await js(`switchSettingsPanel('routes')`); await sleep(900); await shot('settings-routes');
     await js(`switchSettingsPanel('connection')`); await sleep(900); await shot('settings-connection');
     await js(`switchSettingsPanel('notifications')`); await sleep(900); await shot('settings-notifications');
+    await js(`editChannel('ch-ntfy')`); await sleep(1100);
+    // the routing controls are the point of this shot, and they sit below the fold
+    await js(`(() => {
+        const el = document.getElementById('chDigest');
+        if (!el) return;
+        let n = el.parentElement;
+        while (n && n !== document.body) {
+            const st = getComputedStyle(n);
+            if (/(auto|scroll)/.test(st.overflowY) && n.scrollHeight > n.clientHeight) {
+                n.scrollTop = Math.max(0, el.offsetTop - 120);
+                return;
+            }
+            n = n.parentElement;
+        }
+        el.scrollIntoView({ block: 'center' });
+    })()`);
+    await sleep(700); await shot('settings-notification-channel');
+    await js(`cancelChannelEdit()`); await sleep(500);
     await js(`switchSettingsPanel('agents'); loadAgentsList()`);
     await page.waitForFunction(
         `!/Loading agents/.test(document.getElementById('agentsListBody')?.textContent || '')`,
