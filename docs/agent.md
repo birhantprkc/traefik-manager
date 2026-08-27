@@ -35,7 +35,7 @@ When a remote agent is active:
 
 ## Install via installer script
 
-The fastest way is the `traefik-stack` installer, which installs the `tm` CLI and opens its wizard:
+The fastest way is the `tm` CLI installer, which opens its wizard:
 
 ```bash
 curl -fsSL https://get-traefik.xyzlab.dev | bash
@@ -54,7 +54,7 @@ curl -fsSL https://get-traefik.xyzlab.dev | bash
 tm install --mode agent-docker --api-key <key> --traefik-url http://traefik:8080
 ```
 
-Modes: `agent-docker`, `agent-docker-traefik`, `agent-binary`. Afterwards `tm status`, `tm update`, `tm logs` and `tm reconfigure` manage the agent. See [Traefik Stack](traefik-stack.md#managing-the-install).
+Modes: `agent-docker`, `agent-docker-traefik`, `agent-binary`. Afterwards `tm status`, `tm update`, `tm logs` and `tm reconfigure` manage the agent. See [tm CLI](tm-cli.md#managing-the-install).
 
 The wizard uses an arrow-key menu and a review screen - type a section number to go back and edit it, or press Enter to proceed. It covers:
 

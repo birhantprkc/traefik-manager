@@ -6,7 +6,7 @@ This page covers all methods for recovering access to Traefik Manager. All of th
 
 ## Method 1 - tm CLI (recommended)
 
-If the stack was installed with [tm](traefik-stack.md), one command covers every install type. It works out where Traefik Manager keeps its settings, and runs the reset below as the user that owns them.
+If the stack was installed with [tm](tm-cli.md), one command covers every install type. It works out where Traefik Manager keeps its settings, and runs the reset below as the user that owns them.
 
 ```bash
 tm password reset

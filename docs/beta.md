@@ -8,7 +8,7 @@ Beta tracks the `dev` branch, so it carries the next release before it ships. Yo
 
 ### With tm
 
-If the stack was installed with [tm](traefik-stack.md), one command covers every install type, including the Linux service:
+If the stack was installed with [tm](tm-cli.md), one command covers every install type, including the Linux service:
 
 ```bash
 tm update --channel beta

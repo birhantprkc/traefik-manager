@@ -14,7 +14,7 @@ curl -fsSL https://get-traefik.xyzlab.dev | bash
 
 `tm` then manages the install: `tm status`, `tm update`, `tm reconfigure`, `tm doctor`.
 
-[What the installer sets up →](traefik-stack.md)
+[What the installer sets up →](tm-cli.md)
 
 ### Install it yourself
 

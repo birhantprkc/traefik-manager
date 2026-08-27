@@ -241,9 +241,9 @@ The full Docker socket lets TM start, stop, or delete any container on the host.
 
 ---
 
-## Using the traefik-stack installer
+## Using the tm CLI installer {#using-the-traefik-stack-installer}
 
-If you installed with [the traefik-stack installer](traefik-stack.md), answering **y** to "Mount Traefik static config?" asks which restart method you want and generates every required compose addition - volume mounts, env vars, socket proxy service, or Traefik healthcheck.
+If you installed with [the tm CLI installer](tm-cli.md), answering **y** to "Mount Traefik static config?" asks which restart method you want and generates every required compose addition - volume mounts, env vars, socket proxy service, or Traefik healthcheck.
 
 To turn it on or change the restart method afterwards, run `tm reconfigure --section mounts`.
 

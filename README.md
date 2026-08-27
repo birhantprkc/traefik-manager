@@ -43,7 +43,7 @@ curl -fsSL https://get-traefik.xyzlab.dev | bash
 
 Installs the `tm` CLI and runs `tm install`. Six modes: Traefik + Traefik Manager together, Traefik Manager on its own (Docker or native), or the agent for a remote host (Docker, Docker + Traefik, or binary).
 
-Afterwards `tm` manages the install: `tm status`, `tm update`, `tm logs`, `tm reconfigure`, `tm doctor`. [Full guide](https://traefik-manager.xyzlab.dev/traefik-stack.html)
+Afterwards `tm` manages the install: `tm status`, `tm update`, `tm logs`, `tm reconfigure`, `tm doctor`. [Full guide](https://traefik-manager.xyzlab.dev/tm-cli.html)
 
 ### Docker Compose
 
@@ -81,6 +81,10 @@ Open **http://your-server:5000** and the setup wizard takes it from there.
 
 **Logs and CrowdSec** - access log analytics and CrowdSec attacks, bans and decisions. Optional country flags and a world map, resolved on your own server.
 
+**Notifications** - nine destinations: Discord, Slack, ntfy, Gotify, Pushover, Pushbullet, Telegram, UnifiedPush and generic webhooks. Route events to each one by category and severity, with quiet hours, hourly or daily digests, and errors that break through anyway. Desktop notifications while a tab is open.
+
+**Background monitoring** - certificate expiry, Traefik and agent reachability, CrowdSec activity, GeoIP freshness and new releases are checked on a schedule by the server, so alerts arrive whether or not the interface is open.
+
 **Static config editor** - edit `traefik.yml` from the UI and apply it with a one-click restart, via socket proxy, poison pill or direct socket.
 
 **Plugins** - see every Traefik plugin with the middlewares using it, install new ones, and get flagged when the catalog has a newer version.
@@ -103,7 +107,7 @@ Full [documentation](https://traefik-manager.xyzlab.dev/).
 
 | Runtime                                                                                                              | Guide                                                                                 |
 | ----------------------------------------------------------------------------------------------------------------------| ---------------------------------------------------------------------------------------|
-| <img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/windows-terminal.png" width="20" height="20"> Installer | [Full stack, TM only, agent](https://traefik-manager.xyzlab.dev/traefik-stack.html)   |
+| <img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/windows-terminal.png" width="20" height="20"> Installer | [Full stack, TM only, agent](https://traefik-manager.xyzlab.dev/tm-cli.html)   |
 | <img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/docker.png" width="20" height="20"> Docker              | [Compose, networking, behind Traefik](https://traefik-manager.xyzlab.dev/docker.html) |
 | <img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/podman.png" width="20" height="20"> Podman              | [Rootless, Quadlet, SELinux](https://traefik-manager.xyzlab.dev/podman.html)          |
 | <img src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/linux.png" width="20" height="20"> Linux                | [Native Python and systemd](https://traefik-manager.xyzlab.dev/linux.html)            |
@@ -124,6 +128,24 @@ Full [documentation](https://traefik-manager.xyzlab.dev/).
 [OIDC](https://traefik-manager.xyzlab.dev/oidc.html) ·
 [Reset password](https://traefik-manager.xyzlab.dev/reset-password.html) ·
 [Beta](https://traefik-manager.xyzlab.dev/beta.html)
+
+---
+
+## tm CLI
+
+One binary that installs and manages the whole stack. Six install modes: Traefik and Traefik Manager together, Traefik Manager on its own (Docker or native), or an agent for a remote host (Docker, Docker + Traefik, or binary). Afterwards `tm status`, `tm update`, `tm logs`, `tm reconfigure`, `tm doctor` and `tm password reset` manage it in place.
+
+[![tm CLI](https://img.shields.io/badge/tm-repo-green?logo=go&logoColor=white)](https://github.com/chr0nzz/tm-cli)
+[![Release](https://img.shields.io/github/v/release/chr0nzz/tm-cli?logo=github&logoColor=white)](https://github.com/chr0nzz/tm-cli/releases/latest)
+[![Platforms](https://img.shields.io/badge/linux-amd64_%7C_arm64-blue?logo=linux&logoColor=white)](https://github.com/chr0nzz/tm-cli/releases/latest)
+
+```bash
+curl -fsSL https://get-traefik.xyzlab.dev | bash
+```
+
+[Repository](https://github.com/chr0nzz/tm-cli) ·
+[Releases](https://github.com/chr0nzz/tm-cli/releases/latest) ·
+[Docs](https://traefik-manager.xyzlab.dev/tm-cli.html)
 
 ---
 

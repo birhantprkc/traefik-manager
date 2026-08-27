@@ -235,5 +235,5 @@ networks:
 ```
 
 ::: tip Automated setup
-The [traefik-stack installer](traefik-stack.md) can configure CrowdSec during installation. Installing CrowdSec as part of the stack generates the bouncer key (for decisions), registers a **machine**, and wires up `CROWDSEC_MACHINE_ID` / `CROWDSEC_MACHINE_PASSWORD` (for alerts and unban), so both views work out of the box. When connecting to an existing CrowdSec instance, the installer prompts for an optional machine ID and password. To add CrowdSec to an install that does not have it, run `tm add crowdsec`.
+The [tm CLI installer](tm-cli.md) can configure CrowdSec during installation. Installing CrowdSec as part of the stack generates the bouncer key (for decisions), registers a **machine**, and wires up `CROWDSEC_MACHINE_ID` / `CROWDSEC_MACHINE_PASSWORD` (for alerts and unban), so both views work out of the box. When connecting to an existing CrowdSec instance, the installer prompts for an optional machine ID and password. To add CrowdSec to an install that does not have it, run `tm add crowdsec`.
 :::

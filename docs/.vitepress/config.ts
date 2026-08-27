@@ -31,7 +31,7 @@ export default defineConfig({
       {
         text: 'Install',
         items: [
-          { text: 'Traefik Stack (installer)', link: '/traefik-stack' },
+          { text: 'tm CLI (installer)', link: '/tm-cli' },
           { text: 'Docker', link: '/docker' },
           { text: 'Podman', link: '/podman' },
           { text: 'Linux (native)', link: '/linux' },
@@ -70,7 +70,7 @@ export default defineConfig({
       {
         text: 'Install',
         items: [
-          { text: 'Traefik Stack (installer)', link: '/traefik-stack' },
+          { text: 'tm CLI (installer)', link: '/tm-cli' },
           { text: 'Docker', link: '/docker' },
           { text: 'Podman', link: '/podman' },
           { text: 'Linux (native)', link: '/linux' },
