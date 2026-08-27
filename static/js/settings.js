@@ -373,6 +373,21 @@ const TRAEFIK_ADVISORIES = [
             return false;
         },
     },
+    {
+        id: 'GHSA-rf44-j88r-hh8c',
+        severity: 'Moderate',
+        url: 'https://github.com/traefik/traefik/security/advisories/GHSA-rf44-j88r-hh8c',
+        forwardAuthRelated: true,
+        summary: 'ForwardAuth identity spoofing via dot-form header aliases',
+        fixedIn: 'v3.7.12 or v2.11.56',
+        affected: (p) => {
+            const [maj, min, pat] = p;
+            if (maj < 2) return true;
+            if (maj === 2) return (min < 11) || (min === 11 && pat <= 55);
+            if (maj === 3) return (min < 7) || (min === 7 && pat <= 11);
+            return false;
+        },
+    },
 ];
 
 function _configHasForwardAuth() {
@@ -396,7 +411,7 @@ function checkTraefikAdvisories(version) {
     const fa = hit.forwardAuthRelated && _configHasForwardAuth();
     txt.innerHTML = `Your Traefik <b>v${_esc(version)}</b> is affected by <b>${_esc(hit.id)}</b> (${_esc(hit.severity)}) - ${_esc(hit.summary)}.`
         + (fa ? ` A forwardAuth middleware is in use, so this is high priority.` : ``)
-        + ` Update Traefik to a patched version.`;
+        + (hit.fixedIn ? ` Update Traefik to ${_esc(hit.fixedIn)}.` : ` Update Traefik to a patched version.`);
     if (link) link.href = hit.url;
     popup.dataset.advisory = hit.id;
     popup.dataset.version = version;
