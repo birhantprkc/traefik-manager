@@ -92,3 +92,100 @@ def test_the_monitor_actually_schedules_the_flush(app_module):
     assert 'notify-flush' in names, f'no flush check registered, found {names}'
     interval = next(i for n, i, _ in monitor_mod._checks if n == 'notify-flush')
     assert interval <= 300, 'the flush must run often enough to close an hourly window promptly'
+
+
+def test_a_disabled_channel_never_receives_its_backlog(monkeypatch):
+    """Turning a channel off must stop delivery, including anything already held.
+
+    The live path checks enabled via _wants, but flush_queue calls _deliver
+    directly, so a channel disabled after queuing still got pushed.
+    """
+    sent = []
+    ch = _channel(digest='hourly', enabled=False)
+    _install(monkeypatch, ch, sent)
+    _queue_one(started=time.time() - 7200)
+    assert notif.flush_queue() == 0
+    assert sent == [], 'a disabled channel must not be delivered to'
+
+
+def test_a_disabled_channels_queue_is_dropped_not_held(monkeypatch):
+    """Re-enabling later must not replay days of stale events."""
+    sent = []
+    ch = _channel(digest='hourly', enabled=False)
+    _install(monkeypatch, ch, sent)
+    _queue_one(started=time.time() - 7200)
+    notif.flush_queue()
+    with notif._notif_lock, notif._file_lock():
+        q = notif._queue_read()
+    assert 'c1' not in q, 'the backlog must be discarded when the channel is off'
+
+
+def test_force_does_not_override_a_disabled_channel(monkeypatch):
+    sent = []
+    _install(monkeypatch, _channel(enabled=False), sent)
+    _queue_one(started=time.time())
+    assert notif.flush_queue(force=True) == 0
+    assert sent == []
+
+
+def _queue_aged(cid='c1', age_seconds=0, started=None):
+    """Queue one item that was raised age_seconds ago."""
+    notif.queue_add(cid, 'info', 'old event', '2026-08-22 00:36:06', 'crowdsec')
+    with notif._notif_lock, notif._file_lock():
+        q = notif._queue_read()
+        q[cid]['items'][-1]['at'] = time.time() - age_seconds
+        if started is not None:
+            q[cid]['started'] = started
+        notif._queue_write(q)
+
+
+def test_a_days_old_backlog_is_not_delivered_as_a_summary(monkeypatch):
+    """The queue went unsent for days before it was ever flushed.
+
+    Delivering that as one 'Summary 2026-08-22 to 2026-08-23' is not what an
+    hourly digest means, and every upgrading instance would get one.
+    """
+    sent = []
+    _install(monkeypatch, _channel(digest='hourly'), sent)
+    _queue_aged(age_seconds=4 * 86400, started=time.time() - 7200)
+    assert notif.flush_queue() == 0
+    assert sent == [], 'a four day old event must not arrive as an hourly digest'
+
+
+def test_the_stale_queue_is_cleared_rather_than_retried_forever(monkeypatch):
+    sent = []
+    _install(monkeypatch, _channel(digest='hourly'), sent)
+    _queue_aged(age_seconds=4 * 86400, started=time.time() - 7200)
+    notif.flush_queue()
+    with notif._notif_lock, notif._file_lock():
+        q = notif._queue_read()
+    assert 'c1' not in q
+
+
+def test_recent_items_still_go_out(monkeypatch):
+    sent = []
+    _install(monkeypatch, _channel(digest='hourly'), sent)
+    _queue_aged(age_seconds=120, started=time.time() - 7200)
+    assert notif.flush_queue() == 1
+    assert 'old event' in sent[0][2]
+
+
+def test_a_daily_digest_keeps_a_full_day_of_events(monkeypatch):
+    """Daily gets a wider window than the 24h floor, so a 23h old event survives."""
+    sent = []
+    _install(monkeypatch, _channel(digest='daily'), sent)
+    _queue_aged(age_seconds=23 * 3600, started=time.time() - 90000)
+    assert notif.flush_queue() == 1
+
+
+def test_an_item_with_an_unreadable_timestamp_is_treated_as_stale(monkeypatch):
+    sent = []
+    _install(monkeypatch, _channel(digest='hourly'), sent)
+    notif.queue_add('c1', 'info', 'no idea when', 'not-a-timestamp', 'config')
+    with notif._notif_lock, notif._file_lock():
+        q = notif._queue_read()
+        q['c1']['items'][-1].pop('at', None)
+        q['c1']['started'] = time.time() - 7200
+        notif._queue_write(q)
+    assert notif.flush_queue() == 0
+    assert sent == []

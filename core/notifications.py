@@ -232,7 +232,8 @@ def queue_add(channel_id, type_, msg, ts, category):
         if len(held['items']) >= QUEUE_MAX:
             held['dropped'] = held.get('dropped', 0) + 1
         else:
-            held['items'].append({'type': type_, 'msg': msg, 'ts': ts, 'category': category})
+            held['items'].append({'type': type_, 'msg': msg, 'ts': ts,
+                                  'category': category, 'at': time.time()})
         _queue_write(q)
 
 
@@ -261,6 +262,33 @@ def build_report(items, dropped=0) -> str:
 
 DIGEST_SECONDS = {'hourly': 3600, 'daily': 86400}
 FLUSH_INTERVAL = 60
+QUEUE_MAX_AGE  = 86400
+
+
+def _item_epoch(item):
+    at = item.get('at')
+    if isinstance(at, (int, float)):
+        return float(at)
+    try:
+        return time.mktime(time.strptime(str(item.get('ts', '')), "%Y-%m-%d %H:%M:%S"))
+    except (ValueError, TypeError):
+        return None
+
+
+def _fresh_items(ch, items, now=None):
+    """Drop anything too old to belong in this channel's next report.
+
+    A queue that went unsent for days must not arrive as one ancient summary.
+    An item with no readable timestamp is treated as stale.
+    """
+    period = DIGEST_SECONDS.get(str(ch.get('digest', 'immediate')).strip().lower()) or 0
+    cutoff = (now if now is not None else time.time()) - max(QUEUE_MAX_AGE, period * 2)
+    fresh = []
+    for item in items:
+        at = _item_epoch(item)
+        if at is not None and at >= cutoff:
+            fresh.append(item)
+    return fresh
 
 
 def _digest_due(ch, held, now=None) -> bool:
@@ -297,7 +325,7 @@ def flush_queue(channel_id=None, force=False) -> int:
             if channel_id and cid != channel_id:
                 continue
             ch = by_id.get(cid)
-            if not ch:
+            if not ch or not ch.get('enabled', True):
                 del q[cid]
                 continue
             if not force and _in_quiet_hours(ch.get('quiet_hours', '')):
@@ -305,7 +333,7 @@ def flush_queue(channel_id=None, force=False) -> int:
             held = q.get(cid) or {}
             if not force and not _digest_due(ch, held):
                 continue
-            items = held.get('items') or []
+            items = _fresh_items(ch, held.get('items') or [])
             if not items:
                 del q[cid]
                 continue
