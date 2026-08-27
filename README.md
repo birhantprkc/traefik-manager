@@ -172,7 +172,7 @@ Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for reporting 
 
 Thanks as well to everyone who has opened an issue or a discussion - several features started as a question from someone running into something unexpected.
 
-## Star History
+## Stats
 
 <div align="center">
 <picture>
@@ -180,6 +180,13 @@ Thanks as well to everyone who has opened an issue or a discussion - several fea
   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/chr0nzz/chr0nzz/main/profile/star-history-traefik-manager-light.svg" />
   <img src="https://raw.githubusercontent.com/chr0nzz/chr0nzz/main/profile/star-history-traefik-manager-dark.svg" alt="star history" />
 </picture>
+
+<p align="center">
+ <a href="https://www.star-history.com/chr0nzz/traefik-manager">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=chr0nzz/traefik-manager&type=rank&theme=dark" /><source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=chr0nzz/traefik-manager&type=rank" /><img alt="Star History Rank" src="https://api.star-history.com/badge?repo=chr0nzz/traefik-manager&type=rank" /></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=chr0nzz/traefik-manager&type=trending&theme=dark" /><source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=chr0nzz/traefik-manager&type=trending" /><img alt="GitHub Trending Repository of the Day" src="https://api.star-history.com/badge?repo=chr0nzz/traefik-manager&type=trending" /></picture>
+ </a>
+</p>
+
 </div>
 
 
