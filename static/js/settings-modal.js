@@ -2005,7 +2005,6 @@ let _agentWizId   = null;
 let _agentWizKey  = null;
 let _agentWizStep = 0;
 let _agentRestartMethod = '';
-let _agentCfgViewOnly = false;
 
 async function loadAgentsList() {
     const body = document.getElementById('agentsListBody');
@@ -2287,7 +2286,7 @@ function inlineEditAgent(id, field, currentValue) {
             const res  = await fetch('/api/agents/' + id, { method: 'PUT', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ [field]: newVal }) });
             if (!res.ok) { showToast(await _errText(res, 'Update failed'), 'error'); loadAgentsList(); return; }
             const data = await res.json();
-            if (data.ok) { showToast(`Agent ${isName ? 'renamed' : 'URL updated'}`, 'success'); updateServerSwitcher(); }
+            if (data.ok) { showToast(`Agent ${isName ? 'renamed' : 'URL updated'}`, 'success'); }
             else { showToast(`Update failed: ${data.error || data.message || 'the server did not say why'}`, 'error'); }
         } catch(e) { showToast(_netErrText(e, 'Update failed'), 'error'); }
         loadAgentsList();
@@ -2312,7 +2311,6 @@ function startAddAgent() {
     _agentWizId          = null;
     _agentWizKey         = null;
     _agentWizStep        = 1;
-    _agentCfgViewOnly    = false;
     _agentRestartMethod  = '';
     document.getElementById('agentListView').style.display   = 'none';
     document.getElementById('agentWizardView').style.display = 'flex';
@@ -2323,7 +2321,6 @@ function startAddAgent() {
 }
 
 async function openAgentSetup(id, titleOverride) {
-    _agentCfgViewOnly = true;
     _agentWizId = id;
     _agentWizKey = null;
     document.getElementById('agentListView').style.display   = 'none';
@@ -2342,11 +2339,11 @@ async function openAgentSetup(id, titleOverride) {
         const data = await res.json();
         const a    = (data.agents || []).find(x => x.id === id);
         if (a) {
-            if (a.traefik_api_url)    document.getElementById('agCfgTraefikUrl').value  = a.traefik_api_url;
+            document.getElementById('agCfgTraefikUrl').value = a.traefik_api_url || '';
             document.getElementById('agCfgCertResolver').value = a.cert_resolver || '';
             const tlsEl = document.getElementById('agCfgInsecureTLS');
             if (tlsEl) { tlsEl.classList.toggle('on', !!a.traefik_insecure_skip_verify); }
-            if (a.config_path)        document.getElementById('agCfgConfigPath').value  = a.config_path;
+            document.getElementById('agCfgConfigPath').value = a.config_path || '';
             if (a.static_config_path) document.getElementById('agCfgStaticPath').value  = a.static_config_path;
             if (a.backup_dir)         document.getElementById('agCfgBackupDir').value   = a.backup_dir;
             if (a.backup_keep_count)  { const el = document.getElementById('agCfgKeepCount'); if (el) el.value = a.backup_keep_count; }
@@ -2366,14 +2363,12 @@ async function openAgentSetup(id, titleOverride) {
                 document.getElementById('agCfgContainer').value       = container;
                 document.getElementById('agCfgSocketContainer').value = container;
             }
-            if (a.git_backup_enabled) {
-                document.getElementById('agCfgGitEnabled').checked = true;
-                document.getElementById('agentGitFields').style.display = 'block';
-                if (a.git_backup_repo)    document.getElementById('agCfgGitRepo').value   = a.git_backup_repo;
-                if (a.git_backup_branch)  document.getElementById('agCfgGitBranch').value = a.git_backup_branch;
-                if (a.git_backup_username) document.getElementById('agCfgGitUser').value  = a.git_backup_username;
-                document.getElementById('agCfgGitAutoPush').checked = a.git_backup_auto_push !== false;
-            }
+            document.getElementById('agCfgGitEnabled').checked = !!a.git_backup_enabled;
+            document.getElementById('agentGitFields').style.display = a.git_backup_enabled ? 'block' : 'none';
+            document.getElementById('agCfgGitRepo').value   = a.git_backup_repo || '';
+            document.getElementById('agCfgGitBranch').value = a.git_backup_branch || '';
+            document.getElementById('agCfgGitUser').value   = a.git_backup_username || '';
+            document.getElementById('agCfgGitAutoPush').checked = a.git_backup_auto_push !== false;
             if (a.tma_port)       { const el = document.getElementById('agCfgPort');      if (el) el.value = a.tma_port; }
             if (a.tma_rate_limit) { const el = document.getElementById('agCfgRateLimit'); if (el) el.value = a.tma_rate_limit; }
             if (a.domains && a.domains.length) { const el = document.getElementById('agCfgDomains'); if (el) el.value = a.domains.join(', '); }
@@ -2488,21 +2483,30 @@ async function agentWizDone() {
     loadAgentsList();
 }
 
+function _agentCopy(text, okMsg) {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        showToast('Copying needs HTTPS or localhost - select the text and copy it manually', 'warning');
+        return;
+    }
+    navigator.clipboard.writeText(text || '')
+        .then(() => showToast(okMsg, 'success'))
+        .catch(() => showToast('Could not copy - select the text and copy it manually', 'error'));
+}
+
 function copyAgentKey() {
-    navigator.clipboard.writeText(_agentWizKey || '').then(() => showToast('Key copied', 'success'));
+    _agentCopy(_agentWizKey || '', 'Key copied');
 }
 
 function copyAgentCompose() {
-    navigator.clipboard.writeText(document.getElementById('agentComposeOutput').textContent).then(() => showToast('Copied', 'success'));
+    _agentCopy(document.getElementById('agentComposeOutput').textContent, 'Copied');
 }
 
 function copyAgentRun() {
-    navigator.clipboard.writeText(document.getElementById('agentRunOutput').textContent).then(() => showToast('Copied', 'success'));
+    _agentCopy(document.getElementById('agentRunOutput').textContent, 'Copied');
 }
 
 function copyRotatedKey() {
-    const key = document.getElementById('agentRotatedKeyText').textContent;
-    navigator.clipboard.writeText(key).then(() => showToast('Key copied', 'success'));
+    _agentCopy(document.getElementById('agentRotatedKeyText').textContent, 'Key copied');
 }
 
 async function rotateAgentKey() {
@@ -2516,8 +2520,9 @@ async function rotateAgentKey() {
         let data = {};
         try { data = await res.json(); } catch(je) { data = {}; }
         if (!res.ok) throw new Error(data.error || data.message || await _errText(res, 'Rotation failed'));
-        if (!data.api_key_raw) throw new Error(data.error || data.message || 'The server did not return a new key.');
-        _agentWizKey = data.api_key_raw;
+        const rotated = (data.agent && data.agent.api_key_raw) || data.api_key_raw;
+        if (!rotated) throw new Error(data.error || data.message || 'The server did not return a new key.');
+        _agentWizKey = rotated;
         document.getElementById('agentRotatedKeyText').textContent = _agentWizKey;
         document.getElementById('agentRotatedKeyDisplay').style.display = '';
         btn.innerHTML = '<i class="ph-bold ph-check text-xs"></i> Rotated';
@@ -2541,7 +2546,9 @@ function switchAgentCfgTab(id, btn) {
 function selectRestartMethod(method, btn) {
     _agentRestartMethod = method;
     document.querySelectorAll('#restartMethodChips .agent-chip').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
+    const chip = btn || Array.from(document.querySelectorAll('#restartMethodChips .agent-chip'))
+        .find(b => (b.getAttribute('data-method') || '') === (method || ''));
+    if (chip) chip.classList.add('active');
     document.getElementById('restartProxyFields').style.display     = method === 'proxy'       ? '' : 'none';
     document.getElementById('restartPoisonPillFields').style.display = method === 'poison-pill' ? '' : 'none';
     document.getElementById('restartSocketFields').style.display    = method === 'socket'      ? '' : 'none';

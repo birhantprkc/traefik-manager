@@ -1456,10 +1456,10 @@
                                         <div class="sc-fld">
                                             <div class="sc-set-n">Restart method</div>
                                             <div class="flex gap-2 flex-wrap mt-1" id="restartMethodChips">
-                                                <button class="agent-chip active" onclick="selectRestartMethod('',this)">None</button>
-                                                <button class="agent-chip" onclick="selectRestartMethod('proxy',this)">Socket Proxy</button>
-                                                <button class="agent-chip" onclick="selectRestartMethod('poison-pill',this)">Poison Pill</button>
-                                                <button class="agent-chip" onclick="selectRestartMethod('socket',this)">Direct Socket</button>
+                                                <button class="agent-chip active" data-method="" onclick="selectRestartMethod('',this)">None</button>
+                                                <button class="agent-chip" data-method="proxy" onclick="selectRestartMethod('proxy',this)">Socket Proxy</button>
+                                                <button class="agent-chip" data-method="poison-pill" onclick="selectRestartMethod('poison-pill',this)">Poison Pill</button>
+                                                <button class="agent-chip" data-method="socket" onclick="selectRestartMethod('socket',this)">Direct Socket</button>
                                             </div>
                                         </div>
                                         <div id="restartProxyFields" style="display:none;">

@@ -5959,10 +5959,16 @@ def api_agents_create():
 def api_agents_update(agent_id):
     data    = request.get_json(silent=True) or {}
     agents  = load_agents()
-    if 'git_host_branch' in data or data.get('git_host_backup'):
+    target  = next((a for a in agents if a.get('id') == agent_id), {})
+    renames_derived_branch = ('name' in data
+                              and target.get('git_host_backup')
+                              and not str(target.get('git_host_branch') or '').strip())
+    if 'git_host_branch' in data or data.get('git_host_backup') or renames_derived_branch:
         s = load_settings()
-        target = next((a for a in agents if a.get('id') == agent_id), {})
-        branch = _safe_git_branch(str(data.get('git_host_branch', target.get('git_host_branch') or '')).strip() or _agent_git_branch({**target, 'git_host_branch': ''}))
+        probe = {**target, 'git_host_branch': ''}
+        if 'name' in data:
+            probe['name'] = data['name']
+        branch = _safe_git_branch(str(data.get('git_host_branch', target.get('git_host_branch') or '')).strip() or _agent_git_branch(probe))
         enabled = bool(data.get('git_host_backup', target.get('git_host_backup')))
         if enabled:
             if branch == _safe_git_branch(s.get('git_backup_branch', 'main')):
