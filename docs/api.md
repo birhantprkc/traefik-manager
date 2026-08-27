@@ -1226,7 +1226,7 @@ Edit one named section of the static config without writing raw YAML. **Nothing 
 
 | Section | Actions | Main `data` fields |
 |---|---|---|
-| `entrypoints` | `add`, `edit`, `remove` | `address`, `redirect_to`, `http3`, `as_default`, `middlewares`, `tls_enabled`, `tls_cert_resolver`, `tls_options`, `trusted_ips`, `proxy_trusted_ips`, `read_timeout`, `write_timeout`, `idle_timeout`, `underscore_headers` |
+| `entrypoints` | `add`, `edit`, `remove` | `address`, `redirect_to`, `http3`, `as_default`, `middlewares`, `tls_enabled`, `tls_cert_resolver`, `tls_options`, `trusted_ips`, `proxy_trusted_ips`, `read_timeout`, `write_timeout`, `idle_timeout`, `underscore_headers`, `headers_strategy_key` |
 | `resolvers` | `add`, `edit`, `remove` | `email`, `storage`, `challenge_type`, `provider`, `http_entrypoint`, `ca_server`, `key_type`, `eab_kid`, `eab_hmac`, `dns_resolvers`, `dns_delay`, `dns_disable_checks` |
 | `plugins` | `add`, `edit`, `remove` | `moduleName`, `version`, `local` |
 | `api` | `set` | `enabled`, `dashboard`, `insecure`, `debug` |
@@ -1237,6 +1237,8 @@ Edit one named section of the static config without writing raw YAML. **Nothing 
 | `system` | `set` | `check_new_version`, `send_usage`, `rule_syntax`, `st_insecure`, `st_root_cas`, `st_max_idle`, `st_dial`, `st_resp_header`, `st_idle_conn` |
 
 Returns `{ "ok": true, "raw": "...", "parsed": { } }`. `400` for an unknown section, a missing field, or an invalid duration, CIDR or number.
+
+On `entrypoints`, `headers_strategy_key` selects which key `underscore_headers` is written to: `aliasHeadersStrategy` (Traefik 3.7.12+) or `underscoreHeadersStrategy` (3.7.6 to 3.7.11). Anything else falls back to the older name. Only one is ever written, and saving removes the other. See [Traefik Hardening](hardening.md).
 
 ---
 

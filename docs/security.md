@@ -2,7 +2,7 @@
 
 Traefik Manager is designed to run behind a reverse proxy on a trusted network. This page covers the security controls built in and how to harden your installation.
 
-> Looking to harden **Traefik itself** (underscore header spoofing, encoded characters, forwardAuth limits, CVE advisories)? See [Traefik Security Hardening](hardening.md).
+> Looking to harden **Traefik itself** (header alias spoofing, encoded characters, forwardAuth limits, security advisories)? See [Traefik Security Hardening](hardening.md).
 
 ---
 
