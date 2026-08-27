@@ -196,6 +196,13 @@ function _rmBuildDagre(routes) {
     const shown = routes.filter(r => !collapsedIds.has(r.id));
 
     const epNames = [...new Set(routes.flatMap(r => _rmEps(r)))];
+    const epProto = {};
+    routes.forEach(r => {
+        const p = (r.protocol || 'http').toLowerCase();
+        _rmEps(r).forEach(ep => {
+            epProto[ep] = epProto[ep] === undefined || epProto[ep] === p ? p : '';
+        });
+    });
     const mwNames = [...new Set(routes.flatMap(r => r.middlewares||[]))];
     const svcMap  = new Map();
     const svcOwner = new Map();
@@ -211,7 +218,7 @@ function _rmBuildDagre(routes) {
     };
 
     epNames.forEach(n => g.setNode(`ep:${n}`,
-        { ...dims('ep', _rmNodeHtml('ep', n, { mwUsage })), type:'ep', id:n }));
+        { ...dims('ep', _rmNodeHtml('ep', n, { mwUsage, proto: epProto[n] })), type:'ep', id:n }));
     mwNames.forEach(n => g.setNode(`mw:${n}`,
         { ...dims('mw', _rmNodeHtml('mw', n, { mwUsage })), type:'mw', id:n }));
     svcMap.forEach((target, n) => g.setNode(`svc:${n}`,
@@ -618,7 +625,8 @@ function _rmSvcHealth(name, route) {
 function _rmNodeHtml(kind, id, ctx) {
     ctx = ctx || {};
     if (kind === 'ep') {
-        return rmNode('ep', id,
+        const epP = (ctx.proto || '').toLowerCase();
+        return rmNode(epP ? 'ep ' + epP : 'ep', id,
             `<i class="ph-bold ph-door-open rm-node-ic"></i><span class="rm-node-label">${_esc(id)}</span>`);
     }
     if (kind === 'mw') {
