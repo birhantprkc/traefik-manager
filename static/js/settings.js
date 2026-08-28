@@ -208,12 +208,10 @@ async function deleteSelfRoute() {
 
 async function checkForUpdate(currentVersion) {
     try {
-        const res = await fetch('https://api.github.com/repos/traefik/traefik/releases/latest', {
-            headers: { 'Accept': 'application/vnd.github.v3+json' }
-        });
+        const res = await fetch('/api/manager/version', { headers: { 'X-Requested-With': 'fetch' } });
         if (!res.ok) return;
         const data = await res.json();
-        const latestTag = (data.tag_name || '').replace(/^v/, '');
+        const latestTag = (data.traefik_latest || '').replace(/^v/, '');
         const current   = currentVersion.replace(/^v/, '');
         window._latestTraefikTag = latestTag;
 
@@ -221,8 +219,8 @@ async function checkForUpdate(currentVersion) {
         const latEl    = document.getElementById('updateLatestVer');
         const linkEl   = document.getElementById('updateReleaseLink');
         if (curEl) curEl.textContent = 'v' + current;
-        if (latEl) latEl.textContent = 'v' + (latestTag || '-');
-        if (linkEl && data.html_url) linkEl.href = data.html_url;
+        if (latEl) latEl.textContent = latestTag ? 'v' + latestTag : '-';
+        if (linkEl && data.traefik_release_url) linkEl.href = data.traefik_release_url;
 
         if (latestTag && latestTag !== current && compareVersions(latestTag, current) > 0) {
             const badge = document.getElementById('versionBadge');
@@ -300,22 +298,25 @@ async function checkManagerVersion() {
             if (b) b.style.display = 'block';
         }
 
-        const ghRes = await fetch(
-            `https://api.github.com/repos/${d.repo}/releases/latest`,
-            { headers: { 'Accept': 'application/vnd.github.v3+json' } }
-        );
-        if (!ghRes.ok) return;
-
-        const ghData    = await ghRes.json();
-        const latestTag = (ghData.tag_name || '').replace(/^v/, '');
+        const latestTag = (d.latest || '').replace(/^v/, '');
 
         const latEl  = document.getElementById('mgrUpdateLatestVer');
         const linkEl = document.getElementById('mgrUpdateReleaseLink');
-        if (latEl && latestTag) latEl.textContent = 'v' + latestTag;
-        if (linkEl && ghData.html_url) linkEl.href = ghData.html_url;
+        if (latEl) latEl.textContent = latestTag ? 'v' + latestTag : '-';
+        if (linkEl && d.release_url) linkEl.href = d.release_url;
+
+        const tfkEl = document.getElementById('traefikUpdateCurrentVer');
+        const tfkLatEl = document.getElementById('traefikUpdateLatestVer');
+        if (tfkEl && d.traefik_running) tfkEl.textContent = 'v' + d.traefik_running;
+        if (tfkLatEl) tfkLatEl.textContent = d.traefik_latest ? 'v' + d.traefik_latest : '-';
 
         const notesEl = document.getElementById('sm-about-release-notes');
-        if (notesEl && ghData.body) notesEl.innerHTML = renderReleaseNotes(ghData.body);
+        if (notesEl) {
+            if (d.release_notes) notesEl.innerHTML = renderReleaseNotes(d.release_notes);
+            else notesEl.innerHTML = `<span style="color:var(--muted)">${_esc(d.release_error || 'Release notes are not available right now.')}</span>`;
+        }
+
+        if (!latestTag) return;
 
         if (latestTag && current && compareVersions(latestTag, current) > 0) {
             if (footerEl) {
@@ -342,7 +343,7 @@ async function checkManagerVersion() {
                 const popupL  = document.getElementById('tmUpdatePopupLink');
                 if (popup && popupV) {
                     popupV.textContent = `v${latestTag} is available (current: v${current})`;
-                    if (popupL && ghData.html_url) popupL.href = ghData.html_url;
+                    if (popupL && d.release_url) popupL.href = d.release_url;
                     popup.classList.remove('hidden');
                 }
             }

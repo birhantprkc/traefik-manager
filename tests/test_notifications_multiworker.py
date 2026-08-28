@@ -20,7 +20,6 @@ WORKER = textwrap.dedent("""
 
 
 def test_concurrent_workers_do_not_clobber_each_other(tmp_path):
-    """Two gunicorn workers each hold their own deque. Writing must merge, not overwrite."""
     script = tmp_path / "worker.py"
     script.write_text(WORKER)
     notif = tmp_path / "notifications.yml"

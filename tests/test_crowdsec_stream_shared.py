@@ -48,7 +48,6 @@ def _decision(did, value):
 
 
 class _LapiHandler(BaseHTTPRequestHandler):
-    """Stands in for the LAPI, including its one shared LastPull per bouncer key."""
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -136,7 +135,6 @@ class _Workers:
 
 
 def test_a_peers_fresh_poll_is_reused_instead_of_polling_again(tmp_path, lapi):
-    """The second worker must answer from the shared file, not from its own LAPI poll."""
     workers = _Workers(tmp_path, lapi, fresh=30, calls=1)
     first = workers.turn('a', 1)
     lapi['decisions'].append(_decision(2, '2.2.2.2'))
@@ -149,7 +147,6 @@ def test_a_peers_fresh_poll_is_reused_instead_of_polling_again(tmp_path, lapi):
 
 
 def test_a_delta_consumed_by_one_worker_is_visible_to_the_other(tmp_path, lapi):
-    """CrowdSec hands a delta to whoever pulls first, so the other worker must read it here."""
     workers = _Workers(tmp_path, lapi, fresh=0, calls=2)
     assert workers.turn('a', 1)['values'] == ['1.1.1.1']
     assert workers.turn('b', 1)['values'] == ['1.1.1.1']
@@ -164,7 +161,6 @@ def test_a_delta_consumed_by_one_worker_is_visible_to_the_other(tmp_path, lapi):
 
 
 def test_a_stale_fingerprint_still_forces_a_full_resync(tmp_path, lapi):
-    """A key change must not be papered over by another worker's cache file."""
     workers = _Workers(tmp_path, lapi, fresh=0, calls=1)
     assert workers.turn('a', 1)['mode'] == 'full'
     workers.turn('b', 1)
@@ -186,7 +182,6 @@ def test_a_stale_fingerprint_still_forces_a_full_resync(tmp_path, lapi):
 
 
 def test_a_locked_cache_serves_the_last_known_data_instead_of_double_polling(monkeypatch):
-    """The worker that cannot take the lock must not poll the LAPI behind the refresher's back."""
     monkeypatch.setenv('CROWDSEC_LAPI_URL', 'http://lapi.invalid:8080')
     monkeypatch.setenv('CROWDSEC_API_KEY', 'bouncer-key')
     monkeypatch.setenv('CROWDSEC_STREAM_FRESH_SECONDS', '0')

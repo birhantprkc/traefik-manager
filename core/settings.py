@@ -94,12 +94,6 @@ _SECRET_KEEP = ('***',)
 
 
 def _parse_channels(raw):
-    """Parse the stored channel list. One bad entry is skipped, never fatal.
-
-    load_settings wraps everything in a bare except that falls back to full
-    defaults, so a single malformed channel would otherwise revert every
-    setting in the file, auth included.
-    """
     out = []
     for item in raw or []:
         if not isinstance(item, dict):
@@ -133,7 +127,6 @@ def _parse_channels(raw):
 
 
 def _dump_channels(channels):
-    """Serialise channels for manager.yml, encrypting every secret slot."""
     out = []
     for c in channels or []:
         if not isinstance(c, dict):

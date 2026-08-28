@@ -14,11 +14,6 @@ def _put(client, agent_id, payload):
 
 
 def test_renaming_into_another_agents_derived_branch_is_rejected(client):
-    """Both agents derive their branch from their name, so the rename would collide.
-
-    Two agents pushing to one branch reset --hard each other's config before
-    committing, which destroys data inside the user's git repo.
-    """
     _seed([
         {"id": "a1", "name": "alpha", "url": "http://a1:8090", "api_key": "k1",
          "git_host_backup": True, "git_host_branch": ""},
@@ -50,7 +45,6 @@ def test_a_harmless_rename_still_works(client):
 
 
 def test_rename_is_unguarded_when_the_agent_pins_an_explicit_branch(client):
-    """An explicit git_host_branch does not move when the name changes."""
     _seed([
         {"id": "a1", "name": "alpha", "url": "http://a1:8090", "api_key": "k1",
          "git_host_backup": True, "git_host_branch": "pinned-one"},

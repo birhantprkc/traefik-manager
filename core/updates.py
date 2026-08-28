@@ -1,9 +1,5 @@
-"""Release checks for Traefik Manager and Traefik, run by the notification monitor.
+import time
 
-The browser used to ask GitHub on every page load, so an instance nobody had
-open never learned about a release. These run on the monitor schedule instead
-and announce each version once.
-"""
 import requests
 
 from core import env
@@ -35,7 +31,6 @@ def _version_parts(value) -> list:
 
 
 def compare_versions(a, b) -> int:
-    """Positive when a is newer than b, the browser compareVersions in Python."""
     pa, pb = _version_parts(a), _version_parts(b)
     for i in range(max(len(pa), len(pb))):
         diff = (pa[i] if i < len(pa) else 0) - (pb[i] if i < len(pb) else 0)
@@ -45,7 +40,6 @@ def compare_versions(a, b) -> int:
 
 
 def latest_release(repo: str) -> str:
-    """Tag of the newest published release, without the leading v."""
     try:
         resp = requests.get(GITHUB_LATEST.format(repo=repo), timeout=UPDATE_TIMEOUT,
                             headers={'Accept': 'application/vnd.github.v3+json'})
@@ -59,8 +53,37 @@ def latest_release(repo: str) -> str:
     return _strip_v((data or {}).get('tag_name')) if isinstance(data, dict) else ''
 
 
+RELEASE_CACHE_TTL = 3600
+_release_cache = {}
+
+
+def release_info(repo: str) -> dict:
+    now = time.time()
+    hit = _release_cache.get(repo)
+    if hit and (now - hit[0]) < RELEASE_CACHE_TTL:
+        return hit[1]
+    info = {'tag': '', 'url': '', 'notes': '', 'error': ''}
+    try:
+        resp = requests.get(GITHUB_LATEST.format(repo=repo), timeout=UPDATE_TIMEOUT,
+                            headers={'Accept': 'application/vnd.github.v3+json'})
+        if resp.status_code == 200:
+            data = resp.json() or {}
+            info['tag'] = _strip_v(data.get('tag_name'))
+            info['url'] = str(data.get('html_url') or '')
+            info['notes'] = str(data.get('body') or '')
+        elif resp.status_code in (403, 429):
+            info['error'] = 'rate limited by GitHub, retrying later'
+        else:
+            info['error'] = 'GitHub returned HTTP %d' % resp.status_code
+    except Exception as e:
+        info['error'] = str(e)[:120]
+        logger.debug(f"Release lookup for {repo} failed: {e}")
+    if info['tag'] or not hit:
+        _release_cache[repo] = (now, info)
+    return _release_cache.get(repo, (now, info))[1]
+
+
 def running_traefik_version() -> str:
-    """Version Traefik reports on /api/version, empty when it cannot be reached."""
     info = traefik_mod.traefik_api_get('/api/version')
     return _strip_v(info.get('Version')) if isinstance(info, dict) else ''
 
@@ -81,7 +104,6 @@ def _latest_cached(repo, cache) -> str:
 
 
 def agent_traefik_version(agent) -> str:
-    """Version an agent's Traefik reports, empty when the agent cannot be reached."""
     try:
         info = monitor_mod._agent_json(agent, '/api/traefik/version')
     except Exception as e:
@@ -91,11 +113,6 @@ def agent_traefik_version(agent) -> str:
 
 
 def check_updates(seen: dict = None) -> list:
-    """Announce a newer Traefik Manager or Traefik release once per version.
-
-    seen holds the versions already announced and defaults to the monitor's own
-    persisted state, so a release is not repeated on the next run.
-    """
     if seen is None:
         seen = monitor_mod._section('updates')
     cache  = {}

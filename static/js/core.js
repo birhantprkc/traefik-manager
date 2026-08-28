@@ -9,10 +9,6 @@ function showToast(msg, type='success', record=true, category='') {
     if (record) _recordNotification(msg, type, category);
 }
 
-// Toasts are raised from ~130 call sites that predate categories. Rather than
-// thread an argument through every one, infer it from where the user is: the open
-// settings panel if there is one, otherwise the active tab. An explicit argument
-// to showToast always wins.
 const _TOAST_CATEGORY_BY_PANEL = {
     agents: 'agent', backups: 'backup', auth: 'security',
 };
@@ -1138,7 +1134,6 @@ const NOTIF_CATEGORY_LABELS = {
 
 const _tabIcon = id => (TAB_DEFS.find(t => t.id === id) || {}).icon;
 
-// categories that map onto a tab take that tab's icon, so the two never drift
 const NOTIF_CATEGORY_ICONS = {
     config:   _tabIcon('static'),
     backup:   'ph-archive-box',
@@ -1153,8 +1148,6 @@ const NOTIF_CATEGORY_ICONS = {
 let _notifCatFilter = '';
 
 function setNotifCategory(cat, ev) {
-    // the re-render detaches this button, so closest('#notifPanel') would miss it
-    // in the document click handler and the drawer would close behind us
     if (ev) ev.stopPropagation();
     _notifCatFilter = _notifCatFilter === cat ? '' : cat;
     _renderNotifPanel();

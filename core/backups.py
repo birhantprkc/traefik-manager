@@ -1,4 +1,3 @@
-"""Timestamped backups of the dynamic config files."""
 import os
 import re
 import shutil
@@ -23,7 +22,6 @@ def _backup_keep_count() -> int:
         return 0
 
 def _prune_backups(base: str):
-    """Keep only the newest N .bak files for a given config file (0 = keep all)."""
     keep = _backup_keep_count()
     if keep <= 0:
         return

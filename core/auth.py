@@ -1,8 +1,3 @@
-"""Authentication and CSRF decorators.
-
-Lives in core so blueprints can import the decorators without importing app.py,
-which would be circular.
-"""
 import os
 import secrets
 import time

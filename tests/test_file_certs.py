@@ -41,11 +41,6 @@ def _load(tmp_path, cn, sans):
 
 
 def test_file_provider_cert_reports_its_domains(client, tmp_path):
-    """#151: file-provider certs listed the filename instead of the domain.
-
-    The SAN lookup called an API that does not exist, so it raised every time
-    and the bare except fell back to basename(certFile).
-    """
     found = _load(tmp_path, 'shop.example.com', ['shop.example.com', 'www.shop.example.com'])
     assert found, 'file-provider certificate was not listed at all'
     c = found[0]

@@ -223,7 +223,6 @@ def cs_stream_fresh_seconds() -> int:
 
 @contextmanager
 def _cs_file_lock(blocking: bool = True):
-    """Hold the shared decision cache lock, yielding whether the caller owns it."""
     fh   = None
     held = True
     if fcntl is not None:
@@ -305,11 +304,6 @@ def _cs_mirror(doc: dict):
 
 
 def _cs_fresh(doc: dict, now: datetime) -> bool:
-    """True when another worker refreshed the shared cache moments ago.
-
-    A poll this worker made itself never counts, so the tab stays live for the
-    worker that owns the stream while its peers ride along on that same result.
-    """
     if not doc['ready'] or doc['owner'] == os.getpid():
         return False
     return (now - doc['synced']).total_seconds() < cs_stream_fresh_seconds()
@@ -345,15 +339,6 @@ def _cs_apply_stream(payload, base: dict):
 
 
 def cs_decisions_stream(force_full: bool = False):
-    """Active decisions via /v1/decisions/stream, cached with deltas.
-
-    The cache lives in a file under CONFIG_DIR so every gunicorn worker shares one
-    view. CrowdSec tracks the last pull per bouncer key, so a delta consumed by one
-    worker is invisible to the others unless the result is written back here.
-
-    Returns (decisions, mode) where mode is 'full', 'delta' or 'cache'.
-    Raises CrowdSecUnavailable only when there is no usable cached answer.
-    """
     fp  = _cs_fingerprint()
     now = datetime.now(timezone.utc)
     with _cs_stream_lock:
@@ -399,12 +384,6 @@ def _cs_alert_is_local(alert: dict) -> bool:
 
 
 def poll_local_alerts(since: str = '15m') -> list:
-    """Recent locally raised alerts, for the notification monitor to turn into events.
-
-    Returns [] when there are no machine credentials or the LAPI cannot answer.
-    An older LAPI ignores filter keys it does not know instead of rejecting them,
-    so the origin filter is applied again here rather than trusted.
-    """
     if not _cs_has_machine():
         return []
     window = str(since or '15m').strip() or '15m'
@@ -455,11 +434,6 @@ CS_SUMMARY_SCENARIOS = 4
 
 
 def _cs_flag(cc: str) -> str:
-    """Regional indicator pair for a two letter country code.
-
-    Mirrors _flagEmoji in static/js/core.js. Clients with no flag font fall
-    back to rendering the two letters, which is the code it replaced.
-    """
     code = str(cc or '').strip().upper()
     if len(code) != 2 or not code.isalpha():
         return ''
@@ -467,12 +441,6 @@ def _cs_flag(cc: str) -> str:
 
 
 def _cs_alert_origin_detail(alert: dict) -> str:
-    """Country and network for a source, when geoip-enrich filled them in.
-
-    The LAPI never computes these. They are present only if the reporting
-    machine runs crowdsecurity/geoip-enrich, so every caller must cope
-    without them.
-    """
     src = alert.get('source') if isinstance(alert, dict) else None
     if not isinstance(src, dict):
         return ''
@@ -500,11 +468,6 @@ def _cs_scenario_list(names) -> str:
 
 
 def summarise_alerts(alerts, window_label: str = '') -> str:
-    """One line describing a window of alerts, however many there are.
-
-    Aggregation is about how many messages get sent, not how short they are,
-    so this names the country, network and scenarios rather than a bare count.
-    """
     sources = {}
     scenarios = {}
     detail = {}
@@ -540,11 +503,6 @@ def summarise_alerts(alerts, window_label: str = '') -> str:
 
 
 def check_local_alerts(since: str = CS_ALERT_WINDOW) -> list:
-    """One notification summing up every locally raised alert in the window.
-
-    Returns a single (type, message, category) tuple for the monitor, or nothing
-    when CrowdSec raised nothing.
-    """
     msg = summarise_alerts(poll_local_alerts(since), _cs_window_label(since))
     if not msg:
         return []

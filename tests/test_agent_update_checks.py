@@ -6,7 +6,6 @@ def _reachable(monkeypatch, ok=True):
 
 
 def _only_traefik(tag):
-    """Answer for traefik/traefik only, so the Manager check stays silent."""
     return lambda repo: tag if repo == updates.TRAEFIK_REPO else ''
 
 
@@ -26,7 +25,6 @@ def test_an_agent_running_an_old_traefik_is_announced(monkeypatch):
 
 
 def test_the_same_agent_release_is_not_announced_twice(monkeypatch):
-    """This is the bug: the browser used sessionStorage, so every login re-announced."""
     monkeypatch.setattr(updates.monitor_mod, '_agents',
                         lambda: [{'id': 'a1', 'name': 'proxy', 'url': 'http://a1:8090'}])
     _reachable(monkeypatch)
@@ -78,7 +76,6 @@ def test_github_is_asked_once_per_repo_per_run(monkeypatch):
 
 
 def test_an_unreachable_agent_is_never_asked_for_its_version(monkeypatch):
-    """The monitor short-circuits dead agents; the update check must not bypass it."""
     asked = []
     monkeypatch.setattr(updates.monitor_mod, '_agents',
                         lambda: [{'id': 'a1', 'name': 'proxy', 'url': 'http://a1:8090'}])

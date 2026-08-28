@@ -1,11 +1,3 @@
-"""Concurrent workers must agree on the session signing key.
-
-gunicorn runs 2 workers and _load_or_create_secret_key() executes at import in
-each. On a fresh config directory both used to see no .secret_key, both
-generated one, and the second overwrote the first - so each worker signed
-sessions with a different key and roughly half of all requests came back
-"Session expired - please refresh the page." until a restart.
-"""
 import os
 import subprocess
 import time
@@ -61,7 +53,7 @@ def _race(tmp_path, workers=16):
     procs = [subprocess.Popen([sys.executable, str(script), target, str(gate)],
                               stdout=subprocess.PIPE, text=True)
              for _ in range(workers)]
-    time.sleep(0.35)          # let every child reach the gate before opening it
+    time.sleep(0.35)
     gate.write_text('go')
     out = [p.communicate()[0] for p in procs]
     gate.unlink()

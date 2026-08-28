@@ -1,9 +1,3 @@
-"""Scheduled background checks that raise notifications.
-
-One process per host runs the loop. The runner is picked with a non-blocking
-flock on the config directory, so the extra gunicorn workers stay idle instead
-of firing every alert twice.
-"""
 import calendar
 import inspect
 import json
@@ -444,12 +438,6 @@ def _check_geoip():
 
 
 def register(name: str, interval_seconds: int, fn):
-    """Add a check to the schedule.
-
-    fn takes no arguments and may return an iterable of (type, message, category)
-    tuples for the monitor to raise, or None if it raises its own notifications.
-    Registering a name twice replaces the earlier check.
-    """
     entry = (str(name), max(1, int(interval_seconds)), fn)
     for i, check in enumerate(_checks):
         if check[0] == entry[0]:
@@ -459,11 +447,6 @@ def register(name: str, interval_seconds: int, fn):
 
 
 def run_checks_once(force: bool = False) -> list:
-    """Run every check whose interval has elapsed and return the notifications raised.
-
-    Each item is a (type, message, category) tuple. force runs every check
-    regardless of when it last ran.
-    """
     raised = []
     with _run_lock:
         _state.clear()
@@ -545,10 +528,6 @@ def _loop():
 
 
 def start() -> bool:
-    """Become the single runner and start the check loop.
-
-    Returns False when another worker already holds the runner lock.
-    """
     global _thread
     if _thread is not None and _thread.is_alive():
         return True
@@ -562,7 +541,6 @@ def start() -> bool:
 
 
 def stop():
-    """Stop the check loop and release the runner lock."""
     global _thread
     _stop_event.set()
     thread, _thread = _thread, None

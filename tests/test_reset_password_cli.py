@@ -296,11 +296,6 @@ def test_setup_complete_false_is_preserved(runner, app_module):
 
 
 def test_stdin_returns_without_waiting_for_the_stream_to_close(runner):
-    """The command must act on the password line, not on the pipe closing.
-
-    subprocess.communicate closes stdin, which would supply the very EOF this
-    is checking for, so the pipe is deliberately held open and only wait is used.
-    """
     import os
     import subprocess
     import sys

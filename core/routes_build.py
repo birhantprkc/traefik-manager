@@ -179,12 +179,6 @@ def _decode_headers_middleware(body) -> dict | None:
     return toggles
 
 def _server_field(servers, key, default='N/A'):
-    """The first server's address or url.
-
-    Traefik wants a list of mappings, but a bare string is easy to write by
-    hand and Traefik rejects the file rather than the entry. Reading it as a
-    string keeps one malformed service from taking down the whole tab.
-    """
     if not servers:
         return default
     first = servers[0]

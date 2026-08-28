@@ -1,4 +1,3 @@
-"""Reading TLS certificate metadata from acme.json and file-based certs."""
 import os
 
 from core import config as cfg_mod

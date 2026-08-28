@@ -1,11 +1,3 @@
-"""Which header-strategy key the entry point form writes.
-
-underscoreHeadersStrategy exists from Traefik v3.7.6, aliasHeadersStrategy from
-v3.7.12, and neither exists anywhere in 3.6.x. Writing a key the running Traefik
-does not know is not ignored: it refuses to start with
-"field not found, node: <key>", which takes the proxy down until the file is
-edited by hand.
-"""
 import pytest
 
 from conftest import post_json
@@ -21,7 +13,6 @@ def _js(app_module):
 
 
 def test_underscore_gate_no_longer_claims_3_6_support(app_module):
-    """3.6.20 and 3.6.21 both lack the option; the old gate said 3.6.20+ had it."""
     src = _js(app_module)
     body = src.split('function _traefikSupportsUnderscoreStrategy', 1)[1].split('\n}', 1)[0]
     assert 'min === 6' not in body, \
@@ -49,7 +40,6 @@ def test_the_form_writes_the_requested_key(client, config_path, key):
 
 
 def test_only_one_of_the_two_keys_is_ever_written(client):
-    """Traefik deprecates the old name but still accepts it - both at once is ambiguous."""
     post_json(client, '/api/static/section', {
         'action': 'set', 'section': 'entrypoints', 'name': 'websecure',
         'current_raw': 'entryPoints: {}\n',

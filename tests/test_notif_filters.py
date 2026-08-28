@@ -25,7 +25,6 @@ def test_notification_category_filters_behave():
 
 
 def test_the_add_endpoint_honours_a_category(client):
-    """Anything raised from the browser used to land in Config regardless of subject."""
     from conftest import post_json
     r = post_json(client, '/api/notifications/add',
                   {'type': 'info', 'message': 'ping sweep done', 'category': 'traefik'})

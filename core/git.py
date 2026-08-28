@@ -1,9 +1,3 @@
-"""Git backup: repository management, commits and pushes.
-
-Writes to users' backup repositories, so every git invocation goes through
-_git_run with protocol hardening and an askpass shim rather than embedding
-credentials in the remote URL.
-"""
 import contextlib
 import fcntl
 import os
@@ -112,8 +106,6 @@ def _git_ensure_repo():
 
 @contextlib.contextmanager
 def _git_lock():
-    """Cross-process lock (flock) so concurrent gunicorn workers don't run git
-    operations on the same repo at once, which corrupts the index/remote state."""
     os.makedirs(env.BACKUP_DIR, exist_ok=True)
     f = open(os.path.join(env.BACKUP_DIR, '.git-push.lock'), 'w')
     try:

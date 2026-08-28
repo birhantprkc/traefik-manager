@@ -1,4 +1,3 @@
-"""In-app notification log and webhook delivery."""
 import json
 import os
 import threading
@@ -58,7 +57,6 @@ def _file_lock():
 
 
 def _epoch_of(ts):
-    """Unix seconds for a stored local-time stamp, 0 when it will not parse."""
     try:
         return int(time.mktime(time.strptime(str(ts), "%Y-%m-%d %H:%M:%S")))
     except Exception:
@@ -66,7 +64,6 @@ def _epoch_of(ts):
 
 
 def _backfill(entries):
-    """Give pre-1.12 rows an id and an at, in place, preserving their order."""
     nxt = max((e['id'] for e in entries
                if isinstance(e.get('id'), int) and e['id'] > 0), default=0) + 1
     for e in entries:
@@ -112,13 +109,6 @@ def _write_counter(next_id):
 
 
 def _read_state():
-    """Return (entries, next_id).
-
-    The file stays a plain list so an older build can still read it. The
-    counter lives beside it, because a cleared list cannot say what the next
-    id should be and reusing one a client has already seen is worse than an
-    extra file.
-    """
     try:
         with open(env.NOTIFICATIONS_PATH, 'r') as f:
             data = SafeYAML(typ='safe').load(f)
@@ -222,7 +212,6 @@ def _queue_write(data):
 
 
 def queue_add(channel_id, type_, msg, ts, category):
-    """Hold a message for a channel that is in quiet hours or on a digest."""
     if not channel_id:
         return
     with _notif_lock, _file_lock():
@@ -238,11 +227,6 @@ def queue_add(channel_id, type_, msg, ts, category):
 
 
 def build_report(items, dropped=0) -> str:
-    """Collapse held messages into one report, grouped by category.
-
-    Not a replay. Three CrowdSec rollups become one CrowdSec line, so the end of
-    a quiet window is a summary rather than a burst.
-    """
     if not items:
         return ''
     order = [c for c in CATEGORY_LABELS if any(i.get('category') == c for i in items)]
@@ -276,11 +260,6 @@ def _item_epoch(item):
 
 
 def _fresh_items(ch, items, now=None):
-    """Drop anything too old to belong in this channel's next report.
-
-    A queue that went unsent for days must not arrive as one ancient summary.
-    An item with no readable timestamp is treated as stale.
-    """
     period = DIGEST_SECONDS.get(str(ch.get('digest', 'immediate')).strip().lower()) or 0
     cutoff = (now if now is not None else time.time()) - max(QUEUE_MAX_AGE, period * 2)
     fresh = []
@@ -292,7 +271,6 @@ def _fresh_items(ch, items, now=None):
 
 
 def _digest_due(ch, held, now=None) -> bool:
-    """False while a hourly or daily channel is still inside its window."""
     period = DIGEST_SECONDS.get(str(ch.get('digest', 'immediate')).strip().lower())
     if not period:
         return True
@@ -303,7 +281,6 @@ def _digest_due(ch, held, now=None) -> bool:
 
 
 def flush_due():
-    """Monitor hook: deliver reports whose digest or quiet window has ended."""
     try:
         flush_queue()
     except Exception:
@@ -312,7 +289,6 @@ def flush_due():
 
 
 def flush_queue(channel_id=None, force=False) -> int:
-    """Send one collapsed report per channel whose window has ended."""
     try:
         channels = settings_mod.load_settings().get('notification_channels', [])
     except Exception:
@@ -353,7 +329,6 @@ SEVERITY_RANK = {'info': 0, 'success': 0, 'warning': 1, 'error': 2}
 
 
 def _in_quiet_hours(window: str, when=None) -> bool:
-    """True if `when` falls inside a HH:MM-HH:MM window, wrapping past midnight."""
     if not window or '-' not in window:
         return False
     try:
@@ -395,7 +370,6 @@ def _deliver(channel: dict, type_: str, msg: str, ts: str, category: str = 'conf
 
 
 def _fire_webhook(type_: str, msg: str, ts: str, category: str = 'config'):
-    """Route one notification to every channel that wants it."""
     try:
         channels = settings_mod.load_settings().get('notification_channels', [])
     except Exception:
@@ -438,7 +412,6 @@ def _recently_logged(entries, msg, now):
 
 
 def get_notifications():
-    """Newest first. Reads the file so every worker sees the same list."""
     with _notif_lock, _file_lock():
         entries = _read_file()
         _sync(entries)
@@ -458,7 +431,6 @@ def delete_notification(ts):
 
 
 def delete_notification_by_id(nid):
-    """Remove exactly one row. False when no row carries that id."""
     try:
         nid = int(nid)
     except (TypeError, ValueError):

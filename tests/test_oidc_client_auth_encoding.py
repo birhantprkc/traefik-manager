@@ -54,8 +54,6 @@ def _start(client, monkeypatch, disc=None):
 
 
 def test_basic_credentials_are_form_encoded(client, monkeypatch):
-    """RFC 6749 2.3.1: form-encode before base64. Authentik percent-decodes what it receives,
-    so a raw secret containing % arrives corrupted and the exchange fails."""
     _enable(secret='se%2Fcret+w')
     state, nonce = _start(client, monkeypatch,
                           disc=_discovery(token_endpoint_auth_methods_supported=['client_secret_basic']))
@@ -78,8 +76,6 @@ def test_basic_credentials_are_form_encoded(client, monkeypatch):
 
 
 def test_public_client_sends_no_client_authentication(client, monkeypatch):
-    """No secret means a public client. Sending an empty Basic header is what makes
-    providers answer invalid_client."""
     _enable(secret='')
     state, nonce = _start(client, monkeypatch)
 
@@ -100,8 +96,6 @@ def test_public_client_sends_no_client_authentication(client, monkeypatch):
 
 
 def test_userinfo_is_skipped_when_the_id_token_already_has_the_claims(client, monkeypatch):
-    """requests applies its timeout per resolved address, so an unreachable userinfo host can
-    burn the whole gunicorn worker budget. Do not call it when the claims are in hand."""
     _enable()
     state, nonce = _start(client, monkeypatch)
 

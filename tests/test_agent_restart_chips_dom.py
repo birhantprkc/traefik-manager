@@ -16,11 +16,6 @@ def _chips():
 
 
 def test_every_restart_chip_carries_a_data_method():
-    """selectRestartMethod highlights by data-method when no button was clicked.
-
-    Editing an agent calls it with btn=null, so a chip without the attribute
-    leaves nothing lit and the user clicks None to 'fix' it, wiping the method.
-    """
     chips = _chips()
     assert len(chips) == 4, f'expected 4 restart chips with data-method, found {len(chips)}'
 

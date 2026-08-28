@@ -1602,10 +1602,19 @@ def api_ping():
 @app.route('/api/manager/version')
 @login_required
 def api_manager_version():
+    mgr = _updates.release_info(GITHUB_REPO)
+    tfk = _updates.release_info(_updates.TRAEFIK_REPO)
     return jsonify({
         "version": APP_VERSION,
         "repo": GITHUB_REPO,
         "static_config_configured": bool(_get_static_config_path()),
+        "latest": mgr.get('tag', ''),
+        "release_url": mgr.get('url', ''),
+        "release_notes": mgr.get('notes', ''),
+        "release_error": mgr.get('error', ''),
+        "traefik_latest": tfk.get('tag', ''),
+        "traefik_release_url": tfk.get('url', ''),
+        "traefik_running": _updates.running_traefik_version(),
     })
 
 @app.route('/api/health')
@@ -3185,12 +3194,6 @@ _CHANNEL_SECRET_URL_KINDS = ('discord', 'slack', 'ntfy', 'generic')
 
 
 def _mask_channel_url(kind: str, url: str) -> str:
-    """Mask a webhook URL that is itself the credential.
-
-    A Discord or Slack URL carries its token in the path, so returning it in
-    full leaks a usable secret. The scheme and host are kept so the UI can
-    still show which endpoint is configured.
-    """
     if not url or kind not in _CHANNEL_SECRET_URL_KINDS:
         return url
     try:
@@ -3232,7 +3235,6 @@ def _blank_channel() -> dict:
 
 
 def _apply_channel_fields(data, base, require_kind):
-    """Merge a channel payload onto base. Returns (channel, error_message)."""
     ch = dict(base)
     if require_kind or 'kind' in data:
         kind = str(data.get('kind', '')).strip().lower()

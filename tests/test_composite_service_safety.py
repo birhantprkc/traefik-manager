@@ -37,7 +37,6 @@ http:
 
 
 def test_deleting_a_route_keeps_a_service_a_weighted_pool_references(client):
-    """The pool's child must survive, even though no router points at it."""
     write_config(HAND_WRITTEN_WEIGHTED)
     r = client.post("/delete/api-blue", headers={"X-CSRF-Token": "testtoken",
                                                  "X-Requested-With": "fetch"})
@@ -91,7 +90,6 @@ http:
 
 
 def test_a_disabled_route_protects_its_service_from_another_routes_delete(client):
-    """A disabled route's snapshot can hold the only remaining reference."""
     _save_http(client, "shared1")
     r = post_form(client, "/save", serviceName="shared2",
                   subdomain="shared2.example.com", protocol="http", scheme="http",
@@ -106,7 +104,6 @@ def test_a_disabled_route_protects_its_service_from_another_routes_delete(client
 
 
 def test_a_service_does_not_protect_itself(client):
-    """A self-referencing composite must not become undeletable."""
     write_config("""
 http:
   routers:

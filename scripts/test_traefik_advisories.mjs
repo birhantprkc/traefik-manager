@@ -24,8 +24,6 @@ const shown = v => {
 const GHSA = 'GHSA-rf44-j88r-hh8c';
 const CVE  = 'CVE-2026-39858';
 
-// GHSA-rf44-j88r-hh8c: affected <= v2.11.55 and >= v3.0.0 <= v3.7.11,
-// patched in v2.11.56 and v3.7.12.
 const cases = [
     ['2.11.55', GHSA, 'last affected 2.x'],
     ['2.11.56', null, 'patched 2.x'],
@@ -34,7 +32,6 @@ const cases = [
     ['3.8.0',   null, 'later minor is clean'],
     ['4.0.0',   null, 'later major is clean'],
     ['3.6.14',  GHSA, 'past the older CVE, still hit by this one'],
-    // Both advisories apply here; the more severe one must win the find().
     ['3.5.0',   CVE,  'High outranks Moderate'],
     ['3.6.13',  CVE,  'High outranks Moderate'],
 ];

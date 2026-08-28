@@ -79,7 +79,6 @@ def test_a_custom_window_is_passed_through(monkeypatch):
 
 
 def test_capi_and_list_alerts_are_dropped_again_in_python(monkeypatch):
-    """An older LAPI ignores the origin filter instead of erroring, so it is applied here too."""
     _machine(monkeypatch)
     payload = [
         _alert(scenario='local/ssh-bf'),

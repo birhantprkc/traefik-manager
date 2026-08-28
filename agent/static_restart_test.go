@@ -9,9 +9,6 @@ import (
 	"time"
 )
 
-// Traefik normally carries the very connection the answer travels back on, so
-// restarting it before replying loses the reply. The host then reports the
-// agent as unreachable even though the restart worked.
 func TestStaticRestartAnswersBeforeRestarting(t *testing.T) {
 	restarted := make(chan time.Time, 1)
 	docker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -58,8 +55,6 @@ func TestStaticRestartAnswersBeforeRestarting(t *testing.T) {
 	}
 }
 
-// A container that does not exist is worth reporting synchronously: Traefik is
-// still up, so the answer gets through.
 func TestStaticRestartReportsMissingContainer(t *testing.T) {
 	docker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)

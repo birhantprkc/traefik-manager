@@ -55,7 +55,6 @@ def test_a_daily_digest_still_holds_after_an_hour(monkeypatch):
 
 
 def test_a_quiet_hours_hold_flushes_as_soon_as_the_window_ends(monkeypatch):
-    """An immediate channel queued during quiet hours has no digest period."""
     sent = []
     _install(monkeypatch, _channel(digest='immediate'), sent)
     _queue_one(started=time.time())
@@ -82,11 +81,6 @@ def test_queue_add_stamps_the_window_start(monkeypatch):
 
 
 def test_the_monitor_actually_schedules_the_flush(app_module):
-    """The digest shipped with no caller at all, so pin the registration.
-
-    Without a scheduled flush every hourly and daily channel queues forever
-    and the user receives nothing.
-    """
     from core import monitor as monitor_mod
     names = [name for name, _interval, _fn in monitor_mod._checks]
     assert 'notify-flush' in names, f'no flush check registered, found {names}'
@@ -95,11 +89,6 @@ def test_the_monitor_actually_schedules_the_flush(app_module):
 
 
 def test_a_disabled_channel_never_receives_its_backlog(monkeypatch):
-    """Turning a channel off must stop delivery, including anything already held.
-
-    The live path checks enabled via _wants, but flush_queue calls _deliver
-    directly, so a channel disabled after queuing still got pushed.
-    """
     sent = []
     ch = _channel(digest='hourly', enabled=False)
     _install(monkeypatch, ch, sent)
@@ -109,7 +98,6 @@ def test_a_disabled_channel_never_receives_its_backlog(monkeypatch):
 
 
 def test_a_disabled_channels_queue_is_dropped_not_held(monkeypatch):
-    """Re-enabling later must not replay days of stale events."""
     sent = []
     ch = _channel(digest='hourly', enabled=False)
     _install(monkeypatch, ch, sent)
@@ -129,7 +117,6 @@ def test_force_does_not_override_a_disabled_channel(monkeypatch):
 
 
 def _queue_aged(cid='c1', age_seconds=0, started=None):
-    """Queue one item that was raised age_seconds ago."""
     notif.queue_add(cid, 'info', 'old event', '2026-08-22 00:36:06', 'crowdsec')
     with notif._notif_lock, notif._file_lock():
         q = notif._queue_read()
@@ -140,11 +127,6 @@ def _queue_aged(cid='c1', age_seconds=0, started=None):
 
 
 def test_a_days_old_backlog_is_not_delivered_as_a_summary(monkeypatch):
-    """The queue went unsent for days before it was ever flushed.
-
-    Delivering that as one 'Summary 2026-08-22 to 2026-08-23' is not what an
-    hourly digest means, and every upgrading instance would get one.
-    """
     sent = []
     _install(monkeypatch, _channel(digest='hourly'), sent)
     _queue_aged(age_seconds=4 * 86400, started=time.time() - 7200)
@@ -171,7 +153,6 @@ def test_recent_items_still_go_out(monkeypatch):
 
 
 def test_a_daily_digest_keeps_a_full_day_of_events(monkeypatch):
-    """Daily gets a wider window than the 24h floor, so a 23h old event survives."""
     sent = []
     _install(monkeypatch, _channel(digest='daily'), sent)
     _queue_aged(age_seconds=23 * 3600, started=time.time() - 90000)

@@ -46,7 +46,6 @@ def test_reset_mode_rejects_a_password_over_the_bcrypt_limit(client):
 
 
 def test_reset_mode_rejects_accented_text_that_is_short_enough_to_look_valid(client):
-    """40 accented characters clear the 8 character rule but are 80 bytes to bcrypt."""
     _reset_state()
     r = client.post('/setup', data={'csrf_token': 'testtoken',
                                     'password': ACCENTED, 'confirm': ACCENTED})

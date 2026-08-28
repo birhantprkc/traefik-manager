@@ -71,7 +71,6 @@ async function capture(theme) {
     await js(`switchSettingsPanel('connection')`); await sleep(900); await shot('settings-connection');
     await js(`switchSettingsPanel('notifications')`); await sleep(900); await shot('settings-notifications');
     await js(`editChannel('ch-ntfy')`); await sleep(1100);
-    // the routing controls are the point of this shot, and they sit below the fold
     await js(`(() => {
         const el = document.getElementById('chDigest');
         if (!el) return;

@@ -27,7 +27,6 @@ return {
 `;
 const api = new Function('row', harness)(row);
 
-// chips are icon-only now; the title carries "Label (count)"
 const chips = () => [...row.innerHTML.matchAll(/title="([A-Za-z]+) \((\d+)\)"/g)]
     .map(m => `${m[1]}:${m[2]}`).join('  ');
 const iconsOf = () => [...row.innerHTML.matchAll(/<i class="ph-bold (ph-[a-z-]+)"/g)].map(m => m[1]).join(' ');

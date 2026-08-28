@@ -1,9 +1,3 @@
-"""Per-provider delivery for notification channels.
-
-Every sender takes one decrypted channel dict from load_settings() and returns
-(ok, error_message). Nothing here raises: send() is the only public entry point
-and it converts every failure into a message the caller can log or show.
-"""
 from urllib.parse import urljoin
 
 import requests
@@ -44,7 +38,6 @@ REQUIRED_FIELDS = {
 
 
 def required_fields(kind) -> list[str]:
-    """Which of url/token/token2/username/password this kind needs to be usable."""
     return list(REQUIRED_FIELDS.get(str(kind or '').strip().lower(), []))
 
 
@@ -78,12 +71,6 @@ BRANDED_KINDS = ('gotify', 'pushover', 'telegram', 'unifiedpush')
 
 
 def titled(kind: str, title: str) -> str:
-    """Prefix the source with the product name where the destination shows none.
-
-    Gotify, Pushover and Telegram already show the application or bot name, and
-    the mobile app is itself Traefik Manager, so those read the bare source.
-    Discord, Slack, ntfy, Pushbullet and generic show nothing of their own.
-    """
     label = str(title or '').strip() or DEFAULT_TITLE
     if label == DEFAULT_TITLE or kind in BRANDED_KINDS:
         return label
@@ -142,7 +129,6 @@ def _send_generic(channel, type_, title, msg, ts):
 
 
 def gotify_url(base: str) -> str:
-    """Message endpoint for a Gotify host, keeping any reverse proxy subpath."""
     return urljoin(str(base or '').strip().rstrip('/') + '/', 'message')
 
 
@@ -158,7 +144,6 @@ def _send_gotify(channel, type_, title, msg, ts):
 
 
 def pushover_priority(channel, type_) -> int:
-    """Channel override wins, clamped to the API range, else error maps to 1."""
     raw = channel.get('priority')
     if raw in (None, ''):
         return 1 if type_ == 'error' else 0
@@ -220,7 +205,6 @@ def _send_pushbullet(channel, type_, title, msg, ts):
 
 
 def telegram_escape(text: str) -> str:
-    """Escape the three characters Telegram HTML parse mode reserves."""
     return (str(text or '').replace('&', '&amp;')
                            .replace('<', '&lt;')
                            .replace('>', '&gt;'))
@@ -263,14 +247,12 @@ SENDERS = {
 
 
 def missing_fields(channel: dict) -> list[str]:
-    """Required slots this channel leaves blank."""
     if not isinstance(channel, dict):
         return []
     return [f for f in required_fields(channel.get('kind')) if not _field(channel, f)]
 
 
 def send(channel: dict, type_: str, title: str, msg: str, ts: str) -> tuple[bool, str]:
-    """Deliver one notification to one channel. Returns (ok, error_message)."""
     if not isinstance(channel, dict):
         return False, 'invalid channel'
     kind = str(channel.get('kind') or '').strip().lower()
