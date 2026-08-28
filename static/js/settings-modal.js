@@ -754,10 +754,7 @@ const CHANNEL_KIND_SPEC = {
                             token2:      { label: 'Chat ID',     desc: 'Target chat, group or channel to post into.', ph: '-1001234567890' } } },
 };
 
-const CHANNEL_CATEGORY_LABELS = {
-    config: 'Config', backup: 'Backups', security: 'Security', traefik: 'Traefik',
-    certs: 'Certificates', crowdsec: 'CrowdSec', agent: 'Agents', update: 'Updates',
-};
+const CHANNEL_CATEGORY_LABELS = NOTIF_CATEGORY_LABELS;
 
 const CHANNEL_SEVERITY_LABELS = { info: 'Info', success: 'Success', warning: 'Warning', error: 'Error' };
 

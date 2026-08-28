@@ -692,7 +692,7 @@ async function pingAllRoutes() {
         ? `Ping all: ${online}/${total} online - unreachable: ${offlineRoutes.join(', ')}`
         : `Ping all: all ${total} route${total !== 1 ? 's' : ''} online`;
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-    fetch('/api/notifications/add', { method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}, body: JSON.stringify({type, message: msg}) })
+    fetch('/api/notifications/add', { method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}, body: JSON.stringify({type, message: msg, category: 'traefik'}) })
         .then(() => fetchNotifications());
 }
 const _ROUTE_ICON_CDN = 'https://cdn.jsdelivr.net/gh/selfhst/icons/png';
@@ -1066,8 +1066,8 @@ function _initDomainChips(selectedDomains) {
         hiddenContainer.innerHTML = [...selected].map(d => `<input type="hidden" name="domains" value="${_esc(d)}">`).join('');
         container.innerHTML = list.map(d => {
             const on = selected.has(d);
-            return `<button type="button" onclick="_toggleDomainChip(this,'${_esc(d)}')" style="padding:3px 10px;border-radius:9999px;border:1px solid ${on ? 'var(--blue)' : 'var(--border)'};background:${on ? 'rgba(59,130,246,0.15)' : 'transparent'};color:${on ? 'var(--blue)' : 'var(--muted)'};font-size:12px;font-family:monospace;cursor:pointer;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${_esc(d)}">${_esc(d)}</button>`;
-        }).join('') + `<button type="button" onclick="_customDomainPrompt(this)" style="padding:3px 10px;border-radius:9999px;border:1px dashed var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap" title="Add another domain"><i class="ph-bold ph-plus" style="font-size:10px"></i></button>`;
+            return `<button type="button" onclick="_toggleDomainChip(this,'${_esc(d)}')" class="dom-chip${on ? ' on' : ''}" title="${_esc(d)}">${_esc(d)}</button>`;
+        }).join('') + `<button type="button" onclick="_customDomainPrompt(this)" class="dom-chip-add" title="Add another domain"><i class="ph-bold ph-plus" style="font-size:10px"></i></button>`;
     }
     render();
     window._domainChipSelected = selected;
@@ -1086,7 +1086,7 @@ function _customDomainPrompt(btn) {
     const input = document.createElement('input');
     input.type = 'text';
     input.placeholder = 'other.com';
-    input.style.cssText = 'padding:3px 10px;border-radius:9999px;border:1px solid var(--blue);background:transparent;color:var(--text);font-size:12px;font-family:monospace;width:150px;outline:none';
+    input.className = 'dom-chip-input';
     btn.replaceWith(input);
     input.focus();
     const commit = () => {

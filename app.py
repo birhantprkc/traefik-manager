@@ -3158,7 +3158,10 @@ def api_notifications_add():
     msg   = (data.get('message') or '').strip()
     if not msg:
         return jsonify({'ok': False, 'error': 'message required'}), 400
-    add_notification(type_, msg)
+    category = str(data.get('category', '')).strip().lower()
+    if category not in _settings.CHANNEL_CATEGORIES:
+        category = 'config'
+    add_notification(type_, msg, category=category)
     return jsonify({'ok': True})
 
 @app.route('/api/notifications/update', methods=['POST'])

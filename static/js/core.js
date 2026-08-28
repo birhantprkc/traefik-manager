@@ -1103,11 +1103,72 @@ async function fetchNotifications() {
     } catch(e) {}
 }
 
+const NOTIF_CATEGORY_LABELS = {
+    config: 'Config', backup: 'Backups', security: 'Security', traefik: 'Traefik',
+    certs: 'Certificates', crowdsec: 'CrowdSec', agent: 'Agents', update: 'Updates',
+};
+
+const _tabIcon = id => (TAB_DEFS.find(t => t.id === id) || {}).icon;
+
+// categories that map onto a tab take that tab's icon, so the two never drift
+const NOTIF_CATEGORY_ICONS = {
+    config:   _tabIcon('static'),
+    backup:   'ph-archive-box',
+    security: 'ph-lock-simple',
+    traefik:  'ph-signpost',
+    certs:    _tabIcon('certs'),
+    crowdsec: _tabIcon('crowdsec'),
+    agent:    'ph-robot',
+    update:   'ph-arrow-circle-up',
+};
+
+let _notifCatFilter = '';
+
+function setNotifCategory(cat, ev) {
+    // the re-render detaches this button, so closest('#notifPanel') would miss it
+    // in the document click handler and the drawer would close behind us
+    if (ev) ev.stopPropagation();
+    _notifCatFilter = _notifCatFilter === cat ? '' : cat;
+    _renderNotifPanel();
+}
+
+function _renderNotifFilters() {
+    const row = document.getElementById('notifFilters');
+    if (!row) return;
+    const order = Object.keys(NOTIF_CATEGORY_LABELS);
+    const present = [];
+    for (const n of _notifData) {
+        const c = n.category || 'config';
+        if (!present.includes(c)) present.push(c);
+    }
+    if (present.length < 2) {
+        row.style.display = 'none'; row.innerHTML = ''; _notifCatFilter = '';
+        return;
+    }
+    if (_notifCatFilter && !present.includes(_notifCatFilter)) _notifCatFilter = '';
+    present.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    row.style.display = '';
+    const chip = (cat, label, icon, count) => {
+        const on = _notifCatFilter === cat;
+        return `<button class="notif-cat-chip${on ? ' active' : ''}" onclick="setNotifCategory('${_esc(cat)}', event)"`
+             + ` title="${_esc(label)} (${count})" aria-label="${_esc(label)}"><i class="ph-bold ${icon}"></i></button>`;
+    };
+    row.innerHTML = chip('', 'All', 'ph-stack', _notifData.length)
+        + present.map(c => chip(c, NOTIF_CATEGORY_LABELS[c] || c,
+                                NOTIF_CATEGORY_ICONS[c] || 'ph-circle',
+                                _notifData.filter(x => (x.category || 'config') === c).length)).join('');
+}
+
 function _renderNotifPanel() {
     const list  = document.getElementById('notifList');
     const badge = document.getElementById('notifBadge');
     const markReadBtn = document.getElementById('notifMarkRead');
     if (!list || !badge) return;
+
+    const shown = _notifCatFilter
+        ? _notifData.filter(n => (n.category || 'config') === _notifCatFilter)
+        : _notifData;
+    _renderNotifFilters();
 
     const unreadCount = _notifData.filter(n => (n.id || 0) > _notifReadUntil).length;
     const hasUnread = unreadCount > 0;
@@ -1124,7 +1185,13 @@ function _renderNotifPanel() {
         return;
     }
 
-    list.innerHTML = _notifData.map((n, i) => {
+    if (!shown.length) {
+        const label = NOTIF_CATEGORY_LABELS[_notifCatFilter] || _notifCatFilter;
+        list.innerHTML = `<div class="notif-empty"><i class="ph-light ph-funnel" style="font-size:32px;opacity:0.3;display:block;margin-bottom:8px"></i>Nothing in ${_esc(label)}</div>`;
+        return;
+    }
+
+    list.innerHTML = shown.map((n, i) => {
         const isUnread = (n.id || 0) > _notifReadUntil;
         const type  = n.type || 'info';
         const icon  = _NOTIF_ICONS[type] || 'ph-info';
@@ -1132,7 +1199,7 @@ function _renderNotifPanel() {
             <div class="notif-icon ${type}"><i class="ph-bold ${icon}"></i></div>
             <div class="notif-body">
                 <div class="notif-msg">${_esc(n.msg)}</div>
-                <div class="notif-ts">${_notifRelTime(n.ts)}</div>
+                <div class="notif-ts">${_notifRelTime(n.ts)}<span class="notif-cat">${_esc(NOTIF_CATEGORY_LABELS[n.category] || n.category || 'Config')}</span></div>
             </div>
             <button class="notif-delete-btn" onclick="deleteNotification('${_esc(n.ts)}', ${Number(n.id) || 0})" title="Dismiss"><i class="ph-bold ph-x"></i></button>
         </div>`;
