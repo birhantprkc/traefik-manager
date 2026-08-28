@@ -10,15 +10,16 @@ You don't normally need to edit this file by hand - all settings are managed thr
 
 TM stores some data in separate files alongside `manager.yml` in the same config directory:
 
-| File                      | Contents                                                                                                                        |
-| ---------------------------| ---------------------------------------------------------------------------------------------------------------------------------|
-| `manager.yml`             | All TM settings - auth, domains, tabs, webhooks, OIDC, git backup, CrowdSec, disabled routes                                    |
-| `agents.yml`              | Remote agent registrations (encrypted API keys). Auto-created and migrated from `manager.yml` on first start after v1.5.0       |
-| `templates.yml`           | Custom middleware templates created from the Middlewares tab toolbar                                                            |
-| `notifications.yml`       | Recent notification history, capped at the 200 newest entries                                                                   |
-| `notifications.yml.lock`  | Empty lock file that keeps the workers from overwriting each other's notifications. Safe to delete while TM is stopped          |
-| `dashboard.yml`           | Dashboard custom groups and per-card overrides, kept per server                                                                 |
-| `.secret_key`, `.otp_key` | Auto-generated session key and the Fernet key for every encrypted field below. Lose `.otp_key` and those secrets are unreadable |
+| File                        | Contents                                                                                                                        |
+| -----------------------------| ---------------------------------------------------------------------------------------------------------------------------------|
+| `manager.yml`               | All TM settings - auth, domains, tabs, webhooks, OIDC, git backup, CrowdSec, disabled routes                                    |
+| `agents.yml`                | Remote agent registrations (encrypted API keys). Auto-created and migrated from `manager.yml` on first start after v1.5.0       |
+| `templates.yml`             | Custom middleware templates created from the Middlewares tab toolbar                                                            |
+| `notifications.yml`         | Recent notification history, capped at the 200 newest entries                                                                   |
+| `notifications.yml.lock`    | Empty lock file that keeps the workers from overwriting each other's notifications. Safe to delete while TM is stopped          |
+| `notifications.yml.next_id` | The next notification id, so ids are never reused after a clear. Safe to delete while TM is stopped                             |
+| `dashboard.yml`             | Dashboard custom groups and per-card overrides, kept per server                                                                 |
+| `.secret_key`, `.otp_key`   | Auto-generated session key and the Fernet key for every encrypted field below. Lose `.otp_key` and those secrets are unreadable |
 
 None of these need to be edited by hand. Back up the entire config directory to preserve all TM state.
 
@@ -56,6 +57,7 @@ oidc_allowed_groups: ""
 oidc_groups_claim: "groups"
 oidc_allow_any_authenticated: false
 oidc_auto_login: false
+notification_channels: []
 webhook_url: ""
 webhook_type: "discord"
 webhook_username: ""
@@ -187,7 +189,7 @@ python3 -c "import bcrypt; print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()
 
 **Type:** boolean - **Default:** `false`
 
-When `true`, the user is redirected to a forced password-change screen after login. Set automatically by the CLI reset command.
+When `true`, the user is redirected to a forced password-change screen after login. Set automatically by the CLI reset command when run with no password option.
 
 ---
 
@@ -197,8 +199,8 @@ When `true`, the user is redirected to a forced password-change screen after log
 
 When `true`, opening Traefik Manager asks for a new password and nothing else - the setup wizard is
 skipped and the rest of `manager.yml` is left alone. Clears itself once the password is set. Set by the
-CLI reset command, or by hand to recover from a lost password (see
-[Reset Password](/reset-password#method-2-manual-reset-via-manager-yml)).
+CLI reset command when run with no password option, or by hand to recover from a lost password (see
+[Reset Password](/reset-password#method-3-manual-reset-via-manager-yml)).
 
 ---
 
@@ -341,37 +343,58 @@ Redirect straight to the provider instead of showing the login page. Append `?au
 
 ---
 
-## Notification Webhooks
+## Notifications
 
-### `webhook_url`
+### `notification_channels`
 
-**Type:** string - **Default:** `""`
+**Type:** list - **Default:** `[]`
 
-The URL to POST notification payloads to. See [Notification Webhooks](webhooks.md) for full setup details.
+Notification destinations, each with its own type, credentials, filters and schedule. Managed via **Settings - Notifications**. See [Notifications](webhooks.md) for setup.
+
+| Key | Type | Notes |
+|---|---|---|
+| `id` | string | Generated, e.g. `ch_1a2b3c4d` |
+| `name` | string | Label shown in the UI |
+| `kind` | string | `discord`, `slack`, `ntfy`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
+| `enabled` | boolean | Default `true` |
+| `url` | string | Webhook, topic or server URL |
+| `token` | string (Fernet-encrypted) | Gotify app token, Pushover app token, Pushbullet access token, Telegram bot token |
+| `token2` | string (Fernet-encrypted) | Pushover user key, Telegram chat ID |
+| `username` | string | Basic auth username for ntfy or generic |
+| `password` | string (Fernet-encrypted) | Basic auth password for ntfy or generic |
+| `categories` | list | Any of `config`, `backup`, `security`, `traefik`, `certs`, `crowdsec`, `agent`, `update`. Empty means all |
+| `min_severity` | string | `info`, `success`, `warning` or `error`. Default `info` |
+| `digest` | string | `immediate`, `hourly` or `daily`. Default `immediate` |
+| `quiet_hours` | string | `HH:MM-HH:MM`, e.g. `22:00-07:00`. Empty means always on |
+| `break_through` | boolean | Send `error` messages during quiet hours. Default `false` |
+
+```yaml
+notification_channels:
+  - id: ch_1a2b3c4d
+    name: Phone
+    kind: telegram
+    enabled: true
+    url: ""
+    token: "gAAAAAB..."
+    token2: "gAAAAAB..."
+    categories:
+      - security
+      - traefik
+    min_severity: warning
+    digest: immediate
+    quiet_hours: "22:00-07:00"
+    break_through: true
+```
+
+Entries with an unknown `kind` are dropped when the file is loaded. Secrets are encrypted at rest - always set them through the UI.
 
 ---
 
-### `webhook_type`
+### `webhook_url` / `webhook_type` / `webhook_username` / `webhook_password`
 
-**Type:** string - **Default:** `"discord"`
+**Type:** string - **Default:** `""`, `"discord"`, `""`, `""`
 
-Controls the payload format. One of: `discord`, `slack`, `ntfy`, `generic`.
-
----
-
-### `webhook_username`
-
-**Type:** string - **Default:** `""`
-
-Optional basic auth username for ntfy or generic endpoints.
-
----
-
-### `webhook_password`
-
-**Type:** string (Fernet-encrypted) - **Default:** `""`
-
-Optional basic auth password. Stored encrypted at rest. Do not edit by hand.
+The single webhook from before v1.12.0. Still read, and migrated on first start into a channel named **Webhook** when `notification_channels` is absent. Once channels exist these keys are ignored.
 
 ---
 

@@ -86,7 +86,13 @@ async function refreshCertsTab() {
     const container = document.getElementById('certsContent');
     container.innerHTML = `<div class="text-center py-16" style="color:var(--muted)"><i class="ph-light ph-spinner-gap text-4xl block mb-3 animate-spin opacity-40"></i><p>Loading certificates...</p></div>`;
     try {
-        const res  = await agentFetch('/api/traefik/certs').then(r => r.json());
+        const certRes = await agentFetch('/api/traefik/certs');
+        if (!certRes.ok) {
+            const msg = await _errText(certRes, 'Could not load certificate data');
+            container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>${_esc(msg)}</p></div>`;
+            return;
+        }
+        const res  = await certRes.json();
         const certs = Array.isArray(res.certs) ? res.certs : [];
 
         if (res.error && certs.length === 0) {
@@ -119,7 +125,7 @@ async function refreshCertsTab() {
         renderCertsVerdict();
         renderCertCards();
     } catch(e) {
-        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>Could not load certificate data</p></div>`;
+        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p>${_esc(_netErrText(e, 'Could not load certificate data'))}</p></div>`;
     }
 }
 
@@ -135,10 +141,15 @@ async function refreshTlsOptionsTab() {
     el.innerHTML = `<div class="text-center py-16" style="color:var(--muted)"><i class="ph-light ph-spinner-gap text-4xl block mb-3 animate-spin opacity-40"></i><p>Loading TLS profiles...</p></div>`;
     try {
         const res = await fetch('/api/tls-options' + (_tlsSrv() ? '?server=' + encodeURIComponent(_tlsSrv()) : ''));
+        if (!res.ok) {
+            const msg = await _errText(res, 'Failed to load TLS profiles');
+            el.innerHTML = `<div class="text-center py-16" style="color:var(--muted)"><i class="ph-bold ph-warning text-3xl block mb-2"></i><p>${_esc(msg)}</p></div>`;
+            return;
+        }
         _tlsOptions = await res.json();
         renderTlsOptions(_tlsOptions);
     } catch(e) {
-        el.innerHTML = `<div class="text-center py-16" style="color:var(--muted)"><i class="ph-bold ph-warning text-3xl block mb-2"></i><p>Failed to load TLS profiles</p></div>`;
+        el.innerHTML = `<div class="text-center py-16" style="color:var(--muted)"><i class="ph-bold ph-warning text-3xl block mb-2"></i><p>${_esc(_netErrText(e, 'Failed to load TLS profiles'))}</p></div>`;
     }
 }
 
@@ -339,6 +350,7 @@ async function saveTlsOption() {
             headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'X-CSRF-Token': token },
             body: JSON.stringify({ ...body, server: _tlsSrv() }),
         });
+        if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const json = await res.json();
         if (json.ok) {
             closeTlsOptionModal();
@@ -346,9 +358,9 @@ async function saveTlsOption() {
             refreshTlsOptionsTab();
             _populateTlsOptionsSelect();
         } else {
-            showToast(json.message || 'Save failed', 'error');
+            showToast(json.error || json.message || 'Save failed', 'error');
         }
-    } catch(e) { showToast('Save failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Save failed'), 'error'); }
 }
 
 async function deleteTlsOption(name, configFile) {
@@ -361,13 +373,14 @@ async function deleteTlsOption(name, configFile) {
             method: 'DELETE',
             headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': token },
         });
+        if (!res.ok) { showToast(await _errText(res, 'Delete failed'), 'error'); return; }
         const json = await res.json();
         if (json.ok) {
             showToast('TLS profile deleted');
             refreshTlsOptionsTab();
             _populateTlsOptionsSelect();
         } else {
-            showToast(json.message || 'Delete failed', 'error');
+            showToast(json.error || json.message || 'Delete failed', 'error');
         }
-    } catch(e) { showToast('Delete failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Delete failed'), 'error'); }
 }

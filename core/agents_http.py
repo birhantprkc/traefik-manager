@@ -1,4 +1,3 @@
-"""HTTP client for remote Traefik Manager Agents."""
 from io import StringIO
 
 import requests

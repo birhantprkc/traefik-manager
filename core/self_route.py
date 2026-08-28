@@ -1,4 +1,3 @@
-"""The route Traefik Manager creates for itself, so it can be managed from its own UI."""
 import os
 import threading
 

@@ -834,21 +834,71 @@ Delete the local clone. The next push re-initialises it. Use this when the repos
 
 ### `GET /api/notifications`
 
-List stored notifications, newest first. The last 200 are kept.
+List stored notifications, newest first. The last 200 are kept. The response is a
+plain array, not an object.
 
 ```json
-[{ "ts": "2026-04-13 20:25:03", "type": "route_saved", "msg": "Route my-app saved" }]
+[{ "id": 412, "at": 1776112503, "ts": "2026-04-13 20:25:03",
+   "type": "success", "msg": "Route my-app saved", "category": "config" }]
 ```
+
+| Field | Meaning |
+|---|---|
+| `id` | Stable, increasing, never reused. Use it to delete or to mark read |
+| `at` | Unix epoch seconds, UTC. Convert to the reader's own timezone |
+| `ts` | Server-local time as a string, kept for older clients |
+| `category` | `config`, `backup`, `security`, `traefik`, `certs`, `crowdsec`, `agent`, `update` |
+
+::: tip Added in v1.12.0
+`id`, `at` and `category` are new. Rows written by an earlier version are given an
+`id` and an `at` the first time the file is read; a `ts` that will not parse gets
+`at: 0` rather than being dropped.
+:::
 
 ---
 
 ### `POST /api/notifications/delete`
 
-Delete a single notification by timestamp.
+Delete a single notification. Prefer `id`, which removes exactly that row.
+
+```json
+{ "id": 412 }
+```
+
+`ts` is still accepted and behaves as it always has, removing the first row with
+that timestamp. Because `ts` is only second-resolution, two notifications logged
+in the same second cannot be told apart that way.
 
 ```json
 { "ts": "2026-04-13 20:25:03" }
 ```
+
+Returns `404` when no row carries that `id`.
+
+---
+
+### `POST /api/notifications/read`
+
+Set the shared read marker, so the web bell and every phone agree on what has
+been read. Send an `id`, or `all` to mark everything read.
+
+```json
+{ "id": 412 }
+{ "all": true }
+```
+
+---
+
+### `GET /api/notifications/state`
+
+The read marker and what is still unread.
+
+```json
+{ "read_until": 412, "count": 200, "unread": 4 }
+```
+
+Counting unread from the array length breaks once the 200-entry cap is reached,
+because the length stops changing. Use this instead.
 
 ---
 
@@ -894,11 +944,82 @@ Record an "update available" notification. `product` is `manager` for Traefik Ma
 
 ---
 
+## Notification channels
+
+Channels are where notifications are delivered. Each one has a `kind`, a category filter, a
+severity floor and an optional quiet window. Secrets (`token`, `token2`, `password`) read back
+as `***`.
+
+| Field | Values |
+| --- | --- |
+| `kind` | `discord`, `slack`, `ntfy`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
+| `categories` | any of `config`, `backup`, `security`, `traefik`, `certs`, `crowdsec`, `agent`, `update` |
+| `min_severity` | `info`, `success`, `warning`, `error` |
+| `digest` | `immediate`, `hourly`, `daily` |
+| `quiet_hours` | `HH:MM-HH:MM`, or `""` for none |
+| `break_through` | `true` sends `error` events during quiet hours |
+
+An unknown `kind`, category, `min_severity`, `digest` or a malformed `quiet_hours` returns `400`.
+
+### `GET /api/notifications/channels`
+
+List every channel, secrets redacted.
+
+```json
+{ "channels": [{ "id": "ch_1a2b3c4d", "name": "Ops Discord", "kind": "discord", "enabled": true,
+  "url": "https://discord.com/api/webhooks/...", "token": "", "token2": "", "password": "",
+  "categories": ["certs", "crowdsec"], "min_severity": "warning", "digest": "immediate",
+  "quiet_hours": "23:00-07:00", "break_through": true }] }
+```
+
+---
+
+### `POST /api/notifications/channels`
+
+Create a channel. `kind` is required. The `id` is generated server-side and returned. An empty
+`name` falls back to the kind. Omitted fields take their defaults: enabled, every category,
+`min_severity` `info`, `digest` `immediate`, no quiet hours.
+
+```json
+{ "kind": "gotify", "name": "Phone", "url": "https://gotify.example.com", "token": "A1b2C3" }
+```
+
+---
+
+### `PUT /api/notifications/channels/{id}`
+
+Update a channel. Omitted fields keep their value. Send a secret as `***` to keep the stored one,
+or any other string to replace it. `404` if the id is unknown.
+
+```json
+{ "min_severity": "error", "token": "***" }
+```
+
+---
+
+### `DELETE /api/notifications/channels/{id}`
+
+Delete a channel. `404` if the id is unknown.
+
+---
+
+### `POST /api/notifications/channels/{id}/test`
+
+Send a test notification through the channel now, ignoring its category, severity, digest and
+quiet-hour filters. A channel missing a required field for its kind returns `400` naming the
+field, without attempting delivery. A delivery failure returns `200` with `ok: false`.
+
+```json
+{ "ok": true, "detail": "" }
+```
+
+---
+
 ## Authentication endpoints
 
 ### `POST /api/auth/change-password`
 
-Change the login password. Rate-limited to 10/min. The new password must be at least 8 characters. `403` if `current_password` is wrong.
+Change the login password. Rate-limited to 10/min. The new password must be at least 8 characters and at most 72 bytes, which is the bcrypt limit. `403` if `current_password` is wrong.
 
 ```json
 { "current_password": "...", "new_password": "...", "confirm_password": "..." }
@@ -1105,7 +1226,7 @@ Edit one named section of the static config without writing raw YAML. **Nothing 
 
 | Section | Actions | Main `data` fields |
 |---|---|---|
-| `entrypoints` | `add`, `edit`, `remove` | `address`, `redirect_to`, `http3`, `as_default`, `middlewares`, `tls_enabled`, `tls_cert_resolver`, `tls_options`, `trusted_ips`, `proxy_trusted_ips`, `read_timeout`, `write_timeout`, `idle_timeout`, `underscore_headers` |
+| `entrypoints` | `add`, `edit`, `remove` | `address`, `redirect_to`, `http3`, `as_default`, `middlewares`, `tls_enabled`, `tls_cert_resolver`, `tls_options`, `trusted_ips`, `proxy_trusted_ips`, `read_timeout`, `write_timeout`, `idle_timeout`, `underscore_headers`, `headers_strategy_key` |
 | `resolvers` | `add`, `edit`, `remove` | `email`, `storage`, `challenge_type`, `provider`, `http_entrypoint`, `ca_server`, `key_type`, `eab_kid`, `eab_hmac`, `dns_resolvers`, `dns_delay`, `dns_disable_checks` |
 | `plugins` | `add`, `edit`, `remove` | `moduleName`, `version`, `local` |
 | `api` | `set` | `enabled`, `dashboard`, `insecure`, `debug` |
@@ -1116,6 +1237,8 @@ Edit one named section of the static config without writing raw YAML. **Nothing 
 | `system` | `set` | `check_new_version`, `send_usage`, `rule_syntax`, `st_insecure`, `st_root_cas`, `st_max_idle`, `st_dial`, `st_resp_header`, `st_idle_conn` |
 
 Returns `{ "ok": true, "raw": "...", "parsed": { } }`. `400` for an unknown section, a missing field, or an invalid duration, CIDR or number.
+
+On `entrypoints`, `headers_strategy_key` selects which key `underscore_headers` is written to: `aliasHeadersStrategy` (Traefik 3.7.12+) or `underscoreHeadersStrategy` (3.7.6 to 3.7.11). Anything else falls back to the older name. Only one is ever written, and saving removes the other. See [Traefik Hardening](hardening.md).
 
 ---
 

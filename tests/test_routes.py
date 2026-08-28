@@ -492,12 +492,6 @@ def test_editing_a_disabled_route_keeps_it_disabled(client, app_module):
 
 
 def test_load_balancing_checkboxes_are_wired_to_their_panels(client):
-    """#148: checking Sticky sessions / Health check must reveal their fields.
-
-    _lbSyncToggles() shows the matching panel, but it only ran while loading a
-    saved route, so a new route's checkboxes toggled nothing and the config was
-    saved without the feature the user thought they had enabled.
-    """
     html = client.get('/').get_data(as_text=True)
     for box in ('lbStickyEnabled', 'lbHealthEnabled'):
         tag = next((t for t in html.split('<input') if 'id="%s"' % box in t), None)

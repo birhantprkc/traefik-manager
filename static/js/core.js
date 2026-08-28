@@ -1,4 +1,4 @@
-function showToast(msg, type='success', record=true) {
+function showToast(msg, type='success', record=true, category='') {
     const icon = type === 'success' ? 'ph-check-circle' : 'ph-warning-circle';
     const color = type === 'success' ? 'text-green-400' : 'text-red-400';
     const el = document.createElement('div');
@@ -6,16 +6,40 @@ function showToast(msg, type='success', record=true) {
     el.innerHTML = `<i class="ph-fill ${icon} ${color} text-lg"></i><span>${_esc(msg)}</span>`;
     document.getElementById('toastContainer').appendChild(el);
     setTimeout(() => { el.style.animation='slideOut 0.3s ease forwards'; setTimeout(()=>el.remove(),300); }, 4000);
-    if (record) _recordNotification(msg, type);
+    if (record) _recordNotification(msg, type, category);
 }
 
-async function _recordNotification(msg, type) {
+const _TOAST_CATEGORY_BY_PANEL = {
+    agents: 'agent', backups: 'backup', auth: 'security',
+};
+const _TOAST_CATEGORY_BY_TAB = {
+    certs: 'certs', crowdsec: 'crowdsec', logs: 'traefik',
+};
+
+function _toastCategory() {
+    try {
+        for (const el of document.querySelectorAll('[id^="mpanel-"]')) {
+            if (el.offsetParent === null) continue;
+            const hit = _TOAST_CATEGORY_BY_PANEL[el.id.slice('mpanel-'.length)];
+            if (hit) return hit;
+        }
+        if (typeof _activeTab === 'string') {
+            const hit = _TOAST_CATEGORY_BY_TAB[_activeTab];
+            if (hit) return hit;
+        }
+    } catch (e) {}
+    return 'config';
+}
+
+async function _recordNotification(msg, type, category) {
+    if (!category) category = _toastCategory();
     if (typeof _csrfHeaders !== 'function') return;
     try {
         const res = await fetch('/api/notifications/log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', ..._csrfHeaders() },
-            body: JSON.stringify({ message: msg, type: type === 'success' ? 'success' : type === 'info' ? 'info' : 'error' }),
+            body: JSON.stringify({ message: msg, category,
+                type: type === 'success' ? 'success' : type === 'info' ? 'info' : 'error' }),
         });
         const json = await res.json();
         if (json && json.stored) fetchNotifications();
@@ -396,6 +420,40 @@ function renderDetailBlock(title, icon, bodyHtml, badgeHtml) {
 function _dCount(n) {
     return `<span class="d-n">${n}</span>`;
 }
+
+async function _errText(res, fallback) {
+    if (res && res.status === 502) return 'Cannot reach the agent. Check that it is running and reachable.';
+    if (res && res.status === 401) return 'Session expired. Sign in again.';
+    if (res && res.status === 403) return 'Not allowed. Your session may have expired.';
+    if (res && res.status === 404) return fallback + ' (not found)';
+    try {
+        const data = await res.json();
+        const detail = data.error || data.message;
+        if (detail) return String(detail).slice(0, 300);
+    } catch (e) {}
+    return res && res.status ? `${fallback} (HTTP ${res.status})` : fallback;
+}
+
+
+function _passwordError(pw, label) {
+    label = label || 'Password';
+    if (pw.length < 8) return label + ' must be at least 8 characters.';
+    if (new TextEncoder().encode(pw).length > 72) {
+        return label + ' must be 72 bytes or fewer, which is the bcrypt limit. '
+             + 'Accented and non-Latin characters take more than one byte each.';
+    }
+    return null;
+}
+
+
+function _netErrText(err, fallback) {
+    const msg = String((err && err.message) || err || '');
+    if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
+        return 'No response from Traefik Manager. Check that it is still running.';
+    }
+    return msg ? `${fallback}: ${msg.slice(0, 200)}` : fallback;
+}
+
 
 function _esc(s) {
     return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -1034,7 +1092,7 @@ function _initMobileFilterBars() {
 }
 
 let _notifData       = [];
-let _notifLastRead   = parseInt(localStorage.getItem('notifLastRead') || '0', 10);
+let _notifReadUntil  = parseInt(localStorage.getItem('notifReadUntil') || '0', 10);
 let _notifPanelOpen  = false;
 
 const _NOTIF_ICONS = {
@@ -1057,12 +1115,69 @@ async function fetchNotifications() {
         const res  = await fetch('/api/notifications');
         if (!res.ok) return;
         _notifData = await res.json();
-        if (_notifLastRead > _notifData.length) {
-            _notifLastRead = _notifData.length;
-            localStorage.setItem('notifLastRead', _notifLastRead);
-        }
+        try {
+            const st = await (await fetch('/api/notifications/state')).json();
+            if (typeof st.read_until === 'number') {
+                _notifReadUntil = st.read_until;
+                localStorage.setItem('notifReadUntil', _notifReadUntil);
+            }
+        } catch (e) {}
         _renderNotifPanel();
+        _syncBrowserNotifs();
     } catch(e) {}
+}
+
+const NOTIF_CATEGORY_LABELS = {
+    config: 'Config', backup: 'Backups', security: 'Security', traefik: 'Traefik',
+    certs: 'Certificates', crowdsec: 'CrowdSec', agent: 'Agents', update: 'Updates',
+};
+
+const _tabIcon = id => (TAB_DEFS.find(t => t.id === id) || {}).icon;
+
+const NOTIF_CATEGORY_ICONS = {
+    config:   _tabIcon('static'),
+    backup:   'ph-archive-box',
+    security: 'ph-lock-simple',
+    traefik:  'ph-signpost',
+    certs:    _tabIcon('certs'),
+    crowdsec: _tabIcon('crowdsec'),
+    agent:    'ph-robot',
+    update:   'ph-arrow-circle-up',
+};
+
+let _notifCatFilter = '';
+
+function setNotifCategory(cat, ev) {
+    if (ev) ev.stopPropagation();
+    _notifCatFilter = _notifCatFilter === cat ? '' : cat;
+    _renderNotifPanel();
+}
+
+function _renderNotifFilters() {
+    const row = document.getElementById('notifFilters');
+    if (!row) return;
+    const order = Object.keys(NOTIF_CATEGORY_LABELS);
+    const present = [];
+    for (const n of _notifData) {
+        const c = n.category || 'config';
+        if (!present.includes(c)) present.push(c);
+    }
+    if (present.length < 2) {
+        row.style.display = 'none'; row.innerHTML = ''; _notifCatFilter = '';
+        return;
+    }
+    if (_notifCatFilter && !present.includes(_notifCatFilter)) _notifCatFilter = '';
+    present.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    row.style.display = '';
+    const chip = (cat, label, icon, count) => {
+        const on = _notifCatFilter === cat;
+        return `<button class="notif-cat-chip${on ? ' active' : ''}" onclick="setNotifCategory('${_esc(cat)}', event)"`
+             + ` title="${_esc(label)} (${count})" aria-label="${_esc(label)}"><i class="ph-bold ${icon}"></i></button>`;
+    };
+    row.innerHTML = chip('', 'All', 'ph-stack', _notifData.length)
+        + present.map(c => chip(c, NOTIF_CATEGORY_LABELS[c] || c,
+                                NOTIF_CATEGORY_ICONS[c] || 'ph-circle',
+                                _notifData.filter(x => (x.category || 'config') === c).length)).join('');
 }
 
 function _renderNotifPanel() {
@@ -1071,7 +1186,12 @@ function _renderNotifPanel() {
     const markReadBtn = document.getElementById('notifMarkRead');
     if (!list || !badge) return;
 
-    const unreadCount = _notifData.filter((_, i) => i < (_notifData.length - _notifLastRead)).length;
+    const shown = _notifCatFilter
+        ? _notifData.filter(n => (n.category || 'config') === _notifCatFilter)
+        : _notifData;
+    _renderNotifFilters();
+
+    const unreadCount = _notifData.filter(n => (n.id || 0) > _notifReadUntil).length;
     const hasUnread = unreadCount > 0;
 
     badge.classList.toggle('hidden', !hasUnread);
@@ -1086,17 +1206,23 @@ function _renderNotifPanel() {
         return;
     }
 
-    list.innerHTML = _notifData.map((n, i) => {
-        const isUnread = i < (_notifData.length - _notifLastRead);
+    if (!shown.length) {
+        const label = NOTIF_CATEGORY_LABELS[_notifCatFilter] || _notifCatFilter;
+        list.innerHTML = `<div class="notif-empty"><i class="ph-light ph-funnel" style="font-size:32px;opacity:0.3;display:block;margin-bottom:8px"></i>Nothing in ${_esc(label)}</div>`;
+        return;
+    }
+
+    list.innerHTML = shown.map((n, i) => {
+        const isUnread = (n.id || 0) > _notifReadUntil;
         const type  = n.type || 'info';
         const icon  = _NOTIF_ICONS[type] || 'ph-info';
         return `<div class="notif-item${isUnread ? ' unread' : ''}">
             <div class="notif-icon ${type}"><i class="ph-bold ${icon}"></i></div>
             <div class="notif-body">
                 <div class="notif-msg">${_esc(n.msg)}</div>
-                <div class="notif-ts">${_notifRelTime(n.ts)}</div>
+                <div class="notif-ts">${_notifRelTime(n.ts)}<span class="notif-cat">${_esc(NOTIF_CATEGORY_LABELS[n.category] || n.category || 'Config')}</span></div>
             </div>
-            <button class="notif-delete-btn" onclick="deleteNotification('${_esc(n.ts)}')" title="Dismiss"><i class="ph-bold ph-x"></i></button>
+            <button class="notif-delete-btn" onclick="deleteNotification('${_esc(n.ts)}', ${Number(n.id) || 0})" title="Dismiss"><i class="ph-bold ph-x"></i></button>
         </div>`;
     }).join('');
 }
@@ -1126,22 +1252,27 @@ function toggleNotifPanel() {
     }
 }
 
-function markNotifsRead() {
-    _notifLastRead = _notifData.length;
-    localStorage.setItem('notifLastRead', _notifLastRead);
+async function markNotifsRead() {
+    _notifReadUntil = Math.max(_notifReadUntil, ..._notifData.map(n => n.id || 0), 0);
+    localStorage.setItem('notifReadUntil', _notifReadUntil);
     _renderNotifPanel();
+    try {
+        await fetch('/api/notifications/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
+            body: JSON.stringify({ all: true }),
+        });
+    } catch (e) {}
 }
 
-async function deleteNotification(ts) {
+async function deleteNotification(ts, id) {
     try {
         await fetch('/api/notifications/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
-            body: JSON.stringify({ ts })
+            body: JSON.stringify(id ? { id } : { ts })
         });
         await fetchNotifications();
-        if (_notifLastRead > 0) _notifLastRead = Math.max(0, _notifLastRead - 1);
-        localStorage.setItem('notifLastRead', _notifLastRead);
         _renderNotifPanel();
     } catch(e) {}
 }
@@ -1153,10 +1284,124 @@ async function clearAllNotifications() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({})
         });
-        _notifLastRead = 0;
-        localStorage.setItem('notifLastRead', _notifLastRead);
         await fetchNotifications();
     } catch(e) {}
+}
+
+const BROWSER_NOTIF_KEY     = 'tmBrowserNotifs';
+const BROWSER_NOTIF_SEV_KEY = 'tmBrowserNotifsSeverity';
+const BROWSER_NOTIF_SEVERITIES = ['all', 'warning'];
+const BROWSER_NOTIF_BURST = 3;
+
+const _BROWSER_NOTIF_TITLES = {
+    success: 'Traefik Manager',
+    info:    'Traefik Manager',
+    warning: 'Traefik Manager: warning',
+    error:   'Traefik Manager: error',
+};
+
+const _BROWSER_NOTIF_RANK = { info: 0, success: 0, warning: 1, error: 2 };
+
+let _notifSeenTs = null;
+
+function browserNotifSupport() {
+    if (window.isSecureContext === false) return { ok: false, reason: 'insecure' };
+    if (typeof Notification === 'undefined') return { ok: false, reason: 'unsupported' };
+    return { ok: true, reason: '' };
+}
+
+function browserNotifsEnabled() {
+    return localStorage.getItem(BROWSER_NOTIF_KEY) === '1';
+}
+
+function browserNotifsActive() {
+    return browserNotifsEnabled() && browserNotifSupport().ok && Notification.permission === 'granted';
+}
+
+function browserNotifSeverity() {
+    const v = localStorage.getItem(BROWSER_NOTIF_SEV_KEY);
+    return BROWSER_NOTIF_SEVERITIES.includes(v) ? v : 'all';
+}
+
+function setBrowserNotifSeverity(sev) {
+    if (!BROWSER_NOTIF_SEVERITIES.includes(sev)) return;
+    localStorage.setItem(BROWSER_NOTIF_SEV_KEY, sev);
+}
+
+function _requestNotifPermission() {
+    return new Promise(resolve => {
+        let settled = false;
+        const finish = perm => {
+            if (settled) return;
+            settled = true;
+            resolve(perm || Notification.permission);
+        };
+        try {
+            const ret = Notification.requestPermission(finish);
+            if (ret && typeof ret.then === 'function') ret.then(finish).catch(() => finish(Notification.permission));
+        } catch(e) {
+            finish(Notification.permission);
+        }
+    });
+}
+
+async function enableBrowserNotifs() {
+    const support = browserNotifSupport();
+    if (!support.ok) return support;
+    let perm = Notification.permission;
+    if (perm === 'default') perm = await _requestNotifPermission();
+    if (perm !== 'granted') {
+        localStorage.setItem(BROWSER_NOTIF_KEY, '0');
+        return { ok: false, reason: 'denied' };
+    }
+    localStorage.setItem(BROWSER_NOTIF_KEY, '1');
+    _notifSeenTs = new Set(_notifData.map(n => n.ts));
+    return { ok: true, reason: '' };
+}
+
+function disableBrowserNotifs() {
+    localStorage.setItem(BROWSER_NOTIF_KEY, '0');
+}
+
+function _browserNotifWanted(type) {
+    if (browserNotifSeverity() !== 'warning') return true;
+    return (_BROWSER_NOTIF_RANK[type] || 0) >= 1;
+}
+
+function _showBrowserNotif(type, body, tag) {
+    try {
+        const notif = new Notification(_BROWSER_NOTIF_TITLES[type] || _BROWSER_NOTIF_TITLES.info, {
+            body: body,
+            tag:  'tm-' + tag,
+            icon: '/static/icons/icon-192x192.png',
+        });
+        notif.onclick = () => {
+            window.focus();
+            try { notif.close(); } catch(e) {}
+            if (!_notifPanelOpen) toggleNotifPanel();
+        };
+    } catch(e) {}
+}
+
+function _syncBrowserNotifs() {
+    const seen = _notifSeenTs;
+    _notifSeenTs = new Set(_notifData.map(n => n.ts));
+    if (!browserNotifsEnabled()) return;
+    if (!browserNotifSupport().ok) return;
+    if (Notification.permission !== 'granted') {
+        disableBrowserNotifs();
+        if (typeof renderBrowserNotifs === 'function') renderBrowserNotifs();
+        showToast('Desktop notifications are blocked by this browser, so they have been turned off', 'error', false);
+        return;
+    }
+    if (seen === null) return;
+    const fresh = _notifData.filter(n => !seen.has(n.ts) && _browserNotifWanted(n.type || 'info'));
+    if (!fresh.length) return;
+    if (fresh.length > BROWSER_NOTIF_BURST) {
+        _showBrowserNotif('info', fresh.length + ' new notifications', 'burst');
+        return;
+    }
+    fresh.slice().reverse().forEach(n => _showBrowserNotif(n.type || 'info', n.msg || '', n.ts));
 }
 
 let _navReflowPending = false;

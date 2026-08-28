@@ -4,7 +4,7 @@ import re
 import time
 import base64
 import hashlib
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 import shutil
 import secrets
 import threading
@@ -58,6 +58,9 @@ _save_agents      = _ag.encrypt_agents
 _parse_agent_dict = _ag.parse_agent_dict
 from core import backups as _back
 from core import notifications as _noti
+from core import notify_providers as _notify_providers
+from core import monitor as _monitor
+from core import updates as _updates
 from core import traefik as _trae
 from core import agents_http as _agen
 from core import git as _git
@@ -167,7 +170,6 @@ create_backup                = _back.create_backup
 _send_webhook                = _noti._send_webhook
 _fire_webhook                = _noti._fire_webhook
 _load_notifications          = _noti._load_notifications
-_save_notifications_bg       = _noti._save_notifications_bg
 get_notifications            = _noti.get_notifications
 delete_notification          = _noti.delete_notification
 clear_notifications          = _noti.clear_notifications
@@ -200,13 +202,29 @@ def _load_or_create_secret_key() -> bytes:
         if len(key) >= 32:
             return key
     key = secrets.token_hex(32).encode()
-    os.makedirs(os.path.dirname(_SECRET_KEY_PATH), exist_ok=True)
-    with open(_SECRET_KEY_PATH, 'wb') as f:
+    key_dir = os.path.dirname(_SECRET_KEY_PATH)
+    os.makedirs(key_dir, exist_ok=True)
+    tmp = os.path.join(key_dir, '.secret_key.%d.tmp' % os.getpid())
+    with open(tmp, 'wb') as f:
         f.write(key)
     try:
-        os.chmod(_SECRET_KEY_PATH, 0o600)
+        os.chmod(tmp, 0o600)
     except OSError:
         pass
+    try:
+        os.link(tmp, _SECRET_KEY_PATH)
+    except FileExistsError:
+        existing = open(_SECRET_KEY_PATH, 'rb').read().strip()
+        if len(existing) >= 32:
+            key = existing
+    except OSError:
+        with open(_SECRET_KEY_PATH, 'wb') as f:
+            f.write(key)
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
     return key
 
 app.secret_key = _load_or_create_secret_key()
@@ -369,6 +387,15 @@ def _detect_setup_self_route() -> tuple[str, str]:
     return _detect_self_route_from_own_labels()
 
 
+def _password_error(pw: str, label: str = 'Password') -> str | None:
+    if len(pw) < 8:
+        return label + ' must be at least 8 characters.'
+    if len(pw.encode('utf-8')) > 72:
+        return (label + ' must be 72 bytes or fewer, which is the bcrypt limit. '
+                'Accented and non-Latin characters take more than one byte each.')
+    return None
+
+
 def _hash_password(plaintext: str) -> str:
     import bcrypt
     return bcrypt.hashpw(plaintext.encode(), bcrypt.gensalt(rounds=12)).decode()
@@ -515,6 +542,12 @@ _load_notifications()
 
 threading.Thread(target=_geoip_autoupdate_loop, daemon=True).start()
 
+_monitor.register('crowdsec', _crowd.CS_ALERT_INTERVAL,
+                  lambda: _crowd.check_local_alerts(_crowd.CS_ALERT_WINDOW))
+_monitor.register('updates', _updates.UPDATE_INTERVAL, _updates.check_updates)
+_monitor.register('notify-flush', _noti.FLUSH_INTERVAL, _noti.flush_due)
+_monitor.start()
+
 _SILENT_PREFIXES = (
     '/static/',
     '/api/notifications',
@@ -612,7 +645,7 @@ def login():
             session.update(_vals)
             session.permanent = remember
             logger.info(f"Successful login from {request.remote_addr}")
-            add_notification('info', f"Login from {request.remote_addr}")
+            add_notification('info', f"Login from {request.remote_addr}", category='security')
 
             if settings.get('must_change_password', False) and not admin_pw:
                 if not settings.get('setup_complete', False):
@@ -662,10 +695,8 @@ def setup():
         _check_csrf()
         new_pw  = request.form.get('password', '')
         confirm = request.form.get('confirm', '')
-        err = None
-        if len(new_pw) < 8:
-            err = 'Password must be at least 8 characters.'
-        elif new_pw != confirm:
+        err = _password_error(new_pw)
+        if not err and new_pw != confirm:
             err = 'Passwords do not match.'
         if err:
             return render_template('login.html', setup_mode=True, reset_mode=True,
@@ -715,8 +746,15 @@ def setup():
         self_route_domain   = request.form.get('self_route_domain', '').strip()
         self_route_svc      = request.form.get('self_route_service', '').strip() or 'http://traefik-manager:5000'
         self_route_ep       = request.form.get('self_route_entry_point', '').strip() or _best_entrypoint()
+        notify_kind         = request.form.get('notify_kind', '').strip().lower()
+        notify_fields       = {f: request.form.get('notify_' + f, '').strip()
+                               for f in ('url', 'token', 'token2', 'username', 'password')}
+        notify_wanted       = any(notify_fields.values())
+        notify_missing      = [f for f in _notify_providers.required_fields(notify_kind)
+                               if not notify_fields[f]]
 
         domains = [d.strip() for d in domains_raw.split(',') if d.strip()]
+        pw_error = None if temp_password_mode else _password_error(pw)
 
         if not domains:
             error = 'Enter at least one domain.'
@@ -724,10 +762,14 @@ def setup():
             error = 'Enter the Traefik API URL.'
         elif not _safe_api_url(traefik_api_url):
             error = 'Traefik API URL must start with http:// or https://'
-        elif not temp_password_mode and len(pw) < 8:
-            error = 'Password must be at least 8 characters.'
+        elif pw_error:
+            error = pw_error
         elif not temp_password_mode and pw != confirm:
             error = 'Passwords do not match.'
+        elif notify_wanted and notify_kind not in _settings.CHANNEL_KINDS:
+            error = 'Choose a notification destination.'
+        elif notify_wanted and notify_missing:
+            error = 'Complete every notification field, or clear them to skip notifications.'
         else:
             import json as _json
             try:
@@ -744,7 +786,6 @@ def setup():
                 _write_self_route(self_route_domain, self_route_svc, resolver, entry_point=self_route_ep)
             cs_url  = request.form.get('crowdsec_lapi_url', '').strip()
             git_repo = request.form.get('git_backup_repo', '').strip()
-            wh_url   = request.form.get('webhook_url', '').strip()
             extra = {}
             if cs_url:
                 extra.update(
@@ -762,11 +803,10 @@ def setup():
                     git_backup_token=request.form.get('git_backup_token', '').strip(),
                     git_backup_auto_push=request.form.get('git_backup_auto_push', '') == 'on',
                 )
-            if wh_url:
-                extra.update(
-                    webhook_url=wh_url,
-                    webhook_type=request.form.get('webhook_type', 'discord').strip() or 'discord',
-                )
+            if notify_wanted:
+                channel = _blank_channel()
+                channel.update(kind=notify_kind, name=notify_kind.title(), **notify_fields)
+                extra['notification_channels'] = list(current.get('notification_channels') or []) + [channel]
             if request.form.get('geoip_enabled', '') == 'on':
                 extra['geoip_enabled'] = True
             theme = request.form.get('default_theme', '').strip().lower()
@@ -882,11 +922,10 @@ def force_change_password():
         _check_csrf()
         new_pw  = request.form.get('new_password', '')
         confirm = request.form.get('confirm_password', '')
-        if len(new_pw) < 8:
-            error = 'Password must be at least 8 characters.'
-        elif new_pw != confirm:
+        error = _password_error(new_pw)
+        if not error and new_pw != confirm:
             error = 'Passwords do not match.'
-        else:
+        if not error:
             save_settings(
                 domains=settings['domains'],
                 cert_resolver=settings['cert_resolver'],
@@ -907,9 +946,48 @@ def force_change_password():
 @app.cli.command('reset-password')
 @click.option('--disable-otp', is_flag=True, default=False,
               help='Also disable two-factor authentication (use if TOTP app is lost).')
-def reset_password_cli(disable_otp):
+@click.option('--prompt', 'prompt_pw', is_flag=True, default=False,
+              help='Ask for the new password twice instead of generating a temporary one.')
+@click.option('--stdin', 'from_stdin', is_flag=True, default=False,
+              help='Read the new password from standard input.')
+@click.option('--password', 'password_opt', default=None,
+              help='Set the new password directly. Prefer --stdin for scripts.')
+def reset_password_cli(disable_otp, prompt_pw, from_stdin, password_opt):
 
-    password = secrets.token_urlsafe(16)
+    given = [name for name, used in (('--prompt', prompt_pw),
+                                     ('--stdin', from_stdin),
+                                     ('--password', password_opt is not None)) if used]
+    if len(given) > 1:
+        raise click.ClickException('Use only one of %s.' % ', '.join(given))
+
+    explicit = bool(given)
+    if prompt_pw:
+        password = click.prompt('New password', hide_input=True, confirmation_prompt=True,
+                                default='', show_default=False)
+    elif from_stdin:
+        try:
+            raw = click.get_binary_stream('stdin').readline().decode('utf-8-sig')
+        except UnicodeDecodeError:
+            raise click.ClickException('The password on standard input is not valid UTF-8.')
+        password = raw.split('\n', 1)[0].rstrip('\r')
+    elif password_opt is not None:
+        click.echo('Warning: --password is visible in ps output and shell history. '
+                   'Use --stdin instead for scripts.', err=True)
+        password = password_opt
+    else:
+        password = secrets.token_urlsafe(16)
+
+    if explicit:
+        if not password:
+            raise click.ClickException('Password must not be empty.')
+        pw_error = _password_error(password)
+        if pw_error:
+            raise click.ClickException(pw_error)
+        if os.environ.get('ADMIN_PASSWORD', '').strip():
+            raise click.ClickException(
+                'ADMIN_PASSWORD is set, and it overrides the stored password. '
+                'Change or unset that variable instead, or this password will not work.')
+
     settings = load_settings()
     save_settings(
         domains=settings['domains'],
@@ -918,18 +996,22 @@ def reset_password_cli(disable_otp):
         auth_enabled=settings.get('auth_enabled', True),
         password_hash=_hash_password(password),
         visible_tabs=settings['visible_tabs'],
-        must_change_password=True,
-        setup_password_reset=True,
+        must_change_password=False if explicit else True,
+        setup_password_reset=False if explicit else True,
         setup_complete=settings.get('setup_complete', True),
         otp_secret='' if disable_otp else None,
         otp_enabled=False if disable_otp else None,
     )
     print("=" * 60)
     print("TRAEFIK MANAGER - PASSWORD RESET")
-    print(f"New temporary password: {password}")
+    if explicit:
+        print("New password set. It is not shown here.")
+    else:
+        print(f"New temporary password: {password}")
     if disable_otp:
         print("Two-factor authentication has been DISABLED.")
-    print("You will be required to change it on next login.")
+    if not explicit:
+        print("You will be required to change it on next login.")
     print("=" * 60)
 
 
@@ -944,8 +1026,9 @@ def api_change_password():
     new_pw      = (data or {}).get('new_password', '')
     confirm_pw  = (data or {}).get('confirm_password', '')
 
-    if len(new_pw) < 8:
-        return jsonify({'error': 'New password must be at least 8 characters.'}), 400
+    pw_error = _password_error(new_pw, 'New password')
+    if pw_error:
+        return jsonify({'error': pw_error}), 400
     if new_pw != confirm_pw:
         return jsonify({'error': 'Passwords do not match.'}), 400
 
@@ -1050,7 +1133,7 @@ def login_otp():
             session.update(_vals)
             session.permanent = remember
             logger.info(f"Successful OTP login from {request.remote_addr}")
-            add_notification('info', f"Login from {request.remote_addr}")
+            add_notification('info', f"Login from {request.remote_addr}", category='security')
             if must_change:
                 if not setup_complete:
                     return redirect(url_for('setup'))
@@ -1419,7 +1502,7 @@ def api_cs_unban(decision_id):
         result = _cs_request('DELETE', f'/v1/decisions/{decision_id}')
     if result is None:
         return jsonify({'error': 'Failed to delete decision'}), 500
-    add_notification('success', f'Decision {decision_id} deleted (IP unbanned)')
+    add_notification('success', f'Decision {decision_id} deleted (IP unbanned)', category='crowdsec')
     return jsonify({'ok': True})
 
 
@@ -1519,10 +1602,19 @@ def api_ping():
 @app.route('/api/manager/version')
 @login_required
 def api_manager_version():
+    mgr = _updates.release_info(GITHUB_REPO)
+    tfk = _updates.release_info(_updates.TRAEFIK_REPO)
     return jsonify({
         "version": APP_VERSION,
         "repo": GITHUB_REPO,
         "static_config_configured": bool(_get_static_config_path()),
+        "latest": mgr.get('tag', ''),
+        "release_url": mgr.get('url', ''),
+        "release_notes": mgr.get('notes', ''),
+        "release_error": mgr.get('error', ''),
+        "traefik_latest": tfk.get('tag', ''),
+        "traefik_release_url": tfk.get('url', ''),
+        "traefik_running": _updates.running_traefik_version(),
     })
 
 @app.route('/api/health')
@@ -1667,7 +1759,7 @@ def api_static_restart():
     ok, err = trigger_traefik_restart()
     if ok:
         logger.info(f"Traefik restarted via static config by {request.remote_addr}")
-        add_notification('warning', 'Traefik restarted')
+        add_notification('warning', 'Traefik restarted', category='traefik')
         return jsonify({'ok': True})
     logger.error(f"Traefik restart failed for {request.remote_addr}: {err}")
     return jsonify({'ok': False, 'error': err}), 500
@@ -1741,10 +1833,13 @@ def api_static_section_update():
                 else:
                     http_blk.pop('redirections', None)
                 uhs = str(payload.get('underscore_headers', '')).strip().lower()
+                hdr_key = str(payload.get('headers_strategy_key', '')).strip()
+                if hdr_key not in ('aliasHeadersStrategy', 'underscoreHeadersStrategy'):
+                    hdr_key = 'underscoreHeadersStrategy'
+                http_blk.pop('aliasHeadersStrategy', None)
+                http_blk.pop('underscoreHeadersStrategy', None)
                 if uhs in ('delete', 'reject'):
-                    http_blk['underscoreHeadersStrategy'] = uhs
-                else:
-                    http_blk.pop('underscoreHeadersStrategy', None)
+                    http_blk[hdr_key] = uhs
                 mws = [m for m in re.split(r'[\s,]+', str(payload.get('middlewares', ''))) if m]
                 if mws:
                     http_blk['middlewares'] = mws
@@ -2441,7 +2536,7 @@ def api_geoip_lookup():
 def api_geoip_update():
     ok, info = _geoip_download()
     if ok:
-        add_notification('success', f'GeoIP database updated (DB-IP {info})')
+        add_notification('success', f'GeoIP database updated (DB-IP {info})', category='update')
         return jsonify({'success': True, 'db_month': info, 'status': _geoip_status()})
     return jsonify({'success': False, 'error': f'Download failed: {info}'}), 502
 
@@ -2832,9 +2927,10 @@ def api_git_backup_push():
     else:
         ok, err = _git_push_configs('manual', custom_message=message or None)
     if ok:
-        add_notification('success', f"Git backup pushed ({agent['name']})" if agent else 'Git backup pushed')
+        add_notification('success', f"Git backup pushed ({agent['name']})" if agent else 'Git backup pushed',
+                         category='backup')
         return jsonify({'ok': True})
-    add_notification('error', f'Git push failed: {err}')
+    add_notification('error', f'Git push failed: {err}', category='backup')
     return jsonify({'ok': False, 'error': err}), 400
 
 @app.route('/api/backup/git/test', methods=['POST'])
@@ -2942,7 +3038,8 @@ def api_git_backup_restore(sha):
                     resp = _agent_request(agent, 'POST', '/api/configs', json={'name': os.path.basename(fpath), 'content': content})
                     resp.raise_for_status()
                     restored += 1
-            add_notification('warning', f"Restored {agent['name']} from git commit {sha[:8]} ({restored} files)")
+            add_notification('warning', f"Restored {agent['name']} from git commit {sha[:8]} ({restored} files)",
+                             category='backup')
             return jsonify({'ok': True})
         for p in env.CONFIG_PATHS:
             create_backup(p)
@@ -2961,11 +3058,11 @@ def api_git_backup_restore(sha):
             if content:
                 with open(sp, 'w') as f:
                     f.write(content)
-        add_notification('warning', f'Restored from git commit {sha[:8]}')
+        add_notification('warning', f'Restored from git commit {sha[:8]}', category='backup')
         return jsonify({'ok': True})
     except Exception as e:
         logger.exception("Git restore error")
-        add_notification('error', f'Git restore failed: {e}')
+        add_notification('error', f'Git restore failed: {e}', category='backup')
         return jsonify({'error': str(e)}), 500
 
 
@@ -2981,7 +3078,7 @@ def api_git_backup_reset():
         if os.path.exists(repo_dir):
             shutil.rmtree(repo_dir)
         logger.info("Git repo directory reset by user")
-        add_notification('warning', 'Git repository reset - re-initialize by pushing again')
+        add_notification('warning', 'Git repository reset - re-initialize by pushing again', category='backup')
         return jsonify({'ok': True})
     except Exception as e:
         logger.exception("Git repo reset error")
@@ -3004,7 +3101,10 @@ def api_notifications_log():
         type_ = 'info'
     if not msg:
         return jsonify({'ok': False}), 400
-    stored = add_notification(type_, msg, webhook=False)
+    category = str(data.get('category', '')).strip().lower()
+    if category not in _settings.CHANNEL_CATEGORIES:
+        category = 'config'
+    stored = add_notification(type_, msg, category=category, webhook=False)
     return jsonify({'ok': True, 'stored': stored})
 
 
@@ -3012,11 +3112,47 @@ def api_notifications_log():
 @csrf_protect
 @login_required
 def api_notifications_delete():
-    ts = (request.get_json(silent=True) or {}).get('ts', '')
+    data = request.get_json(silent=True) or {}
+    if 'id' in data:
+        if not _noti.delete_notification_by_id(data.get('id')):
+            return jsonify({'ok': False, 'message': 'Notification not found'}), 404
+        return jsonify({'ok': True})
+    ts = data.get('ts', '')
     if not ts:
-        return jsonify({'ok': False, 'message': 'Missing ts'}), 400
+        return jsonify({'ok': False, 'message': 'Missing id or ts'}), 400
     delete_notification(ts)
     return jsonify({'ok': True})
+
+
+@app.route('/api/notifications/read', methods=['POST'])
+@csrf_protect
+@login_required
+def api_notifications_read():
+    data = request.get_json(silent=True) or {}
+    if data.get('all'):
+        marker = _noti.highest_id()
+    else:
+        try:
+            marker = int(data.get('id'))
+        except (TypeError, ValueError):
+            return jsonify({'ok': False, 'message': 'Missing id or all'}), 400
+    s = load_settings()
+    save_settings(
+        domains=s['domains'], cert_resolver=s['cert_resolver'],
+        traefik_api_url=s['traefik_api_url'], auth_enabled=s['auth_enabled'],
+        password_hash=s['password_hash'], visible_tabs=s['visible_tabs'],
+        notifications_read_until=max(0, marker),
+    )
+    return jsonify({'ok': True, 'read_until': max(0, marker)})
+
+
+@app.route('/api/notifications/state')
+@login_required
+def api_notifications_state():
+    entries = _noti.get_notifications()
+    marker  = int(load_settings().get('notifications_read_until', 0) or 0)
+    unread  = sum(1 for e in entries if int(e.get('id', 0) or 0) > marker)
+    return jsonify({'read_until': marker, 'count': len(entries), 'unread': unread})
 
 @app.route('/api/notifications/clear', methods=['POST'])
 @csrf_protect
@@ -3034,7 +3170,10 @@ def api_notifications_add():
     msg   = (data.get('message') or '').strip()
     if not msg:
         return jsonify({'ok': False, 'error': 'message required'}), 400
-    add_notification(type_, msg)
+    category = str(data.get('category', '')).strip().lower()
+    if category not in _settings.CHANNEL_CATEGORIES:
+        category = 'config'
+    add_notification(type_, msg, category=category)
     return jsonify({'ok': True})
 
 @app.route('/api/notifications/update', methods=['POST'])
@@ -3045,8 +3184,196 @@ def api_notifications_update():
     version = data.get('version', '')
     product = 'Traefik Manager' if data.get('product') == 'manager' else 'Traefik'
     if version:
-        add_notification('info', f"{product} v{version} is available - update now")
+        add_notification('info', f"{product} v{version} is available - update now", category='update')
     return jsonify({'ok': True})
+
+
+_CHANNEL_SECRETS = ('token', 'token2', 'password')
+
+_CHANNEL_SECRET_URL_KINDS = ('discord', 'slack', 'ntfy', 'generic')
+
+
+def _mask_channel_url(kind: str, url: str) -> str:
+    if not url or kind not in _CHANNEL_SECRET_URL_KINDS:
+        return url
+    try:
+        parts = urlparse(url)
+        if not parts.scheme or not parts.netloc:
+            return '***'
+        return f'{parts.scheme}://{parts.netloc}/***'
+    except Exception:
+        return '***'
+
+_QUIET_HOURS_RE = re.compile(r'^(?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d$')
+
+
+def _redact_channel(c: dict) -> dict:
+    out = dict(c)
+    for field in _CHANNEL_SECRETS:
+        out[field] = '***' if out.get(field) else ''
+    out['url'] = _mask_channel_url(out.get('kind', ''), out.get('url', ''))
+    return out
+
+
+def _blank_channel() -> dict:
+    return {
+        'id':            _settings._new_channel_id(),
+        'name':          '',
+        'kind':          '',
+        'enabled':       True,
+        'url':           '',
+        'token':         '',
+        'token2':        '',
+        'username':      '',
+        'password':      '',
+        'categories':    list(_settings.CHANNEL_CATEGORIES),
+        'min_severity':  'info',
+        'digest':        'immediate',
+        'quiet_hours':   '',
+        'break_through': False,
+    }
+
+
+def _apply_channel_fields(data, base, require_kind):
+    ch = dict(base)
+    if require_kind or 'kind' in data:
+        kind = str(data.get('kind', '')).strip().lower()
+        if kind not in _settings.CHANNEL_KINDS:
+            return None, 'kind must be one of: ' + ', '.join(_settings.CHANNEL_KINDS)
+        ch['kind'] = kind
+    if 'categories' in data:
+        raw = data.get('categories')
+        if not isinstance(raw, list):
+            return None, 'categories must be a list'
+        unknown = [str(c) for c in raw if c not in _settings.CHANNEL_CATEGORIES]
+        if unknown:
+            return None, 'unknown categories: ' + ', '.join(unknown)
+        ch['categories'] = list(raw)
+    if 'min_severity' in data:
+        sev = str(data.get('min_severity', '')).strip().lower()
+        if sev not in _settings.CHANNEL_SEVERITIES:
+            return None, 'min_severity must be one of: ' + ', '.join(_settings.CHANNEL_SEVERITIES)
+        ch['min_severity'] = sev
+    if 'digest' in data:
+        digest = str(data.get('digest', '')).strip().lower()
+        if digest not in _settings.CHANNEL_DIGESTS:
+            return None, 'digest must be one of: ' + ', '.join(_settings.CHANNEL_DIGESTS)
+        ch['digest'] = digest
+    if 'quiet_hours' in data:
+        window = str(data.get('quiet_hours', '')).strip()
+        if window and not _QUIET_HOURS_RE.match(window):
+            return None, 'quiet_hours must be HH:MM-HH:MM, for example 23:00-07:00'
+        ch['quiet_hours'] = window
+    if 'name' in data:
+        ch['name'] = str(data.get('name', '')).strip()[:60]
+    if 'url' in data:
+        incoming_url = str(data.get('url', '')).strip()[:500]
+        if '***' not in incoming_url:
+            ch['url'] = incoming_url
+    if 'username' in data:
+        ch['username'] = str(data.get('username', '')).strip()[:100]
+    if 'enabled' in data:
+        ch['enabled'] = bool(data.get('enabled'))
+    if 'break_through' in data:
+        ch['break_through'] = bool(data.get('break_through'))
+    for field in _CHANNEL_SECRETS:
+        if field in data and str(data[field]) != '***':
+            ch[field] = str(data[field])
+    return ch, ''
+
+
+def _save_channels(settings, channels):
+    save_settings(
+        domains=settings['domains'],
+        cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'],
+        auth_enabled=settings['auth_enabled'],
+        password_hash=settings['password_hash'],
+        visible_tabs=settings['visible_tabs'],
+        notification_channels=channels,
+    )
+
+
+def _stored_channel(channel_id, fallback):
+    channels = load_settings().get('notification_channels', [])
+    return next((c for c in channels if c.get('id') == channel_id), fallback)
+
+
+@app.route('/api/notifications/channels', methods=['GET'])
+@login_required
+def api_notification_channels_list():
+    channels = load_settings().get('notification_channels', [])
+    return jsonify({'channels': [_redact_channel(c) for c in channels]})
+
+
+@app.route('/api/notifications/channels', methods=['POST'])
+@csrf_protect
+@login_required
+def api_notification_channels_create():
+    data     = request.get_json(silent=True) or {}
+    settings = load_settings()
+    channel, err = _apply_channel_fields(data, _blank_channel(), True)
+    if err:
+        return jsonify({'ok': False, 'error': err}), 400
+    channel['name'] = channel['name'] or channel['kind'].title()
+    channels = list(settings.get('notification_channels', []))
+    channels.append(channel)
+    _save_channels(settings, channels)
+    logger.info(f"Notification channel '{channel['name']}' ({channel['kind']}) created by {request.remote_addr}")
+    return jsonify({'ok': True, 'channel': _redact_channel(_stored_channel(channel['id'], channel))})
+
+
+@app.route('/api/notifications/channels/<channel_id>', methods=['PUT'])
+@csrf_protect
+@login_required
+def api_notification_channels_update(channel_id):
+    data     = request.get_json(silent=True) or {}
+    settings = load_settings()
+    channels = list(settings.get('notification_channels', []))
+    idx = next((i for i, c in enumerate(channels) if c.get('id') == channel_id), None)
+    if idx is None:
+        return jsonify({'ok': False, 'error': 'Channel not found'}), 404
+    channel, err = _apply_channel_fields(data, channels[idx], False)
+    if err:
+        return jsonify({'ok': False, 'error': err}), 400
+    channel['id'] = channel_id
+    channels[idx] = channel
+    _save_channels(settings, channels)
+    return jsonify({'ok': True, 'channel': _redact_channel(_stored_channel(channel_id, channel))})
+
+
+@app.route('/api/notifications/channels/<channel_id>', methods=['DELETE'])
+@csrf_protect
+@login_required
+def api_notification_channels_delete(channel_id):
+    settings = load_settings()
+    current  = settings.get('notification_channels', [])
+    channels = [c for c in current if c.get('id') != channel_id]
+    if len(channels) == len(current):
+        return jsonify({'ok': False, 'error': 'Channel not found'}), 404
+    _save_channels(settings, channels)
+    logger.info(f"Notification channel {channel_id} deleted by {request.remote_addr}")
+    return jsonify({'ok': True})
+
+
+@app.route('/api/notifications/channels/<channel_id>/test', methods=['POST'])
+@csrf_protect
+@login_required
+def api_notification_channels_test(channel_id):
+    channels = load_settings().get('notification_channels', [])
+    channel  = next((c for c in channels if c.get('id') == channel_id), None)
+    if channel is None:
+        return jsonify({'ok': False, 'error': 'Channel not found'}), 404
+    missing = _notify_providers.missing_fields(channel)
+    if missing:
+        return jsonify({'ok': False, 'error': 'Channel is missing ' + ', '.join(missing)}), 400
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    ok, detail = _notify_providers.send(channel, 'info', 'Traefik Manager',
+                                        'Traefik Manager test notification', ts)
+    if not ok:
+        return jsonify({'ok': False, 'error': detail[:200]})
+    return jsonify({'ok': True, 'detail': detail[:200]})
+
 
 def _tls_opt_sources(server):
     agent = _agent_by_id(server) if server else None
@@ -3197,7 +3524,7 @@ def api_restore(filename):
         create_backup(target_path)
         shutil.copy2(path, target_path)
         logger.info(f"Restored: {filename} → {target_path}")
-        add_notification('warning', f"Backup restored: {filename}")
+        add_notification('warning', f"Backup restored: {filename}", category='backup')
         return jsonify({'success': True})
     except Exception as e:
         logger.exception("Restore error")
@@ -3214,7 +3541,8 @@ def api_backup_create():
             if dest:
                 created.append(os.path.basename(dest))
         if created:
-            add_notification('success', f"Backup created ({len(created)} file{'s' if len(created) > 1 else ''})")
+            add_notification('success', f"Backup created ({len(created)} file{'s' if len(created) > 1 else ''})",
+                             category='backup')
             return jsonify({'success': True, 'names': created, 'count': len(created)})
         return jsonify({'error': 'No config files found to backup'}), 400
     except Exception as e:
@@ -3231,7 +3559,7 @@ def api_static_backup_create():
     try:
         dest = create_backup(path)
         if dest:
-            add_notification('success', "Static config backup created")
+            add_notification('success', "Static config backup created", category='backup')
             return jsonify({'success': True, 'name': os.path.basename(dest)})
         return jsonify({'error': 'Static config file not found'}), 400
     except Exception as e:
@@ -3253,11 +3581,32 @@ def api_backup_delete(filename):
         path = _validated_backup_path(filename)
         if os.path.exists(path):
             os.remove(path)
-        add_notification('warning', f"Backup deleted: {filename}")
+        add_notification('warning', f"Backup deleted: {filename}", category='backup')
         return jsonify({'success': True})
     except Exception as e:
         logger.exception("Backup delete error")
         return jsonify({'error': str(e)}), 500
+
+
+def _redact_channels(channels) -> list:
+    return [_redact_channel(c) for c in (channels or []) if isinstance(c, dict)]
+
+
+def _merge_channel_secrets(incoming, existing) -> list:
+    by_id = {str(c.get('id', '')): c for c in (existing or []) if isinstance(c, dict)}
+    out   = []
+    for item in (incoming or []):
+        if not isinstance(item, dict):
+            continue
+        c   = dict(item)
+        old = by_id.get(str(c.get('id', '')), {})
+        for field in _CHANNEL_SECRETS:
+            if str(c.get(field, '')) in ('', '***'):
+                c[field] = old.get(field, '')
+        if '***' in str(c.get('url', '')):
+            c['url'] = old.get('url', '')
+        out.append(c)
+    return out
 
 
 @app.route('/api/settings', methods=['GET'])
@@ -3286,6 +3635,7 @@ def api_get_settings():
     s['crowdsec_enabled']       = bool(_cs_lapi_url() and (_cs_api_key() or _cs_has_machine()))
     s['git_backup_token_set']   = bool(s.get('git_backup_token', ''))
     s.pop('git_backup_token', None)
+    s['notification_channels'] = _redact_channels(s.get('notification_channels'))
     return jsonify(s)
 
 @app.route('/api/settings', methods=['POST'])
@@ -3330,6 +3680,10 @@ def api_save_settings():
         backup_keep_count         = max(0, int(data['backup_keep_count'])) if str(data.get('backup_keep_count', '')).strip() != '' else None
         default_theme             = str(data['default_theme']).strip().lower() if 'default_theme' in data else None
         existing = load_settings()
+        notification_channels = None
+        if 'notification_channels' in data and isinstance(data['notification_channels'], list):
+            notification_channels = _merge_channel_secrets(data['notification_channels'],
+                                                           existing.get('notification_channels', []))
         if not webhook_password:
             webhook_password = existing.get('webhook_password', '')
         if not crowdsec_api_key:
@@ -3368,12 +3722,14 @@ def api_save_settings():
                       git_backup_commit_message=git_backup_commit_message,
                       git_backup_auto_push=git_backup_auto_push,
                       backup_keep_count=backup_keep_count,
+                      notification_channels=notification_channels,
                       default_theme=default_theme)
         result = load_settings()
         for _k in ('password_hash', 'oidc_client_secret', 'crowdsec_api_key',
                    'crowdsec_machine_password', 'traefik_api_password', 'git_backup_token',
                    'webhook_password', 'otp_secret', 'agents'):
             result.pop(_k, None)
+        result['notification_channels'] = _redact_channels(result.get('notification_channels'))
         return jsonify({'success': True, 'settings': result})
     except Exception as e:
         logger.exception("Settings save error")
@@ -3754,16 +4110,65 @@ def _headers_toggles_from_form(form) -> dict:
     }
 
 
+def _composite_children(svc_def) -> list:
+    if not isinstance(svc_def, dict):
+        return []
+    names = []
+    for key in ('weighted', 'highestRandomWeight'):
+        block = svc_def.get(key)
+        if isinstance(block, dict):
+            for child in (block.get('services') or []):
+                if isinstance(child, dict):
+                    names.append(child.get('name', ''))
+    mirroring = svc_def.get('mirroring')
+    if isinstance(mirroring, dict):
+        names.append(mirroring.get('service', ''))
+        for mirror in (mirroring.get('mirrors') or []):
+            if isinstance(mirror, dict):
+                names.append(mirror.get('name', ''))
+    failover = svc_def.get('failover')
+    if isinstance(failover, dict):
+        names.append(failover.get('service', ''))
+        names.append(failover.get('fallback', ''))
+    return [n for n in names if isinstance(n, str) and n]
+
+
+def _service_in_disabled_snapshots(target: str, exclude_router: str) -> bool:
+    try:
+        disabled = load_settings().get('disabled_routes', {}) or {}
+    except Exception:
+        return False
+    for key, snap in disabled.items():
+        if not isinstance(snap, dict):
+            continue
+        if str(key).split('::')[-1] == exclude_router:
+            continue
+        router = snap.get('router')
+        if isinstance(router, dict) and _svc_key(router.get('service', '')) == target:
+            return True
+        for child in _composite_children(snap.get('service')):
+            if _svc_key(child) == target:
+                return True
+    return False
+
+
 def _service_shared(config: dict, svc_name: str, exclude_router: str) -> bool:
     target = _svc_key(svc_name)
     for sec in ('http', 'tcp', 'udp'):
-        routers = (config.get(sec) or {}).get('routers') or {}
+        sec_cfg = config.get(sec) or {}
+        routers = sec_cfg.get('routers') or {}
         for rn, rd in routers.items():
             if rn == exclude_router or not isinstance(rd, dict):
                 continue
             if _svc_key(rd.get('service', '')) == target:
                 return True
-    return False
+        for sn, sd in (sec_cfg.get('services') or {}).items():
+            if _svc_key(sn) == target:
+                continue
+            for child in _composite_children(sd):
+                if _svc_key(child) == target:
+                    return True
+    return _service_in_disabled_snapshots(target, exclude_router)
 
 
 def _disabled_key(disabled, full_id, plain_id, prefix=''):
@@ -3816,7 +4221,8 @@ def _toggle_route(route_id: str, enable: bool):
         config      = load_config(target_path)
         config.setdefault(proto, {}).setdefault('routers', {})[rname] = router
         if svc_cf == cf or not svc_cf:
-            config.setdefault(proto, {}).setdefault('services', {})[svc_name] = svc
+            if svc:
+                config.setdefault(proto, {}).setdefault('services', {})[svc_name] = svc
             create_backup(target_path)
             save_config(_strip_empty_sections(config), target_path)
         else:
@@ -3824,7 +4230,8 @@ def _toggle_route(route_id: str, enable: bool):
             save_config(_strip_empty_sections(config), target_path)
             svc_path   = _resolve_or_fallback(svc_cf)
             svc_config = load_config(svc_path)
-            svc_config.setdefault(proto, {}).setdefault('services', {})[svc_name] = svc
+            if svc:
+                svc_config.setdefault(proto, {}).setdefault('services', {})[svc_name] = svc
             create_backup(svc_path)
             save_config(_strip_empty_sections(svc_config), svc_path)
     else:
@@ -4718,7 +5125,7 @@ def save_entry():
             _new_dkey = f"agent_{agent_id}::{_new_rid}" if agent else _new_rid
             disabled[_new_dkey] = {'protocol': protocol, 'router': _kept_router,
                                    'service': _kept_svc, 'configFile': cfg_filename}
-            save_settings(disabled_routes=disabled)
+            _save_disabled_routes(load_settings(), disabled)
         if agent:
             _agent_write_config(agent, cfg_filename, config)
             threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'route save'), daemon=True).start()
@@ -5211,7 +5618,7 @@ def oidc_callback():
         'oidc_name':     name,
     })
     logger.info(f"OIDC login success for {email!r} from {request.remote_addr}")
-    add_notification('info', f"OIDC login: {email} from {request.remote_addr}")
+    add_notification('info', f"OIDC login: {email} from {request.remote_addr}", category='security')
     return redirect(url_for('index'))
 
 
@@ -5580,10 +5987,16 @@ def api_agents_create():
 def api_agents_update(agent_id):
     data    = request.get_json(silent=True) or {}
     agents  = load_agents()
-    if 'git_host_branch' in data or data.get('git_host_backup'):
+    target  = next((a for a in agents if a.get('id') == agent_id), {})
+    renames_derived_branch = ('name' in data
+                              and target.get('git_host_backup')
+                              and not str(target.get('git_host_branch') or '').strip())
+    if 'git_host_branch' in data or data.get('git_host_backup') or renames_derived_branch:
         s = load_settings()
-        target = next((a for a in agents if a.get('id') == agent_id), {})
-        branch = _safe_git_branch(str(data.get('git_host_branch', target.get('git_host_branch') or '')).strip() or _agent_git_branch({**target, 'git_host_branch': ''}))
+        probe = {**target, 'git_host_branch': ''}
+        if 'name' in data:
+            probe['name'] = data['name']
+        branch = _safe_git_branch(str(data.get('git_host_branch', target.get('git_host_branch') or '')).strip() or _agent_git_branch(probe))
         enabled = bool(data.get('git_host_backup', target.get('git_host_backup')))
         if enabled:
             if branch == _safe_git_branch(s.get('git_backup_branch', 'main')):

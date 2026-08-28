@@ -1,4 +1,4 @@
-# Traefik Stack
+# tm CLI
 
 Install Traefik and Traefik Manager with a single interactive command. It installs `tm`, a CLI that asks what you want to install and how, generates all required config files, starts the services, and manages the install afterwards.
 
@@ -33,7 +33,7 @@ Commands find the install from `--dir` or `TM_DIR`, then the current directory, 
 
 ### Non-interactive install
 
-`tm install --answers answers.yml --yes` runs without prompts. `tm install --dump-answers answers.yml` writes the answers of a wizard run (no secrets) to start from, and `--dry-run` renders every file without starting anything. Secrets come from environment variables of the same name (`TMA_API_KEY`, `CF_DNS_API_TOKEN`, ...) or a `secrets:` map in the file. Schema and examples: [traefik-stack README](https://github.com/chr0nzz/traefik-stack#non-interactive).
+`tm install --answers answers.yml --yes` runs without prompts. `tm install --dump-answers answers.yml` writes the answers of a wizard run (no secrets) to start from, and `--dry-run` renders every file without starting anything. Secrets come from environment variables of the same name (`TMA_API_KEY`, `CF_DNS_API_TOKEN`, ...) or a `secrets:` map in the file. Schema and examples: [tm CLI README](https://github.com/chr0nzz/tm-cli#non-interactive).
 
 ## Install modes
 

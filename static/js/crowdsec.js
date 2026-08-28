@@ -535,7 +535,7 @@ async function _csRefreshInner() {
         ]);
     } catch (e) {
         _csLapiOk = false; _csAlertsOk = false;
-        _csDecErr = 'Could not reach the CrowdSec LAPI';
+        _csDecErr = _netErrText(e, 'Could not reach the CrowdSec LAPI');
         _csAltErr = _csDecErr;
         _csDecisions = []; _csAlerts = [];
         _csFetched = Date.now();
@@ -1593,14 +1593,20 @@ async function submitCsBan() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ value: ip, type: _csBanType, duration, reason }),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to add decision');
+        let data = {};
+        try { data = await res.json() || {}; } catch (_) {}
+        if (!res.ok) {
+            const msg = data.error || data.message || ('Failed to add decision (HTTP ' + res.status + ')');
+            if (errEl && errMsg) { errMsg.textContent = msg; errEl.style.display = 'flex'; }
+            return;
+        }
         document.getElementById('csBanIp').value = '';
         closeCsBanModal();
         showToast(`Decision added: ${_csBanType} ${ip} for ${duration}`, 'success');
         setTimeout(refreshCrowdSecTab, 800);
     } catch(e) {
-        if (errEl && errMsg) { errMsg.textContent = e.message || 'Failed to add decision'; errEl.style.display = 'flex'; }
+        const msg = _netErrText(e, 'Failed to add decision');
+        if (errEl && errMsg) { errMsg.textContent = msg; errEl.style.display = 'flex'; }
     } finally {
         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Add Decision'; }
     }
@@ -1613,8 +1619,10 @@ async function csUnban(id) {
         : true;
     if (!ok) return;
     try {
-        const res = await agentFetch('/api/crowdsec/decisions/' + id, { method: 'DELETE' }).then(r => r.json());
-        if (res.ok) { showToast('Decision ' + id + ' deleted', 'success'); refreshCrowdSecTab(); }
-        else showToast(res.error || 'Failed to delete decision', 'error');
-    } catch(e) { showToast('Request failed', 'error'); }
+        const res = await agentFetch('/api/crowdsec/decisions/' + id, { method: 'DELETE' });
+        let data = {};
+        try { data = await res.json() || {}; } catch (_) {}
+        if (res.ok && data.ok) { showToast('Decision ' + id + ' deleted', 'success'); refreshCrowdSecTab(); }
+        else showToast(data.error || data.message || ('Failed to delete decision ' + id + ' (HTTP ' + res.status + ')'), 'error');
+    } catch(e) { showToast(_netErrText(e, 'Failed to delete decision ' + id), 'error'); }
 }

@@ -368,8 +368,6 @@ func (a *App) staticRestartHandler(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "docker restart failed: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		// Traefik usually carries this very connection, so the restart runs once
-		// the answer is on its way out. Failures land in the agent log.
 		jsonOK(w, map[string]any{"ok": true, "restarting": true})
 		go func() {
 			time.Sleep(400 * time.Millisecond)
@@ -412,9 +410,6 @@ func (a *App) dockerClient() (*http.Client, string) {
 	return http.DefaultClient, h
 }
 
-// dockerPreflight reports problems that would make the restart fail, while the
-// connection carrying the answer is still alive. Only a dead endpoint or a
-// missing container count: anything else is left to the restart itself.
 func (a *App) dockerPreflight(ctx context.Context) error {
 	client, baseURL := a.dockerClient()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,

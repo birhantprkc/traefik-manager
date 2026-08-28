@@ -1,7 +1,3 @@
-"""IP geolocation using a local MaxMind-format database.
-
-Lookups are server-side against a local file: no IP ever leaves the instance.
-"""
 import os
 import threading
 import time

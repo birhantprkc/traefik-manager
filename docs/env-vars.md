@@ -6,12 +6,12 @@ All supported environment variables for Traefik Manager.
 
 Each variable below is labelled with one of these:
 
-| Label | Behaviour |
-|---|---|
-| **Overrides** | Env always wins. `AUTH_ENABLED` and `ADMIN_PASSWORD` only. |
-| **Seeds** | Used on first start only. Once the setting is saved, `manager.yml` wins - even if you clear the field. |
-| **Fallback** | The Settings field wins while it has a value. Clear it and the variable takes over. |
-| **-** | Env-only, never written to `manager.yml`. |
+| Label         | Behaviour                                                                                              |
+| ---------------| --------------------------------------------------------------------------------------------------------|
+| **Overrides** | Env always wins. `AUTH_ENABLED` and `ADMIN_PASSWORD` only.                                             |
+| **Seeds**     | Used on first start only. Once the setting is saved, `manager.yml` wins - even if you clear the field. |
+| **Fallback**  | The Settings field wins while it has a value. Clear it and the variable takes over.                    |
+| **-**         | Env-only, never written to `manager.yml`.                                                              |
 
 Adding a **Seeds** variable to an existing install does nothing. Change the value in Settings, or delete the key
 from `manager.yml` and restart.
@@ -208,7 +208,7 @@ Environment=ADMIN_PASSWORD=mysecretpassword
 :::
 
 ::: info
-When set, the in-UI password change, `flask reset-password` and 2FA are all bypassed. Remove the variable to switch back to `manager.yml`-managed passwords.
+When set, the in-UI password change and 2FA are bypassed. `flask reset-password` with `--prompt`, `--stdin` or `--password` exits with an error and writes nothing; with no password option it still writes a temporary password, which login then ignores. Remove the variable to switch back to `manager.yml`-managed passwords.
 :::
 
 ---
@@ -751,7 +751,7 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 
 **Default:** _(auto-generated and stored as `.otp_key` alongside `SETTINGS_PATH`)_
 
-Fernet key for every secret TM stores encrypted: the TOTP secret, Traefik API password, OIDC client secret, webhook password, CrowdSec credentials, git backup token and agent API keys.
+Fernet key for every secret TM stores encrypted: the TOTP secret, Traefik API password, OIDC client secret, notification channel tokens and passwords, CrowdSec credentials, git backup token and agent API keys.
 
 :::tabs
 == Docker / Podman

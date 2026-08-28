@@ -6,41 +6,52 @@ All of them apply to the Host and to remote agents: the Static Config editor and
 
 ---
 
-## Header alias spoofing (underscore headers)
+## Header alias spoofing
 
 ### The problem
 
-Go - and therefore Traefik - treats `X-Auth-User` and `X_Auth_User` as two **different** headers. A forwardAuth middleware manages the dash form (`X-Auth-User`), but an attacker-supplied underscore variant (`X_Auth_User`) passes through untouched.
+Go - and therefore Traefik - treats `X-Auth-User`, `X_Auth_User` and `X.Auth.User` as three **different** headers. A forwardAuth middleware manages the dash form, so an attacker-supplied alias passes through untouched.
 
-It becomes exploitable at the backend: CGI, WSGI (Python), PHP, and some application-server setups collapse both forms into the same variable (`HTTP_X_AUTH_USER`). The app can then read the attacker's `X_Auth_User` instead of the identity your auth server set - an authentication bypass behind an otherwise correct forwardAuth setup (Authelia, Authentik, Gatekeeper, etc.).
+It becomes exploitable at the backend: CGI, WSGI (Python), PHP, and some application-server setups uppercase the name and replace every character that is neither a letter nor a digit with an underscore, collapsing all three into the same variable (`HTTP_X_AUTH_USER`). The app then reads the attacker's alias instead of the identity your auth server set - an authentication bypass behind an otherwise correct forwardAuth setup (Authelia, Authentik, Gatekeeper, etc.).
 
-### The fix: `underscoreHeadersStrategy`
+### The fix: `aliasHeadersStrategy`
 
-Traefik added an entry point option (**Traefik 3.6.20 / 3.7.6 or newer**) that controls underscore headers before routing:
+**Traefik 3.7.12 or newer.** Covers every aliasing name: any header whose name contains a character that is not a letter, a digit or a dash, including `_`, `.`, `!`, `#`, `$`, `%`, `&`, `'`, `*`, `+`, `^`, `` ` ``, `|` and `~`.
 
 | Strategy | Behaviour |
 |---|---|
-| `keep` | Forward underscore headers as-is (Traefik default). |
-| `delete` | Silently strip any request header whose name contains an underscore. **Recommended.** |
-| `reject` | Reject any request carrying an underscore header with `400 Bad Request`. |
+| `keep` | Forward aliasing headers as-is (Traefik default). |
+| `delete` | Silently strip them. **Recommended.** |
+| `reject` | Reject the request with `400 Bad Request`. |
 
-**In Traefik Manager:** open **Static Config → Entrypoints**, edit the entry point that handles your external HTTPS traffic, and set **Underscore Headers** to `Delete` (or `Reject`). The option is written to whichever entry point you edit, and only offered when the running Traefik version supports it.
-
-The entry point name is whatever you called it - `websecure`, `https`, `web`, etc. Using `websecure` as an example, it writes:
+**In Traefik Manager:** open **Static Config → Entrypoints**, edit the entry point that handles your external HTTPS traffic, and set **Alias Headers** to `Delete` (or `Reject`).
 
 ```yaml
 entryPoints:
   websecure:   # your external HTTPS entry point, whatever its name
     address: ":443"
     http:
-      underscoreHeadersStrategy: delete
+      aliasHeadersStrategy: delete
 ```
 
 If you use the forwardAuth wizards, enabling this is strongly recommended.
 
-### Related: CVE-2026-39858
+### On older Traefik: `underscoreHeadersStrategy`
 
-A separate but related flaw (**CVE-2026-39858**, CVSS 7.8) let underscore aliases of *forwarded* headers (e.g. `X_Forwarded_Proto`) bypass ForwardAuth entirely. This one is fixed only by **upgrading Traefik** to **2.11.43 / 3.6.14 / 3.7.0-rc.2 or newer**. Traefik Manager warns you when your running Traefik is affected.
+**Traefik 3.7.6 through 3.7.11 only.** It takes the same three values but covers **underscores alone**, so dot-form aliases like `X.Auth.User` still get through. It is deprecated in favour of `aliasHeadersStrategy`.
+
+> **No 3.6.x release has either option.** Traefik does not ignore an option it does not know - it refuses to start with `field not found, node: underscoreHeadersStrategy`, taking the proxy down until the file is corrected. Traefik Manager only offers the field on versions that actually have it, and writes whichever name your Traefik supports.
+
+Upgrading to 3.7.12 or newer is the real fix. Traefik Manager reads either name, so switching over is just re-saving the entry point.
+
+### Related advisories
+
+| Advisory | Severity | Fixed in |
+|---|---|---|
+| [GHSA-rf44-j88r-hh8c](https://github.com/traefik/traefik/security/advisories/GHSA-rf44-j88r-hh8c) - ForwardAuth identity spoofing via dot-form header aliases | Moderate (CVSS 5.3) | **2.11.56 / 3.7.12** |
+| **CVE-2026-39858** - underscore aliases of *forwarded* headers (e.g. `X_Forwarded_Proto`) bypassing ForwardAuth | High (CVSS 7.8) | **2.11.43 / 3.6.14 / 3.7.0-rc.2** |
+
+Both are fixed by upgrading Traefik, not by configuration. Traefik Manager warns you when your running version is affected, and says which release to move to.
 
 ---
 

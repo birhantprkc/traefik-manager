@@ -83,7 +83,7 @@ Click the pencil icon on any route card, or open the detail panel and click **Ed
 Saving rewrites only the parts the form owns: the rule, entry points, service reference, middlewares and TLS on the router, and the backends, `passHostHeader` and the insecure-TLS transport on the service. Sticky sessions, health checks and router `priority` are written when the form manages them - see [Multiple backends and load balancing](#multiple-backends-and-load-balancing). Anything else you wrote by hand is preserved, including your own `serversTransport`, and an existing route keeps the service name it already points at rather than being renamed to `<name>-service`.
 
 ::: warning Advanced service types
-If a router points at a `weighted`, `mirroring` or `failover` service instead of a `loadBalancer`, that service is left untouched, so editing the target field in the route form has no effect on it. Edit those services directly in the config file.
+If a router points at a `weighted`, `mirroring`, `failover` or `highestRandomWeight` service instead of a `loadBalancer`, that service is left untouched, so editing the target field in the route form has no effect on it. Edit those services directly in the config file. A service referenced by one of these, whether or not a router also points at it, is never removed when a route is deleted or disabled.
 :::
 
 ## Security headers preset

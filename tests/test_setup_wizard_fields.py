@@ -12,7 +12,7 @@ def _fresh_setup(client):
         crowdsec_machine_id='', crowdsec_machine_password='',
         git_backup_enabled=False, git_backup_repo='', git_backup_token='',
         git_backup_auto_push=False,
-        webhook_url='', webhook_type='',
+        webhook_url='', webhook_type='', notification_channels=[],
         geoip_enabled=False, default_theme='dark',
     )
 
@@ -57,15 +57,17 @@ def test_setup_persists_git_backup(client):
     assert s['git_backup_auto_push'] is True
 
 
-def test_setup_persists_webhook(client):
+def test_setup_persists_a_notification_channel(client):
     _fresh_setup(client)
     client.post('/setup', data={**BASE,
-                                'webhook_url': 'https://discord.com/api/webhooks/x',
-                                'webhook_type': 'discord'},
+                                'notify_kind': 'discord',
+                                'notify_url': 'https://discord.com/api/webhooks/x'},
                 headers={'X-Requested-With': 'fetch'})
     s = settings_mod.load_settings()
-    assert s['webhook_url'] == 'https://discord.com/api/webhooks/x'
-    assert s['webhook_type'] == 'discord'
+    channels = s['notification_channels']
+    assert len(channels) == 1
+    assert channels[0]['kind'] == 'discord'
+    assert channels[0]['url'] == 'https://discord.com/api/webhooks/x'
 
 
 def test_setup_persists_geoip_and_theme(client):
@@ -93,6 +95,7 @@ def test_skipping_the_optional_steps_leaves_them_unset(client):
     assert not s.get('crowdsec_lapi_url')
     assert not s.get('git_backup_enabled')
     assert not s.get('webhook_url')
+    assert not s.get('notification_channels')
     assert not s.get('geoip_enabled')
 
 

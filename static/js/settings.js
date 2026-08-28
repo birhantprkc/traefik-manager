@@ -19,12 +19,15 @@ async function _fixSelfRouteEp(fixEp) {
             headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'X-CSRF-Token': token },
             body: JSON.stringify({ domain: sr.domain, service_url: sr.service_url, router_name: sr.router_name || 'traefik-manager', entry_point: fixEp })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to update self-route'), 'error'); return; }
         const json = await res.json();
         if (json.ok) {
             document.getElementById('selfRouteEpWarning')?.remove();
             showToast('Self-route entrypoint updated to ' + fixEp);
+        } else {
+            showToast(json.error || json.message || 'Failed to update self-route', 'error');
         }
-    } catch(e) { showToast('Failed to update self-route', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Failed to update self-route'), 'error'); }
 }
 
 function loadTabTogglesIntoModal() {
@@ -106,6 +109,7 @@ async function generateApiKey() {
             headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': token, 'Content-Type': 'application/json' },
             body: JSON.stringify({ device_name: deviceName })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to generate key.'), 'error'); return; }
         const json = await res.json();
         if (json.ok) {
             hideAddApiKeyForm();
@@ -114,9 +118,9 @@ async function generateApiKey() {
             showToast('API key generated. Copy it now.', 'success');
             loadApiKeyStatus();
         } else {
-            showToast(json.error || 'Failed to generate key.', 'error');
+            showToast(json.error || json.message || 'Failed to generate key.', 'error');
         }
-    } catch(e) { showToast('Error generating key.', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Failed to generate key.'), 'error'); }
 }
 
 async function revokeApiKey(preview) {
@@ -128,12 +132,15 @@ async function revokeApiKey(preview) {
             headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': token, 'Content-Type': 'application/json' },
             body: JSON.stringify({ preview })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to revoke key.'), 'error'); return; }
         const json = await res.json();
         if (json.ok) {
             showToast('API key revoked.', 'success');
             loadApiKeyStatus();
+        } else {
+            showToast(json.error || json.message || 'Failed to revoke key.', 'error');
         }
-    } catch(e) { showToast('Error revoking key.', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Failed to revoke key.'), 'error'); }
 }
 
 function copyApiKey() {
@@ -179,6 +186,7 @@ async function saveSelfRoute() {
             headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'X-CSRF-Token': token },
             body: JSON.stringify({ domain, service_url: serviceUrl, router_name: _selfRouteRouterName, entry_point: entryPoint })
         });
+        if (!res.ok) { showToast(await _errText(res, 'Could not save the self route.'), 'error'); return; }
         const json = await res.json();
         if (json.ok) {
             const notice    = document.getElementById('selfRouteSavedNotice');
@@ -186,8 +194,10 @@ async function saveSelfRoute() {
             if (notice) { notice.classList.remove('hidden'); setTimeout(() => notice.classList.add('hidden'), 2500); }
             if (deleteBtn) deleteBtn.classList.toggle('hidden', !domain);
             showToast(domain ? 'Self route saved.' : 'Self route removed.', 'success');
+        } else {
+            showToast(json.error || json.message || 'Could not save the self route.', 'error');
         }
-    } catch(e) { showToast('Error saving self route.', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Could not save the self route.'), 'error'); }
 }
 
 async function deleteSelfRoute() {
@@ -196,43 +206,21 @@ async function deleteSelfRoute() {
     await saveSelfRoute();
 }
 
-async function checkAgentTraefikUpdates() {
-    const latest = window._latestTraefikTag;
-    if (!latest || typeof _agentList === 'undefined' || !_agentList.length) return;
-    for (const a of _agentList) {
-        const key = 'tm-agent-traefik-' + a.id + '-' + latest;
-        if (sessionStorage.getItem(key)) continue;
-        try {
-            const res = await fetch('/api/agents/proxy/' + a.id + '/traefik/version', { headers: _csrfHeaders() });
-            if (!res.ok) continue;
-            const cur = ((await res.json()).Version || '').replace(/^v/, '');
-            if (!cur) continue;
-            sessionStorage.setItem(key, '1');
-            if (compareVersions(latest, cur) > 0) {
-                fetch('/api/notifications/add', { method: 'POST', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ type: 'info', message: `Traefik v${latest} is available on ${a.name} (running v${cur})` }) }).catch(() => {});
-            }
-        } catch (e) {}
-    }
-}
-
 async function checkForUpdate(currentVersion) {
     try {
-        const res = await fetch('https://api.github.com/repos/traefik/traefik/releases/latest', {
-            headers: { 'Accept': 'application/vnd.github.v3+json' }
-        });
+        const res = await fetch('/api/manager/version', { headers: { 'X-Requested-With': 'fetch' } });
         if (!res.ok) return;
         const data = await res.json();
-        const latestTag = (data.tag_name || '').replace(/^v/, '');
+        const latestTag = (data.traefik_latest || '').replace(/^v/, '');
         const current   = currentVersion.replace(/^v/, '');
         window._latestTraefikTag = latestTag;
-        checkAgentTraefikUpdates();
 
         const curEl    = document.getElementById('updateCurrentVer');
         const latEl    = document.getElementById('updateLatestVer');
         const linkEl   = document.getElementById('updateReleaseLink');
         if (curEl) curEl.textContent = 'v' + current;
-        if (latEl) latEl.textContent = 'v' + (latestTag || '-');
-        if (linkEl && data.html_url) linkEl.href = data.html_url;
+        if (latEl) latEl.textContent = latestTag ? 'v' + latestTag : '-';
+        if (linkEl && data.traefik_release_url) linkEl.href = data.traefik_release_url;
 
         if (latestTag && latestTag !== current && compareVersions(latestTag, current) > 0) {
             const badge = document.getElementById('versionBadge');
@@ -310,22 +298,25 @@ async function checkManagerVersion() {
             if (b) b.style.display = 'block';
         }
 
-        const ghRes = await fetch(
-            `https://api.github.com/repos/${d.repo}/releases/latest`,
-            { headers: { 'Accept': 'application/vnd.github.v3+json' } }
-        );
-        if (!ghRes.ok) return;
-
-        const ghData    = await ghRes.json();
-        const latestTag = (ghData.tag_name || '').replace(/^v/, '');
+        const latestTag = (d.latest || '').replace(/^v/, '');
 
         const latEl  = document.getElementById('mgrUpdateLatestVer');
         const linkEl = document.getElementById('mgrUpdateReleaseLink');
-        if (latEl && latestTag) latEl.textContent = 'v' + latestTag;
-        if (linkEl && ghData.html_url) linkEl.href = ghData.html_url;
+        if (latEl) latEl.textContent = latestTag ? 'v' + latestTag : '-';
+        if (linkEl && d.release_url) linkEl.href = d.release_url;
+
+        const tfkEl = document.getElementById('traefikUpdateCurrentVer');
+        const tfkLatEl = document.getElementById('traefikUpdateLatestVer');
+        if (tfkEl && d.traefik_running) tfkEl.textContent = 'v' + d.traefik_running;
+        if (tfkLatEl) tfkLatEl.textContent = d.traefik_latest ? 'v' + d.traefik_latest : '-';
 
         const notesEl = document.getElementById('sm-about-release-notes');
-        if (notesEl && ghData.body) notesEl.innerHTML = renderReleaseNotes(ghData.body);
+        if (notesEl) {
+            if (d.release_notes) notesEl.innerHTML = renderReleaseNotes(d.release_notes);
+            else notesEl.innerHTML = `<span style="color:var(--muted)">${_esc(d.release_error || 'Release notes are not available right now.')}</span>`;
+        }
+
+        if (!latestTag) return;
 
         if (latestTag && current && compareVersions(latestTag, current) > 0) {
             if (footerEl) {
@@ -352,7 +343,7 @@ async function checkManagerVersion() {
                 const popupL  = document.getElementById('tmUpdatePopupLink');
                 if (popup && popupV) {
                     popupV.textContent = `v${latestTag} is available (current: v${current})`;
-                    if (popupL && ghData.html_url) popupL.href = ghData.html_url;
+                    if (popupL && d.release_url) popupL.href = d.release_url;
                     popup.classList.remove('hidden');
                 }
             }
@@ -383,6 +374,21 @@ const TRAEFIK_ADVISORIES = [
             return false;
         },
     },
+    {
+        id: 'GHSA-rf44-j88r-hh8c',
+        severity: 'Moderate',
+        url: 'https://github.com/traefik/traefik/security/advisories/GHSA-rf44-j88r-hh8c',
+        forwardAuthRelated: true,
+        summary: 'ForwardAuth identity spoofing via dot-form header aliases',
+        fixedIn: 'v3.7.12 or v2.11.56',
+        affected: (p) => {
+            const [maj, min, pat] = p;
+            if (maj < 2) return true;
+            if (maj === 2) return (min < 11) || (min === 11 && pat <= 55);
+            if (maj === 3) return (min < 7) || (min === 7 && pat <= 11);
+            return false;
+        },
+    },
 ];
 
 function _configHasForwardAuth() {
@@ -406,7 +412,7 @@ function checkTraefikAdvisories(version) {
     const fa = hit.forwardAuthRelated && _configHasForwardAuth();
     txt.innerHTML = `Your Traefik <b>v${_esc(version)}</b> is affected by <b>${_esc(hit.id)}</b> (${_esc(hit.severity)}) - ${_esc(hit.summary)}.`
         + (fa ? ` A forwardAuth middleware is in use, so this is high priority.` : ``)
-        + ` Update Traefik to a patched version.`;
+        + (hit.fixedIn ? ` Update Traefik to ${_esc(hit.fixedIn)}.` : ` Update Traefik to a patched version.`);
     if (link) link.href = hit.url;
     popup.dataset.advisory = hit.id;
     popup.dataset.version = version;

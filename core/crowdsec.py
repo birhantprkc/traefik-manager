@@ -1,16 +1,26 @@
 import hashlib
+import json
 import os
 import threading
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 import requests
 
+from core import env
 from core import settings as settings_mod
 from core.env import logger
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 _cs_jwt_cache = {'token': '', 'expiry': None}
 
 CS_STREAM_RESYNC_SECONDS = 3600
+CS_STREAM_FRESH_DEFAULT = 5
 _cs_stream_lock = threading.Lock()
 _cs_stream_cache = {'fp': '', 'items': {}, 'synced': None, 'ready': False, 'streamable': True}
 
@@ -199,13 +209,118 @@ def _cs_fingerprint() -> str:
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]
 
 
+def _cs_stream_path() -> str:
+    return os.path.join(env.CONFIG_DIR, 'crowdsec-decisions.json')
+
+
+def _cs_stream_lock_path() -> str:
+    return _cs_stream_path() + '.lock'
+
+
+def cs_stream_fresh_seconds() -> int:
+    return _cs_int_env('CROWDSEC_STREAM_FRESH_SECONDS', CS_STREAM_FRESH_DEFAULT, 0, 3600)
+
+
+@contextmanager
+def _cs_file_lock(blocking: bool = True):
+    fh   = None
+    held = True
+    if fcntl is not None:
+        try:
+            fh = open(_cs_stream_lock_path(), 'a+')
+        except OSError:
+            fh = None
+        if fh is not None:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                held = blocking
+                try:
+                    fh.close()
+                except OSError:
+                    pass
+                fh = None
+    try:
+        yield held
+    finally:
+        if fh is not None:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+            try:
+                fh.close()
+            except OSError:
+                pass
+
+
+def _cs_shared_read(fp: str, known: dict = None) -> dict:
+    empty = {'fp': fp, 'items': {}, 'synced': None, 'ready': False, 'owner': 0, 'stamp': None}
+    path  = _cs_stream_path()
+    try:
+        st = os.stat(path)
+    except OSError:
+        return empty
+    stamp = (st.st_mtime_ns, st.st_size)
+    if known is not None and known['stamp'] == stamp:
+        return known
+    try:
+        with open(path, 'r') as f:
+            doc = json.load(f)
+    except (OSError, ValueError):
+        return empty
+    if not isinstance(doc, dict) or doc.get('fp') != fp or not isinstance(doc.get('items'), dict):
+        return empty
+    try:
+        synced = datetime.fromtimestamp(float(doc.get('synced') or 0), timezone.utc)
+    except (TypeError, ValueError, OSError, OverflowError):
+        return empty
+    return {'fp': fp, 'items': doc['items'], 'synced': synced, 'ready': True,
+            'owner': doc.get('owner') or 0, 'stamp': stamp}
+
+
+def _cs_shared_write(fp: str, items: dict, synced: datetime):
+    path = _cs_stream_path()
+    tmp  = f"{path}.tmp.{os.getpid()}.{threading.get_ident()}"
+    try:
+        with open(tmp, 'w') as f:
+            json.dump({'fp': fp, 'synced': synced.timestamp(), 'owner': os.getpid(), 'items': items},
+                      f, separators=(',', ':'))
+        os.replace(tmp, path)
+    except (OSError, ValueError) as e:
+        logger.warning(f"CrowdSec decision cache write failed: {e}")
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+
+def _cs_mirror(doc: dict):
+    _cs_stream_cache.update({'fp': doc['fp'], 'items': doc['items'],
+                             'synced': doc['synced'], 'ready': doc['ready']})
+    return list(doc['items'].values())
+
+
+def _cs_fresh(doc: dict, now: datetime) -> bool:
+    if not doc['ready'] or doc['owner'] == os.getpid():
+        return False
+    return (now - doc['synced']).total_seconds() < cs_stream_fresh_seconds()
+
+
 def cs_stream_reset():
     with _cs_stream_lock:
         _cs_stream_cache.update({'fp': '', 'items': {}, 'synced': None, 'ready': False, 'streamable': True})
+        with _cs_file_lock():
+            try:
+                os.unlink(_cs_stream_path())
+            except OSError:
+                pass
 
 
-def _cs_apply_stream(payload, replace: bool):
-    items = {} if replace else dict(_cs_stream_cache['items'])
+def _cs_apply_stream(payload, base: dict):
+    items = dict(base)
     for d in (payload.get('new') or []):
         did = d.get('id')
         if did is not None:
@@ -224,31 +339,171 @@ def _cs_apply_stream(payload, replace: bool):
 
 
 def cs_decisions_stream(force_full: bool = False):
-    """Active decisions via /v1/decisions/stream, cached with deltas.
-
-    Returns (decisions, mode) where mode is 'full', 'delta' or 'cache'.
-    Raises CrowdSecUnavailable only when there is no usable cached answer.
-    """
-    fp = _cs_fingerprint()
+    fp  = _cs_fingerprint()
     now = datetime.now(timezone.utc)
     with _cs_stream_lock:
-        c = _cs_stream_cache
-        stale = bool(c['synced'] and (now - c['synced']).total_seconds() > CS_STREAM_RESYNC_SECONDS)
-        full = force_full or c['fp'] != fp or not c['ready'] or stale
-        path = '/v1/decisions/stream?startup=true' if full else '/v1/decisions/stream'
-        try:
-            payload = _cs_request_strict('GET', path)
-        except CrowdSecUnavailable:
-            if c['ready'] and c['fp'] == fp:
-                return list(c['items'].values()), 'cache'
-            raise
-        if not isinstance(payload, dict):
-            raise CrowdSecUnavailable('LAPI stream returned an unexpected payload')
-        if full:
-            c['items'] = _cs_apply_stream(payload, True)
-        else:
-            c['items'] = _cs_apply_stream(payload, False)
-        c['fp'] = fp
-        c['synced'] = now
-        c['ready'] = True
-        return list(c['items'].values()), ('full' if full else 'delta')
+        doc = _cs_shared_read(fp)
+        if not force_full and _cs_fresh(doc, now):
+            return _cs_mirror(doc), 'cache'
+        with _cs_file_lock(blocking=not doc['ready']) as held:
+            doc = _cs_shared_read(fp, known=doc)
+            if doc['ready'] and (not held or (not force_full and _cs_fresh(doc, now))):
+                return _cs_mirror(doc), 'cache'
+            if not held:
+                raise CrowdSecUnavailable('The CrowdSec decision cache is being refreshed')
+            stale = bool(doc['synced'] and (now - doc['synced']).total_seconds() > CS_STREAM_RESYNC_SECONDS)
+            full  = force_full or not doc['ready'] or stale
+            path  = '/v1/decisions/stream?startup=true' if full else '/v1/decisions/stream'
+            try:
+                payload = _cs_request_strict('GET', path)
+            except CrowdSecUnavailable:
+                if doc['ready']:
+                    return _cs_mirror(doc), 'cache'
+                raise
+            if not isinstance(payload, dict):
+                raise CrowdSecUnavailable('LAPI stream returned an unexpected payload')
+            items = _cs_apply_stream(payload, {} if full else doc['items'])
+            _cs_shared_write(fp, items, now)
+            doc = {'fp': fp, 'items': items, 'synced': now, 'ready': True,
+                   'owner': os.getpid(), 'stamp': None}
+            return _cs_mirror(doc), ('full' if full else 'delta')
+
+
+CS_ALERT_POLL_LIMIT = 200
+CS_FOREIGN_SCOPES = ('capi', 'lists')
+
+
+def _cs_alert_is_local(alert: dict) -> bool:
+    scope = str((alert.get('source') or {}).get('scope') or '').strip().lower()
+    if scope in CS_FOREIGN_SCOPES or scope.startswith('lists:'):
+        return False
+    origins = {str(d.get('origin') or '').strip().lower()
+               for d in (alert.get('decisions') or []) if isinstance(d, dict)}
+    origins.discard('')
+    return not origins or 'crowdsec' in origins
+
+
+def poll_local_alerts(since: str = '15m') -> list:
+    if not _cs_has_machine():
+        return []
+    window = str(since or '15m').strip() or '15m'
+    alerts = _cs_machine_request('GET', f'/v1/alerts?since={quote(window)}&origin=crowdsec'
+                                        f'&with_decisions=false&limit={CS_ALERT_POLL_LIMIT}')
+    if not isinstance(alerts, list):
+        return []
+    return [a for a in alerts if isinstance(a, dict) and _cs_alert_is_local(a)]
+
+
+CS_ALERT_INTERVAL = 300
+CS_ALERT_WINDOW = '10m'
+CS_WINDOW_UNITS = {'s': 'second', 'm': 'minute', 'h': 'hour', 'd': 'day'}
+
+
+def _cs_count(n: int, word: str) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
+def _cs_window_label(since: str) -> str:
+    window = str(since or '').strip().lower()
+    unit   = CS_WINDOW_UNITS.get(window[-1:], '')
+    number = window[:-1]
+    if unit and number.isdigit():
+        return _cs_count(int(number), unit)
+    return window
+
+
+def _cs_alert_source(alert: dict) -> str:
+    source = alert.get('source') or {}
+    return str(source.get('ip') or source.get('value') or '').strip()
+
+
+def _cs_alert_scenario(alert: dict) -> str:
+    scenario = str(alert.get('scenario') or '').strip() or 'unknown'
+    prefix   = 'crowdsecurity/'
+    return scenario[len(prefix):] if scenario.startswith(prefix) else scenario
+
+
+def _cs_alert_events(alert: dict) -> int:
+    try:
+        return max(0, int(alert.get('events_count') or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+CS_SUMMARY_SCENARIOS = 4
+
+
+def _cs_flag(cc: str) -> str:
+    code = str(cc or '').strip().upper()
+    if len(code) != 2 or not code.isalpha():
+        return ''
+    return ''.join(chr(0x1F1E6 + ord(ch) - 65) for ch in code)
+
+
+def _cs_alert_origin_detail(alert: dict) -> str:
+    src = alert.get('source') if isinstance(alert, dict) else None
+    if not isinstance(src, dict):
+        return ''
+    bits = []
+    cn = str(src.get('cn') or '').strip()
+    if cn:
+        bits.append(_cs_flag(cn) or cn)
+    as_name = str(src.get('as_name') or '').strip()
+    as_num = str(src.get('as_number') or '').strip()
+    if as_name and as_num:
+        bits.append(f'AS{as_num} {as_name}')
+    elif as_name:
+        bits.append(as_name)
+    elif as_num:
+        bits.append(f'AS{as_num}')
+    return ', '.join(bits)
+
+
+def _cs_scenario_list(names) -> str:
+    ordered = sorted(names)
+    shown = ordered[:CS_SUMMARY_SCENARIOS]
+    rest = len(ordered) - len(shown)
+    text = ', '.join(shown)
+    return f'{text} and {rest} more' if rest > 0 else text
+
+
+def summarise_alerts(alerts, window_label: str = '') -> str:
+    sources = {}
+    scenarios = {}
+    detail = {}
+    for alert in alerts or []:
+        scenario = _cs_alert_scenario(alert)
+        ip = _cs_alert_source(alert)
+        events = _cs_alert_events(alert)
+        scenarios[scenario] = scenarios.get(scenario, 0) + events
+        if not ip:
+            continue
+        entry = sources.setdefault(ip, {'events': 0, 'scenarios': {}})
+        entry['events'] += events
+        entry['scenarios'][scenario] = entry['scenarios'].get(scenario, 0) + events
+        if ip not in detail:
+            where = _cs_alert_origin_detail(alert)
+            if where:
+                detail[ip] = where
+    if not sources:
+        return ''
+    when = f' in the last {window_label}' if window_label else ''
+    total = sum(v['events'] for v in sources.values())
+    worst_ip, worst = sorted(sources.items(), key=lambda kv: (-kv[1]['events'], kv[0]))[0]
+    where = detail.get(worst_ip, '')
+    where = f' ({where})' if where else ''
+    if len(sources) == 1:
+        return (f"{worst_ip}{where} tripped {_cs_count(len(scenarios), 'scenario')}"
+                f", {_cs_count(total, 'event')}{when}: {_cs_scenario_list(scenarios)}")
+    return (f"{_cs_count(len(sources), 'source')} tripped "
+            f"{_cs_count(len(scenarios), 'scenario')}, {_cs_count(total, 'event')}{when}. "
+            f"Worst: {worst_ip}{where}, "
+            f"{sorted(worst['scenarios'].items(), key=lambda kv: (-kv[1], kv[0]))[0][0]}, "
+            f"{_cs_count(worst['events'], 'event')}. Scenarios: {_cs_scenario_list(scenarios)}")
+
+
+def check_local_alerts(since: str = CS_ALERT_WINDOW) -> list:
+    msg = summarise_alerts(poll_local_alerts(since), _cs_window_label(since))
+    if not msg:
+        return []
+    return [('warning', msg, 'crowdsec')]

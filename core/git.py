@@ -1,9 +1,3 @@
-"""Git backup: repository management, commits and pushes.
-
-Writes to users' backup repositories, so every git invocation goes through
-_git_run with protocol hardening and an askpass shim rather than embedding
-credentials in the remote URL.
-"""
 import contextlib
 import fcntl
 import os
@@ -112,8 +106,6 @@ def _git_ensure_repo():
 
 @contextlib.contextmanager
 def _git_lock():
-    """Cross-process lock (flock) so concurrent gunicorn workers don't run git
-    operations on the same repo at once, which corrupts the index/remote state."""
     os.makedirs(env.BACKUP_DIR, exist_ok=True)
     f = open(os.path.join(env.BACKUP_DIR, '.git-push.lock'), 'w')
     try:
@@ -184,10 +176,10 @@ def _git_push_if_enabled(action='backup'):
         if enabled and auto_push and repo:
             ok, err = _git_push_configs(action)
             if ok and err != 'No changes':
-                notifications.add_notification('success', f'Git backup pushed ({action})')
+                notifications.add_notification('success', f'Git backup pushed ({action})', category='backup')
             elif not ok:
                 logger.warning(f"Git backup failed: {err}")
-                notifications.add_notification('error', f'Git backup failed ({action}): {err}')
+                notifications.add_notification('error', f'Git backup failed ({action}): {err}', category='backup')
     except Exception:
         logger.exception("Git push error")
 
@@ -288,10 +280,12 @@ def _git_push_agent_if_enabled(agent, action='backup'):
             return
         ok, err = _git_push_agent_configs(agent, action)
         if ok and err != 'No changes':
-            notifications.add_notification('success', f"Git backup pushed ({agent.get('name')}: {action})")
+            notifications.add_notification('success', f"Git backup pushed ({agent.get('name')}: {action})",
+                                           category='backup')
         elif not ok:
             logger.warning(f"Agent git backup failed: {err}")
-            notifications.add_notification('error', f"Git backup failed ({agent.get('name')}): {err}")
+            notifications.add_notification('error', f"Git backup failed ({agent.get('name')}): {err}",
+                                           category='backup')
     except Exception:
         logger.exception("Agent git push error")
 

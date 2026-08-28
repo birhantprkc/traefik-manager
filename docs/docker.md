@@ -393,10 +393,10 @@ docker run -d \
 ## Password reset
 
 ```bash
-docker exec traefik-manager flask reset-password
+docker exec -it traefik-manager flask reset-password --prompt
 ```
 
-Prints a new temporary password and forces a change at next login. Two-factor authentication is preserved - add `--disable-otp` if you have also lost your TOTP app. Other recovery methods: [Reset Password](reset-password.md).
+Asks for the new password twice, hidden, and sets it. Drop `--prompt` to get a random temporary password and a forced change at next login instead. Two-factor authentication is preserved - add `--disable-otp` if you have also lost your TOTP app. Other recovery methods: [Reset Password](reset-password.md).
 
 ---
 

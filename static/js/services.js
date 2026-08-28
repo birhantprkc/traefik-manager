@@ -66,6 +66,11 @@ async function refreshLiveView() {
 
     try {
         const r = await agentFetch('/api/traefik/services');
+        if (!r.ok) {
+            const why = await _errText(r, 'Could not load services');
+            container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Could not load services</p><p class="text-sm mt-2 px-4" style="color:var(--text-secondary);word-break:break-word">${_esc(why)}</p></div>`;
+            return;
+        }
         const res = await r.json();
         if (res.error) {
             container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Traefik API not reachable</p><p class="text-sm mt-2 font-mono px-4" style="color:var(--text-secondary);word-break:break-all">${_esc(res.error)}</p></div>`;
@@ -83,7 +88,7 @@ async function refreshLiveView() {
 
         renderServicesTable();
     } catch(e) {
-        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Traefik API not reachable</p></div>`;
+        container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Could not load services</p><p class="text-sm mt-2 px-4" style="color:var(--text-secondary);word-break:break-word">${_esc(_netErrText(e, 'Traefik API not reachable'))}</p></div>`;
     }
 }
 
@@ -147,6 +152,7 @@ function renderServicesTable() {
         if (s.mirroring)    return 'mirroring';
         if (s.failover)     return 'failover';
         if (s.weighted)     return 'weighted';
+        if (s.highestRandomWeight) return 'highestrandomweight';
         return null;
     };
 
@@ -310,7 +316,7 @@ function openSvcDetail(idx) {
     document.getElementById('svcDetailTitle').textContent = (s.name || '').split('@')[0];
 
     const provider = (s.name || '').includes('@') ? s.name.split('@').pop() : 'file';
-    const type = s.loadBalancer ? 'loadbalancer' : s.mirroring ? 'mirroring' : s.weighted ? 'weighted' : s.failover ? 'failover' : '-';
+    const type = s.loadBalancer ? 'loadbalancer' : s.mirroring ? 'mirroring' : s.weighted ? 'weighted' : s.failover ? 'failover' : s.highestRandomWeight ? 'highestrandomweight' : '-';
     const status = s.status || 'unknown';
     const stKind = status === 'enabled' ? ['status-online', 'd-on', 'Success']
                  : status === 'disabled' || status === 'error' ? ['status-offline', 'd-bad', 'Error']
@@ -319,7 +325,8 @@ function openSvcDetail(idx) {
 
     const lb = s.loadBalancer || {};
     const servers = lb.servers || [];
-    const passHostHeader = lb.passHostHeader !== undefined ? String(lb.passHostHeader) : 'true';
+    const passHostHeader = !s.loadBalancer ? '-'
+                         : lb.passHostHeader !== undefined ? String(lb.passHostHeader) : 'true';
 
     
     const serversHtml = servers.length > 0 ? `

@@ -73,7 +73,6 @@ func TestAcmeJSONPathsDirectory(t *testing.T) {
 	}
 }
 
-// The common case, and what every existing agent install uses.
 func TestCertsHandlerSingleFileUnchanged(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "acme.json")

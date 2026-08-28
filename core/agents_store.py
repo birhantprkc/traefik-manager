@@ -1,9 +1,3 @@
-"""Persistence for remote agent registrations (agents.yml).
-
-Secrets are encrypted at rest via core.crypto. Kept separate from core.settings
-because settings depends on this module (to migrate agents out of manager.yml),
-not the other way round.
-"""
 import os
 import threading
 

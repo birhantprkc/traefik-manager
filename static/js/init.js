@@ -138,7 +138,7 @@ window.addEventListener('appinstalled', () => {
 })();
 
 document.addEventListener('click', e => {
-    if (_notifPanelOpen && !e.target.closest('#notifBellWrap')) {
+    if (_notifPanelOpen && !e.target.closest('#notifBellWrap') && !e.target.closest('#notifPanel')) {
         _notifPanelOpen = false;
         document.getElementById('notifPanel')?.classList.remove('open');
         const btn  = document.getElementById('notifBellBtn');

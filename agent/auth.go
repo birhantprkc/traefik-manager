@@ -66,7 +66,6 @@ func (s *limiterStore) allow(ip string) bool {
 	return l.Allow()
 }
 
-// perIPLimiter is kept for App struct wiring (unused directly - store is created per-middleware call)
 type perIPLimiter struct{}
 
 func newPerIPLimiter(_ int) *perIPLimiter { return &perIPLimiter{} }

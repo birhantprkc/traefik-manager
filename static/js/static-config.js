@@ -293,6 +293,7 @@ async function saveStaticConfig() {
             ? () => agentFetch('/api/static', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })
             : () => fetch('/api/static/config', { method: 'POST', headers: { 'Content-Type': 'application/json', ..._csrfHeaders() }, body: JSON.stringify({ content }) });
         const res  = await fetchFn();
+        if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             _staticRawContent = content;
@@ -311,10 +312,10 @@ async function saveStaticConfig() {
                 if (d2.parsed) _renderStaticSections(d2.parsed);
             } catch(e) {}
         } else {
-            showToast(data.error || 'Save failed', 'error');
+            showToast(data.error || data.message || 'Save failed', 'error');
         }
     } catch(e) {
-        showToast('Save failed', 'error');
+        showToast(_netErrText(e, 'Save failed'), 'error');
     }
 }
 
@@ -357,13 +358,14 @@ async function openRouteYamlEditor(id) {
     if (title) title.textContent = `Raw YAML - ${name}`;
     try {
         const res  = await agentFetch(`/api/routes/${encodeURIComponent(id)}/raw`);
+        if (!res.ok) { showToast(await _errText(res, 'Failed to load route YAML'), 'error'); return; }
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
         const overlay = document.getElementById('routeYamlPopout');
         if (overlay) overlay.style.display = 'flex';
         _initRouteYamlMonaco(data.raw || '');
     } catch(e) {
-        showToast('Failed to load route YAML', 'error');
+        showToast(_netErrText(e, 'Failed to load route YAML'), 'error');
     }
 }
 
@@ -380,16 +382,17 @@ async function saveRouteYaml() {
             headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
             body: JSON.stringify({ content }),
         });
+        if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
         if (data.ok) {
             closeRouteYamlEditor();
             refreshRoutes();
             fetchNotifications();
         } else {
-            showToast(data.error || 'Save failed', 'error');
+            showToast(data.error || data.message || 'Save failed', 'error');
         }
     } catch(e) {
-        showToast('Save failed', 'error');
+        showToast(_netErrText(e, 'Save failed'), 'error');
     }
 }
 
@@ -453,7 +456,7 @@ async function triggerTraefikRestart() {
             _waitForReconnect(true);
         } else {
             _hideRestartOverlay();
-            showToast(data.error || 'Restart failed', 'error');
+            showToast(data.error || data.message || ('Restart failed (HTTP ' + res.status + ')'), 'error');
         }
     } catch(e) {
         _hideStaticRestartBanner();
@@ -504,13 +507,46 @@ function _traefikSupportsUnderscoreStrategy() {
     if (maj < 3) return false;
     if (min > 7) return true;
     if (min === 7) return pat >= 6;
-    if (min === 6) return pat >= 20;
     return false;
+}
+
+function _traefikSupportsAliasStrategy() {
+    const p = _semverParts(typeof _currentVersion !== 'undefined' ? _currentVersion : '');
+    if (!p) return true;
+    const [maj, min, pat] = p;
+    if (maj > 3) return true;
+    if (maj < 3) return false;
+    if (min > 7) return true;
+    if (min === 7) return pat >= 12;
+    return false;
+}
+
+function _epHeaderStrategyKey() {
+    return _traefikSupportsAliasStrategy() ? 'aliasHeadersStrategy' : 'underscoreHeadersStrategy';
+}
+
+function _epHeaderStrategyValue(ep) {
+    return (ep && ep.http && (ep.http.aliasHeadersStrategy || ep.http.underscoreHeadersStrategy)) || '';
 }
 
 function _updateEpUnderscoreVisibility() {
     const row = document.getElementById('sfEpUnderscoreRow');
-    if (row) row.style.display = _traefikSupportsUnderscoreStrategy() ? 'block' : 'none';
+    const supported = _traefikSupportsAliasStrategy() || _traefikSupportsUnderscoreStrategy();
+    if (row) row.style.display = supported ? 'block' : 'none';
+    if (!supported) return;
+    const alias = _traefikSupportsAliasStrategy();
+    const lbl = document.getElementById('sfEpHdrLabel');
+    if (lbl) lbl.textContent = alias ? 'Alias Headers' : 'Underscore Headers';
+    const del = document.getElementById('sfEpHdrDelete');
+    const rej = document.getElementById('sfEpHdrReject');
+    if (del) del.textContent = alias ? 'Delete - strip aliased headers' : 'Delete - strip underscore headers';
+    if (rej) rej.textContent = alias ? 'Reject - 400 on aliased headers' : 'Reject - 400 on underscore headers';
+    const hint = document.getElementById('sfEpHdrHint');
+    if (hint) {
+        hint.innerHTML = alias
+            ? 'Stops aliased header names (e.g. <code class="font-mono">X_Auth_User</code>, <code class="font-mono">X.Auth.User</code>) from bypassing forwardAuth. <code class="font-mono">Delete</code> recommended. <a href="https://traefik-manager.xyzlab.dev/hardening.html" target="_blank" style="color:var(--blue)">Learn more</a>'
+            : 'Stops underscore header aliases (e.g. <code class="font-mono">X_Auth_User</code>) from bypassing forwardAuth. Traefik 3.7.12 widens this to every aliased name. <code class="font-mono">Delete</code> recommended. <a href="https://traefik-manager.xyzlab.dev/hardening.html" target="_blank" style="color:var(--blue)">Learn more</a>';
+    }
 }
 
 function openStaticAddForm(section) {
@@ -578,7 +614,7 @@ function _prefillStaticForm(section, name) {
         document.getElementById('sfEpRedirect').value = ep.http?.redirections?.entryPoint?.to || '';
         const h3chk = document.getElementById('sfEpHttp3'); if (h3chk) h3chk.checked = !!ep.http3;
         const uhsSel = document.getElementById('sfEpUnderscore');
-        if (uhsSel) uhsSel.value = ep.http?.underscoreHeadersStrategy || '';
+        if (uhsSel) uhsSel.value = _epHeaderStrategyValue(ep);
         const fh = ep.forwardedHeaders || {};
         const pp = ep.proxyProtocol || {};
         const tipsEl = document.getElementById('sfEpTrustedIps');
@@ -657,8 +693,9 @@ async function _applyStaticSectionChange(body) {
         headers: { 'Content-Type': 'application/json', ..._csrfHeaders() },
         body: JSON.stringify({ ...body, current_raw: _staticRawContent }),
     });
+    if (!res.ok) { showToast(await _errText(res, 'Could not update the static config'), 'error'); return; }
     const data = await res.json();
-    if (!data.ok) { showToast(data.error || 'Failed', 'error'); return; }
+    if (!data.ok) { showToast(data.error || data.message || 'Could not update the static config', 'error'); return; }
     _staticParsedData = data.parsed || {};
     _staticRawContent = data.raw || '';
     _renderStaticSections(_staticParsedData);
@@ -674,6 +711,7 @@ async function submitStaticSection(section) {
     if (section === 'entrypoints') {
         name    = document.getElementById('sfEpName').value.trim();
         payload = { address: document.getElementById('sfEpAddr').value.trim(), redirect_to: document.getElementById('sfEpRedirect').value.trim(), http3: document.getElementById('sfEpHttp3')?.checked || false, underscore_headers: document.getElementById('sfEpUnderscore')?.value || '',
+            headers_strategy_key: _epHeaderStrategyKey(),
             trusted_ips: document.getElementById('sfEpTrustedIps')?.value || '',
             forwarded_insecure: document.getElementById('sfEpFwdInsecure')?.checked || false,
             proxy_trusted_ips: document.getElementById('sfEpProxyIps')?.value || '',
@@ -704,14 +742,14 @@ async function submitStaticSection(section) {
     try {
         await _applyStaticSectionChange({ action, section, name, old_name, data: payload });
         closeStaticForm(section);
-    } catch(e) { showToast('Request failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Could not update the static config'), 'error'); }
 }
 
 async function removeStaticItem(section, name) {
     if (!await _confirm(`Remove "${name}"?`, 'Remove Item', 'Remove')) return;
     try {
         await _applyStaticSectionChange({ action: 'remove', section, name, data: {} });
-    } catch(e) { showToast('Request failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Could not update the static config'), 'error'); }
 }
 
 function _scFile(path) {
@@ -772,7 +810,7 @@ function _scEmpty(text) {
 function _scEpRow(name, ep) {
     const addr  = ep.address || '';
     const redir = ep.http?.redirections?.entryPoint?.to || '';
-    const uhs   = ep.http?.underscoreHeadersStrategy || '';
+    const uhs   = _epHeaderStrategyValue(ep);
     const tips  = Array.isArray(ep.forwardedHeaders?.trustedIPs) ? ep.forwardedHeaders.trustedIPs.length : 0;
     const insecureFwd = !!ep.forwardedHeaders?.insecure;
     const insecurePp  = !!ep.proxyProtocol?.insecure;
@@ -785,7 +823,7 @@ function _scEpRow(name, ep) {
     if (ep.http3) glyphs.push(['ph-lightning', 'd-mw', 'HTTP/3 enabled']);
     if (redir) glyphs.push(['ph-arrow-u-up-right', 'd-off', 'redirects to ' + redir]);
     if (tips) glyphs.push(['ph-shield', 'd-blue', 'forwardedHeaders.trustedIPs: ' + tips + ' range(s)']);
-    if (uhs) glyphs.push(['ph-shield-check', 'd-on', 'underscoreHeadersStrategy: ' + uhs]);
+    if (uhs) glyphs.push(['ph-shield-check', 'd-on', _epHeaderStrategyKey() + ': ' + uhs]);
     let warn = '';
     if (insecureFwd) warn = 'forwardedHeaders.insecure is on, any client can set X-Forwarded-For';
     else if (insecurePp) warn = 'proxyProtocol.insecure is on, the PROXY header is trusted from any source';
@@ -802,7 +840,7 @@ function _scEpRow(name, ep) {
 function _tmEpCard(name, ep) {
     const addr  = ep.address || '';
     const redir = ep.http?.redirections?.entryPoint?.to || '';
-    const uhs   = ep.http?.underscoreHeadersStrategy || '';
+    const uhs   = _epHeaderStrategyValue(ep);
     const tips  = Array.isArray(ep.forwardedHeaders?.trustedIPs) ? ep.forwardedHeaders.trustedIPs.length : 0;
     const isUdp = /\/udp$/i.test(addr);
     const isTcp = /\/tcp$/i.test(addr);
@@ -811,7 +849,7 @@ function _tmEpCard(name, ep) {
                 : port === '443' ? ['HTTPS', 'var(--green)'] : ['HTTP', 'var(--blue)'];
     const glyphs = (ep.http3 ? '<i class="ph-bold ph-lightning tm-glyph" style="color:var(--purple)" title="HTTP/3 enabled"></i>' : '')
         + (tips ? `<i class="ph-bold ph-shield tm-glyph" style="color:var(--blue)" title="forwardedHeaders.trustedIPs: ${tips} range(s)"></i>` : '')
-        + (uhs ? `<i class="ph-bold ph-shield-check tm-glyph" style="color:var(--green)" title="underscoreHeadersStrategy: ${_esc(uhs)}"></i>` : '');
+        + (uhs ? `<i class="ph-bold ph-shield-check tm-glyph" style="color:var(--green)" title="${_epHeaderStrategyKey()}: ${_esc(uhs)}"></i>` : '');
     const vals = redir
         ? `<div class="tm-vals"><div class="tm-val tm-val-target"><i class="ph-bold ph-arrow-u-up-right"></i><span class="tm-v">redirects to ${_esc(redir)}</span></div></div>`
         : '';
@@ -1446,7 +1484,7 @@ async function submitStaticProvider() {
     try {
         await _applyStaticSectionChange({ action, section: 'providers', name: type, old_name, data: { yaml_config } });
         closeStaticForm('providers');
-    } catch(e) { showToast('Request failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Could not update the static config'), 'error'); }
 }
 
 async function saveStaticSingleSection(section) {
@@ -1516,7 +1554,7 @@ async function saveStaticSingleSection(section) {
         await _applyStaticSectionChange({ action: 'set', section, name: '', data });
         const save = document.querySelector(`.sc-save[data-sc-save="${section}"]`);
         if (save) save.style.display = 'none';
-    } catch(e) { showToast('Request failed', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Could not update the static config'), 'error'); }
 }
 
 function _buildStaticTabHTML() {
@@ -1693,13 +1731,13 @@ function _buildStaticClassicHTML() {
                 <span class="text-xs" style="color:var(--muted)">- adds <code class="font-mono">http3: {}</code> to this entrypoint</span>
             </div>
             <div id="sfEpUnderscoreRow" style="display:none">
-                <label class="text-xs block mb-1" style="color:var(--muted)">Underscore Headers <span style="color:var(--muted);font-weight:400">(security)</span></label>
+                <label class="text-xs block mb-1" style="color:var(--muted)"><span id="sfEpHdrLabel">Alias Headers</span> <span style="color:var(--muted);font-weight:400">(security)</span></label>
                 <select id="sfEpUnderscore" class="input-field text-sm">
                     <option value="">Keep (default)</option>
-                    <option value="delete">Delete - strip underscore headers</option>
-                    <option value="reject">Reject - 400 on underscore headers</option>
+                    <option id="sfEpHdrDelete" value="delete">Delete - strip aliased headers</option>
+                    <option id="sfEpHdrReject" value="reject">Reject - 400 on aliased headers</option>
                 </select>
-                <p class="text-xs mt-1" style="color:var(--muted)">Stops underscore header aliases (e.g. <code class="font-mono">X_Auth_User</code>) from bypassing forwardAuth. <code class="font-mono">Delete</code> recommended. <a href="https://traefik-manager.xyzlab.dev/hardening.html" target="_blank" style="color:var(--blue)">Learn more</a></p>
+                <p id="sfEpHdrHint" class="text-xs mt-1" style="color:var(--muted)">Stops aliased header names (e.g. <code class="font-mono">X_Auth_User</code>, <code class="font-mono">X.Auth.User</code>) from bypassing forwardAuth. <code class="font-mono">Delete</code> recommended. <a href="https://traefik-manager.xyzlab.dev/hardening.html" target="_blank" style="color:var(--blue)">Learn more</a></p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -2239,7 +2277,8 @@ async function _loadStaticFromDisk() {
             if (bar) bar.style.display = 'none';
             const acts = document.querySelector('#tab-static .fb-secondary');
             if (acts) acts.style.display = 'none';
-            wrapper.innerHTML = (!_activeAgent && typeof _emptyMountState === 'function')
+            const notMounted = res.ok || res.status === 404;
+            wrapper.innerHTML = (!_activeAgent && notMounted && typeof _emptyMountState === 'function')
                 ? _emptyMountState({
                     icon: 'ph-sliders',
                     title: 'traefik.yml not mounted',
@@ -2278,7 +2317,7 @@ async function _loadStaticFromDisk() {
     } catch(e) {
         wrapper.innerHTML = `<div class="text-center py-16" style="color:var(--muted)">
             <i class="ph-light ph-warning-circle text-4xl block mb-3 opacity-40"></i>
-            <p>Failed to load static config</p></div>`;
+            <p>${_esc(_netErrText(e, 'Failed to load static config'))}</p></div>`;
     }
 }
 
@@ -2474,8 +2513,9 @@ function closeTrustedIpsModal() {
 async function _tipInspect() {
     try {
         const res = await fetch('/api/static/trusted-ips/preview', { method: 'POST', headers: { 'Content-Type': 'application/json', ..._csrfHeaders() }, body: JSON.stringify({ current_raw: _tipBaseRaw() }) });
+        if (!res.ok) { showToast(await _errText(res, 'Failed to read static config'), 'error'); closeTrustedIpsModal(); return; }
         const d = await res.json();
-        if (!res.ok || d.error) { showToast(d.error || 'Failed to read static config', 'error'); closeTrustedIpsModal(); return; }
+        if (d.error) { showToast(d.error, 'error'); closeTrustedIpsModal(); return; }
         _tipData = d;
         const sel = document.getElementById('tipEntrypoint');
         if (!d.entrypoints.length) {
@@ -2486,7 +2526,7 @@ async function _tipInspect() {
         const cf = document.getElementById('tipCfLabel');
         if (cf) cf.textContent = `Cloudflare edge ranges (${(d.cloudflare_ranges || []).length}, captured ${d.cloudflare_captured})`;
         _tipRenderCurrent();
-    } catch (e) { showToast('Failed to read static config', 'error'); closeTrustedIpsModal(); }
+    } catch (e) { showToast(_netErrText(e, 'Failed to read static config'), 'error'); closeTrustedIpsModal(); }
 }
 
 function _tipRenderCurrent() {
@@ -2518,11 +2558,12 @@ async function tipPreview() {
     if (!cloudflare && !priv && !custom.trim()) { showToast('Select at least one source', 'error'); return; }
     try {
         const res = await fetch('/api/static/trusted-ips/preview', { method: 'POST', headers: { 'Content-Type': 'application/json', ..._csrfHeaders() }, body: JSON.stringify({ current_raw: _tipBaseRaw(), entrypoint, cloudflare, private: priv, custom_cidrs: custom }) });
+        if (!res.ok) { showToast(await _errText(res, 'Preview failed'), 'error'); return; }
         const d = await res.json();
-        if (!res.ok || d.error) { showToast(d.error || 'Preview failed', 'error'); return; }
+        if (d.error) { showToast(d.error, 'error'); return; }
         if (_tipData) _tipData.preview = d;
         _tipRenderPreview(d);
-    } catch (e) { showToast('Preview failed', 'error'); }
+    } catch (e) { showToast(_netErrText(e, 'Preview failed'), 'error'); }
 }
 
 function _tipRenderPreview(d) {

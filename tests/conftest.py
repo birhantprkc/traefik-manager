@@ -35,6 +35,11 @@ os.environ["CONFIG_PATHS"] = str(DYNAMIC_PATH)
 os.environ["BACKUP_DIR"] = str(BACKUP_DIR)
 os.environ["TRAEFIK_API_URL"] = "http://traefik.invalid:8080"
 os.environ["STATIC_CONFIG_PATH"] = str(STATIC_PATH)
+import core.monitor as _tm_monitor
+
+if not hasattr(_tm_monitor, 'real_start'):
+    _tm_monitor.real_start = _tm_monitor.start
+    _tm_monitor.start = lambda: False
 
 import app as tm
 

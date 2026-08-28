@@ -129,7 +129,7 @@ Installed Traefik plugins with the middlewares using each one, and a guided inst
 
 ## Settings
 
-Interface, authentication with API keys and OIDC, backups, system and route monitoring, and the connection to Traefik itself.
+Interface, authentication with API keys and OIDC, backups, system and route monitoring, notification channels, and the connection to Traefik itself.
 
 <img class="screenshot dark-only" src="/images/dark-settings-interface.png" alt="Interface settings">
 <img class="screenshot light-only" src="/images/light-settings-interface.png" alt="Interface settings">
@@ -154,6 +154,15 @@ Interface, authentication with API keys and OIDC, backups, system and route moni
 
 <img class="screenshot dark-only" src="/images/dark-settings-connection.png" alt="Connection settings">
 <img class="screenshot light-only" src="/images/light-settings-connection.png" alt="Connection settings">
+
+<img class="screenshot dark-only" src="/images/dark-settings-notifications.png" alt="Notification channels">
+<img class="screenshot light-only" src="/images/light-settings-notifications.png" alt="Notification channels">
+
+<img class="screenshot dark-only" src="/images/dark-settings-notification-channel.png" alt="Editing a notification channel">
+<img class="screenshot light-only" src="/images/light-settings-notification-channel.png" alt="Editing a notification channel">
+
+<img class="screenshot dark-only" src="/images/dark-settings-agents.png" alt="Agents">
+<img class="screenshot light-only" src="/images/light-settings-agents.png" alt="Agents">
 
 <img class="screenshot dark-only" src="/images/dark-settings-about.png" alt="About">
 <img class="screenshot light-only" src="/images/light-settings-about.png" alt="About">

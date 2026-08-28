@@ -565,11 +565,12 @@ async function saveRouteAjax(event) {
         }
         if (_activeAgent) fd.append('agent_id', _activeAgent.id);
         const res = await fetch(form.action, { method:'POST', headers:{'X-Requested-With':'fetch'}, body: fd });
+        if (!res.ok) { showToast(await _errText(res, 'Error saving route'), 'error'); return; }
         const json = await res.json();
-        showToast(json.message, json.ok ? 'success' : 'error');
+        showToast(json.message || json.error || 'Error saving route', json.ok ? 'success' : 'error');
         if (json.ok) { closeModal(); refreshRoutes(); fetchNotifications(); if (typeof window.rmInvalidateData === 'function') window.rmInvalidateData(); setTimeout(fetchNotifications, 8000); }
     } catch(e) {
-        showToast('Error saving route', 'error');
+        showToast(_netErrText(e, 'Error saving route'), 'error');
     } finally {
         btn.disabled = false;
     }
@@ -585,10 +586,11 @@ async function deleteRoute(id, configFile) {
     if (_activeAgent) data.append('agent_id', _activeAgent.id);
     try {
         const res = await fetch('/delete/' + encodeURIComponent(id), { method:'POST', headers:{'X-Requested-With':'fetch'}, body: data });
+        if (!res.ok) { showToast(await _errText(res, 'Error deleting route'), 'error'); return; }
         const json = await res.json();
-        showToast(json.message, json.ok ? 'success' : 'error');
+        showToast(json.message || json.error || 'Error deleting route', json.ok ? 'success' : 'error');
         if (json.ok) { refreshRoutes(); fetchNotifications(); if (typeof window.rmInvalidateData === 'function') window.rmInvalidateData(); }
-    } catch(e) { showToast('Error deleting route', 'error'); }
+    } catch(e) { showToast(_netErrText(e, 'Error deleting route'), 'error'); }
 }
 
 async function toggleRoute(id, currentlyEnabled, silent = false) {
@@ -600,14 +602,18 @@ async function toggleRoute(id, currentlyEnabled, silent = false) {
             headers: { 'X-Requested-With': 'fetch', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '', 'Content-Type': 'application/json' },
             body: JSON.stringify({ enable: !currentlyEnabled, agent_id: _activeAgent ? _activeAgent.id : '', csrf_token: document.querySelector('meta[name="csrf-token"]')?.content || '' })
         });
+        if (!res.ok) {
+            if (!silent) showToast(await _errText(res, 'Failed to toggle route'), 'error');
+            return;
+        }
         const json = await res.json();
         if (json.ok) {
             if (!silent) { showToast(currentlyEnabled ? 'Route disabled.' : 'Route enabled.', 'success'); refreshRoutes(); }
             if (typeof window.rmInvalidateData === 'function') window.rmInvalidateData();
         } else {
-            if (!silent) showToast(json.message || 'Failed to toggle route.', 'error');
+            if (!silent) showToast(json.message || json.error || 'Failed to toggle route.', 'error');
         }
-    } catch(e) { if (!silent) showToast('Error toggling route.', 'error'); }
+    } catch(e) { if (!silent) showToast(_netErrText(e, 'Error toggling route'), 'error'); }
 }
 
 async function refreshRoutes() {
@@ -618,7 +624,10 @@ async function refreshRoutes() {
         } else {
             res = await fetch('/api/routes');
         }
-        if (!res.ok) throw new Error('routes ' + res.status);
+        if (!res.ok) {
+            showToast(await _errText(res, 'Could not load routes'), 'error');
+            return;
+        }
         const data = await res.json();
         if (data.services) window._tmServices = data.services;
         renderRouteGrid(data.apps || []);
@@ -627,7 +636,7 @@ async function refreshRoutes() {
         _renderConfigErrorBanner(data.configErrors || []);
     } catch(e) {
         console.error('refreshRoutes failed:', e);
-        showToast('Could not load routes. Check the connection and try again.', 'error');
+        showToast(_netErrText(e, 'Could not load routes'), 'error');
     }
 }
 
@@ -683,7 +692,7 @@ async function pingAllRoutes() {
         ? `Ping all: ${online}/${total} online - unreachable: ${offlineRoutes.join(', ')}`
         : `Ping all: all ${total} route${total !== 1 ? 's' : ''} online`;
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-    fetch('/api/notifications/add', { method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}, body: JSON.stringify({type, message: msg}) })
+    fetch('/api/notifications/add', { method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}, body: JSON.stringify({type, message: msg, category: 'traefik'}) })
         .then(() => fetchNotifications());
 }
 const _ROUTE_ICON_CDN = 'https://cdn.jsdelivr.net/gh/selfhst/icons/png';
@@ -1057,8 +1066,8 @@ function _initDomainChips(selectedDomains) {
         hiddenContainer.innerHTML = [...selected].map(d => `<input type="hidden" name="domains" value="${_esc(d)}">`).join('');
         container.innerHTML = list.map(d => {
             const on = selected.has(d);
-            return `<button type="button" onclick="_toggleDomainChip(this,'${_esc(d)}')" style="padding:3px 10px;border-radius:9999px;border:1px solid ${on ? 'var(--blue)' : 'var(--border)'};background:${on ? 'rgba(59,130,246,0.15)' : 'transparent'};color:${on ? 'var(--blue)' : 'var(--muted)'};font-size:12px;font-family:monospace;cursor:pointer;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${_esc(d)}">${_esc(d)}</button>`;
-        }).join('') + `<button type="button" onclick="_customDomainPrompt(this)" style="padding:3px 10px;border-radius:9999px;border:1px dashed var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap" title="Add another domain"><i class="ph-bold ph-plus" style="font-size:10px"></i></button>`;
+            return `<button type="button" onclick="_toggleDomainChip(this,'${_esc(d)}')" class="dom-chip${on ? ' on' : ''}" title="${_esc(d)}">${_esc(d)}</button>`;
+        }).join('') + `<button type="button" onclick="_customDomainPrompt(this)" class="dom-chip-add" title="Add another domain"><i class="ph-bold ph-plus" style="font-size:10px"></i></button>`;
     }
     render();
     window._domainChipSelected = selected;
@@ -1077,7 +1086,7 @@ function _customDomainPrompt(btn) {
     const input = document.createElement('input');
     input.type = 'text';
     input.placeholder = 'other.com';
-    input.style.cssText = 'padding:3px 10px;border-radius:9999px;border:1px solid var(--blue);background:transparent;color:var(--text);font-size:12px;font-family:monospace;width:150px;outline:none';
+    input.className = 'dom-chip-input';
     btn.replaceWith(input);
     input.focus();
     const commit = () => {
@@ -1499,11 +1508,12 @@ async function cloneRoute(btn) {
     }
     if (proto === 'http') {
         _applyHttpRuleToForm(app.rule || '');
+        const _cloneComposite = !!app.serviceType && app.serviceType !== 'loadBalancer';
         const targetScheme = (app.target || '').startsWith('https://') ? 'https' : 'http';
-        let target = (app.target || '').replace('http://','').replace('https://','');
+        let target = _cloneComposite ? '' : (app.target || '').replace('http://','').replace('https://','');
         const parts = target.split(':');
         document.getElementById('targetIp').value = parts[0] || '';
-        document.getElementById('targetPort').value = parts[1] || '80';
+        document.getElementById('targetPort').value = _cloneComposite ? '' : (parts[1] || '80');
         const _ownedHdr = (app.headersPreset && app.headersPreset.owned) ? app.name + '-headers' : null;
         await _initMiddlewareChips((app.middlewares || []).filter(m => m !== _ownedHdr));
         _applyHeadersPreset(app.headersPreset);
@@ -1748,7 +1758,7 @@ async function bulkDelete() {
     if (!ids.length) return;
     if (!await _confirm(`Delete ${ids.length} route${ids.length > 1 ? 's' : ''}? This removes them from the config files and stops serving them.`, 'Bulk Delete', 'Delete', 'DELETE')) return;
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-    let failed = 0;
+    let failed = 0, firstErr = '';
     for (const id of ids) {
         const card = document.querySelector(`.route-card[data-routekey="${CSS.escape(id)}"]`);
         const cf   = card?.dataset.configfile || '';
@@ -1758,11 +1768,19 @@ async function bulkDelete() {
         if (_activeAgent) data.append('agent_id', _activeAgent.id);
         try {
             const res  = await fetch('/delete/' + encodeURIComponent(id), { method:'POST', headers:{'X-Requested-With':'fetch'}, body: data });
+            if (!res.ok) {
+                failed++;
+                if (!firstErr) firstErr = await _errText(res, 'Route could not be deleted');
+                continue;
+            }
             const json = await res.json();
-            if (!res.ok || !json.ok) failed++;
-        } catch(e) { failed++; }
+            if (!json.ok) {
+                failed++;
+                if (!firstErr) firstErr = json.message || json.error || '';
+            }
+        } catch(e) { failed++; if (!firstErr) firstErr = _netErrText(e, 'Route could not be deleted'); }
     }
-    if (failed) showToast(`${failed} of ${ids.length} route${ids.length > 1 ? 's' : ''} could not be deleted.`, 'error');
+    if (failed) showToast(`${failed} of ${ids.length} route${ids.length > 1 ? 's' : ''} could not be deleted.` + (firstErr ? ' ' + firstErr : ''), 'error');
     else showToast(`Deleted ${ids.length} route${ids.length > 1 ? 's' : ''}.`, 'success');
     _bulkSelected.clear(); updateBulkBar(); refreshRoutes(); fetchNotifications();
     if (typeof window.rmInvalidateData === 'function') window.rmInvalidateData();
@@ -1893,7 +1911,11 @@ function closeRouteDetail() {
 
 function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints, apiState) {
     const status = liveRouter ? liveRouter.status : null;
-    const routerError = liveRouter ? (liveRouter.error || null) : null;
+    const _rawErr = liveRouter ? liveRouter.error : null;
+    const routerError = !_rawErr ? null
+        : (Array.isArray(_rawErr) ? _rawErr : [_rawErr])
+            .map(x => (typeof x === 'string' ? x : (x && x.message) || JSON.stringify(x)))
+            .map(x => String(x).trim()).filter(Boolean).join(' - ') || null;
     const isDisabled = app.enabled === false;
     const statusBadge = isDisabled
         ? _dState('Disabled')
@@ -2016,7 +2038,7 @@ function renderDetailPanel(app, protocol, liveRouter, liveService, entrypoints, 
 
     const svcRows = [
         ['Status', svcStatus !== '-' ? _dState(svcStatus === 'enabled' ? 'Enabled' : svcStatus) : '-', svcStatus !== '-'],
-        ['Type', 'Load Balancer', false],
+        ['Type', app.serviceType && app.serviceType !== 'loadBalancer' ? app.serviceType : 'Load Balancer', false],
         ['Pass Host Header', svcPassHostHeader, false],
         ...(app.containerAddr ? [['Container', app.containerAddr, false]] : []),
         ...svcServerRows,

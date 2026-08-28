@@ -33,7 +33,7 @@ Traefik's static configuration controls settings that cannot be changed at runti
 
 | Section               | Description                                                                                                                                          |
 | -----------------------| ------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Entrypoints           | Port, protocol, optional HTTP-to-HTTPS redirect, the [Underscore Headers](hardening.md#header-alias-spoofing-underscore-headers) strategy (Traefik 3.6.20 / 3.7.6+), trusted IPs for forwarded headers (`forwardedHeaders.trustedIPs` / `insecure`, one CIDR per line), PROXY protocol trust (`proxyProtocol.trustedIPs` / `insecure`), an entrypoint-wide middleware chain (`http.middlewares`), TLS-by-default (`http.tls` with cert resolver and TLS options), `asDefault`, and responding timeouts (read / write / idle). |
+| Entrypoints           | Port, protocol, optional HTTP-to-HTTPS redirect, the [Alias Headers](hardening.md#header-alias-spoofing) strategy (Traefik 3.7.12+, or Underscore Headers on 3.7.6 to 3.7.11), trusted IPs for forwarded headers (`forwardedHeaders.trustedIPs` / `insecure`, one CIDR per line), PROXY protocol trust (`proxyProtocol.trustedIPs` / `insecure`), an entrypoint-wide middleware chain (`http.middlewares`), TLS-by-default (`http.tls` with cert resolver and TLS options), `asDefault`, and responding timeouts (read / write / idle). |
 | Certificate Resolvers | ACME email, storage path, DNS / HTTP / TLS challenge type, custom CA server, key type, external account binding (EAB), and DNS propagation controls (check resolvers, delay, disable checks). |
 | Plugins               | Remote plugins (module + version) and local plugins from the `plugins-local` directory. The [Plugins tab](tab-plugins.md) offers the richer install flow. |
 | API                   | Enable or disable the Traefik API and Dashboard, insecure mode, and debug mode. |
@@ -241,9 +241,9 @@ The full Docker socket lets TM start, stop, or delete any container on the host.
 
 ---
 
-## Using the traefik-stack installer
+## Using the tm CLI installer {#using-the-traefik-stack-installer}
 
-If you installed with [the traefik-stack installer](traefik-stack.md), answering **y** to "Mount Traefik static config?" asks which restart method you want and generates every required compose addition - volume mounts, env vars, socket proxy service, or Traefik healthcheck.
+If you installed with [the tm CLI installer](tm-cli.md), answering **y** to "Mount Traefik static config?" asks which restart method you want and generates every required compose addition - volume mounts, env vars, socket proxy service, or Traefik healthcheck.
 
 To turn it on or change the restart method afterwards, run `tm reconfigure --section mounts`.
 

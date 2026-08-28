@@ -14,7 +14,7 @@ curl -fsSL https://get-traefik.xyzlab.dev | bash
 
 `tm` then manages the install: `tm status`, `tm update`, `tm reconfigure`, `tm doctor`.
 
-[What the installer sets up →](traefik-stack.md)
+[What the installer sets up →](tm-cli.md)
 
 ### Install it yourself
 
@@ -208,7 +208,7 @@ A verdict line above the search flags anything that needs attention, such as no 
 
 | Page | Description |
 |------|-------------|
-| [Reset Password](reset-password.md) | CLI reset, TOTP recovery, and manual reset via manager.yml |
+| [Reset Password](reset-password.md) | Set a chosen password or a temporary one, TOTP recovery, and manual reset via manager.yml |
 | [Security](security.md) | Security controls, API keys, sessions, and hardening recommendations |
 | [Traefik Hardening](hardening.md) | CVE advisories, header aliases, forwardAuth limits, and real client IPs |
 | [Development](development.md) | Project layout, running the test suite, and what a pull request needs |
