@@ -5923,6 +5923,9 @@ def api_agent_routes(agent_id):
 
         return jsonify({'apps': apps, 'middlewares': middlewares, 'configErrors': config_errors,
                         'services': _collect_file_services(all_configs.values())})
+    except requests.exceptions.SSLError as e:
+        return jsonify({'error': 'TLS verification failed - the agent certificate is not trusted '
+                                 'by Traefik Manager (%s)' % str(e)[:100]}), 502
     except requests.exceptions.ConnectionError:
         return jsonify({'error': 'Cannot reach agent'}), 502
     except Exception as e:
@@ -6206,6 +6209,10 @@ def api_agents_health(agent_id):
         ms   = int((time.time() - t0) * 1000)
         body = resp.json() if resp.headers.get('content-type', '').startswith('application/json') else {}
         return jsonify({'ok': resp.status_code == 200, 'latency_ms': ms, 'version': body.get('version', ''), 'status': resp.status_code})
+    except requests.exceptions.SSLError as e:
+        return jsonify({'ok': False, 'latency_ms': -1,
+                        'error': 'TLS verification failed - the agent certificate is not trusted '
+                                 'by Traefik Manager (%s)' % str(e)[:100]})
     except requests.exceptions.ConnectionError:
         return jsonify({'ok': False, 'latency_ms': -1, 'error': 'Connection refused'})
     except Exception as e:
@@ -6235,6 +6242,9 @@ def api_agents_proxy(agent_id, path):
             threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'config change'), daemon=True).start()
         content_type = resp.headers.get('content-type', 'application/json')
         return resp.content, resp.status_code, {'Content-Type': content_type}
+    except requests.exceptions.SSLError as e:
+        return jsonify({'error': 'TLS verification failed - the agent certificate is not trusted '
+                                 'by Traefik Manager (%s)' % str(e)[:100]}), 502
     except requests.exceptions.ConnectionError:
         return jsonify({'error': 'Cannot reach agent - check URL and network'}), 502
     except requests.exceptions.Timeout:
