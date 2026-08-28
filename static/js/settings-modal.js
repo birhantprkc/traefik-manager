@@ -2357,8 +2357,7 @@ async function openAgentSetup(id, titleOverride) {
             if (a.restart_method)     selectRestartMethod(a.restart_method, null);
             const container = a.traefik_container || '';
             if (container) {
-                document.getElementById('agCfgContainer').value       = container;
-                document.getElementById('agCfgSocketContainer').value = container;
+                document.getElementById('agCfgContainer').value = container;
             }
             document.getElementById('agCfgGitEnabled').checked = !!a.git_backup_enabled;
             document.getElementById('agentGitFields').style.display = a.git_backup_enabled ? 'block' : 'none';
@@ -2397,9 +2396,8 @@ function resetAgentWizardCfgFields() {
     document.getElementById('agCfgLogPath').value     = '';
     document.getElementById('agCfgPluginsDir').value  = '';
     document.getElementById('agCfgDockerHost').value  = '';
-    document.getElementById('agCfgContainer').value   = 'traefik';
+    document.getElementById('agCfgContainer').value = 'traefik';
     document.getElementById('agCfgSignalFile').value  = '';
-    document.getElementById('agCfgSocketContainer').value = 'traefik';
     document.getElementById('agCfgGitEnabled').checked = false;
     document.getElementById('agentGitFields').style.display = 'none';
     document.getElementById('agCfgGitRepo').value     = '';
@@ -2549,6 +2547,8 @@ function selectRestartMethod(method, btn) {
     document.getElementById('restartProxyFields').style.display     = method === 'proxy'       ? '' : 'none';
     document.getElementById('restartPoisonPillFields').style.display = method === 'poison-pill' ? '' : 'none';
     document.getElementById('restartSocketFields').style.display    = method === 'socket'      ? '' : 'none';
+    const containerField = document.getElementById('restartContainerField');
+    if (containerField) containerField.style.display = (method === 'proxy' || method === 'socket') ? '' : 'none';
     agentCfgChanged();
 }
 
@@ -2570,7 +2570,7 @@ function buildAgentCfgPayload() {
         access_log_path:    document.getElementById('agCfgLogPath').value.trim(),
         plugins_dir:        document.getElementById('agCfgPluginsDir').value.trim(),
         restart_method:     _agentRestartMethod,
-        traefik_container:  (document.getElementById('agCfgContainer').value || document.getElementById('agCfgSocketContainer').value || 'traefik').trim(),
+        traefik_container:  (document.getElementById('agCfgContainer').value || 'traefik').trim(),
         docker_host:        document.getElementById('agCfgDockerHost').value.trim(),
         signal_file_path:   document.getElementById('agCfgSignalFile').value.trim(),
         crowdsec_lapi_url:  document.getElementById('agCfgCsUrl').value.trim(),
@@ -2602,7 +2602,7 @@ function agentCfgChanged() {
     const logPath   = document.getElementById('agCfgLogPath').value.trim();
     const pluginsDir= document.getElementById('agCfgPluginsDir').value.trim();
     const restart   = _agentRestartMethod;
-    const container = (document.getElementById('agCfgContainer').value || document.getElementById('agCfgSocketContainer').value || 'traefik').trim();
+    const container = (document.getElementById('agCfgContainer').value || 'traefik').trim();
     const dockerHost= document.getElementById('agCfgDockerHost').value.trim();
     const signalFile= document.getElementById('agCfgSignalFile').value.trim();
     const csUrl     = document.getElementById('agCfgCsUrl').value.trim();

@@ -1467,10 +1467,6 @@
                                                 <div class="sc-set-n">Docker host</div>
                                                 <input id="agCfgDockerHost" type="text" class="input-field text-xs" placeholder="tcp://socket-proxy:2375" oninput="agentCfgChanged()">
                                             </div>
-                                            <div class="sc-fld">
-                                                <div class="sc-set-n">Container name</div>
-                                                <input id="agCfgContainer" type="text" class="input-field text-xs" value="traefik" oninput="agentCfgChanged()">
-                                            </div>
                                         </div>
                                         <div id="restartPoisonPillFields" style="display:none;">
                                             <div class="sc-fld">
@@ -1480,9 +1476,13 @@
                                         </div>
                                         <div id="restartSocketFields" style="display:none;">
                                             <div class="sc-fld">
-                                                <div class="sc-set-n">Container name</div>
                                                 <div class="sc-set-d">Requires <code>/var/run/docker.sock:/var/run/docker.sock:ro</code> volume.</div>
-                                                <input id="agCfgSocketContainer" type="text" class="input-field text-xs" value="traefik" oninput="agentCfgChanged()">
+                                            </div>
+                                        </div>
+                                        <div id="restartContainerField" style="display:none;">
+                                            <div class="sc-fld">
+                                                <div class="sc-set-n">Container name</div>
+                                                <input id="agCfgContainer" type="text" class="input-field text-xs" value="traefik" oninput="agentCfgChanged()">
                                             </div>
                                         </div>
                                     </div>
