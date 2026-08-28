@@ -2003,6 +2003,15 @@ let _agentWizKey  = null;
 let _agentWizStep = 0;
 let _agentRestartMethod = '';
 
+async function refreshAgentRegistry() {
+    try {
+        const res = await fetch('/api/agents');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof updateServerSwitcher === 'function') updateServerSwitcher(data.agents || []);
+    } catch (e) {}
+}
+
 async function loadAgentsList() {
     const body = document.getElementById('agentsListBody');
     if (!body) return;
@@ -2529,7 +2538,7 @@ async function agentWizStep1Next() {
         } else {
             showAgentWizStep(2);
         }
-        loadAgentsList();
+        refreshAgentRegistry();
     } catch(e) { err.textContent = _netErrText(e, 'Failed to create agent'); err.style.display = ''; }
     finally { btn.disabled = false; btn.innerHTML = 'Continue <i class="ph-bold ph-caret-right text-xs"></i>'; }
 }
@@ -2546,7 +2555,7 @@ async function agentWizStep3Save() {
         const res  = await fetch('/api/agents/' + _agentWizId, { method: 'PUT', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
         if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
-        if (data.ok) { showToast('Agent config saved', 'success'); loadAgentsList(); }
+        if (data.ok) { showToast('Agent config saved', 'success'); refreshAgentRegistry(); }
         else showToast('Save failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
     } catch(e) { showToast(_netErrText(e, 'Save failed'), 'error'); }
 }

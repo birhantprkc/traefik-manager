@@ -67,3 +67,37 @@ def test_the_cli_step_is_hidden_unless_selected():
     assert 'display:none' in step
     show = _js().split('function showAgentWizStep', 1)[1].split('\n}', 1)[0]
     assert "n === 'cli'" in show
+
+def test_creating_an_agent_does_not_close_the_wizard():
+    js = _js()
+    body = js.split('async function agentWizStep1Next', 1)[1].split('\n}\n', 1)[0]
+    assert 'loadAgentsList()' not in body, (
+        'loadAgentsList hides agentWizardView and shows agentListView, so calling it here '
+        'closes the CLI step the moment it is rendered')
+    assert 'refreshAgentRegistry()' in body
+
+
+def test_saving_agent_config_does_not_close_the_wizard():
+    js = _js()
+    body = js.split('async function agentWizStep3Save', 1)[1].split('\n}\n', 1)[0]
+    assert 'loadAgentsList()' not in body
+    assert 'refreshAgentRegistry()' in body
+
+
+def test_the_registry_refresh_never_switches_views():
+    js = _js()
+    body = js.split('async function refreshAgentRegistry', 1)[1].split('\n}\n', 1)[0]
+    for banned in ('agentListView', 'agentWizardView', 'agentKeysView', 'style.display'):
+        assert banned not in body, (
+            'a data refresh must not move the user: found %s' % banned)
+    assert 'updateServerSwitcher' in body
+
+
+def test_the_cli_step_survives_to_show_the_key_and_command():
+    js = _js()
+    body = js.split('async function agentWizStep1Next', 1)[1].split('\n}\n', 1)[0]
+    assert "_renderAgentCliStep()" in body
+    assert "showAgentWizStep('cli')" in body
+    order = body.index("showAgentWizStep('cli')")
+    refresh = body.index('refreshAgentRegistry()')
+    assert order < refresh, 'the step must render before anything else runs'
