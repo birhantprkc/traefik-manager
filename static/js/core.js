@@ -1,4 +1,4 @@
-function showToast(msg, type='success', record=true) {
+function showToast(msg, type='success', record=true, category='') {
     const icon = type === 'success' ? 'ph-check-circle' : 'ph-warning-circle';
     const color = type === 'success' ? 'text-green-400' : 'text-red-400';
     const el = document.createElement('div');
@@ -6,16 +6,44 @@ function showToast(msg, type='success', record=true) {
     el.innerHTML = `<i class="ph-fill ${icon} ${color} text-lg"></i><span>${_esc(msg)}</span>`;
     document.getElementById('toastContainer').appendChild(el);
     setTimeout(() => { el.style.animation='slideOut 0.3s ease forwards'; setTimeout(()=>el.remove(),300); }, 4000);
-    if (record) _recordNotification(msg, type);
+    if (record) _recordNotification(msg, type, category);
 }
 
-async function _recordNotification(msg, type) {
+// Toasts are raised from ~130 call sites that predate categories. Rather than
+// thread an argument through every one, infer it from where the user is: the open
+// settings panel if there is one, otherwise the active tab. An explicit argument
+// to showToast always wins.
+const _TOAST_CATEGORY_BY_PANEL = {
+    agents: 'agent', backups: 'backup', auth: 'security',
+};
+const _TOAST_CATEGORY_BY_TAB = {
+    certs: 'certs', crowdsec: 'crowdsec', logs: 'traefik',
+};
+
+function _toastCategory() {
+    try {
+        for (const el of document.querySelectorAll('[id^="mpanel-"]')) {
+            if (el.offsetParent === null) continue;
+            const hit = _TOAST_CATEGORY_BY_PANEL[el.id.slice('mpanel-'.length)];
+            if (hit) return hit;
+        }
+        if (typeof _activeTab === 'string') {
+            const hit = _TOAST_CATEGORY_BY_TAB[_activeTab];
+            if (hit) return hit;
+        }
+    } catch (e) {}
+    return 'config';
+}
+
+async function _recordNotification(msg, type, category) {
+    if (!category) category = _toastCategory();
     if (typeof _csrfHeaders !== 'function') return;
     try {
         const res = await fetch('/api/notifications/log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', ..._csrfHeaders() },
-            body: JSON.stringify({ message: msg, type: type === 'success' ? 'success' : type === 'info' ? 'info' : 'error' }),
+            body: JSON.stringify({ message: msg, category,
+                type: type === 'success' ? 'success' : type === 'info' ? 'info' : 'error' }),
         });
         const json = await res.json();
         if (json && json.stored) fetchNotifications();

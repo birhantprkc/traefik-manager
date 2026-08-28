@@ -3092,7 +3092,10 @@ def api_notifications_log():
         type_ = 'info'
     if not msg:
         return jsonify({'ok': False}), 400
-    stored = add_notification(type_, msg, webhook=False)
+    category = str(data.get('category', '')).strip().lower()
+    if category not in _settings.CHANNEL_CATEGORIES:
+        category = 'config'
+    stored = add_notification(type_, msg, category=category, webhook=False)
     return jsonify({'ok': True, 'stored': stored})
 
 
