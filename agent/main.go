@@ -123,7 +123,7 @@ func envBool(key string, def bool) bool {
 
 func loadConfig() *Config {
 	return &Config{
-		APIKey:                    os.Getenv("TMA_API_KEY"),
+		APIKey:                    strings.TrimSpace(os.Getenv("TMA_API_KEY")),
 		Port:                      envOr("TMA_PORT", "8090"),
 		RateLimit:                 envInt("TMA_RATE_LIMIT", 300),
 		TraefikAPIURL:             envOr("TRAEFIK_API_URL", "http://traefik:8080"),

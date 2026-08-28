@@ -38,6 +38,7 @@ KEY_SEP           = '|'
 
 _state     = {}
 _cycle_up  = {}
+_cycle_auth = {}
 _run_lock  = threading.Lock()
 _stop_event = threading.Event()
 _thread    = None
@@ -187,6 +188,24 @@ def _agent_reachable(agent) -> bool:
     return _cycle_up[agent_id]
 
 
+def _agent_key_accepted(agent) -> bool:
+    agent_id = str(agent.get('id') or '')
+    if agent_id in _cycle_auth:
+        return _cycle_auth[agent_id]
+    ok = True
+    try:
+        resp = agents_http_mod._agent_request(agent, 'GET', '/api/traefik/version')
+        ok = resp.status_code != 401
+    except Exception as e:
+        logger.debug(f"Auth probe failed for agent {agent.get('name', '')}: {e}")
+    _cycle_auth[agent_id] = ok
+    return ok
+
+
+def _agent_usable(agent) -> bool:
+    return _agent_reachable(agent) and _agent_key_accepted(agent)
+
+
 def _agent_servers():
     servers = []
     for agent in _agents():
@@ -237,7 +256,7 @@ def _cert_sources(servers):
         logger.exception("Certificate check failed for the host")
     for server, name, agent in servers:
         try:
-            if _agent_reachable(agent):
+            if _agent_usable(agent):
                 sources.append((server, name, _agent_certs(agent)))
         except Exception:
             logger.exception(f"Certificate check failed for agent {name}")
@@ -288,7 +307,7 @@ def _traefik_sources(servers):
         logger.exception("Traefik check failed for the host")
     for server, name, agent in servers:
         try:
-            if _agent_reachable(agent):
+            if _agent_usable(agent):
                 sources.append((server, name, _agent_traefik_up(agent)))
         except Exception:
             logger.exception(f"Traefik check failed for agent {name}")
@@ -325,13 +344,20 @@ def _check_agents():
         except Exception:
             logger.exception(f"Health check failed for agent {name}")
             continue
+        auth_ok = _agent_key_accepted(agent) if up else True
+        status = 'up' if (up and auth_ok) else ('badkey' if up else 'down')
         prev = state.get(agent_id)
-        seen[agent_id] = up
-        if up == prev:
+        if isinstance(prev, bool):
+            prev = 'up' if prev else 'down'
+        seen[agent_id] = status
+        if status == prev:
             continue
-        if up:
+        if status == 'up':
             if prev is not None:
                 raised.append(('success', f"Agent {name} is back online", 'agent'))
+        elif status == 'badkey':
+            raised.append(('error', f"Agent {name} rejected the API key - rotate it in "
+                                    f"Settings or fix TMA_API_KEY on the agent", 'agent'))
         else:
             raised.append(('error', f"Agent {name} is unreachable", 'agent'))
     known = {agent_id for agent_id, _name, _agent in servers}
@@ -385,7 +411,7 @@ def _check_crowdsec_agents():
     for server, name, agent in servers:
         key = _server_key(server, 'lapi')
         try:
-            if not _agent_reachable(agent):
+            if not _agent_usable(agent):
                 continue
             configured, up, alerts = _agent_crowdsec(agent)
             if not configured:
@@ -452,6 +478,7 @@ def run_checks_once(force: bool = False) -> list:
         _state.clear()
         _state.update(_read_state())
         _cycle_up.clear()
+        _cycle_auth.clear()
         due = _section('due')
         ran = False
         for name, interval, fn in list(_checks):
