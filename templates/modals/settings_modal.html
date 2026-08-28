@@ -1333,9 +1333,58 @@
                         </div>
                     </div>
 
+                    <div id="agentChooserView" style="display:none;flex-direction:column;">
+                        <div class="sc-sec-head"><button onclick="cancelAddAgent()" class="btn-icon" style="margin-right:2px"><i class="ph-bold ph-caret-left text-sm"></i></button><span class="sc-sec-label">Add Agent</span><span class="sc-sec-rule"></span></div>
+                        <p class="text-xs mb-3" style="color:var(--muted)">An agent runs beside Traefik on a remote host so this instance can manage it. Pick how you want to install it.</p>
+                        <button type="button" class="agent-door" onclick="startAgentAdd('cli')">
+                            <div class="agent-door-icon"><i class="ph-bold ph-terminal-window"></i></div>
+                            <div class="agent-door-body">
+                                <div class="agent-door-title">Install with the tm CLI<span class="agent-door-tag">Recommended</span></div>
+                                <div class="agent-door-desc">One command on the remote host. It asks whether you want Docker, Docker with Traefik, or a systemd binary, then installs and starts the agent. Traefik Manager mints the key for you.</div>
+                            </div>
+                            <i class="ph-bold ph-caret-right agent-door-go"></i>
+                        </button>
+                        <button type="button" class="agent-door" onclick="startAgentAdd('manual')">
+                            <div class="agent-door-icon"><i class="ph-bold ph-sliders-horizontal"></i></div>
+                            <div class="agent-door-body">
+                                <div class="agent-door-title">Configure manually</div>
+                                <div class="agent-door-desc">Fill in every setting here and copy out a compose file or docker run command. Use this when the host is already set up, or when you want to review the config before it runs.</div>
+                            </div>
+                            <i class="ph-bold ph-caret-right agent-door-go"></i>
+                        </button>
+                    </div>
                     <div id="agentWizardView" style="display:none;flex-direction:column;">
                         <div class="sc-sec-head"><button onclick="cancelAddAgent()" class="btn-icon" style="margin-right:2px"><i class="ph-bold ph-caret-left text-sm"></i></button><span class="sc-sec-label" id="agentWizardTitle">Add Agent</span><span class="sc-sec-rule"></span><div class="flex items-center gap-1.5" id="agentWizardStepPills"><span id="wiz-step-pill-1" class="wiz-step on">1</span><span id="wiz-step-pill-2" class="wiz-step">2</span><span id="wiz-step-pill-3" class="wiz-step">3</span></div></div>
                         <div>
+                            <div id="agentWizStepCli" style="display:none">
+                                <p class="text-xs mb-3" style="color:var(--muted)">Run this on <span id="agentCliHostName" style="color:var(--text)"></span>. It installs the <code class="font-mono">tm</code> CLI and opens its agent installer with the key already set.</p>
+                                <div class="sc-panel">
+                                    <div class="sc-fld">
+                                        <div class="sc-set-n">Install command<button onclick="copyAgentCliCmd()" class="notif-mark-read" style="float:right">Copy</button></div>
+                                        <div class="sc-set-d">The key is passed through the environment, so it stays out of <code class="font-mono">ps</code> output.</div>
+                                        <pre id="agentCliCmd" class="text-xs font-mono" style="white-space:pre-wrap;word-break:break-all;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px"></pre>
+                                    </div>
+                                    <div class="sc-fld">
+                                        <div class="sc-set-n">API key</div>
+                                        <div class="sc-set-d">Shown once. It is already inside the command above.</div>
+                                        <pre id="agentCliKey" class="text-xs font-mono" style="white-space:pre-wrap;word-break:break-all;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px"></pre>
+                                    </div>
+                                </div>
+                                <div class="sc-panel" style="margin-top:10px">
+                                    <div class="sc-fld">
+                                        <div class="sc-set-n">After it finishes</div>
+                                        <div class="sc-set-d">Check that Traefik Manager can reach it. The agent does not report its own address back, so the URL you entered is a guess until this passes.</div>
+                                        <div class="flex items-center gap-2 mt-2">
+                                            <button onclick="verifyAgentInstall()" id="agentVerifyBtn" class="nav-btn text-xs"><i class="ph-bold ph-plugs-connected"></i> Verify connection</button>
+                                            <span id="agentVerifyResult" class="text-xs" style="color:var(--muted)"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-between mt-4">
+                                    <button onclick="cancelAddAgent()" class="nav-btn text-xs">Done</button>
+                                    <button onclick="openAgentSetup(_agentWizId, 'Agent Settings')" class="nav-btn text-xs">Open settings <i class="ph-bold ph-caret-right text-xs"></i></button>
+                                </div>
+                            </div>
                             <div id="agentWizStep1">
                                 <p class="text-xs mb-3" style="color:var(--muted)">Enter the name and URL for this remote agent. The URL is where TMA is reachable from this Traefik Manager instance.</p>
                                 <div class="sc-panel">

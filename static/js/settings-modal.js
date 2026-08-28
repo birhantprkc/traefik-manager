@@ -2304,17 +2304,80 @@ async function deleteAgent(id, name) {
     } catch(e) { showToast(_netErrText(e, 'Remove failed'), 'error'); }
 }
 
+let _agentAddMode = 'manual';
+
 function startAddAgent() {
+    document.getElementById('agentListView').style.display    = 'none';
+    document.getElementById('agentWizardView').style.display  = 'none';
+    document.getElementById('agentChooserView').style.display = 'flex';
+}
+
+function startAgentAdd(mode) {
+    _agentAddMode        = mode === 'cli' ? 'cli' : 'manual';
     _agentWizId          = null;
     _agentWizKey         = null;
     _agentWizStep        = 1;
     _agentRestartMethod  = '';
-    document.getElementById('agentListView').style.display   = 'none';
-    document.getElementById('agentWizardView').style.display = 'flex';
-    document.getElementById('agentWizardTitle').textContent  = 'Add Agent';
-    document.getElementById('agentWizardStepPills').style.display = '';
+    document.getElementById('agentChooserView').style.display = 'none';
+    document.getElementById('agentListView').style.display    = 'none';
+    document.getElementById('agentWizardView').style.display  = 'flex';
+    document.getElementById('agentWizardTitle').textContent   = _agentAddMode === 'cli'
+        ? 'Install with the tm CLI' : 'Add Agent';
+    document.getElementById('agentWizardStepPills').style.display = _agentAddMode === 'cli' ? 'none' : '';
     resetAgentWizard();
     showAgentWizStep(1);
+}
+
+function _renderAgentCliStep() {
+    const name = document.getElementById('agentWizName').value.trim();
+    const host = document.getElementById('agentCliHostName');
+    if (host) host.textContent = name || 'the remote host';
+    const cmd = document.getElementById('agentCliCmd');
+    if (cmd) {
+        cmd.textContent = `export TMA_API_KEY='${_agentWizKey || ''}'\n`
+                        + `curl -fsSL https://get-traefik.xyzlab.dev | bash -s -- --mode agent`;
+    }
+    const key = document.getElementById('agentCliKey');
+    if (key) key.textContent = _agentWizKey || '';
+    const res = document.getElementById('agentVerifyResult');
+    if (res) { res.textContent = ''; res.style.color = 'var(--muted)'; }
+}
+
+function copyAgentCliCmd() {
+    _agentCopy(document.getElementById('agentCliCmd').textContent, 'Command copied');
+}
+
+async function verifyAgentInstall() {
+    const btn = document.getElementById('agentVerifyBtn');
+    const out = document.getElementById('agentVerifyResult');
+    if (!_agentWizId || !out) return;
+    btn.disabled = true;
+    out.style.color = 'var(--muted)';
+    out.textContent = 'Checking...';
+    const say = (text, color) => { out.textContent = text; out.style.color = color; };
+    try {
+        const health = await fetch('/api/agents/' + _agentWizId + '/health').then(r => r.json());
+        if (!health.ok) {
+            say(health.error || 'Not reachable yet - check the URL, the port and any firewall.', 'var(--red)');
+            return;
+        }
+        const keys = await fetch('/api/agents/proxy/' + _agentWizId + '/keys', { headers: _csrfHeaders() });
+        if (keys.status === 401) {
+            say('Reachable, but it is refusing this key. Re-run the command, or rotate the key.', 'var(--yellow)');
+            return;
+        }
+        const ver = await fetch('/api/agents/proxy/' + _agentWizId + '/traefik/version', { headers: _csrfHeaders() });
+        if (!ver.ok) {
+            say('Agent is up, but it cannot reach Traefik yet.', 'var(--yellow)');
+            return;
+        }
+        say('Connected. The agent is answering and can see Traefik.', 'var(--green)');
+        loadAgentsList();
+    } catch (e) {
+        say(_netErrText(e, 'Could not check the agent'), 'var(--red)');
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 async function openAgentSetup(id, titleOverride) {
@@ -2374,6 +2437,8 @@ async function openAgentSetup(id, titleOverride) {
 }
 
 function cancelAddAgent() {
+    const chooser = document.getElementById('agentChooserView');
+    if (chooser) chooser.style.display = 'none';
     document.getElementById('agentWizardView').style.display = 'none';
     document.getElementById('agentListView').style.display   = 'flex';
 }
@@ -2420,6 +2485,8 @@ function resetAgentWizardCfgFields() {
 }
 
 function showAgentWizStep(n) {
+    const cliStep = document.getElementById('agentWizStepCli');
+    if (cliStep) cliStep.style.display = n === 'cli' ? '' : 'none';
     [1,2,3].forEach(i => {
         const el = document.getElementById('agentWizStep' + i);
         if (el) el.style.display = i === n ? '' : 'none';
@@ -2435,7 +2502,6 @@ function showAgentWizStep(n) {
 
 async function agentWizStep1Next() {
     const name = document.getElementById('agentWizName').value.trim();
-    const url  = document.getElementById('agentWizUrl').value.trim();
     const err  = document.getElementById('agentWizStep1Err');
     if (!name || !url) { err.textContent = 'Name and URL are required.'; err.style.display = ''; return; }
     const btn = document.getElementById('agentWizStep1Btn');
@@ -2449,7 +2515,13 @@ async function agentWizStep1Next() {
         _agentWizKey = data.agent.api_key_raw;
         document.getElementById('agentWizKeyDisplay').textContent = _agentWizKey;
         err.style.display = 'none';
-        showAgentWizStep(2);
+        if (_agentAddMode === 'cli') {
+            _renderAgentCliStep();
+            showAgentWizStep('cli');
+        } else {
+            showAgentWizStep(2);
+        }
+        loadAgentsList();
     } catch(e) { err.textContent = _netErrText(e, 'Failed to create agent'); err.style.display = ''; }
     finally { btn.disabled = false; btn.innerHTML = 'Continue <i class="ph-bold ph-caret-right text-xs"></i>'; }
 }
