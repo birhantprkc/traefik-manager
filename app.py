@@ -6122,12 +6122,53 @@ def api_agents_update(agent_id):
     return jsonify({'ok': True})
 
 
+def _remove_agent_git_clone(agent_id: str) -> bool:
+    try:
+        target = os.path.abspath(_git_agent_repo_dir(agent_id))
+        base   = os.path.abspath(env.BACKUP_DIR)
+        if not target.startswith(base + os.sep):
+            return False
+        if not os.path.basename(target).startswith('git-agent-'):
+            return False
+        if not os.path.isdir(target):
+            return False
+        shutil.rmtree(target, ignore_errors=True)
+        return True
+    except Exception:
+        logger.exception("Could not remove the git clone for agent %s" % agent_id)
+        return False
+
+
+def _forget_agent_settings(agent_id: str) -> bool:
+    prefix = f"agent_{agent_id}::"
+    s = load_settings()
+    disabled = {k: v for k, v in (s.get('disabled_routes') or {}).items()
+                if not str(k).startswith(prefix)}
+    ledger   = {k: v for k, v in (s.get('managed_middlewares') or {}).items()
+                if not str(k).startswith(prefix)}
+    if (len(disabled) == len(s.get('disabled_routes') or {})
+            and len(ledger) == len(s.get('managed_middlewares') or {})):
+        return False
+    save_settings(
+        domains=s['domains'], cert_resolver=s['cert_resolver'],
+        traefik_api_url=s['traefik_api_url'], auth_enabled=s['auth_enabled'],
+        password_hash=s['password_hash'], visible_tabs=s['visible_tabs'],
+        disabled_routes=disabled, managed_middlewares=ledger,
+    )
+    return True
+
+
 @app.route('/api/agents/<agent_id>', methods=['DELETE'])
 @csrf_protect
 @login_required
 def api_agents_delete(agent_id):
-    agents = [a for a in load_agents() if a.get('id') != agent_id]
+    before = load_agents()
+    agents = [a for a in before if a.get('id') != agent_id]
+    if len(agents) == len(before):
+        return jsonify({'ok': True})
     save_agents_file(agents)
+    _remove_agent_git_clone(agent_id)
+    _forget_agent_settings(agent_id)
     return jsonify({'ok': True})
 
 
