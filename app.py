@@ -5939,6 +5939,9 @@ def api_agents_create():
     url  = str(data.get('url', '')).strip().rstrip('/')
     if not name or not url:
         return jsonify({'error': 'name and url are required'}), 400
+    url_err = _agent_url_error(url)
+    if url_err:
+        return jsonify({'error': url_err}), 400
     raw_key = secrets.token_urlsafe(32)
     agent = {
         'id':         str(_uuid.uuid4()),
@@ -5981,12 +5984,33 @@ def api_agents_create():
     return jsonify({'ok': True, 'agent': result})
 
 
+def _agent_url_error(url: str) -> str:
+    value = str(url or '').strip()
+    if not value:
+        return 'Agent URL must not be empty.'
+    if not value.startswith(('http://', 'https://')):
+        return 'Agent URL must start with http:// or https:// - without a scheme the agent cannot be reached.'
+    rest = value.split('://', 1)[1]
+    if not rest or rest.startswith('/'):
+        return 'Agent URL must include a host, for example http://10.0.0.5:8090'
+    return ''
+
+
 @app.route('/api/agents/<agent_id>', methods=['PUT'])
 @csrf_protect
 @login_required
 def api_agents_update(agent_id):
     data    = request.get_json(silent=True) or {}
     agents  = load_agents()
+    if 'url' in data:
+        url_err = _agent_url_error(str(data.get('url', '')).strip())
+        if url_err:
+            return jsonify({'ok': False, 'error': url_err}), 400
+        data['url'] = str(data.get('url', '')).strip().rstrip('/')
+    if 'name' in data:
+        data['name'] = str(data.get('name', '')).strip()[:100]
+        if not data['name']:
+            return jsonify({'ok': False, 'error': 'Name must not be empty.'}), 400
     target  = next((a for a in agents if a.get('id') == agent_id), {})
     renames_derived_branch = ('name' in data
                               and target.get('git_host_backup')

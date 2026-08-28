@@ -2468,7 +2468,7 @@ async function agentWizStep3Save() {
         const res  = await fetch('/api/agents/' + _agentWizId, { method: 'PUT', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
         if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
-        if (data.ok) showToast('Agent config saved', 'success');
+        if (data.ok) { showToast('Agent config saved', 'success'); loadAgentsList(); }
         else showToast('Save failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
     } catch(e) { showToast(_netErrText(e, 'Save failed'), 'error'); }
 }
