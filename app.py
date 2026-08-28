@@ -5760,6 +5760,7 @@ def api_test_oidc():
 def _redact_agent(a: dict) -> dict:
     out = dict(a)
     out['api_key'] = '***' if out.get('api_key') else ''
+    out['traefik_api_password'] = '***' if out.get('traefik_api_password') else ''
     out['crowdsec_api_key'] = '***' if out.get('crowdsec_api_key') else ''
     out['crowdsec_machine_password'] = '***' if out.get('crowdsec_machine_password') else ''
     out['git_backup_token'] = '***' if out.get('git_backup_token') else ''
@@ -6105,12 +6106,15 @@ def api_agents_update(agent_id):
                 'git_backup_branch', 'git_backup_username', 'git_backup_auto_push',
                 'git_backup_commit_message', 'tma_port', 'tma_rate_limit', 'domains',
                 'git_host_backup', 'git_host_branch',
+                'traefik_api_user', 'git_backup_commit_message',
             ]
             for field in updatable:
                 if field in data:
                     agents[i][field] = data[field]
             if 'visible_tabs' in data:
                 agents[i]['visible_tabs'] = _settings.sanitize_visible_tabs(data['visible_tabs'])
+            if 'traefik_api_password' in data and data['traefik_api_password'] not in ('', '***'):
+                agents[i]['traefik_api_password'] = str(data['traefik_api_password'])
             if 'crowdsec_api_key' in data and data['crowdsec_api_key'] not in ('', '***'):
                 agents[i]['crowdsec_api_key'] = str(data['crowdsec_api_key'])
             if 'crowdsec_machine_password' in data and data['crowdsec_machine_password'] not in ('', '***'):

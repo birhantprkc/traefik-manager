@@ -1447,6 +1447,14 @@
                                             <div class="sc-set-d">Cert resolver names for this server's Traefik, comma-separated. Resolvers already used by this server's routes are detected automatically from its Traefik API, so this is only needed for a resolver no route uses yet.</div>
                                             <input id="agCfgCertResolver" type="text" class="input-field text-xs" placeholder="cloudflare, letsencrypt" oninput="agentCfgChanged()">
                                         </div>
+                                        <div class="sc-fld">
+                                            <div class="sc-set-n">Traefik API basic auth <span style="color:var(--muted);font-weight:400">optional</span></div>
+                                            <div class="sc-set-d">Only if this server's Traefik API sits behind basic auth. Leave both blank otherwise.</div>
+                                            <div class="flex flex-col gap-2">
+                                                <input id="agCfgTraefikApiUser" type="text" class="input-field text-xs" placeholder="Username" autocomplete="off" oninput="agentCfgChanged()">
+                                                <input id="agCfgTraefikApiPassword" type="password" class="input-field text-xs" placeholder="Password" autocomplete="new-password" oninput="agentCfgChanged()">
+                                            </div>
+                                        </div>
                                         <div class="sc-set">
                                             <div class="sc-set-l">
                                                 <div class="sc-set-n">Skip TLS verification</div>
@@ -1564,6 +1572,11 @@
                                                     <input id="agCfgGitUser" type="text" class="input-field text-xs" oninput="agentCfgChanged()" style="flex:1">
                                                 </div>
                                             </div>
+                                        <div class="sc-fld">
+                                            <div class="sc-set-n">Commit message <span style="color:var(--muted);font-weight:400">optional</span></div>
+                                            <div class="sc-set-d">Used for every push from this agent. Leave blank for the default.</div>
+                                            <input id="agCfgGitCommitMessage" type="text" class="input-field text-xs" placeholder="chore: config backup" oninput="agentCfgChanged()">
+                                        </div>
                                             <div class="sc-fld">
                                                 <div class="sc-set-n">Access token</div>
                                                 <input id="agCfgGitToken" type="password" class="input-field text-xs" placeholder="ghp_..." oninput="agentCfgChanged()">

@@ -2401,6 +2401,10 @@ async function openAgentSetup(id, titleOverride) {
         if (a) {
             document.getElementById('agCfgTraefikUrl').value = a.traefik_api_url || '';
             document.getElementById('agCfgCertResolver').value = a.cert_resolver || '';
+            document.getElementById('agCfgTraefikApiUser').value = a.traefik_api_user || '';
+            document.getElementById('agCfgTraefikApiPassword').value =
+                a.traefik_api_password === '***' ? '' : (a.traefik_api_password || '');
+            document.getElementById('agCfgGitCommitMessage').value = a.git_backup_commit_message || '';
             const tlsEl = document.getElementById('agCfgInsecureTLS');
             if (tlsEl) { tlsEl.classList.toggle('on', !!a.traefik_insecure_skip_verify); }
             document.getElementById('agCfgConfigPath').value = a.config_path || '';
@@ -2462,6 +2466,9 @@ function resetAgentWizardCfgFields() {
     document.getElementById('agCfgPluginsDir').value  = '';
     document.getElementById('agCfgDockerHost').value  = '';
     document.getElementById('agCfgContainer').value = 'traefik';
+    document.getElementById('agCfgTraefikApiUser').value = '';
+    document.getElementById('agCfgTraefikApiPassword').value = '';
+    document.getElementById('agCfgGitCommitMessage').value = '';
     document.getElementById('agCfgSignalFile').value  = '';
     document.getElementById('agCfgGitEnabled').checked = false;
     document.getElementById('agentGitFields').style.display = 'none';
@@ -2502,6 +2509,7 @@ function showAgentWizStep(n) {
 
 async function agentWizStep1Next() {
     const name = document.getElementById('agentWizName').value.trim();
+    const url  = document.getElementById('agentWizUrl').value.trim();
     const err  = document.getElementById('agentWizStep1Err');
     if (!name || !url) { err.textContent = 'Name and URL are required.'; err.style.display = ''; return; }
     const btn = document.getElementById('agentWizStep1Btn');
@@ -2643,6 +2651,9 @@ function buildAgentCfgPayload() {
         plugins_dir:        document.getElementById('agCfgPluginsDir').value.trim(),
         restart_method:     _agentRestartMethod,
         traefik_container:  (document.getElementById('agCfgContainer').value || 'traefik').trim(),
+        traefik_api_user:     document.getElementById('agCfgTraefikApiUser').value.trim(),
+        traefik_api_password: document.getElementById('agCfgTraefikApiPassword').value,
+        git_backup_commit_message: document.getElementById('agCfgGitCommitMessage').value.trim(),
         docker_host:        document.getElementById('agCfgDockerHost').value.trim(),
         signal_file_path:   document.getElementById('agCfgSignalFile').value.trim(),
         crowdsec_lapi_url:  document.getElementById('agCfgCsUrl').value.trim(),
@@ -2699,6 +2710,12 @@ function agentCfgChanged() {
     if (agentPort !== '8090') envLines.push(`      - TMA_PORT=${agentPort}`);
     if (rateLimit && rateLimit !== '300') envLines.push(`      - TMA_RATE_LIMIT=${rateLimit}`);
     if (insecureTLS) envLines.push(`      - TRAEFIK_INSECURE_SKIP_VERIFY=true`);
+    const tApiUser = document.getElementById('agCfgTraefikApiUser')?.value.trim() || '';
+    const tApiPass = document.getElementById('agCfgTraefikApiPassword')?.value || '';
+    if (tApiUser) envLines.push(`      - TRAEFIK_API_USER=${tApiUser}`);
+    if (tApiPass) envLines.push(`      - TRAEFIK_API_PASSWORD=${tApiPass}`);
+    const gitMsg = document.getElementById('agCfgGitCommitMessage')?.value.trim() || '';
+    if (gitMsg) envLines.push(`      - GIT_BACKUP_COMMIT_MESSAGE=${gitMsg}`);
     if (staticPath)  envLines.push(`      - STATIC_CONFIG_PATH=${staticPath}`);
     if (restart)     envLines.push(`      - RESTART_METHOD=${restart}`);
     if (restart && container) envLines.push(`      - TRAEFIK_CONTAINER=${container}`);
