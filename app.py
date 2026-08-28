@@ -5147,6 +5147,49 @@ def save_entry():
     return redirect(url_for('index'))
 
 
+def _transport_in_use(config, name, exclude_service=''):
+    http = config.get('http') or {}
+    for sname, sdef in (http.get('services') or {}).items():
+        if sname == exclude_service or not isinstance(sdef, dict):
+            continue
+        lb = sdef.get('loadBalancer')
+        if isinstance(lb, dict) and lb.get('serversTransport') == name:
+            return True
+    try:
+        disabled = load_settings().get('disabled_routes', {}) or {}
+    except Exception:
+        return True
+    for snap in disabled.values():
+        if not isinstance(snap, dict):
+            continue
+        svc = snap.get('service')
+        if not isinstance(svc, dict):
+            continue
+        lb = svc.get('loadBalancer')
+        if isinstance(lb, dict) and lb.get('serversTransport') == name:
+            return True
+    return False
+
+
+def _drop_owned_transport(config, svc_name, ledger, agent_id=''):
+    if not svc_name:
+        return False
+    name = f"{svc_name}-transport"
+    key = f"agent_{agent_id}::tp::{name}" if agent_id else f"tp::{name}"
+    if key not in ledger:
+        return False
+    http = config.get('http') or {}
+    transports = http.get('serversTransports') or {}
+    if name in transports:
+        if _transport_in_use(config, name, exclude_service=svc_name):
+            return False
+        del transports[name]
+        if not transports and 'serversTransports' in http:
+            del http['serversTransports']
+    ledger.pop(key, None)
+    return True
+
+
 @app.route('/delete/<router_id>', methods=['POST'])
 @csrf_protect
 @login_required
@@ -5159,6 +5202,8 @@ def delete_entry(router_id):
         agent           = _agent_by_id(agent_id) if agent_id else None
         plain_id = router_id.split('::', 1)[1] if '::' in router_id else router_id
         deleted = False
+        _del_ledger = dict(settings.get('managed_middlewares', {}) or {})
+        _del_ledger_changed = False
         if agent:
             all_configs = _agent_load_configs(agent)
             for fname, config in all_configs.items():
@@ -5172,6 +5217,8 @@ def delete_entry(router_id):
                         if (svc and 'services' in s and svc in s['services']
                                 and not _service_shared(config, svc, plain_id)):
                             del s['services'][svc]
+                            if _drop_owned_transport(config, svc, _del_ledger, agent_id):
+                                _del_ledger_changed = True
                         _agent_write_config(agent, fname, config)
                         deleted = True
                         break
@@ -5192,6 +5239,8 @@ def delete_entry(router_id):
                         if (svc and 'services' in s and svc in s['services']
                                 and not _service_shared(config, svc, plain_id)):
                             del s['services'][svc]
+                            if _drop_owned_transport(config, svc, _del_ledger):
+                                _del_ledger_changed = True
                         create_backup(target_path)
                         save_config(_strip_empty_sections(config), target_path)
                         deleted = True
@@ -5219,6 +5268,14 @@ def delete_entry(router_id):
             threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'route delete'), daemon=True).start()
         else:
             threading.Thread(target=lambda: _git_push_if_enabled('route delete'), daemon=True).start()
+        if _del_ledger_changed:
+            _s = load_settings()
+            save_settings(
+                domains=_s['domains'], cert_resolver=_s['cert_resolver'],
+                traefik_api_url=_s['traefik_api_url'], auth_enabled=_s['auth_enabled'],
+                password_hash=_s['password_hash'], visible_tabs=_s['visible_tabs'],
+                managed_middlewares=_del_ledger,
+            )
         msg = f"Route {plain_id} deleted"
         add_notification('warning', msg)
         if fetch:
