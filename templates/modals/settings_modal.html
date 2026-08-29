@@ -1380,6 +1380,18 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="sc-panel" style="margin-top:10px">
+                                    <div class="sc-fld">
+                                        <div class="sc-set-n">Managing it later</div>
+                                        <div class="sc-set-d">Run these on the agent itself, where you just installed <code class="font-mono">tm</code>. It manages the install it created, including updates.</div>
+                                        <pre class="text-xs font-mono" style="white-space:pre-wrap;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px">tm status        show what is installed and whether it is healthy
+tm logs          follow the agent log
+tm update        update the agent to the current release
+tm reconfigure   change any answer from the installer
+tm doctor        diagnose a broken install</pre>
+                                        <div class="sc-set-d" style="margin-top:6px">Full reference: <a href="https://traefik-manager.xyzlab.dev/tm-cli.html#managing-the-install" target="_blank" style="color:var(--blue)">tm CLI docs</a></div>
+                                    </div>
+                                </div>
                                 <div class="flex justify-between mt-4">
                                     <button onclick="cancelAddAgent()" class="nav-btn text-xs">Done</button>
                                     <button onclick="openAgentSetup(_agentWizId, 'Agent Settings')" class="nav-btn text-xs">Open settings <i class="ph-bold ph-caret-right text-xs"></i></button>
@@ -1420,6 +1432,68 @@
 
                             <div id="agentWizStep3" style="display:none;">
                                 <p class="text-xs mb-3" style="color:var(--muted)">Configure paths and options, then copy the generated install commands to your remote server.</p>
+                                <div id="agentSummaryView">
+                                    <div class="sc-panel mb-3">
+                                        <div class="sc-fld">
+                                            <div class="sc-set-n">Agent name</div>
+                                            <input id="agEditName" type="text" class="input-field text-sm" oninput="_agentIdentityChanged()">
+                                        </div>
+                                        <div class="sc-fld">
+                                            <div class="sc-set-n">Agent URL</div>
+                                            <div class="sc-set-d">Where this agent is reachable from Traefik Manager.</div>
+                                            <input id="agEditUrl" type="text" class="input-field text-sm" oninput="_agentIdentityChanged()">
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button onclick="saveAgentIdentity()" id="agEditSaveBtn" class="nav-btn text-xs" disabled><i class="ph-bold ph-floppy-disk"></i> Save</button>
+                                            <span id="agEditMsg" class="text-xs" style="color:var(--muted)"></span>
+                                        </div>
+                                    </div>
+                                    <div class="sc-panel mb-3">
+                                        <div class="sc-fld">
+                                            <div class="sc-set-n">Connection</div>
+                                            <div class="sc-set-d">Check that Traefik Manager can reach this agent and that its key is accepted.</div>
+                                            <div class="flex items-center gap-2 mt-2">
+                                                <button onclick="verifyAgentInstall()" class="nav-btn text-xs"><i class="ph-bold ph-plugs-connected"></i> Verify connection</button>
+                                                <span id="agentVerifyResultEdit" class="text-xs" style="color:var(--muted)"></span>
+                                            </div>
+                                        </div>
+                                    <div id="agentRotateKeyBanner" style="display:none;" class="mt-4">
+                                    <div class="px-3 py-2.5 rounded-lg text-xs flex items-center gap-3" style="background:rgba(36,161,222,0.08);border:1px solid rgba(36,161,222,0.25);color:var(--muted)">
+                                    <i class="ph-bold ph-key flex-shrink-0" style="color:var(--blue)"></i>
+                                    <span style="flex:1">API key is hidden after first creation. Use the key already in your running agent compose - do not rotate unless you want to invalidate the old key and reconfigure your agent.</span>
+                                    <button id="agentRotateKeyBtn" onclick="rotateAgentKey()" class="btn-secondary text-xs py-1 px-2.5 flex-shrink-0" style="white-space:nowrap"><i class="ph-bold ph-arrows-clockwise text-xs"></i> Rotate Key</button>
+                                    </div>
+                                    <div id="agentRotatedKeyDisplay" style="display:none;" class="mt-2">
+                                    <div class="px-3 py-2 rounded-lg text-xs" style="background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.3);color:var(--orange)"><i class="ph-bold ph-warning mr-1"></i> Save this new key - it will not be shown again. Your agent will stop working until you update it.</div>
+                                    <div class="flex items-center gap-2 px-3 py-2.5 rounded-lg mt-2" style="background:var(--input-bg);border:1px solid var(--border);">
+                                    <code id="agentRotatedKeyText" class="text-xs font-mono flex-1 break-all" style="color:var(--text)"></code>
+                                    <button onclick="copyRotatedKey()" class="btn-icon flex-shrink-0" title="Copy"><i class="ph-bold ph-copy text-sm"></i></button>
+                                    </div>
+                                    </div>
+                                    </div>
+                                    </div>
+                                <div style="margin-bottom:12px;">
+                                    <div class="sc-sec-head"><i class="ph-bold ph-wrench sc-sec-icon" style="color:var(--teal)"></i><span class="sc-sec-label">Manage on the agent</span><span class="sc-sec-rule"></span></div>
+                                    <div class="sc-panel">
+                                        <div class="sc-fld">
+                                            <div id="agentCliManagedNote" class="sc-set-d" style="display:none;color:var(--blue)">This agent was installed with <code class="font-mono">tm</code>, which owns its compose file on the agent. Editing one here would conflict with it.</div>
+                                            <div class="sc-set-d">These settings write the agent's configuration. Updating, restarting and diagnosing the agent process happen on the agent's own machine, using the <code class="font-mono">tm</code> CLI installed there.</div>
+                                            <pre class="text-xs font-mono" style="white-space:pre-wrap;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px">tm status        show what is installed and whether it is healthy
+tm logs          follow the agent log
+tm update        update the agent to the current release
+tm reconfigure   change any answer from the installer
+tm doctor        diagnose a broken install</pre>
+                                            <div class="sc-set-d" style="margin-top:6px">Not installed with <code class="font-mono">tm</code>? <a href="https://traefik-manager.xyzlab.dev/tm-cli.html" target="_blank" style="color:var(--blue)">It adopts an existing install</a>.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                    <div class="flex justify-between mt-4">
+                                        <button onclick="agentWizDone()" class="nav-btn text-xs">Done</button>
+                                        <button onclick="showAgentComposeConfig()" class="nav-btn text-xs">Compose settings <i class="ph-bold ph-caret-right text-xs"></i></button>
+                                    </div>
+                                </div>
+                                <div id="agentComposeConfig" style="display:none">
+                                    <button onclick="hideAgentComposeConfig()" class="notif-mark-read" style="margin-bottom:8px"><i class="ph-bold ph-caret-left text-xs"></i> Back</button>
                                 <div class="sc-panel mb-3">
                                     <div class="sc-fld">
                                         <div class="sc-set-n">Domains <span style="color:var(--muted);font-weight:400">optional, comma-separated</span></div>
@@ -1628,21 +1702,14 @@
                                     </div>
                                 </div>
 
-                                <div id="agentRotateKeyBanner" style="display:none;" class="mt-4">
-                                    <div class="px-3 py-2.5 rounded-lg text-xs flex items-center gap-3" style="background:rgba(36,161,222,0.08);border:1px solid rgba(36,161,222,0.25);color:var(--muted)">
-                                        <i class="ph-bold ph-key flex-shrink-0" style="color:var(--blue)"></i>
-                                        <span style="flex:1">API key is hidden after first creation. Use the key already in your running agent compose - do not rotate unless you want to invalidate the old key and reconfigure your agent.</span>
-                                        <button id="agentRotateKeyBtn" onclick="rotateAgentKey()" class="btn-secondary text-xs py-1 px-2.5 flex-shrink-0" style="white-space:nowrap"><i class="ph-bold ph-arrows-clockwise text-xs"></i> Rotate Key</button>
-                                    </div>
-                                    <div id="agentRotatedKeyDisplay" style="display:none;" class="mt-2">
-                                        <div class="px-3 py-2 rounded-lg text-xs" style="background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.3);color:var(--orange)"><i class="ph-bold ph-warning mr-1"></i> Save this new key - it will not be shown again. Your agent will stop working until you update it.</div>
-                                        <div class="flex items-center gap-2 px-3 py-2.5 rounded-lg mt-2" style="background:var(--input-bg);border:1px solid var(--border);">
-                                            <code id="agentRotatedKeyText" class="text-xs font-mono flex-1 break-all" style="color:var(--text)"></code>
-                                            <button onclick="copyRotatedKey()" class="btn-icon flex-shrink-0" title="Copy"><i class="ph-bold ph-copy text-sm"></i></button>
-                                        </div>
-                                    </div>
-                                </div>
 
+                                <div id="agentDockerOutputsWrap" class="sc-notice rounded-lg" style="border:1px solid var(--border);margin-bottom:12px">
+                                    <div class="px-4 py-2.5 text-xs flex items-center gap-2" onclick="toggleAgentDockerOutputs()" style="cursor:pointer;color:var(--muted)">
+                                        <i class="ph-bold ph-file-code" style="color:var(--teal)"></i>
+                                        <span class="font-semibold" style="color:var(--text)">Compose and run commands</span>
+                                        <span style="margin-left:auto"><i class="ph-bold ph-caret-down sc-notice-caret text-xs"></i></span>
+                                    </div>
+                                    <div class="sc-notice-body px-4 pb-3">
                                 <div class="mt-4" style="margin-bottom:12px;">
                                     <div class="sc-sec-head"><i class="ph-bold ph-file-code sc-sec-icon" style="color:var(--teal)"></i><span class="sc-sec-label">Docker Compose</span><span class="sc-sec-rule"></span><div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)"><button onclick="copyAgentCompose()" class="proto-btn text-xs px-3 py-1.5" title="Copy"><i class="ph-bold ph-copy"></i></button></div></div>
                                     <pre id="agentComposeOutput" class="sc-panel" style="font-size:10px;line-height:1.5;padding:12px;overflow-x:auto;color:var(--text);white-space:pre;margin:0;max-height:220px;overflow-y:auto;"></pre>
@@ -1651,13 +1718,16 @@
                                     <div class="sc-sec-head"><i class="ph-bold ph-terminal sc-sec-icon" style="color:var(--teal)"></i><span class="sc-sec-label">Docker Run</span><span class="sc-sec-rule"></span><div class="flex gap-1 p-1 rounded-lg" style="background:var(--input-bg);border:1px solid var(--border)"><button onclick="copyAgentRun()" class="proto-btn text-xs px-3 py-1.5" title="Copy"><i class="ph-bold ph-copy"></i></button></div></div>
                                     <pre id="agentRunOutput" class="sc-panel" style="font-size:10px;line-height:1.5;padding:12px;overflow-x:auto;color:var(--text);white-space:pre;margin:0;max-height:160px;overflow-y:auto;"></pre>
                                 </div>
-
+                                    </div>
+                                </div>
                                 <div class="flex justify-between mt-4">
                                     <button onclick="agentWizStep3Save()" class="btn-secondary text-xs py-1.5 px-4" id="agentWizSaveBtn">
                                         <i class="ph-bold ph-floppy-disk text-xs"></i> Save Config
                                     </button>
                                     <button onclick="agentWizDone()" class="btn-primary text-xs py-1.5 px-4">Done <i class="ph-bold ph-check text-xs"></i></button>
                                 </div>
+                                </div>
+
                             </div>
                         </div>
                     </div>

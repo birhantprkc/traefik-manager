@@ -54,7 +54,23 @@ curl -fsSL https://get-traefik.xyzlab.dev | bash
 tm install --mode agent-docker --api-key <key> --traefik-url http://traefik:8080
 ```
 
-Modes: `agent-docker`, `agent-docker-traefik`, `agent-binary`. Afterwards `tm status`, `tm update`, `tm logs` and `tm reconfigure` manage the agent. See [tm CLI](tm-cli.md#managing-the-install).
+Modes: `agent-docker`, `agent-docker-traefik`, `agent-binary`.
+
+## Managing an agent
+
+Traefik Manager's Agents panel writes the agent's **configuration**. The agent process itself - updating,
+restarting, diagnosing - is managed on the agent's own machine, with `tm` installed there:
+
+| Command | What it does |
+|---|---|
+| `tm status` | what is installed, and whether it is healthy |
+| `tm logs` | follow the agent log |
+| `tm update` | update the agent to the current release |
+| `tm reconfigure` | change any answer from the installer |
+| `tm doctor` | diagnose a broken install |
+
+`tm` adopts an install it did not create, so this works even if the agent was set up by hand. See
+[tm CLI](tm-cli.md#managing-the-install).
 
 The wizard uses an arrow-key menu and a review screen - type a section number to go back and edit it, or press Enter to proceed. It covers:
 

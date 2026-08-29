@@ -616,6 +616,19 @@ async function toggleRoute(id, currentlyEnabled, silent = false) {
     } catch(e) { if (!silent) showToast(_netErrText(e, 'Error toggling route'), 'error'); }
 }
 
+function _clearRouteViews(message) {
+    window._tmServices = null;
+    try { renderRouteGrid([]); } catch (e) {}
+    try { renderMwGrid([]); } catch (e) {}
+    try { loadOverviewStats(); } catch (e) {}
+    const where = (typeof _activeAgent !== 'undefined' && _activeAgent)
+        ? _activeAgent.name : 'this server';
+    _renderConfigErrorBanner([
+        `Showing nothing for ${where}: ${message}. Nothing below is from another server.`,
+    ]);
+    if (message) showToast(message, 'error');
+}
+
 async function refreshRoutes() {
     try {
         let res;
@@ -625,7 +638,7 @@ async function refreshRoutes() {
             res = await fetch('/api/routes');
         }
         if (!res.ok) {
-            showToast(await _errText(res, 'Could not load routes'), 'error');
+            _clearRouteViews(await _errText(res, 'Could not load routes'));
             return;
         }
         const data = await res.json();
@@ -636,7 +649,7 @@ async function refreshRoutes() {
         _renderConfigErrorBanner(data.configErrors || []);
     } catch(e) {
         console.error('refreshRoutes failed:', e);
-        showToast(_netErrText(e, 'Could not load routes'), 'error');
+        _clearRouteViews(_netErrText(e, 'Could not load routes'));
     }
 }
 

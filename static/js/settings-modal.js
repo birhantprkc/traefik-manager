@@ -2037,11 +2037,9 @@ async function loadAgentsList() {
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full flex-shrink-0" id="agent-dot-${a.id}" style="background:var(--muted)"></span>
                         <span class="agent-name-label sc-set-n truncate">${_esc(a.name)}</span>
-                        <button onclick="inlineEditAgent('${a.id}','name','${_esc(a.name)}')" class="btn-icon agent-rename-btn flex-shrink-0" title="Rename" style="opacity:0.5;padding:0 2px;"><i class="ph-bold ph-pencil-simple" style="font-size:10px;"></i></button>
                     </div>
                     <div class="flex items-center gap-1">
                         <span class="agent-url-label sc-set-d truncate">${_esc(a.url)}</span>
-                        <button onclick="inlineEditAgent('${a.id}','url','${_esc(a.url)}')" class="btn-icon agent-url-btn flex-shrink-0" title="Edit URL" style="opacity:0.5;padding:0 2px;"><i class="ph-bold ph-pencil-simple" style="font-size:10px;"></i></button>
                     </div>
                 </div>
                 <div class="sc-set-v">
@@ -2070,8 +2068,8 @@ function openAgentKeys(agentId, agentName) {
 }
 
 function closeAgentKeys() {
-    document.getElementById('agentKeysView').style.display  = 'none';
-    document.getElementById('agentListView').style.display  = 'flex';
+    document.getElementById('agentKeysView').style.display = 'none';
+    loadAgentsList();
 }
 
 async function loadAgentKeys() {
@@ -2264,43 +2262,6 @@ async function pingAgent(id, url) {
     } catch(e) { if (dot) dot.style.background = 'var(--red)'; }
 }
 
-function inlineEditAgent(id, field, currentValue) {
-    const card = document.querySelector(`[data-agent-id="${id}"]`);
-    if (!card) return;
-    const isName = field === 'name';
-    const labelEl  = card.querySelector(isName ? '.agent-name-label' : '.agent-url-label');
-    const pencilBtn = card.querySelector(isName ? '.agent-rename-btn' : '.agent-url-btn');
-    if (!labelEl || !pencilBtn) return;
-    const input = document.createElement('input');
-    input.type = isName ? 'text' : 'url';
-    input.value = currentValue;
-    input.className = 'input-field text-xs';
-    input.style.cssText = isName ? 'padding:2px 6px;height:24px;width:120px;' : 'padding:2px 6px;height:24px;width:200px;';
-    labelEl.replaceWith(input);
-    pencilBtn.innerHTML = '<i class="ph-bold ph-check text-xs"></i>';
-    pencilBtn.style.color = 'var(--green)';
-    pencilBtn.style.opacity = '1';
-    input.focus();
-    input.select();
-    let _settled = false;
-    const submit = async () => {
-        if (_settled) return;
-        _settled = true;
-        const newVal = input.value.trim();
-        if (!newVal || newVal === currentValue) { loadAgentsList(); return; }
-        try {
-            const res  = await fetch('/api/agents/' + id, { method: 'PUT', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ [field]: newVal }) });
-            if (!res.ok) { showToast(await _errText(res, 'Update failed'), 'error'); loadAgentsList(); return; }
-            const data = await res.json();
-            if (data.ok) { showToast(`Agent ${isName ? 'renamed' : 'URL updated'}`, 'success'); }
-            else { showToast(`Update failed: ${data.error || data.message || 'the server did not say why'}`, 'error'); }
-        } catch(e) { showToast(_netErrText(e, 'Update failed'), 'error'); }
-        loadAgentsList();
-    };
-    pencilBtn.onclick = submit;
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { _settled = true; loadAgentsList(); } });
-    input.addEventListener('blur', () => setTimeout(submit, 150));
-}
 
 async function deleteAgent(id, name) {
     if (!await _confirm(`Remove agent "${name}"? This only removes it from TM settings - the agent service on the remote server is unaffected.`, 'Remove Agent', 'Remove')) return;
@@ -2348,7 +2309,7 @@ function _renderAgentCliStep() {
     }
     const key = document.getElementById('agentCliKey');
     if (key) key.textContent = _agentWizKey || '';
-    const res = document.getElementById('agentVerifyResult');
+    const res = _agentVerifyEl();
     if (res) { res.textContent = ''; res.style.color = 'var(--muted)'; }
 }
 
@@ -2356,9 +2317,18 @@ function copyAgentCliCmd() {
     _agentCopy(document.getElementById('agentCliCmd').textContent, 'Command copied');
 }
 
+function _agentVerifyEl() {
+    const summary = document.getElementById('agentSummaryView');
+    if (summary && summary.style.display !== 'none' && summary.offsetParent !== null) {
+        return document.getElementById('agentVerifyResultEdit');
+    }
+    return document.getElementById('agentVerifyResult')
+        || document.getElementById('agentVerifyResultEdit');
+}
+
 async function verifyAgentInstall() {
     const btn = document.getElementById('agentVerifyBtn');
-    const out = document.getElementById('agentVerifyResult');
+    const out = _agentVerifyEl();
     if (!_agentWizId || !out) return;
     btn.disabled = true;
     out.style.color = 'var(--muted)';
@@ -2401,6 +2371,8 @@ async function openAgentSetup(id, titleOverride) {
     document.getElementById('agentRotatedKeyText').textContent = '';
     resetAgentWizardCfgFields();
     showAgentWizStep(3);
+    hideAgentComposeConfig();
+    document.getElementById('agentWizardTitle').textContent = titleOverride || 'Agent';
     document.getElementById('agentWizSaveBtn').style.display = 'inline-flex';
     document.getElementById('agentWizKeyDisplay').textContent = '';
     try {
@@ -2410,6 +2382,11 @@ async function openAgentSetup(id, titleOverride) {
         if (a) {
             document.getElementById('agCfgTraefikUrl').value = a.traefik_api_url || '';
             document.getElementById('agCfgCertResolver').value = a.cert_resolver || '';
+            _applyAgentInstallMethod(a.install_method);
+            _agEditOrig = { name: a.name || '', url: a.url || '' };
+            document.getElementById('agEditName').value = _agEditOrig.name;
+            document.getElementById('agEditUrl').value  = _agEditOrig.url;
+            _agentIdentityChanged();
             document.getElementById('agCfgTraefikApiUser').value = a.traefik_api_user || '';
             document.getElementById('agCfgTraefikApiPassword').value =
                 a.traefik_api_password === '***' ? '' : (a.traefik_api_password || '');
@@ -2453,7 +2430,7 @@ function cancelAddAgent() {
     const chooser = document.getElementById('agentChooserView');
     if (chooser) chooser.style.display = 'none';
     document.getElementById('agentWizardView').style.display = 'none';
-    document.getElementById('agentListView').style.display   = 'flex';
+    loadAgentsList();
 }
 
 function resetAgentWizard() {
@@ -2461,6 +2438,80 @@ function resetAgentWizard() {
     document.getElementById('agentWizUrl').value  = '';
     document.getElementById('agentWizStep1Err').style.display = 'none';
     resetAgentWizardCfgFields();
+}
+
+function toggleAgentDockerOutputs() {
+    const el = document.getElementById('agentDockerOutputsWrap');
+    if (!el) return;
+    const open = !el.classList.contains('open');
+    el.classList.toggle('open', open);
+    try { localStorage.setItem('tmAgentComposeOpen', open ? '1' : '0'); } catch (e) {}
+}
+
+let _agEditOrig = { name: '', url: '' };
+
+function showAgentComposeConfig() {
+    document.getElementById('agentSummaryView').style.display = 'none';
+    document.getElementById('agentComposeConfig').style.display = '';
+    agentCfgChanged();
+}
+
+function hideAgentComposeConfig() {
+    document.getElementById('agentComposeConfig').style.display = 'none';
+    document.getElementById('agentSummaryView').style.display = '';
+}
+
+function _agentIdentityChanged() {
+    const name = document.getElementById('agEditName').value.trim();
+    const url  = document.getElementById('agEditUrl').value.trim();
+    const btn  = document.getElementById('agEditSaveBtn');
+    if (btn) btn.disabled = !name || !url || (name === _agEditOrig.name && url === _agEditOrig.url);
+    const msg = document.getElementById('agEditMsg');
+    if (msg) msg.textContent = '';
+}
+
+async function saveAgentIdentity() {
+    if (!_agentWizId) return;
+    const name = document.getElementById('agEditName').value.trim();
+    const url  = document.getElementById('agEditUrl').value.trim();
+    const msg  = document.getElementById('agEditMsg');
+    const btn  = document.getElementById('agEditSaveBtn');
+    btn.disabled = true;
+    try {
+        const res = await fetch('/api/agents/' + _agentWizId, {
+            method: 'PUT',
+            headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, url }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+            msg.textContent = data.error || data.message || await _errText(res, 'Save failed');
+            msg.style.color = 'var(--red)';
+            btn.disabled = false;
+            return;
+        }
+        _agEditOrig = { name, url };
+        msg.textContent = 'Saved';
+        msg.style.color = 'var(--green)';
+        refreshAgentRegistry();
+    } catch (e) {
+        msg.textContent = _netErrText(e, 'Save failed');
+        msg.style.color = 'var(--red)';
+        btn.disabled = false;
+    }
+}
+
+function _applyAgentInstallMethod(method) {
+    const cli = method === 'cli';
+    const wrap = document.getElementById('agentDockerOutputsWrap');
+    if (wrap) {
+        wrap.style.display = cli ? 'none' : '';
+        let open = false;
+        try { open = localStorage.getItem('tmAgentComposeOpen') === '1'; } catch (e) {}
+        wrap.classList.toggle('open', open);
+    }
+    const note = document.getElementById('agentCliManagedNote');
+    if (note) note.style.display = cli ? '' : 'none';
 }
 
 function resetAgentWizardCfgFields() {
@@ -2475,6 +2526,7 @@ function resetAgentWizardCfgFields() {
     document.getElementById('agCfgPluginsDir').value  = '';
     document.getElementById('agCfgDockerHost').value  = '';
     document.getElementById('agCfgContainer').value = 'traefik';
+    _applyAgentInstallMethod('manual');
     document.getElementById('agCfgTraefikApiUser').value = '';
     document.getElementById('agCfgTraefikApiPassword').value = '';
     document.getElementById('agCfgGitCommitMessage').value = '';
@@ -2524,7 +2576,7 @@ async function agentWizStep1Next() {
     const btn = document.getElementById('agentWizStep1Btn');
     btn.disabled = true; btn.innerHTML = '<i class="ph-light ph-spinner-gap animate-spin text-xs"></i> Creating…';
     try {
-        const res  = await fetch('/api/agents', { method: 'POST', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ name, url }) });
+        const res  = await fetch('/api/agents', { method: 'POST', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ name, url, install_method: _agentAddMode === 'cli' ? 'cli' : 'manual' }) });
         if (!res.ok) { err.textContent = await _errText(res, 'Failed to create agent'); err.style.display = ''; return; }
         const data = await res.json();
         if (!data.ok) { err.textContent = data.error || data.message || 'Failed to create agent'; err.style.display = ''; return; }
@@ -2546,6 +2598,7 @@ async function agentWizStep1Next() {
 function agentWizStep2Next() {
     document.getElementById('agentRotateKeyBanner').style.display = 'none';
     showAgentWizStep(3);
+    showAgentComposeConfig();
 }
 
 async function agentWizStep3Save() {

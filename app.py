@@ -6010,6 +6010,7 @@ def api_agents_create():
         'url':        url,
         'api_key':    raw_key,
         'created_at': datetime.now(timezone.utc).isoformat(),
+        'install_method':        'cli' if str(data.get('install_method', '')).strip() == 'cli' else 'manual',
         'traefik_api_url':       str(data.get('traefik_api_url', 'http://traefik:8080')).strip(),
         'cert_resolver':         str(data.get('cert_resolver', '')).strip(),
         'config_path':           str(data.get('config_path', '/app/config')).strip(),
@@ -6107,6 +6108,7 @@ def api_agents_update(agent_id):
                 'git_backup_commit_message', 'tma_port', 'tma_rate_limit', 'domains',
                 'git_host_backup', 'git_host_branch',
                 'traefik_api_user', 'git_backup_commit_message',
+                'install_method',
             ]
             for field in updatable:
                 if field in data:

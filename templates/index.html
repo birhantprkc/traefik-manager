@@ -592,6 +592,8 @@ function switchServer(agentId) {
     _cachedMiddlewares = null;
     _cachedCertResolvers = null;
     window._tmServices = null;
+    try { if (typeof renderRouteGrid === 'function') renderRouteGrid([]); } catch (e) {}
+    try { if (typeof renderMwGrid === 'function') renderMwGrid([]); } catch (e) {}
     _inflightEntrypoints = null;
     _inflightMiddlewares = null;
     _inflightCertResolvers = null;
