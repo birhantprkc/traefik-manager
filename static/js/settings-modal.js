@@ -359,7 +359,60 @@ function switchSystemTab(id, btn) {
     if (panel) panel.style.display = 'flex';
 }
 
+const AGENT_HIDDEN_MOBILE_ROWS = [
+    "switchSettingsPanel('auth')",
+    "openSettingsChild('auth'",
+    "switchSettingsPanel('connection')",
+    "switchSettingsPanel('notifications')",
+    "openSettingsChild('system', 'crowdsec')",
+];
+
+function _updateMobileRowsForAgent(active) {
+    document.querySelectorAll('#settingsMobileRoot .settings-mobile-row').forEach(btn => {
+        const target = btn.getAttribute('onclick') || '';
+        if (AGENT_HIDDEN_MOBILE_ROWS.some(p => target.includes(p))) {
+            btn.style.display = active ? 'none' : '';
+        }
+    });
+}
+
+function _settleSettingsLayout() {
+    const modal = document.getElementById('settingsModal');
+    if (!modal || modal.style.display === 'none') return;
+    ['settingsMobileRoot', 'settingsPanelWrapper'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.scrollTop = 0;
+    });
+    document.querySelectorAll('#settingsPanelWrapper .modal-panel').forEach(el => {
+        el.scrollTop = 0;
+    });
+}
+
+function _applySettingsBreakpoint() {
+    const modal = document.getElementById('settingsModal');
+    if (!modal || modal.style.display !== 'flex') return;
+    const wrapper = document.getElementById('settingsPanelWrapper');
+    const root = document.getElementById('settingsMobileRoot');
+    if (!wrapper || !root) return;
+    const narrow = window.innerWidth < 640;
+    const onRoot = root.style.display === 'flex';
+    const back = document.getElementById('settingsMobileBack');
+    if (!narrow && onRoot) {
+        root.style.display = 'none';
+        wrapper.style.display = 'flex';
+        if (back) back.style.display = 'none';
+    } else if (narrow && !onRoot && wrapper.style.display !== 'flex') {
+        root.style.display = 'flex';
+        if (back) back.style.display = 'none';
+    }
+    _settleSettingsLayout();
+}
+
+window.addEventListener('resize', _applySettingsBreakpoint);
+window.addEventListener('orientationchange', () => setTimeout(_applySettingsBreakpoint, 150));
+
 function _updateSettingsSidebarForAgent(active) {
+    _updateMobileRowsForAgent(active);
     const localOnly = ['auth', 'connection', 'notifications'];
     localOnly.forEach(id => {
         const btn = document.getElementById('msb-' + id);
@@ -498,6 +551,7 @@ async function openSettingsModal(panel) {
     document.getElementById('settingsModal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     _updateSettingsSidebarForAgent(!!_activeAgent);
+    requestAnimationFrame(_settleSettingsLayout);
 
     if (window.innerWidth < 640 && !panel) {
         document.getElementById('settingsMobileRoot').style.display = 'flex';
@@ -525,6 +579,8 @@ async function openSettingsModal(panel) {
         document.getElementById('settingsAccessLogPath').value    = data.access_log_path || '';
         document.getElementById('settingsStaticConfigPath').value = data.static_config_path || '';
         document.getElementById('settingsCrowdSecUrl').value      = data.crowdsec_lapi_url || '';
+        document.getElementById('settingsCrowdSecAlertLimit').value = data.crowdsec_alert_limit || '';
+        window._tmAlertLimit = data.crowdsec_alert_limit || '';
         const csKeyHint = document.getElementById('crowdsecKeySetHint');
         if (csKeyHint) csKeyHint.classList.toggle('hidden', !data.crowdsec_api_key_set);
         const csMidEl = document.getElementById('settingsCrowdSecMachineId');
@@ -1234,7 +1290,7 @@ async function saveSettings() {
         const res  = await fetch('/api/settings', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
-            body: JSON.stringify({ domains, cert_resolver: resolver, traefik_api_url: apiUrl, acme_json_path: acmeJsonPath, access_log_path: accessLogPath, static_config_path: staticConfigPath, webhook_url: webhookUrl, webhook_type: webhookType, webhook_username: webhookUsername, webhook_password: webhookPassword, crowdsec_lapi_url: crowdsecLapiUrl, crowdsec_api_key: crowdsecApiKey, crowdsec_machine_id: crowdsecMachineId, crowdsec_machine_password: crowdsecMachinePassword, crowdsec_client_cert: crowdsecClientCert, crowdsec_client_key: crowdsecClientKey, crowdsec_ca_cert: crowdsecCaCert, traefik_api_user: traefikApiUser, traefik_api_password: traefikApiPassword })
+            body: JSON.stringify({ domains, cert_resolver: resolver, traefik_api_url: apiUrl, acme_json_path: acmeJsonPath, access_log_path: accessLogPath, static_config_path: staticConfigPath, webhook_url: webhookUrl, webhook_type: webhookType, webhook_username: webhookUsername, webhook_password: webhookPassword, crowdsec_lapi_url: crowdsecLapiUrl, crowdsec_api_key: crowdsecApiKey, crowdsec_alert_limit: (document.getElementById('settingsCrowdSecAlertLimit')?.value || '').trim(), crowdsec_machine_id: crowdsecMachineId, crowdsec_machine_password: crowdsecMachinePassword, crowdsec_client_cert: crowdsecClientCert, crowdsec_client_key: crowdsecClientKey, crowdsec_ca_cert: crowdsecCaCert, traefik_api_user: traefikApiUser, traefik_api_password: traefikApiPassword })
         });
         if (!res.ok) { showToast(await _errText(res, 'Failed to save settings'), 'error'); return; }
         const data = await res.json();

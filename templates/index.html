@@ -573,9 +573,7 @@ function _updateServerSwitcherList(agents) {
 function _warnIfAgentUnreachable(agent) {
     const d = _agentHealthInfo[agent.id];
     if (!d || d.ok) return;
-    const why = d.status === 401
-        ? 'it is rejecting the API key'
-        : (d.error || 'it is not responding');
+    const why = d.error || 'it is not responding';
     if (typeof showToast === 'function') {
         showToast(`${agent.name} is offline - ${why}. Its tabs will stay empty until it responds.`,
                   'error', false);

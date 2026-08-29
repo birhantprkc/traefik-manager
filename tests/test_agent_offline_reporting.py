@@ -53,7 +53,10 @@ def test_switching_to_an_offline_agent_explains_why():
     src = open(os.path.join(ROOT, 'templates', 'index.html'), encoding='utf-8').read()
     assert '_warnIfAgentUnreachable' in src
     body = src.split('function _warnIfAgentUnreachable', 1)[1].split('\n}', 1)[0]
-    assert 'd.status === 401' in body, 'a refused key reads differently from an unreachable host'
+    assert 'd.error' in body, 'the toast should name the reason the health check reported'
+    assert 'd.status === 401' not in body, (
+        'the agent health endpoint is registered outside authMiddleware, so it never '
+        'returns 401 and that branch can never run')
     assert 'showToast' in body
     call = src.split('function switchServer', 1)[1].split('\n}', 1)[0]
     assert '_warnIfAgentUnreachable' in call, 'switchServer must actually call it'

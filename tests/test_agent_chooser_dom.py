@@ -103,12 +103,33 @@ def test_the_cli_step_survives_to_show_the_key_and_command():
     assert order < refresh, 'the step must render before anything else runs'
 
 
-def test_both_agent_surfaces_point_at_the_cli_for_management():
+def _section(html, tag):
+    import re
+    lines = html.split('\n')
+    start = next(n for n, l in enumerate(lines) if 'id="%s"' % tag in l)
+    depth = 0
+    for n in range(start, len(lines)):
+        depth += len(re.findall(r'<div\b', lines[n])) - len(re.findall(r'</div>', lines[n]))
+        if depth == 0:
+            return '\n'.join(lines[start:n + 1])
+    raise AssertionError('%s never closes' % tag)
+
+
+def test_every_agent_surface_points_at_the_cli():
     html = _modal()
-    assert html.count('tm reconfigure') == 2, \
-        'the CLI step and the agent settings screen should both name the management commands'
-    for cmd in ('tm status', 'tm logs', 'tm update', 'tm doctor'):
-        assert html.count(cmd) >= 2, cmd
+    for tag in ('agentWizStepCli', 'agentSummaryView', 'agentComposeConfig'):
+        block = _section(html, tag)
+        assert 'tm ' in block, '%s should name the CLI' % tag
+    for cmd in ('tm status', 'tm logs', 'tm update', 'tm doctor', 'tm add crowdsec'):
+        assert cmd in _section(html, 'agentSummaryView'), cmd
+
+
+def test_the_manual_route_says_it_only_writes_compose():
+    block = _section(_modal(), 'agentComposeConfig')
+    assert 'own environment' in block, \
+        'the fields feed the compose text, not the running agent - say so'
+    assert 'tm reconfigure' in block and 'tm add crowdsec' in block
+    assert 'get-traefik.xyzlab.dev' in block, 'offer the install one-liner here too'
 
 
 def test_the_management_block_sits_in_the_summary_not_behind_compose():
