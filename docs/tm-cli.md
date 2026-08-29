@@ -13,7 +13,7 @@ curl -fsSL https://get-traefik.xyzlab.dev | bash
 | Command | What it does |
 |---|---|
 | `tm status` | Mode, directory, services, URLs, health |
-| `tm update` | Pulls images, `git pull`, or downloads the agent binary, then restarts |
+| `tm update` | Pulls images, `git pull`, or downloads the agent binary, then restarts. On a Linux service install it skips reinstalling dependencies and rebuilding assets when git reports no change, `--force` does it anyway |
 | `tm logs [service]` | Follows the logs (`--no-follow`, `-n <lines>`) |
 | `tm restart`, `tm start`, `tm stop` | Whole install, or one service |
 | `tm password` | Prints the temporary password from the logs |
