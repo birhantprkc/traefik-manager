@@ -936,11 +936,19 @@ function _atkCardAgents(d) {
         return _atkFilteredCard('agents', 'var(--teal)', 'ph-fill ph-robot', 'Tooling', false, d.retained);
     }
     if (!d.alerts.some(a => a.uas.length)) {
+        const httpFired = d.alerts.some(a => a.uris.length || a.verbs.length || a.codes.length);
         return _atkBlindCard({
             key: 'agents', accent: 'var(--teal)', ic: 'ph-fill ph-robot', title: 'Tooling',
-            state: 'HTTP only', sub: 'no HTTP scenario fired here',
-            note: 'The <code>user_agent</code> meta key is written by HTTP scenarios. SSH buckets such as <code>crowdsecurity/ssh-bf</code> share none of the HTTP keys, '
-                + 'so this card stays out of the way rather than rendering an empty list.',
+            state: httpFired ? 'not logged' : 'HTTP only',
+            sub: httpFired ? 'the access log carries no user agent' : 'no HTTP scenario fired here',
+            note: httpFired
+                ? 'HTTP scenarios did fire and their paths, methods and status codes came through, so only the '
+                  + '<code>user_agent</code> key is missing. Traefik drops request headers from its access log unless '
+                  + 'you keep them, so CrowdSec never sees one. Add <code>User-Agent: keep</code> under '
+                  + '<code>accessLog.fields.headers.names</code> in the static config, then restart Traefik.'
+                : 'The <code>user_agent</code> meta key is written by HTTP scenarios. SSH buckets such as '
+                  + '<code>crowdsecurity/ssh-bf</code> share none of the HTTP keys, so this card stays out of the way '
+                  + 'rather than rendering an empty list.',
             go: 'clear=all', goLabel: 'clear filters', goTip: 'Remove every filter and look at the whole retained window'
         });
     }
