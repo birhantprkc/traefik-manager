@@ -531,6 +531,7 @@ Get current application settings. Every secret is stripped and replaced by a `*_
 | `traefik_api_password_set` | `true` if a Traefik API password is saved          |
 | `crowdsec_lapi_url`        | CrowdSec LAPI URL                                  |
 | `crowdsec_api_key_set`     | `true` if a CrowdSec API key is saved              |
+| `crowdsec_alert_limit`     | Alert row limit, blank falls back to `CROWDSEC_ALERT_LIMIT` |
 | `crowdsec_enabled`         | `true` when a LAPI URL is set plus either a bouncer API key or machine credentials |
 
 ---
@@ -541,7 +542,7 @@ Update settings. Full replace, not a patch: `domains` is required (`400` without
 
 Exceptions: `git_backup_*`, `backup_keep_count` and `default_theme` are updated only when present, and blank `traefik_api_password`, `crowdsec_api_key`, `crowdsec_machine_password`, `webhook_password` and `git_backup_token` keep the stored secret.
 
-Returns `{ "success": true, "settings": { ... } }` with secrets stripped. `400` for a missing domain, an invalid `traefik_api_url` or an unsupported `git_backup_repo` scheme.
+Returns `{ "success": true, "settings": { ... } }` with secrets stripped. `400` for a missing domain, an invalid `traefik_api_url`, an unsupported `git_backup_repo` scheme, a `crowdsec_alert_limit` that is not a whole number ("Alert limit must be a whole number") or one outside 0-100000 ("Alert limit must be between 0 and 100000").
 
 ---
 
@@ -1557,7 +1558,7 @@ Manage remote TMA agents registered in TM.
 
 ### `GET /api/agents`
 
-List all registered agents. The agent API key, CrowdSec secrets and git token are redacted to `***`.
+List all registered agents. The agent API key, the Traefik API password, the CrowdSec secrets and the git token are redacted to `***`.
 
 **Response**
 
@@ -1583,14 +1584,19 @@ List all registered agents. The agent API key, CrowdSec secrets and git token ar
 
 Register a new agent. `name` and `url` are required; every other agent field can be set here and otherwise takes its default. TM generates the API key and returns it once as `api_key_raw` - store it immediately, it is never returned again.
 
+`install_method` records which path added the agent: `"cli"` for the tm CLI install, `"manual"` for the compose generator. Anything else is stored as `"manual"`.
+
 **Request body**
 
 ```json
 {
   "name": "Server 2",
-  "url": "https://server2.example.com:8090"
+  "url": "https://server2.example.com:8090",
+  "install_method": "cli"
 }
 ```
+
+`400` when `name` or `url` is missing, when the URL has no `http://` or `https://` scheme, or when it has a scheme but no host. The message names which of the three it is.
 
 **Response**
 
@@ -1611,13 +1617,21 @@ Register a new agent. `name` and `url` are required; every other agent field can
 
 ### `PUT /api/agents/{id}`
 
-Update an agent's config fields (name, URL, paths, restart method, CrowdSec, git backup, visible tabs). Send only the fields you want to change. Secrets sent as `""` or `"***"` keep their stored value. `404` for an unknown id, `400` if the git branch collides with the Host's or another agent's.
+Update an agent's config fields (name, URL, paths, restart method, Traefik API basic auth, CrowdSec, git backup, visible tabs, `install_method`). Send only the fields you want to change. Secrets sent as `""` or `"***"` keep their stored value, including `traefik_api_password`. `name` is trimmed to 100 characters.
+
+`404` for an unknown id. `400` for an empty `name`, for a `url` with no scheme or no host, or if the git branch collides with the Host's or another agent's.
+
+::: warning
+`install_method`, `traefik_api_user` and `traefik_api_password` are written to `agents.yml` but not read back by the loader, so they do not survive a reload, and the password is stored unencrypted.
+:::
 
 ---
 
 ### `DELETE /api/agents/{id}`
 
-Remove an agent from TM. Does not stop the agent service on the remote server.
+Remove an agent from TM, along with the Host's per-agent git clone at `{BACKUP_DIR}/git-agent-<id>` and that agent's `disabled_routes` and `managed_middlewares` entries in `manager.yml`. Does not stop the agent service on the remote server.
+
+Idempotent: an unknown id returns `200` with `{"ok": true}`, not `404`.
 
 ---
 
@@ -1631,7 +1645,7 @@ Check connectivity to an agent by calling its `/health`.
 { "ok": true, "latency_ms": 12, "version": "1.5.1", "status": 200 }
 ```
 
-If the agent is unreachable, `ok` is `false` and `latency_ms` is `-1`.
+If the agent is unreachable, `ok` is `false` and `latency_ms` is `-1`. A TLS failure returns `ok: false` with `error` naming the untrusted agent certificate, so a certificate problem is distinguishable from a refused connection.
 
 ---
 
@@ -1682,11 +1696,13 @@ Proxy a request to the agent's API. TM injects the `X-Api-Key` header, so a brow
 
 Accepts `GET`, `POST`, `PUT`, `DELETE` and `PATCH`. Method, query string and body are forwarded; the agent's status code and body come back as-is.
 
+The agent's `X-*` response headers are passed back too, except `x-api-key`, `x-csrf-token`, `x-frame-options` and `x-powered-by`. This is how `X-CS-Alert-Limit` and `X-CS-Alert-Capped` reach the browser.
+
 For example, `GET /api/agents/proxy/abc123/traefik/routers` proxies to `GET https://agent-host:8090/api/traefik/routers`.
 
 A successful write to the agent's config, route, middleware, static or backup paths also triggers that agent's git backup push, when configured.
 
-Returns `404` for an unknown agent, `502` if the agent refuses the connection, `504` if it times out, and `500` for any other proxy error.
+Returns `404` for an unknown agent, `502` if the agent refuses the connection or if its TLS certificate is not trusted by TM, `504` if it times out, and `500` for any other proxy error.
 
 See the [Agent API Reference](api-agent.md) for every endpoint an agent exposes.
 

@@ -4,19 +4,18 @@ TMA is a lightweight Go daemon that runs alongside Traefik on a remote server. I
 
 ## How it works
 
-1. Install TMA on each remote server (alongside Traefik)
-2. In TM Settings - Agents, click **Add Agent** and enter the agent's URL
-3. TM generates an API key - save it and set it as `TMA_API_KEY` in the agent's environment
+1. In TM Settings - Agents, click **Add Agent** and pick one of the two paths
+2. **Install with the tm CLI** (recommended) - enter a name and URL, TM mints the key and hands you a one-line command to run on the remote server, then a **Verify connection** button checks that TM can reach it
+3. **Configure manually** - enter a name and URL, save the API key (shown once), set it as `TMA_API_KEY` on the remote server, and copy out the generated Docker Compose or `docker run` command
 4. Use the **server switcher** in the TM navigation bar to switch between the Host and remote servers
 
-Each agent card in Settings - Agents carries three buttons on the right, plus an inline pencil next to the name and next to the URL:
+Each agent card in Settings - Agents carries three buttons on the right:
 
-| Control                        | Action                                                                            |
-| --------------------------------| -----------------------------------------------------------------------------------|
-| Pencil next to the name or URL | Edit it inline - Enter or the checkmark saves, Escape cancels                     |
-| Key icon                       | Manage API keys for this agent                                                    |
-| Gear icon                      | Edit agent settings (Traefik config, paths, restart method, git backup, CrowdSec) |
-| Trash icon                     | Remove the agent from TM (the agent service on the remote server keeps running)   |
+| Control | Action |
+|---|---|
+| Key icon | Manage API keys for this agent |
+| Gear icon | Agent Settings - edit the name and URL, verify the connection, rotate the key, and configure Traefik, paths, restart method, git backup and CrowdSec |
+| Trash icon | Remove the agent from TM. Its git clone under the Host's `BACKUP_DIR` and its per-agent entries in `manager.yml` go with it (see [Storage](#storage)); the agent service on the remote machine keeps running |
 
 When a remote agent is active:
 
@@ -56,6 +55,25 @@ tm install --mode agent-docker --api-key <key> --traefik-url http://traefik:8080
 
 Modes: `agent-docker`, `agent-docker-traefik`, `agent-binary`.
 
+**Add Agent - Install with the tm CLI** generates exactly this, with the key already filled in:
+
+```bash
+export TMA_API_KEY='<key>'
+curl -fsSL https://get-traefik.xyzlab.dev | bash -s -- --mode agent
+```
+
+`tm` reads the key from the environment, so it never appears in `ps` output.
+
+## Installer wizard
+
+The wizard uses an arrow-key menu and a review screen - type a section number to go back and edit it, or press Enter to proceed. It covers:
+
+- **Install method** - Docker agent only, Docker agent + Traefik (deploys both), or binary (systemd)
+- **Traefik connection** - API URL, config path, static config mount, and TLS skip-verify (prompted automatically when the URL is `https://`)
+- **Traefik install** (Agent + Traefik mode) - TLS method, Let's Encrypt email, Cloudflare token, dashboard hostname, network name
+- **CrowdSec** - install alongside the agent (Docker only) or connect to an existing instance
+- **Git backup**, **optional paths**, **restart method**, **install location**
+
 ## Managing an agent
 
 Traefik Manager's Agents panel writes the agent's **configuration**. The agent process itself - updating,
@@ -68,17 +86,10 @@ restarting, diagnosing - is managed on the agent's own machine, with `tm` instal
 | `tm update` | update the agent to the current release |
 | `tm reconfigure` | change any answer from the installer |
 | `tm doctor` | diagnose a broken install |
+| `tm add crowdsec` | add CrowdSec to this agent |
 
 `tm` adopts an install it did not create, so this works even if the agent was set up by hand. See
 [tm CLI](tm-cli.md#managing-the-install).
-
-The wizard uses an arrow-key menu and a review screen - type a section number to go back and edit it, or press Enter to proceed. It covers:
-
-- **Install method** - Docker agent only, Docker agent + Traefik (deploys both), or binary (systemd)
-- **Traefik connection** - API URL, config path, static config mount, and TLS skip-verify (prompted automatically when the URL is `https://`)
-- **Traefik install** (Agent + Traefik mode) - TLS method, Let's Encrypt email, Cloudflare token, dashboard hostname, network name
-- **CrowdSec** - install alongside the agent (Docker only) or connect to an existing instance
-- **Git backup**, **optional paths**, **restart method**, **install location**
 
 ## Install via Docker manually
 
@@ -317,7 +328,7 @@ Setup, credential generation and what each credential unlocks are in [CrowdSec o
 | `CROWDSEC_CLIENT_KEY` | - | The client certificate's private key |
 | `CROWDSEC_CA_CERT` | - | CA certificate that signed the LAPI's own certificate (private PKI) |
 | `CROWDSEC_READ_TIMEOUT` | `20` | Seconds to wait for the LAPI to answer, clamped to 1-120. Raise it on a busy or large LAPI |
-| `CROWDSEC_ALERT_LIMIT` | `500` | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
+| `CROWDSEC_ALERT_LIMIT` | `500` | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI. Traefik Manager passes its own **Alert limit** as `?limit=` when reading this agent's alerts, so a non-blank, non-zero setting there overrides this. This value applies when that setting is blank or `0` |
 
 ### Git backup
 
@@ -347,7 +358,7 @@ Instead of configuring `GIT_BACKUP_*` on every agent, enable **Use Host Reposito
 | `TMA_RATE_LIMIT` | `300` | Requests per minute per IP on `/api/` (0 = disabled) |
 | `TMA_DEBUG` | `false` | Log each failed Traefik API call (request URL and returned status) to the journal. Turn it on when a tab shows "could not load" and you need to see why, for example a `401` from an authenticated API |
 
-`TMA_PORT` and `TMA_RATE_LIMIT` can also be set from the **Settings - Agents** wizard, as optional fields in the configuration step. The generated Docker Compose only includes them when you enter a non-default value.
+`TMA_PORT` and `TMA_RATE_LIMIT` can also be set in **Settings - Agents - gear icon - Configure manually**, along with the paths, restart method and git backup fields. The generated Docker Compose only includes them when you enter a non-default value. Saving there rewrites the compose text only: the running agent keeps its current values until it is redeployed or reconfigured with `tm reconfigure`.
 
 ### Domains (TM-side, not an env var)
 
@@ -359,9 +370,20 @@ Agent registrations (name, URL, encrypted API key, and configuration) live in `a
 
 Back up `agents.yml` alongside `manager.yml` to preserve agent registrations.
 
+Removing an agent also deletes the state the Host kept for it, all of it on the Traefik Manager server:
+
+| What | Where |
+|---|---|
+| The Host's clone of the agent's config | `{BACKUP_DIR}/git-agent-<id>` (the Host's `BACKUP_DIR`) |
+| Its disabled-route snapshots | `manager.yml`, `disabled_routes` keys starting `agent_<id>::` |
+| Its managed-middleware and transport entries | `manager.yml`, `managed_middlewares` keys starting `agent_<id>::` |
+
+The agent service on the remote machine keeps running, and a branch already pushed to the git remote is left alone.
+
 ## Security
 
 - The API key is the only credential - keep it secret and use HTTPS between TM and TMA
+- TM verifies the agent's TLS certificate on every call and has no skip-verify for the TM to agent hop. A self-signed or private-CA certificate fails the health check, the routes fetch and proxied calls with `TLS verification failed - the agent certificate is not trusted by Traefik Manager`. Use a publicly trusted certificate, or add your CA to the TM container's trust store
 - Put TMA behind a reverse proxy (Traefik itself) with TLS for production use
 - `TMA_RATE_LIMIT` defaults to 300 req/min because TM makes many API calls per tab switch; lower it only if you need to restrict access
 - The `/health` endpoint is public (no auth required) - use it for uptime monitoring
@@ -424,7 +446,11 @@ TRAEFIK_API_USER=youruser
 TRAEFIK_API_PASSWORD=yourpassword
 ```
 
-The setup wizard also asks for these when you tell it the Traefik API is behind basic auth.
+The setup wizard also asks for these when you tell it the Traefik API is behind basic auth. **Settings - Agents - gear icon - Configure manually - Traefik** has a matching **Traefik API basic auth** username and password pair, which writes `TRAEFIK_API_USER` and `TRAEFIK_API_PASSWORD` into the generated compose. The password is redacted when the form is read back, and saving there only rewrites the compose text - redeploy or run `tm reconfigure` on the agent to apply it.
+
+**Switched to an agent and got an "is offline" toast**
+
+Switching to an agent that is down names the reason it reported, or says it is not responding. If a route load fails, the Routes and Middlewares grids are emptied and a banner names the server, so nothing on screen belongs to the previous server. Rotate the key from **Settings - Agents - gear icon** if the key is being rejected.
 
 **Viewing the agent's logs (binary install)**
 

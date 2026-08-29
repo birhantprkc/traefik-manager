@@ -114,7 +114,7 @@ See [Static Config Editor](static.md) for each restart method.
 
 Manage remote Traefik instances from one UI through [TMA](agent.md), a small Go agent that runs next to Traefik on each server. A switcher at the top of the side nav changes the active server, and every tab - routes, middlewares, services, backups, logs - then works against it. No VPN or SSH required.
 
-Adding an agent generates a ready-to-paste Docker Compose or Docker Run command. The API key is shown once and stored encrypted.
+Adding an agent offers two paths: a one-line `tm` CLI install command to run on the remote server, or a ready-to-paste Docker Compose or Docker Run command to deploy yourself. The API key is shown once and stored encrypted.
 
 ---
 

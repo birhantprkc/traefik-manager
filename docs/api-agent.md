@@ -12,6 +12,8 @@ X-Api-Key: your-api-key-here
 
 `Authorization: Bearer <key>` works too.
 
+The key is trimmed of surrounding whitespace on both sides - in the header and in `TMA_API_KEY` - so a trailing newline from a secrets file or a copy-paste does not cause a `401`.
+
 TM handles authentication automatically when proxying calls through `/api/agents/proxy/<id>/...`.
 
 ## Rate limiting
@@ -40,7 +42,7 @@ TM handles authentication automatically when proxying calls through `/api/agents
 | POST | `/api/static/restart` | Restart Traefik (requires `RESTART_METHOD`) |
 | GET | `/api/crowdsec/decisions` | CrowdSec active decisions (requires CrowdSec config) |
 | POST | `/api/crowdsec/decisions` | Add a decision - body: `{"value": "<ip>", "type": "ban", "duration": "24h", "reason": "..."}`; `type` is `ban`, `captcha` or `bypass` |
-| GET | `/api/crowdsec/alerts` | CrowdSec recent alerts |
+| GET | `/api/crowdsec/alerts` | CrowdSec recent alerts - `?limit=N` (0 to 100000, defaults to `CROWDSEC_ALERT_LIMIT`). Returns `X-CS-Alert-Limit` and `X-CS-Alert-Capped` (`1` when the response hit the limit) |
 | DELETE | `/api/crowdsec/decisions/<id>` | Unban an IP |
 | GET | `/api/backups` | List local `.bak` backup files |
 | POST | `/api/backup/create` | Create `.bak` backups for all config files (one per file) |
@@ -118,4 +120,4 @@ Routes to:
 GET https://agent-host:8090/api/traefik/routers
 ```
 
-TM injects the `X-Api-Key` header automatically using the stored (encrypted) key.
+TM injects the `X-Api-Key` header automatically using the stored (encrypted) key, and passes the agent's `X-*` response headers back to the caller, except `x-api-key`, `x-csrf-token`, `x-frame-options` and `x-powered-by`.

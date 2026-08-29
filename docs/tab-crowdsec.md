@@ -152,6 +152,7 @@ A **TLS client certificate** is the third option: if your LAPI authenticates wit
 Go to **Settings → System Monitoring → CrowdSec** and fill in:
 
 - **LAPI URL** - the base URL of your CrowdSec LAPI (e.g. `http://crowdsec:8080`)
+- **Alert limit** - how many of the most recent alerts to read, 0 to 100000. Blank falls back to `CROWDSEC_ALERT_LIMIT`, or 500; `0` reads every alert
 - **API Key** - a bouncer API key, reads decisions (see below)
 - **Machine Credentials** - machine ID + password, reads alerts and enables unban
 - **Client Certificate mTLS** - cert, key and CA paths for a LAPI behind mutual TLS, replaces both credentials above
@@ -206,7 +207,7 @@ This mirrors CrowdSec's own auth model: `cscli decisions list` uses the bouncer/
 ## Fetching
 
 - **Decisions** come from `/v1/decisions/stream` - a full sync on first read, then cached deltas, resynced hourly. On a LAPI with no stream endpoint it falls back to cursor pagination (`id_gt`), 1000 rows per page up to 200 pages. Expired rows are dropped. There is no display cap: every active decision is fetched, and the strip on the Bans card rescales rather than truncating, printing its own `1 cell = N` legend.
-- **Alerts** come from one request with `with_decisions=false` and a row limit - 500 by default, set with the `CROWDSEC_ALERT_LIMIT` env var or the `crowdsec_alert_limit` setting (0-100000). That flag stays: a single community blocklist alert can embed 15,000 decision objects.
+- **Alerts** come from one request with `with_decisions=false` and a row limit - 500 by default, set under **Settings → System Monitoring → CrowdSec → Alert limit** or with the `CROWDSEC_ALERT_LIMIT` env var (0-100000, the setting wins). When a response hits the limit the alert counts show an **alert cap reached** flag rather than quietly truncating. A blank or `0` setting is not passed to an agent, which then uses its own `CROWDSEC_ALERT_LIMIT`. That flag stays: a single community blocklist alert can embed 15,000 decision objects.
 - Both are refetched together when you open the tab or press Refresh. The feed renders one page at a time, so a busy instance never builds tens of thousands of rows at once.
 
 ## Docker Compose example

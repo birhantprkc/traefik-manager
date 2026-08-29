@@ -40,6 +40,8 @@ Click a card, or **More - View Details**. The panel shows a traffic flow diagram
 
 When Traefik is not serving the route, a banner says why: the API is unreachable, Traefik has loaded nothing at all from the file provider (usually the two containers do not share the config path, or `providers.file` is not watching it), or Traefik is serving other file routes but not this one.
 
+If the routes cannot be loaded for the selected server at all, the Routes and Middlewares grids are emptied and a banner names that server and the error, so nothing left on screen belongs to the server you switched away from.
+
 **More** also offers **Open** (for a simple `Host()` route), **Clone**, **Raw YAML**, and **Delete**.
 
 ## App icons
@@ -168,7 +170,7 @@ Behavior worth knowing:
 
 ## Deleting a route
 
-Open **More - Delete** on the route card and type `DELETE` to confirm. The route's service entry is removed with it, unless another router still references it.
+Open **More - Delete** on the route card and type `DELETE` to confirm. The route's service entry is removed with it, unless another router still references it. The `<service>-transport` `serversTransport` that traefik-manager generated for that service goes too, unless another service or a disabled route still points at it.
 
 ## Entrypoint middlewares
 

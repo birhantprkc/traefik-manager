@@ -83,7 +83,7 @@ from `manager.yml` and restart.
 | `CROWDSEC_CA_CERT` | _(unset)_ | Fallback `crowdsec_ca_cert` | Path to the CA certificate that signed the LAPI's own certificate (private PKI) |
 | `CROWDSEC_READ_TIMEOUT` | `20` | - | Seconds to wait for the LAPI to answer. Capped at 25 |
 | `CROWDSEC_CONNECT_TIMEOUT` | `5` | - | Seconds to wait for the TCP/TLS connection itself |
-| `CROWDSEC_ALERT_LIMIT` | `500` | - | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
+| `CROWDSEC_ALERT_LIMIT` | `500` | Fallback `crowdsec_alert_limit` | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
 
 ### Agents
 
@@ -709,6 +709,8 @@ environment:
 **Default:** `500`
 
 How many of the most recent alerts the CrowdSec tab reads, newest first. The default keeps the tab responsive on a LAPI holding a large community blocklist. Set it to `0` to read every alert the LAPI still retains - on a large instance that can take longer than the read timeout allows, which is what the limit exists to prevent.
+
+**Alert limit** under **Settings - System Monitoring - CrowdSec** wins when it is set. It is written to `manager.yml` as `crowdsec_alert_limit` and survives a Settings save; this env var applies when the field is blank.
 
 ```yaml
 environment:

@@ -241,7 +241,7 @@ These run inside the container on their own schedule, so an instance nobody has 
 |---|---|---|---|
 | Certificates | daily | Host and agents | expiry at 14 days, 3 days and on the day |
 | Traefik | 1 min | Host and agents | reachability changes |
-| Agents | 2 min | agents | agent unreachable, agent back online |
+| Agents | 2 min | agents | agent unreachable, agent rejected the API key, agent back online |
 | GeoIP | daily | Host | database refreshed or too old to refresh |
 | CrowdSec | 5 min | Host and agents | one aggregated message per window |
 | Updates | daily | Host | a new Traefik Manager or Traefik release, once per version |
@@ -251,8 +251,9 @@ Each fires once per change, not once per cycle.
 Messages from an agent are prefixed with its name, so `VPS One: Traefik API is unreachable`
 tells you which server without opening the app. Host messages carry no prefix.
 
-An agent that is unreachable reports once. Its certificate, Traefik and CrowdSec checks are
-skipped for that cycle rather than each reporting the same outage separately.
+An agent that is unreachable, or that answers but refuses the API key, reports once. Its
+certificate, Traefik and CrowdSec checks are skipped for that cycle rather than each reporting the
+same outage separately.
 
 ---
 

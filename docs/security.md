@@ -209,6 +209,7 @@ TM writes to these locations (default paths - they follow `SETTINGS_PATH`):
 | `/app/config/manager.yml` | Settings, hashed password, API key hashes, encrypted secrets |
 | `/app/config/.secret_key` | Session signing key (generated once, written `0600`) |
 | `/app/config/.otp_key` | Fernet key for the TOTP secret and every other stored secret |
+| `/app/config/agents.yml` | Agent registrations. The agent API key, CrowdSec API key, CrowdSec machine password and git token are encrypted; other fields, including the Traefik API password, are stored as written |
 | `CONFIG_DIR` / `CONFIG_PATHS` | Dynamic Traefik config files |
 
 `/app/config/` is the most sensitive directory: it holds the password hash and both encryption keys. Own it as the container user and keep it out of world-readable host directories - `.secret_key` is created `0600`, but `.otp_key` is written with the process umask.

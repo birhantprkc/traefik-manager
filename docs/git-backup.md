@@ -132,7 +132,7 @@ Dynamic config files contain everything you define through the Traefik file prov
 
 No extra configuration is needed. The `git` binary is included in the Traefik Manager Docker image.
 
-The local clone lives at `{BACKUP_DIR}/git-repo/` (default `/app/backups/git-repo/`), and each agent that uses the Host repository gets its own clone at `{BACKUP_DIR}/git-agent-<id>/`. To persist them across container restarts, mount `BACKUP_DIR` as a volume:
+The local clone lives at `{BACKUP_DIR}/git-repo/` (default `/app/backups/git-repo/`), and each agent that uses the Host repository gets its own clone at `{BACKUP_DIR}/git-agent-<id>/`. Removing an agent deletes its clone; the branch already pushed to the remote is left alone. To persist them across container restarts, mount `BACKUP_DIR` as a volume:
 
 ```yaml
 volumes:
