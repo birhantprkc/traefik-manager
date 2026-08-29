@@ -3661,6 +3661,15 @@ def api_save_settings():
         webhook_password     = str(data.get('webhook_password', ''))
         crowdsec_lapi_url    = str(data.get('crowdsec_lapi_url', '')).strip()
         crowdsec_api_key     = str(data.get('crowdsec_api_key', ''))
+        crowdsec_alert_limit = str(data.get('crowdsec_alert_limit', '')).strip()
+        if crowdsec_alert_limit:
+            try:
+                _lim = int(crowdsec_alert_limit)
+                if _lim < 0 or _lim > 100000:
+                    return jsonify({'error': 'Alert limit must be between 0 and 100000'}), 400
+                crowdsec_alert_limit = str(_lim)
+            except ValueError:
+                return jsonify({'error': 'Alert limit must be a whole number'}), 400
         crowdsec_machine_id       = str(data.get('crowdsec_machine_id', '')).strip()
         crowdsec_machine_password = str(data.get('crowdsec_machine_password', ''))
         crowdsec_client_cert      = str(data.get('crowdsec_client_cert', '')).strip()
@@ -3707,6 +3716,7 @@ def api_save_settings():
                       webhook_password=webhook_password,
                       crowdsec_lapi_url=crowdsec_lapi_url,
                       crowdsec_api_key=crowdsec_api_key,
+                      crowdsec_alert_limit=crowdsec_alert_limit,
                       crowdsec_machine_id=crowdsec_machine_id,
                       crowdsec_machine_password=crowdsec_machine_password,
                       crowdsec_client_cert=crowdsec_client_cert,
@@ -6225,6 +6235,11 @@ def api_agents_health(agent_id):
         return jsonify({'ok': False, 'latency_ms': -1, 'error': str(e)})
 
 
+_PROXY_HEADER_DENY = frozenset({
+    'x-api-key', 'x-csrf-token', 'x-frame-options', 'x-powered-by',
+})
+
+
 @app.route('/api/agents/proxy/<agent_id>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
 @csrf_protect
 @login_required
@@ -6247,7 +6262,11 @@ def api_agents_proxy(agent_id, path):
                 and any(agent_path.startswith(x) for x in ('/api/configs', '/api/routes', '/api/middlewares', '/api/static', '/api/restore/', '/api/backup/'))):
             threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'config change'), daemon=True).start()
         content_type = resp.headers.get('content-type', 'application/json')
-        return resp.content, resp.status_code, {'Content-Type': content_type}
+        out_headers = {'Content-Type': content_type}
+        for key, value in resp.headers.items():
+            if key.lower().startswith('x-') and key.lower() not in _PROXY_HEADER_DENY:
+                out_headers[key] = value
+        return resp.content, resp.status_code, out_headers
     except requests.exceptions.SSLError as e:
         return jsonify({'error': 'TLS verification failed - the agent certificate is not trusted '
                                  'by Traefik Manager (%s)' % str(e)[:100]}), 502

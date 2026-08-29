@@ -13,6 +13,13 @@ let _csAlerts     = [];
 let _csLapiOk     = false;
 let _csAlertsOk   = false;
 let _csAltStatus  = 0;
+
+function _csAlertLimitParam() {
+    const n = parseInt(window._tmAlertLimit || '0', 10);
+    return (_activeAgent && n > 0) ? ('?limit=' + n) : '';
+}
+let _csAltCapped  = false;
+let _csAltLimit   = 0;
 let _csAltErr     = '';
 let _csDecErr     = '';
 let _csFetched    = 0;
@@ -531,13 +538,14 @@ async function _csRefreshInner() {
     try {
         [decRes, altRes] = await Promise.all([
             agentFetch('/api/crowdsec/decisions'),
-            agentFetch('/api/crowdsec/alerts'),
+            agentFetch('/api/crowdsec/alerts' + (_csAlertLimitParam())),
         ]);
     } catch (e) {
         _csLapiOk = false; _csAlertsOk = false;
         _csDecErr = _netErrText(e, 'Could not reach the CrowdSec LAPI');
         _csAltErr = _csDecErr;
         _csDecisions = []; _csAlerts = [];
+        _csAltCapped = false; _csAltLimit = 0;
         _csFetched = Date.now();
         _csRender();
         return;
@@ -561,6 +569,8 @@ async function _csRefreshInner() {
     }
     if (altRes.ok) {
         _csAlertsOk = true;
+        _csAltCapped = altRes.headers.get('X-CS-Alert-Capped') === '1';
+        _csAltLimit  = parseInt(altRes.headers.get('X-CS-Alert-Limit') || '0', 10) || 0;
         let raw = null;
         try { raw = await altRes.json(); } catch (_) { raw = null; }
         _csAlerts = (Array.isArray(raw) ? raw : [])
@@ -1076,6 +1086,11 @@ function _atkVerdict(d, sel) {
             tip: 'Distinct scenarios that fired' }));
         items.push(_atkFlag({ cls: 'd-off', ic: 'ph-bold ph-pulse', n: ev, label: 'events', tag: 'span',
             tip: 'Sum of events_count, the raw log lines that rolled up into these alerts. Always larger than the alert count' }));
+        if (d.capped) {
+            items.push(_atkFlag({ cls: 'd-warn', ic: 'ph-bold ph-funnel', n: d.limit, label: 'alert cap reached', tag: 'span',
+                tip: 'CrowdSec returned as many alerts as the cap allows, so older ones are not counted here. '
+                   + 'Raise CROWDSEC_ALERT_LIMIT, or the alert limit in Settings, to see further back' }));
+        }
         if (loose > 0) {
             items.push(_atkFlag({ cls: 'd-warn', ic: 'ph-bold ph-lock-open', n: loose, label: 'no active ban',
                 go: _atkSpec({ outcome: 'loose' }),
@@ -1483,6 +1498,7 @@ function _csRender() {
     const sel = _atkSelect();
     const d = {
         lapiOk: _csLapiOk, alertsOk: _csAlertsOk, altStatus: _csAltStatus, altErr: _csAltErr, decErr: _csDecErr,
+        capped: _csAltCapped, limit: _csAltLimit,
         alerts: sel.alerts, decisions: _csDecisions, span: _csSpan, fetched: _csFetched,
         retained: _csAlerts.length,
         own: _csDecisions.filter(x => x.own).length,

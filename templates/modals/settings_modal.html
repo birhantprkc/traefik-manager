@@ -451,6 +451,11 @@
                                         <input type="text" id="settingsCrowdSecUrl" class="input-field" placeholder="http://crowdsec:8080" onblur="saveSettings()">
                                     </div>
                                     <div class="sc-fld">
+                                        <div class="sc-set-n">Alert limit</div>
+                                        <div class="sc-set-d">How many of the most recent alerts to read, 0 to 100000. Blank uses <code class="font-mono">CROWDSEC_ALERT_LIMIT</code>, or 500. <code class="font-mono">0</code> reads every alert, which is slow on a large LAPI. Applies to this server and to agents.</div>
+                                        <input type="number" min="0" max="100000" id="settingsCrowdSecAlertLimit" class="input-field" placeholder="500" onblur="saveSettings()">
+                                    </div>
+                                    <div class="sc-fld">
                                         <div class="sc-set-n">API Key</div>
                                         <div class="sc-set-d">Bouncer API key, used to read <strong>decisions</strong>. Stored encrypted. Leave blank to use the <code class="font-mono">CROWDSEC_API_KEY</code> env var.</div>
                                         <input type="password" id="settingsCrowdSecKey" class="input-field" placeholder="••••••••" autocomplete="new-password" onblur="saveSettings()">
@@ -1388,7 +1393,8 @@
 tm logs          follow the agent log
 tm update        update the agent to the current release
 tm reconfigure   change any answer from the installer
-tm doctor        diagnose a broken install</pre>
+tm doctor        diagnose a broken install
+tm add crowdsec  add CrowdSec to this agent</pre>
                                         <div class="sc-set-d" style="margin-top:6px">Full reference: <a href="https://traefik-manager.xyzlab.dev/tm-cli.html#managing-the-install" target="_blank" style="color:var(--blue)">tm CLI docs</a></div>
                                     </div>
                                 </div>
@@ -1477,23 +1483,34 @@ tm doctor        diagnose a broken install</pre>
                                     <div class="sc-panel">
                                         <div class="sc-fld">
                                             <div id="agentCliManagedNote" class="sc-set-d" style="display:none;color:var(--blue)">This agent was installed with <code class="font-mono">tm</code>, which owns its compose file on the agent. Editing one here would conflict with it.</div>
-                                            <div class="sc-set-d">These settings write the agent's configuration. Updating, restarting and diagnosing the agent process happen on the agent's own machine, using the <code class="font-mono">tm</code> CLI installed there.</div>
+                                            <div class="sc-set-d">Run these on the agent's own machine. <code class="font-mono">tm</code> adopts an agent it did not install, so this works however the agent was set up.</div>
                                             <pre class="text-xs font-mono" style="white-space:pre-wrap;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px">tm status        show what is installed and whether it is healthy
 tm logs          follow the agent log
 tm update        update the agent to the current release
 tm reconfigure   change any answer from the installer
-tm doctor        diagnose a broken install</pre>
+tm doctor        diagnose a broken install
+tm add crowdsec  add CrowdSec to this agent</pre>
                                             <div class="sc-set-d" style="margin-top:6px">Not installed with <code class="font-mono">tm</code>? <a href="https://traefik-manager.xyzlab.dev/tm-cli.html" target="_blank" style="color:var(--blue)">It adopts an existing install</a>.</div>
                                         </div>
                                     </div>
                                 </div>
                                     <div class="flex justify-between mt-4">
                                         <button onclick="agentWizDone()" class="nav-btn text-xs">Done</button>
-                                        <button onclick="showAgentComposeConfig()" class="nav-btn text-xs">Compose settings <i class="ph-bold ph-caret-right text-xs"></i></button>
+                                        <button onclick="showAgentComposeConfig()" class="nav-btn text-xs" title="Generate a compose file by hand instead of using tm">Configure manually <i class="ph-bold ph-caret-right text-xs"></i></button>
                                     </div>
                                 </div>
                                 <div id="agentComposeConfig" style="display:none">
                                     <button onclick="hideAgentComposeConfig()" class="notif-mark-read" style="margin-bottom:8px"><i class="ph-bold ph-caret-left text-xs"></i> Back</button>
+                                    <div class="sc-notice rounded-lg open" style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);margin-bottom:12px">
+                                        <div class="px-4 py-2.5 text-xs" style="color:var(--muted)">
+                                            <span class="font-semibold" style="color:var(--text)"><i class="ph-bold ph-terminal" style="color:var(--blue)"></i> The agent reads these from its own environment.</span>
+                                            <span class="block mt-1">Saving here only changes the compose text below. The running agent keeps its current values until you redeploy it. <code class="font-mono">tm</code> edits them in place instead, and it adopts an agent it did not install.</span>
+                                            <pre class="font-mono mt-2" style="white-space:pre-wrap;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px">curl -fsSL https://get-traefik.xyzlab.dev | bash    install tm on the agent
+tm reconfigure                                     change any of these values
+tm add crowdsec                                    add CrowdSec to this agent</pre>
+                                            <span class="block mt-2">Prefer to do it by hand? Everything below still generates a compose file you can deploy yourself. <a href="https://traefik-manager.xyzlab.dev/tm-cli.html#managing-the-install" target="_blank" style="color:var(--blue)">tm CLI docs</a> · <a href="https://traefik-manager.xyzlab.dev/agent.html" target="_blank" style="color:var(--blue)">Agent docs</a></span>
+                                        </div>
+                                    </div>
                                 <div class="sc-panel mb-3">
                                     <div class="sc-fld">
                                         <div class="sc-set-n">Domains <span style="color:var(--muted);font-weight:400">optional, comma-separated</span></div>

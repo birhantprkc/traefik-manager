@@ -620,12 +620,19 @@ func (a *App) crowdsecAlertsHandler(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "CROWDSEC_LAPI_URL not configured", http.StatusNotFound)
 		return
 	}
+	limit := a.cfg.CrowdSecAlertLimit
+	if q := r.URL.Query().Get("limit"); q != "" {
+		if n, err := strconv.Atoi(q); err == nil && n >= 0 && n <= 100000 {
+			limit = n
+		}
+	}
 	chunk, err := a.csPageJSON(r.Context(),
-		fmt.Sprintf("/v1/alerts?limit=%d&with_decisions=false", a.cfg.CrowdSecAlertLimit), true)
+		fmt.Sprintf("/v1/alerts?limit=%d&with_decisions=false", limit), true)
 	if err != nil {
 		jsonError(w, "crowdsec unavailable: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	capped := limit > 0 && len(chunk) >= limit
 	out := make([]json.RawMessage, 0, len(chunk))
 	for _, raw := range chunk {
 		var meta struct {
@@ -639,6 +646,12 @@ func (a *App) crowdsecAlertsHandler(w http.ResponseWriter, r *http.Request) {
 		out = append(out, raw)
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-CS-Alert-Limit", strconv.Itoa(limit))
+	if capped {
+		w.Header().Set("X-CS-Alert-Capped", "1")
+	} else {
+		w.Header().Set("X-CS-Alert-Capped", "0")
+	}
 	json.NewEncoder(w).Encode(out)
 }
 
