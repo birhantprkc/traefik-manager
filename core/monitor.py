@@ -27,6 +27,7 @@ CERT_INTERVAL     = 86400
 TRAEFIK_INTERVAL  = 60
 AGENT_INTERVAL    = 120
 GEOIP_INTERVAL    = 86400
+STORAGE_INTERVAL  = 300
 CROWDSEC_INTERVAL = 300
 
 CERT_ALERT_DAYS   = (14, 3, 0)
@@ -58,6 +59,7 @@ def _state_path():
 
 
 _memory_state = {}
+_persist_ok = True
 
 
 def _remember_state(data):
@@ -66,6 +68,8 @@ def _remember_state(data):
 
 
 def _read_state():
+    if not _persist_ok:
+        return json.loads(json.dumps(_memory_state))
     try:
         with open(_state_path(), 'r') as f:
             data = json.load(f)
@@ -77,6 +81,7 @@ def _read_state():
 
 
 def _write_state():
+    global _persist_ok
     path = _state_path()
     tmp  = f"{path}.tmp.{os.getpid()}"
     _remember_state(_state)
@@ -84,8 +89,11 @@ def _write_state():
         with open(tmp, 'w') as f:
             json.dump(_state, f)
         cfg_mod._replace_or_copy(tmp, path)
+        _persist_ok = True
     except Exception:
-        logger.exception("Failed to save monitor state")
+        if _persist_ok:
+            logger.exception("Failed to save monitor state")
+        _persist_ok = False
     finally:
         try:
             if os.path.exists(tmp):
@@ -474,6 +482,27 @@ def _check_geoip():
     return [('warning', f"GeoIP database is out of date and could not be updated: {info}", 'update')]
 
 
+def _check_storage():
+    state  = _section('storage')
+    broken = {}
+    for label, path, err in env.unwritable_storage():
+        broken[path] = (label, err)
+    raised = []
+    for path, (label, err) in broken.items():
+        if state.get(path):
+            continue
+        raised.append(('error',
+                       f"{label} storage at {path} is not writable, so settings, backups and "
+                       f"scheduled checks will not survive a restart ({err})",
+                       'config'))
+    for path in state:
+        if path not in broken:
+            raised.append(('success', f"Storage at {path} is writable again", 'config'))
+    state.clear()
+    state.update({path: err for path, (_label, err) in broken.items()})
+    return raised
+
+
 def register(name: str, interval_seconds: int, fn):
     entry = (str(name), max(1, int(interval_seconds)), fn)
     for i, check in enumerate(_checks):
@@ -593,4 +622,5 @@ _checks = [
     ('traefik',         TRAEFIK_INTERVAL,  _check_traefik),
     ('crowdsec_agents', CROWDSEC_INTERVAL, _check_crowdsec_agents),
     ('geoip',           GEOIP_INTERVAL,    _check_geoip),
+    ('storage',         STORAGE_INTERVAL,  _check_storage),
 ]
