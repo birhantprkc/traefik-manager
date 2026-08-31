@@ -53,7 +53,9 @@ panel. That records ownership without touching the file - it stays byte for byte
 
 ## Requirements
 
-No volume mounts required. Data is read directly from the Traefik API (`/api/http/services`, `/api/tcp/services`, `/api/udp/services`). The Traefik API URL must be configured in **Settings - Connection**.
+Viewing needs no volume mounts: the list is read from the Traefik API (`/api/http/services`, `/api/tcp/services`, `/api/udp/services`), and the Traefik API URL must be configured in **Settings - Connection**.
+
+Creating, editing and deleting write to your dynamic config files, so those need the same mount the Routes tab uses. Without it the tab still works as a read-only view.
 
 ## Notes
 

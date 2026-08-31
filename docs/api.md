@@ -311,7 +311,13 @@ All routers across HTTP, TCP, and UDP, following Traefik's pagination.
 
 ### `GET /api/traefik/services`
 
-All services across HTTP, TCP, and UDP. Same shape as `GET /api/traefik/routers`.
+All services across HTTP, TCP, and UDP, in the same `{http, tcp, udp, reachable}` shape as
+`GET /api/traefik/routers`, plus two lists naming what Traefik Manager manages:
+
+| Field | Meaning |
+|---|---|
+| `ownedServices` | Composite services Traefik Manager manages, so they can be edited rather than being read only |
+| `ownedChildren` | The `<name>-backend-<n>` services it generated. Clients hide these from the list and show them on their parent |
 
 ---
 
