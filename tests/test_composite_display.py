@@ -55,3 +55,70 @@ def test_failover_shows_both_halves():
 
 def test_a_plain_load_balancer_has_no_composite_children():
     assert _run('{"loadBalancer": {"servers": [{"url": "http://a:80"}]}}') == []
+
+
+def _children(service):
+    with open(JS, encoding='utf-8') as fh:
+        src = fh.read()
+    m = re.search(r'(function _compositeChildren\(s\) \{.*?\n\})', src, re.S)
+    assert m, 'the composite children helper moved'
+    script = m.group(1) + '\nconsole.log(JSON.stringify(_compositeChildren(' + service + ')));\n'
+    out = subprocess.run(['node', '-e', script], capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    import json
+    return json.loads(out.stdout)
+
+
+def test_the_detail_panel_lists_weighted_children():
+    out = _children('{"weighted": {"services": [{"name": "blue", "weight": 2}, {"name": "green"}]}}')
+    assert out == [
+        {'name': 'blue', 'role': 'Weighted', 'share': '2'},
+        {'name': 'green', 'role': 'Weighted', 'share': '-'},
+    ]
+
+
+def test_the_detail_panel_names_the_mirror_roles_and_share():
+    out = _children('{"mirroring": {"service": "main", "mirrors": [{"name": "shadow"}]}}')
+    assert out == [
+        {'name': 'main', 'role': 'Main', 'share': '-'},
+        {'name': 'shadow', 'role': 'Mirror', 'share': '0%'},
+    ]
+
+
+def test_the_detail_panel_distinguishes_primary_from_fallback():
+    out = _children('{"failover": {"service": "primary", "fallback": "backup"}}')
+    assert out == [
+        {'name': 'primary', 'role': 'Primary', 'share': '-'},
+        {'name': 'backup', 'role': 'Fallback', 'share': '-'},
+    ]
+
+
+def test_the_detail_panel_lists_highest_random_weight_children():
+    out = _children('{"highestRandomWeight": {"services": [{"name": "a", "weight": 5}]}}')
+    assert out == [{'name': 'a', 'role': 'Weighted', 'share': '5'}]
+
+
+def test_a_plain_load_balancer_has_no_backends_block():
+    assert _children('{"loadBalancer": {"servers": [{"url": "http://a:80"}]}}') == []
+
+
+def test_a_child_with_no_name_is_dropped():
+    assert _children('{"weighted": {"services": [{"weight": 1}, {"name": "ok", "weight": 2}]}}') == [
+        {'name': 'ok', 'role': 'Weighted', 'share': '2'}]
+
+
+def test_the_panel_swaps_servers_for_backends_only_when_there_are_children():
+    with open(JS, encoding='utf-8') as fh:
+        src = fh.read()
+    assert "children.length" in src
+    assert "renderDetailBlock('Backends'" in src
+    assert "renderDetailBlock('Servers'" in src, \
+        'a plain load balancer must still show its Servers block'
+
+
+def test_children_are_clickable_through_to_their_own_service():
+    with open(JS, encoding='utf-8') as fh:
+        src = fh.read()
+    assert 'function _openServiceByName(' in src
+    assert '_openServiceByName(' in src.split('function _openServiceByName(')[1], \
+        'the backends table must link each child'

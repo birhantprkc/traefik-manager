@@ -301,6 +301,27 @@ function renderServicesTable() {
     setTabCount('live', _allServices.length);
 }
 
+function _compositeChildren(s) {
+    const out = [];
+    (s.weighted?.services || []).forEach(x =>
+        out.push({ name: x.name, role: 'Weighted', share: x.weight != null ? String(x.weight) : '-' }));
+    (s.highestRandomWeight?.services || []).forEach(x =>
+        out.push({ name: x.name, role: 'Weighted', share: x.weight != null ? String(x.weight) : '-' }));
+    if (s.mirroring?.service) out.push({ name: s.mirroring.service, role: 'Main', share: '-' });
+    (s.mirroring?.mirrors || []).forEach(m =>
+        out.push({ name: m.name, role: 'Mirror', share: (m.percent || 0) + '%' }));
+    if (s.failover?.service)  out.push({ name: s.failover.service,  role: 'Primary',  share: '-' });
+    if (s.failover?.fallback) out.push({ name: s.failover.fallback, role: 'Fallback', share: '-' });
+    return out.filter(c => c.name);
+}
+
+function _openServiceByName(name) {
+    const bare = String(name || '').split('@')[0];
+    const idx = _allServices.findIndex(x => (x.name || '').split('@')[0] === bare);
+    if (idx >= 0) openSvcDetail(idx);
+    else showToast('Service ' + bare + ' is not in this list', 'error');
+}
+
 function openSvcDetail(idx) {
     closeOtherPanels('svcDetailPanel');
     const s = _allServices[idx];
@@ -350,6 +371,28 @@ function openSvcDetail(idx) {
         </table>` : `<div class="text-xs mt-2" style="color:var(--muted)">No servers configured</div>`;
 
     
+    const children = _compositeChildren(s);
+    const childrenHtml = `
+        <table class="w-full text-left mt-2">
+            <thead style="background:var(--card)">
+                <tr>
+                    <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wider" style="color:var(--muted)">Role</th>
+                    <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wider" style="color:var(--muted)">Service</th>
+                    <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wider" style="color:var(--muted)">Share</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${children.map(c => `
+                <tr style="border-top:1px solid var(--border)">
+                    <td class="px-3 py-2.5 text-xs" style="color:var(--muted)">${_esc(c.role)}</td>
+                    <td class="px-3 py-2.5">
+                        <button type="button" class="route-deep-chip" onclick="_openServiceByName('${_esc(c.name)}')" title="Open service"><i class="ph-bold ph-stack"></i>${_esc(String(c.name).split('@')[0])}</button>
+                    </td>
+                    <td class="px-3 py-2.5 font-mono text-xs" style="color:var(--text)">${_esc(c.share)}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+
     const usedBy = s.usedBy || [];
     const usedByHtml = usedBy.length > 0
         ? `<div class="flex flex-wrap gap-1.5">${usedBy.map(r =>
@@ -363,7 +406,9 @@ function openSvcDetail(idx) {
             ['Status', statusBadge, true],
             ['Pass Host Header', passHostHeader === '-' ? '-' : _dBool(passHostHeader === 'true'), true],
         ])
-        + renderDetailBlock('Servers', 'ph-globe', serversHtml, _dCount(servers.length))
+        + (children.length
+            ? renderDetailBlock('Backends', 'ph-tree-structure', childrenHtml, _dCount(children.length))
+            : renderDetailBlock('Servers', 'ph-globe', serversHtml, _dCount(servers.length)))
         + renderDetailBlock('Used by Routers', 'ph-git-branch', usedByHtml);
 
     backdrop.classList.add('open');
