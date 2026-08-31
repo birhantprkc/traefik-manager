@@ -1620,6 +1620,17 @@ CS_PAGE_SIZE = 1000
 CS_MAX_PAGES = 200
 
 
+def _cs_age_text(seconds: int) -> str:
+    if seconds >= 86400:
+        days = seconds // 86400
+        return f"{days} day{'s' if days != 1 else ''}"
+    if seconds >= 3600:
+        hours = seconds // 3600
+        return f"{hours} hour{'s' if hours != 1 else ''}"
+    minutes = max(1, seconds // 60)
+    return f"{minutes} minute{'s' if minutes != 1 else ''}"
+
+
 @app.route('/api/crowdsec/decisions')
 @login_required
 def api_cs_decisions():
@@ -1633,9 +1644,14 @@ def api_cs_decisions():
     force_full = request.args.get('full') in ('1', 'true', 'yes')
     try:
         all_decisions = None
+        stale_note = ''
         if _crowd._cs_stream_cache.get('streamable', True):
             try:
                 all_decisions, _mode = _crowd.cs_decisions_stream(force_full=force_full)
+                if str(_mode).startswith('stale:'):
+                    _, _age, _why = str(_mode).split(':', 2)
+                    stale_note = (f'CrowdSec has not answered for {_cs_age_text(int(_age))}, so these '
+                                  f'decisions are the last ones read and may be out of date. {_why}')
             except CrowdSecUnavailable as e:
                 if 'HTTP 404' in str(e) or 'HTTP 405' in str(e):
                     logger.info("CrowdSec LAPI has no /v1/decisions/stream, falling back to the paged walk")
@@ -1677,6 +1693,11 @@ def api_cs_decisions():
                 except Exception:
                     pass
             active.append(d)
+        if stale_note:
+            logger.warning(f"CrowdSec decisions served from a stale cache: {stale_note}")
+            resp = jsonify(active)
+            resp.headers['X-CS-Stale'] = stale_note
+            return resp
         return jsonify(active)
     except CrowdSecUnavailable as e:
         return jsonify({'error': str(e)}), 502

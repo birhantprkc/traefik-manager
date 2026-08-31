@@ -4,6 +4,7 @@ const ATK_ROW_CAP      = 6;
 const ATK_FEED_PAGE    = 20;
 const ATK_EV_CAP       = 400;
 const ATK_SUBSCRIBED   = { capi: 1, lists: 1 };
+let _csDecStale = '';
 const ATK_ALERT_ONLY   = { asn: 1, cc: 1, uri: 1, user: 1, agent: 1, verb: 1, outcome: 1 };
 const ATK_PULL_SCOPE   = /^(capi|lists)$/i;
 const ATK_DEC_ONLY     = { origin: 1, type: 1 };
@@ -544,6 +545,7 @@ async function _csRefreshInner() {
         _csLapiOk = false; _csAlertsOk = false;
         _csDecErr = _netErrText(e, 'Could not reach the CrowdSec LAPI');
         _csAltErr = _csDecErr;
+        _csDecStale = '';
         _csDecisions = []; _csAlerts = [];
         _csAltCapped = false; _csAltLimit = 0;
         _csFetched = Date.now();
@@ -555,12 +557,14 @@ async function _csRefreshInner() {
     _csDecErr = ''; _csAltErr = ''; _csAltStatus = altRes.status;
     if (decRes.ok) {
         _csLapiOk = true;
+        _csDecStale = decRes.headers.get('X-CS-Stale') || '';
         let raw = null;
         try { raw = await decRes.json(); } catch (_) { raw = null; }
         _csDecisions = (Array.isArray(raw) ? raw : []).map(_atkParseDecision);
     } else {
         _csLapiOk = false;
         _csDecisions = [];
+        _csDecStale = '';
         _csDecErr = 'CrowdSec LAPI unavailable (HTTP ' + decRes.status + ')';
         try { _csDecErr = (await decRes.json()).error || _csDecErr; } catch (_) {}
         if (/\b403\b/.test(_csDecErr) && !/bouncer/i.test(_csDecErr)) {
@@ -999,7 +1003,10 @@ function _atkCardBans(d) {
     const lab = x => x.value + ' - ' + x.type + ', ' + (x.origin || 'unknown') + ', ' + _scenShort(x.scenario)
         + (x.duration ? ', ' + x.duration + ' left' : '') + (x.scope !== 'Ip' ? ', ' + x.scope + ' scope' : '');
     return _atkCard({
-        key: 'bans', accent: 'var(--green)', ic: 'ph-fill ph-shield-check', title: 'Bans in force',
+        key: 'bans', accent: d.stale ? 'var(--yellow)' : 'var(--green)',
+        ic: d.stale ? 'ph-fill ph-clock-countdown' : 'ph-fill ph-shield-check',
+        title: d.stale ? 'Bans in force (stale)' : 'Bans in force',
+        note: d.stale ? _esc(d.stale) : undefined,
         total: _sdNum(dec.length),
         flags: _atkFlag({ cls: 'd-off', ic: 'ph-bold ph-prohibit', n: bans.length, label: 'ban',
                 go: _atkSpec({ type: 'ban' }), tip: 'Show only ban decisions in the decisions view' })
@@ -1507,6 +1514,7 @@ function _csRender() {
     const d = {
         lapiOk: _csLapiOk, alertsOk: _csAlertsOk, altStatus: _csAltStatus, altErr: _csAltErr, decErr: _csDecErr,
         capped: _csAltCapped, limit: _csAltLimit,
+        stale: _csDecStale,
         alerts: sel.alerts, decisions: _csDecisions, span: _csSpan, fetched: _csFetched,
         retained: _csAlerts.length,
         own: _csDecisions.filter(x => x.own).length,
