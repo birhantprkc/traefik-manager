@@ -566,6 +566,12 @@ _monitor.register('crowdsec', _crowd.CS_ALERT_INTERVAL,
                   lambda: _crowd.check_local_alerts(_crowd.CS_ALERT_WINDOW))
 _monitor.register('updates', _updates.UPDATE_INTERVAL, _updates.check_updates)
 _monitor.register('notify-flush', _noti.FLUSH_INTERVAL, _noti.flush_due)
+
+for _label, _path, _err in env.unwritable_storage():
+    logger.error(f"{_label} storage at {_path} is not writable ({_err}). "
+                 f"Settings, backups and scheduled checks will not survive a restart. "
+                 f"Check the volume or bind mount for this path.")
+
 _monitor.start()
 
 _SILENT_PREFIXES = (
