@@ -134,6 +134,10 @@ window.addEventListener('appinstalled', () => {
     if (typeof refreshStaticTabAvailability === 'function') refreshStaticTabAvailability();
     window.addEventListener('resize', () => { if (window.innerWidth >= 768) closeSideNavDrawer(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSideNavDrawer(); });
+    if (typeof refreshStorageBanner === 'function') {
+        refreshStorageBanner();
+        setInterval(refreshStorageBanner, 300000);
+    }
     setInterval(fetchNotifications, 60000);
 })();
 

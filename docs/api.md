@@ -1336,6 +1336,26 @@ A URL pointing at TM's own hostname, or at the configured self-route domain, sho
 
 ---
 
+### `GET /api/storage/status`
+
+Whether the directories Traefik Manager writes to are writable. It writes and removes a temporary file
+in the configuration, backup and dynamic config directories, so it reports what a real save would do
+rather than what the permission bits claim. The result is cached for 30 seconds.
+
+```json
+{ "problems": [] }
+```
+
+An empty array means everything is writable. Otherwise each entry names the directory and the error:
+
+```json
+{ "problems": [
+  { "label": "Configuration", "path": "/app/config", "error": "read-only file system" }
+] }
+```
+
+---
+
 ### `GET /api/health`
 
 Liveness probe. The only `/api/` endpoint that needs no authentication, so it can be used as a container healthcheck.

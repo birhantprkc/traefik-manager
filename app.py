@@ -1648,6 +1648,22 @@ def static_manifest():
     body = render_template('manifest.json')
     return app.response_class(body, mimetype='application/manifest+json')
 
+_storage_probe_cache = {'at': 0.0, 'problems': []}
+STORAGE_PROBE_TTL = 30
+
+
+@app.route('/api/storage/status')
+@login_required
+def api_storage_status():
+    now = time.time()
+    if now - _storage_probe_cache['at'] >= STORAGE_PROBE_TTL:
+        _storage_probe_cache['problems'] = [
+            {'label': label, 'path': path, 'error': err}
+            for label, path, err in env.unwritable_storage()
+        ]
+        _storage_probe_cache['at'] = now
+    return jsonify({'problems': _storage_probe_cache['problems']})
+
 @app.route('/api/health')
 def api_health():
     return jsonify({"ok": True}), 200

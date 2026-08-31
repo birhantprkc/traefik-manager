@@ -145,3 +145,60 @@ def test_a_recovered_save_trusts_the_file_again(storage, monkeypatch):
     monitor._state.update({'due': {'x': 1.0}})
     monitor._write_state()
     assert monitor._persist_ok is True
+
+
+def test_the_status_endpoint_is_empty_when_healthy(client):
+    r = client.get('/api/storage/status')
+    assert r.status_code == 200
+    assert r.get_json() == {'problems': []}
+
+
+def test_the_status_endpoint_reports_a_broken_directory(client, monkeypatch):
+    import app as tm
+    monkeypatch.setattr(env, 'unwritable_storage',
+                        lambda: [('Configuration', '/app/config', 'read-only file system')])
+    tm._storage_probe_cache['at'] = 0
+    try:
+        r = client.get('/api/storage/status')
+        problems = r.get_json()['problems']
+    finally:
+        tm._storage_probe_cache['at'] = 0
+    assert problems == [{'label': 'Configuration', 'path': '/app/config',
+                         'error': 'read-only file system'}]
+
+
+def test_the_status_endpoint_requires_a_session(anon_client):
+    r = anon_client.get('/api/storage/status')
+    assert r.status_code != 200
+
+
+def test_the_probe_is_cached_so_open_tabs_do_not_hammer_the_disk(client, monkeypatch):
+    import app as tm
+    calls = []
+    monkeypatch.setattr(env, 'unwritable_storage', lambda: calls.append(1) or [])
+    tm._storage_probe_cache['at'] = 0
+    try:
+        c = client
+        for _ in range(5):
+            c.get('/api/storage/status')
+    finally:
+        tm._storage_probe_cache['at'] = 0
+    assert len(calls) == 1
+
+
+def test_the_banner_element_sits_outside_any_tab():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, 'templates', 'index.html'), encoding='utf-8') as fh:
+        html = fh.read()
+    assert html.count('id="storageBanner"') == 1
+    before = html.split('id="storageBanner"')[0]
+    assert '<main' in before, 'the banner must be inside main so it shows on every tab'
+    assert "include 'tabs/" not in before, 'the banner must not live inside one tab'
+
+
+def test_the_banner_is_refreshed_on_load():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, 'static', 'js', 'init.js'), encoding='utf-8') as fh:
+        js = fh.read()
+    assert 'refreshStorageBanner()' in js
+    assert 'setInterval(refreshStorageBanner' in js

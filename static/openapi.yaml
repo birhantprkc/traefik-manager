@@ -2632,6 +2632,31 @@ paths:
                   ok: { type: boolean }
                   version: { type: string, example: "3.2.0" }
 
+  /api/storage/status:
+    get:
+      tags: [Utility]
+      summary: Whether the directories Traefik Manager writes to are writable
+      description: >
+        Probes the configuration, backup and dynamic config directories by writing and removing a
+        temporary file. An empty `problems` array means everything is writable. The result is cached
+        for 30 seconds.
+      responses:
+        "200":
+          description: Probe result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  problems:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        label: { type: string, example: Configuration }
+                        path:  { type: string, example: /app/config }
+                        error: { type: string, example: read-only file system }
+
   /api/health:
     get:
       tags: [Utility]

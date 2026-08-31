@@ -475,6 +475,29 @@ function toggleLiveDd(id) {
     if (!isOpen) { menu.classList.add('open'); btn.classList.add('open'); }
 }
 
+async function refreshStorageBanner() {
+    const el = document.getElementById('storageBanner');
+    if (!el) return;
+    let problems = [];
+    try {
+        const res = await fetch('/api/storage/status', { headers: { 'X-Requested-With': 'fetch' } });
+        if (!res.ok) return;
+        problems = (await res.json()).problems || [];
+    } catch (e) {
+        return;
+    }
+    if (!problems.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'block';
+    el.innerHTML = `<div class="flex items-start gap-2">
+            <i class="ph-bold ph-warning-octagon flex-shrink-0 mt-0.5" style="color:var(--red)"></i>
+            <div class="text-xs">
+                <div class="font-semibold" style="color:var(--text)">Storage is not writable</div>
+                <div class="mt-1" style="color:var(--muted)">Settings, backups and scheduled checks will not survive a restart. Check the volume or bind mount for:</div>
+                ${problems.map(p => `<div class="mt-1 font-mono" style="color:var(--muted)">${_esc(p.label)}: ${_esc(p.path)} <span style="opacity:.75">(${_esc(p.error)})</span></div>`).join('')}
+            </div>
+        </div>`;
+}
+
 let _tmAuthLost = false;
 
 const TM_BASE = (document.querySelector('meta[name="tm-base-path"]')?.content || '').replace(/\/$/, '');
