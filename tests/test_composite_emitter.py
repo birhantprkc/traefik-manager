@@ -213,3 +213,12 @@ def test_a_fallback_that_is_removed_is_still_dropped():
     cs.merge_into(section, 'api-service', block, owned)
     assert 'fallback' not in section['api-service']['failover'], \
         'keys we do author must still be removable'
+
+
+def test_failover_never_builds_a_child_it_will_not_name():
+    block, owned, names = cs.build('api', 'failover',
+                                   [_manual('a:80'), _manual('b:80'), _manual('c:80')])
+    assert block == {'failover': {'service': 'api-backend-1', 'fallback': 'api-backend-2'}}
+    assert set(owned) == {'api-backend-1', 'api-backend-2'}, \
+        'a third child would be a real service in the config that nothing references'
+    assert names == ['api-backend-1', 'api-backend-2']

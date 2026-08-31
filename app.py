@@ -1455,6 +1455,10 @@ def api_service_save():
     if kind not in _composite.TYPES + ('loadBalancer',):
         return jsonify({'ok': False,
                         'error': 'Choose load balancer, weighted, mirroring or failover'}), 400
+    if kind == 'failover' and len(_composite.normalise_children(children)) > 2:
+        return jsonify({'ok': False,
+                        'error': 'Failover takes two backends: the one that serves and the '
+                                 'one that takes over'}), 400
     block, owned, _names = _composite.build(name, kind, children)
     if not block:
         return jsonify({'ok': False, 'error': 'Add at least one backend'}), 400

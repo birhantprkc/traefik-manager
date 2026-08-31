@@ -52,6 +52,8 @@ def build(route_name: str, composite_type: str, children: list, lb_extra: dict =
     children = normalise_children(children)
     if not children:
         return None, {}, []
+    if composite_type == 'failover':
+        children = children[:2]
     if composite_type == 'loadBalancer':
         servers = [{'url': _child_url(c)} for c in children if c['kind'] == MANUAL]
         if not servers:

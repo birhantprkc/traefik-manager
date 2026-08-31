@@ -204,3 +204,18 @@ def test_an_unknown_config_file_is_refused_not_silently_redirected(client):
     r = _save(client, 'pool', [_manual('a:80')], configFile='does-not-exist.yml')
     assert r.status_code == 400
     assert _svc('pool') is None
+
+
+def test_failover_refuses_a_third_backend(client):
+    r = _save(client, 'fo', [_manual('a:80'), _manual('b:80'), _manual('c:80')], kind='failover')
+    assert r.status_code == 400
+    assert 'two backends' in r.get_json()['error']
+    assert _svc('fo') is None
+    assert _svc('fo-backend-3') is None, 'a rejected save must leave nothing behind'
+
+
+def test_failover_with_two_backends_creates_exactly_two_children(client):
+    assert _save(client, 'fo', [_manual('a:80'), _manual('b:80')], kind='failover').status_code == 200
+    assert _svc('fo')['failover'] == {'service': 'fo-backend-1', 'fallback': 'fo-backend-2'}
+    assert _svc('fo-backend-1') is not None and _svc('fo-backend-2') is not None
+    assert _svc('fo-backend-3') is None

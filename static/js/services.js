@@ -551,6 +551,12 @@ function _svcTypeChanged() {
             : 'The first backend serves; the second takes over if it fails.';
     }
     const plain = kind === 'loadBalancer';
+    const addBtn = document.querySelector('#svcRows')?.previousElementSibling?.querySelector('button');
+    if (addBtn) {
+        const over = kind === 'failover' && document.querySelectorAll('#svcRows .svc-row').length >= 2;
+        addBtn.disabled = over;
+        addBtn.title = over ? 'Failover takes two backends' : '';
+    }
     document.querySelectorAll('#svcRows .svc-row').forEach(r => {
         const w = r.querySelector('.svc-weight');
         if (w) { w.style.display = plain ? 'none' : ''; w.title = kind === 'mirroring' ? 'Percent' : 'Weight'; }
@@ -566,6 +572,11 @@ function _svcTypeChanged() {
 async function addServiceRow(data) {
     const wrap = document.getElementById('svcRows');
     if (!wrap) return;
+    const kind = document.getElementById('svcType')?.value || 'loadBalancer';
+    if (kind === 'failover' && wrap.querySelectorAll('.svc-row').length >= 2) {
+        showToast('Failover takes two backends: the one that serves and the one that takes over', 'error');
+        return;
+    }
     const d = data || {};
     const id = 'svcrow' + (++_svcRowSeq);
     const row = document.createElement('div');
