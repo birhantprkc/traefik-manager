@@ -206,6 +206,7 @@ This mirrors CrowdSec's own auth model: `cscli decisions list` uses the bouncer/
 ## Fetching
 
 - **Decisions** come from `/v1/decisions/stream` - a full sync on first read, then cached deltas, resynced hourly. On a LAPI with no stream endpoint it falls back to cursor pagination (`id_gt`), 1000 rows per page up to 200 pages. Expired rows are dropped. There is no display cap: every active decision is fetched, and the strip on the Bans card rescales rather than truncating, printing its own `1 cell = N` legend.
+- If a refresh fails, the last good decisions are still shown rather than a screen of zeroes. Once they are more than 15 minutes old the **Bans in force** card says so and names the reason, so an expired machine login reads as an authentication problem rather than as no bans. The cache lives in the config directory, so it survives a restart.
 - **Alerts** come from one request with `with_decisions=false` and a row limit - 500 by default, set with the `CROWDSEC_ALERT_LIMIT` env var or the `crowdsec_alert_limit` setting (0-100000). That flag stays: a single community blocklist alert can embed 15,000 decision objects.
 - Both are refetched together when you open the tab or press Refresh. The feed renders one page at a time, so a busy instance never builds tens of thousands of rows at once.
 
