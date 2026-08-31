@@ -189,8 +189,9 @@ function renderServicesTable() {
             const dotTitle = anyDown ? `${activeCount} of ${serverEntries.length} servers up` : stLabel;
             const lb = s.loadBalancer || {};
             const composite = (s.weighted?.services || []).map(x => `${x.name}${x.weight != null ? ` (${x.weight})` : ''}`)
+                .concat((s.highestRandomWeight?.services || []).map(x => `${x.name}${x.weight != null ? ` (${x.weight})` : ''}`))
                 .concat(s.mirroring?.service ? [s.mirroring.service] : [])
-                .concat((s.mirroring?.mirrors || []).map(m => `${m.name} mirror`))
+                .concat((s.mirroring?.mirrors || []).map(m => `${m.name} mirror (${m.percent || 0}%)`))
                 .concat(s.failover?.service ? [s.failover.service] : [])
                 .concat(s.failover?.fallback ? [`${s.failover.fallback} fallback`] : []);
             const servers = (lb.servers || []).map(x => x.url || x.address).filter(Boolean)
