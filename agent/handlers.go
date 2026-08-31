@@ -244,7 +244,9 @@ func (a *App) configsWriteHandler(w http.ResponseWriter, r *http.Request) {
 		targetPath = cfgPath
 	}
 	if err := a.createFileBak(targetPath, body.Name); err != nil {
-		log.Printf("pre-write backup failed: %v", err)
+		a.failuref("backup", "pre-write backup of %s failed: %v", targetPath, err)
+		jsonError(w, "backup failed, nothing was written: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	if err := atomicWrite(targetPath, []byte(body.Content)); err != nil {
 		jsonError(w, "write failed: "+err.Error(), http.StatusInternalServerError)
@@ -253,7 +255,7 @@ func (a *App) configsWriteHandler(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.GitBackupEnabled && a.cfg.GitBackupAutoPush && a.cfg.GitBackupRepo != "" {
 		go func() {
 			if err := a.gitPush("config save", ""); err != nil {
-				log.Printf("git auto-push failed: %v", err)
+				a.failuref("git", "auto-push failed: %v", err)
 			}
 		}()
 	}
@@ -298,7 +300,9 @@ func (a *App) staticWriteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.createFileBak(a.cfg.StaticConfigPath, ""); err != nil {
-		log.Printf("pre-write static backup failed: %v", err)
+		a.failuref("backup", "pre-write backup of %s failed: %v", a.cfg.StaticConfigPath, err)
+		jsonError(w, "backup failed, nothing was written: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	if err := atomicWrite(a.cfg.StaticConfigPath, []byte(body.Content)); err != nil {
 		jsonError(w, "write failed: "+err.Error(), http.StatusInternalServerError)
@@ -374,7 +378,7 @@ func (a *App) staticRestartHandler(w http.ResponseWriter, r *http.Request) {
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 			if err := a.dockerRestart(ctx); err != nil {
-				log.Printf("traefik restart failed: %v", err)
+				a.failuref("restart", "Traefik restart failed: %v", err)
 			}
 		}()
 
@@ -910,7 +914,9 @@ func (a *App) restoreHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := a.createFileBak(dest, origName); err != nil {
-		log.Printf("pre-restore backup failed: %v", err)
+		a.failuref("backup", "pre-restore backup of %s failed: %v", dest, err)
+		jsonError(w, "backup failed, nothing was restored: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	if err := atomicWrite(dest, data); err != nil {
 		jsonError(w, "restore failed: "+err.Error(), http.StatusInternalServerError)
@@ -1278,7 +1284,9 @@ func (a *App) gitRestoreHandler(w http.ResponseWriter, r *http.Request, sha stri
 		return
 	}
 	if _, err := a.createBackup(); err != nil {
-		log.Printf("pre-restore backup failed: %v", err)
+		a.failuref("backup", "pre-restore backup failed: %v", err)
+		jsonError(w, "backup failed, nothing was restored: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	cfgPath := a.cfg.ConfigPath
 	info, _ := os.Stat(cfgPath)
@@ -1648,7 +1656,9 @@ func (a *App) routeRawSaveHandler(w http.ResponseWriter, r *http.Request, routeI
 	}
 
 	if err := a.createFileBak(targetPath, filepath.Base(targetPath)); err != nil {
-		log.Printf("pre-write backup failed: %v", err)
+		a.failuref("backup", "pre-write backup of %s failed: %v", targetPath, err)
+		jsonError(w, "backup failed, nothing was written: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	out, err := yaml.Marshal(config)
 	if err != nil {
@@ -1662,7 +1672,7 @@ func (a *App) routeRawSaveHandler(w http.ResponseWriter, r *http.Request, routeI
 	if a.cfg.GitBackupEnabled && a.cfg.GitBackupAutoPush && a.cfg.GitBackupRepo != "" {
 		go func() {
 			if err := a.gitPush("route raw save", ""); err != nil {
-				log.Printf("git auto-push failed: %v", err)
+				a.failuref("git", "auto-push failed: %v", err)
 			}
 		}()
 	}

@@ -28,6 +28,8 @@ TRAEFIK_INTERVAL  = 60
 AGENT_INTERVAL    = 120
 GEOIP_INTERVAL    = 86400
 STORAGE_INTERVAL  = 300
+AGENT_EVENT_INTERVAL = 120
+AGENT_EVENT_MAX   = 10
 CROWDSEC_INTERVAL = 300
 
 CERT_ALERT_DAYS   = (14, 3, 0)
@@ -503,6 +505,62 @@ def _check_storage():
     return raised
 
 
+_AGENT_EVENT_LABELS = {
+    'git':     'git backup',
+    'restart': 'restart',
+    'backup':  'backup',
+    'storage': 'storage',
+}
+
+
+def _check_agent_events():
+    state  = _section('agent_events')
+    raised = []
+    seen   = {}
+    for agent in _agents():
+        agent_id = str(agent.get('id') or '')
+        if not agent_id or not _agent_usable(agent):
+            seen[agent_id] = state.get(agent_id, 0)
+            continue
+        since = state.get(agent_id)
+        try:
+            resp = agents_http_mod._agent_request(
+                agent, 'GET', f'/api/events?since={int(since or 0)}')
+        except Exception as e:
+            logger.debug(f"Agent event poll failed for {agent.get('name', '')}: {e}")
+            seen[agent_id] = since or 0
+            continue
+        if resp is None or getattr(resp, 'status_code', 0) != 200:
+            seen[agent_id] = since or 0
+            continue
+        try:
+            data = resp.json() or {}
+        except Exception:
+            seen[agent_id] = since or 0
+            continue
+        events = data.get('events') or []
+        latest = data.get('latest') or since or 0
+        seen[agent_id] = latest
+        if since is None:
+            continue
+        name = str(agent.get('name') or agent_id)
+        for item in events[-AGENT_EVENT_MAX:]:
+            kind = str(item.get('kind') or '')
+            msg  = str(item.get('message') or '').strip()
+            if not msg:
+                continue
+            label = _AGENT_EVENT_LABELS.get(kind, kind or 'agent')
+            raised.append(('error', f"{name}: {label} - {msg}", 'agent'))
+        if len(events) > AGENT_EVENT_MAX:
+            raised.append(('error',
+                           f"{name}: {len(events) - AGENT_EVENT_MAX} more failures not shown, "
+                           f"check the agent log",
+                           'agent'))
+    state.clear()
+    state.update(seen)
+    return raised
+
+
 def register(name: str, interval_seconds: int, fn):
     entry = (str(name), max(1, int(interval_seconds)), fn)
     for i, check in enumerate(_checks):
@@ -623,4 +681,5 @@ _checks = [
     ('crowdsec_agents', CROWDSEC_INTERVAL, _check_crowdsec_agents),
     ('geoip',           GEOIP_INTERVAL,    _check_geoip),
     ('storage',         STORAGE_INTERVAL,  _check_storage),
+    ('agent_events',    AGENT_EVENT_INTERVAL, _check_agent_events),
 ]

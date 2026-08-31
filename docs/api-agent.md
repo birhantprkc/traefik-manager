@@ -25,6 +25,7 @@ TM handles authentication automatically when proxying calls through `/api/agents
 | Method | Path | Description |
 |---|---|---|
 | GET | `/health` | Health check - no auth required |
+| GET | `/api/events` | Failures the agent could not report in a response, newest last - `?since=<id>` returns only newer ones |
 | GET | `/api/traefik/overview` | Traefik API overview |
 | GET | `/api/traefik/routers` | Routers across all protocols - returns `{"http":[...],"tcp":[...],"udp":[...]}` |
 | GET | `/api/traefik/services` | Services across all protocols - returns `{"http":[...],"tcp":[...],"udp":[...]}` |
@@ -35,7 +36,7 @@ TM handles authentication automatically when proxying calls through `/api/agents
 | GET | `/api/traefik/certs` | Certificates from acme.json (requires `ACME_JSON_PATH`) |
 | GET | `/api/traefik/plugins` | Plugins declared in the agent's static config (requires `STATIC_CONFIG_PATH`) |
 | GET | `/api/configs` | Read dynamic config file(s) |
-| POST | `/api/configs` | Write a dynamic config file (creates a `.bak` before writing) - body: `{"name": "...", "content": "<yaml>"}` |
+| POST | `/api/configs` | Write a dynamic config file (creates a `.bak` first, and refuses to write if that fails) - body: `{"name": "...", "content": "<yaml>"}` |
 | GET | `/api/static` | Read static config (requires `STATIC_CONFIG_PATH`) |
 | POST | `/api/static` | Write static config - body: `{"content": "<yaml>"}` |
 | GET | `/api/static/status` | Restart method info |
@@ -60,6 +61,28 @@ TM handles authentication automatically when proxying calls through `/api/agents
 | GET | `/api/keys` | List API keys |
 | POST | `/api/keys` | Create an API key - body: `{"name": "..."}` |
 | DELETE | `/api/keys/<id>` | Delete an API key |
+
+## Failure events
+
+Some work happens after the agent has already answered: a git auto-push, or a Traefik restart. A
+failure there has no response left to report in, so the agent keeps the last 100 in memory and
+Traefik Manager collects them every two minutes and raises them as notifications.
+
+```
+GET /api/events?since=12
+```
+
+```json
+{
+  "events": [
+    { "id": 13, "at": 1756574400, "kind": "git", "message": "auto-push failed: no remote" }
+  ],
+  "latest": 13
+}
+```
+
+Pass the previous `latest` back as `since` to get only what is new. `kind` is one of `git`,
+`restart`, `backup` or `storage`. The list lives in memory, so it starts empty after a restart.
 
 ## Health check
 
