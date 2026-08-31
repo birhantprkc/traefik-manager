@@ -45,7 +45,7 @@ def test_a_stale_hit_survives_a_later_failure(monkeypatch):
     monkeypatch.setattr(updates.requests, 'get',
                         lambda url, **kw: _Resp(200, {'tag_name': 'v1.0.0'}))
     assert updates.release_info('owner/repo')['tag'] == '1.0.0'
-    updates._release_cache['owner/repo'] = (0, updates._release_cache['owner/repo'][1])
+    updates._release_cache['owner/repo'] = (0, updates._release_cache['owner/repo'][1], 0)
     monkeypatch.setattr(updates.requests, 'get', lambda url, **kw: _Resp(403))
     assert updates.release_info('owner/repo')['tag'] == '1.0.0'
 

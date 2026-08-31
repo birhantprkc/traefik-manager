@@ -83,7 +83,7 @@ else _initAutofillGuard();
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/sw.js')
+        navigator.serviceWorker.register(tmUrl('/static/sw.js'), { scope: tmUrl('/static/') })
             .then(reg => console.log('SW registered:', reg.scope))
             .catch(err => console.warn('SW registration failed:', err));
     });

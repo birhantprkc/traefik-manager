@@ -40,29 +40,31 @@ def compare_versions(a, b) -> int:
 
 
 def latest_release(repo: str) -> str:
-    try:
-        resp = requests.get(GITHUB_LATEST.format(repo=repo), timeout=UPDATE_TIMEOUT,
-                            headers={'Accept': 'application/vnd.github.v3+json'})
-        if resp.status_code != 200:
-            logger.debug(f"Update check for {repo} returned HTTP {resp.status_code}")
-            return ''
-        data = resp.json()
-    except Exception as e:
-        logger.debug(f"Update check for {repo} failed: {e}")
-        return ''
-    return _strip_v((data or {}).get('tag_name')) if isinstance(data, dict) else ''
+    return release_info(repo).get('tag', '')
 
 
 RELEASE_CACHE_TTL = 3600
+RELEASE_RETRY_TTL = 300
 _release_cache = {}
+
+
+def _cached_release(repo, now):
+    hit = _release_cache.get(repo)
+    if not hit:
+        return None
+    stamp, info = hit[0], hit[1]
+    ttl = hit[2] if len(hit) > 2 else RELEASE_CACHE_TTL
+    return info if (now - stamp) < ttl else None
 
 
 def release_info(repo: str) -> dict:
     now = time.time()
-    hit = _release_cache.get(repo)
-    if hit and (now - hit[0]) < RELEASE_CACHE_TTL:
-        return hit[1]
+    fresh = _cached_release(repo, now)
+    if fresh is not None:
+        return fresh
+    previous = (_release_cache.get(repo) or (0, {}))[1]
     info = {'tag': '', 'url': '', 'notes': '', 'error': ''}
+    ttl = RELEASE_CACHE_TTL
     try:
         resp = requests.get(GITHUB_LATEST.format(repo=repo), timeout=UPDATE_TIMEOUT,
                             headers={'Accept': 'application/vnd.github.v3+json'})
@@ -75,12 +77,17 @@ def release_info(repo: str) -> dict:
             info['error'] = 'rate limited by GitHub, retrying later'
         else:
             info['error'] = 'GitHub returned HTTP %d' % resp.status_code
+            ttl = RELEASE_RETRY_TTL
     except Exception as e:
         info['error'] = str(e)[:120]
+        ttl = RELEASE_RETRY_TTL
         logger.debug(f"Release lookup for {repo} failed: {e}")
-    if info['tag'] or not hit:
-        _release_cache[repo] = (now, info)
-    return _release_cache.get(repo, (now, info))[1]
+    if not info['tag'] and previous.get('tag'):
+        kept = dict(previous)
+        kept['error'] = info['error']
+        info = kept
+    _release_cache[repo] = (now, info, ttl)
+    return info
 
 
 def running_traefik_version() -> str:

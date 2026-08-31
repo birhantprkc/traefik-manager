@@ -99,6 +99,7 @@ from `manager.yml` and restart.
 | `INACTIVITY_TIMEOUT_MINUTES` | `120` | - | Log out after this many minutes of inactivity |
 | `OTP_ENCRYPTION_KEY` | _(auto-generated)_ | - | Fernet key for every secret stored encrypted in `manager.yml` |
 | `PROXY_FIX_HOPS` | `1` | - | Number of trusted proxy hops in front of Traefik Manager for `X-Forwarded-For` |
+| `BASE_PATH` | _(none)_ | - | Serve Traefik Manager under a sub path, for example `/traefik-manager` |
 | `LOG_LEVEL` | `INFO` | - | Python log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
 ---
@@ -776,6 +777,36 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 ::: warning
 Lose this key and every stored secret becomes unreadable - 2FA must be re-enrolled and the other credentials re-entered. Back up `.otp_key` alongside your config volume.
 :::
+
+---
+
+### `BASE_PATH`
+
+**Default:** _(none)_
+
+Serves Traefik Manager under a sub path instead of the root of a host, for example
+`https://example.com/traefik-manager`. Leave it unset to serve from the root, which is the default
+and needs no configuration.
+
+The value must be a path starting with a single `/`, with no trailing slash and no scheme. Anything
+else is ignored and logged at startup.
+
+```yaml
+services:
+  traefik-manager:
+    environment:
+      BASE_PATH: /traefik-manager
+```
+
+A `stripPrefix` middleware in front is optional. Traefik Manager accepts the prefixed path whether or
+not Traefik has already removed it.
+
+::: warning OIDC redirect URI
+If you use OIDC, the callback URL changes when you set this. Update the redirect URI at your identity
+provider to include the prefix, or sign in will fail after the redirect.
+:::
+
+Use a sub domain instead where you can. It needs no configuration on either side.
 
 ---
 

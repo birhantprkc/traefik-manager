@@ -477,22 +477,39 @@ function toggleLiveDd(id) {
 
 let _tmAuthLost = false;
 
+const TM_BASE = (document.querySelector('meta[name="tm-base-path"]')?.content || '').replace(/\/$/, '');
+
+function tmUrl(path) {
+    if (!TM_BASE) return path;
+    if (typeof path !== 'string' || !path.startsWith('/')) return path;
+    if (path === TM_BASE || path.startsWith(TM_BASE + '/')) return path;
+    return TM_BASE + path;
+}
+
+function _tmAppPath(pathname) {
+    if (TM_BASE && pathname.startsWith(TM_BASE)) return pathname.slice(TM_BASE.length) || '/';
+    return pathname;
+}
+
 function _tmHandleAuthLoss() {
     if (_tmAuthLost) return;
     _tmAuthLost = true;
-    const here = window.location.pathname + window.location.search;
-    window.location.href = '/login?next=' + encodeURIComponent(here);
+    const here = _tmAppPath(window.location.pathname) + window.location.search;
+    window.location.href = tmUrl('/login') + '?next=' + encodeURIComponent(here);
 }
 
 (function () {
     const orig = window.fetch;
     window.fetch = function (input, init) {
+        if (typeof input === 'string') input = tmUrl(input);
         return orig.call(this, input, init).then(res => {
             if (res.status !== 401) return res;
             let url = '';
             try { url = new URL(typeof input === 'string' ? input : input.url, window.location.origin).pathname; }
             catch (e) { url = String(input || ''); }
-            if (url.startsWith('/api/') && !window.location.pathname.startsWith('/login')) _tmHandleAuthLoss();
+            if (_tmAppPath(url).startsWith('/api/') && !_tmAppPath(window.location.pathname).startsWith('/login')) {
+                _tmHandleAuthLoss();
+            }
             return res;
         });
     };

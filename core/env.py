@@ -12,6 +12,19 @@ logging.basicConfig(
 logger = logging.getLogger("traefik-manager")
 
 
+def base_path() -> str:
+    raw = os.environ.get('BASE_PATH', '').strip().rstrip('/')
+    if not raw:
+        return ''
+    if not raw.startswith('/') or raw.startswith('//') or '://' in raw:
+        logger.warning(f"Ignoring BASE_PATH {raw!r}: it must be a path starting with a single /")
+        return ''
+    return raw
+
+
+BASE_PATH = base_path()
+
+
 def proxy_fix_hops() -> int:
     try:
         return max(0, int(os.environ.get('PROXY_FIX_HOPS', '1')))

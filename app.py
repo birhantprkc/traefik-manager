@@ -185,8 +185,24 @@ _agent_write_config          = _agen._agent_write_config
 _notifications = _noti._notifications
 _notif_lock    = _noti._notif_lock
 
+class _BasePathMiddleware:
+    def __init__(self, wsgi_app, prefix):
+        self.wsgi_app = wsgi_app
+        self.prefix = prefix
+
+    def __call__(self, environ, start_response):
+        path = environ.get('PATH_INFO', '')
+        if path == self.prefix or path.startswith(self.prefix + '/'):
+            environ['PATH_INFO'] = path[len(self.prefix):] or '/'
+        environ['SCRIPT_NAME'] = self.prefix
+        return self.wsgi_app(environ, start_response)
+
+
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=PROXY_FIX_HOPS, x_proto=1, x_host=1)
+if env.BASE_PATH:
+    app.wsgi_app = _BasePathMiddleware(app.wsgi_app, env.BASE_PATH)
+    app.config['APPLICATION_ROOT'] = env.BASE_PATH
 
 _CONFIG_DIR      = os.path.dirname(os.environ.get('SETTINGS_PATH', '/app/config/manager.yml'))
 _SECRET_KEY_PATH = os.path.join(_CONFIG_DIR, '.secret_key')
@@ -511,6 +527,10 @@ def inject_csrf():
 @app.context_processor
 def inject_asset_version():
     return {'asset_version': APP_VERSION}
+
+@app.context_processor
+def inject_base_path():
+    return {'base_path': env.BASE_PATH}
 
 
 def _hash_api_key(key: str) -> str:
@@ -1616,6 +1636,11 @@ def api_manager_version():
         "traefik_release_url": tfk.get('url', ''),
         "traefik_running": _updates.running_traefik_version(),
     })
+
+@app.route('/static/manifest.json')
+def static_manifest():
+    body = render_template('manifest.json')
+    return app.response_class(body, mimetype='application/manifest+json')
 
 @app.route('/api/health')
 def api_health():

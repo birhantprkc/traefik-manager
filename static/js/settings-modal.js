@@ -1997,7 +1997,7 @@ async function oidcToggleEnabled() {
 
 function _redirectToLoginAfterAuthEnable(what) {
     showToast(`${what} - authentication is now required, redirecting to sign in`, 'info');
-    setTimeout(() => { window.location.href = '/login'; }, 1200);
+    setTimeout(() => { window.location.href = tmUrl('/login'); }, 1200);
 }
 
 async function saveOidcConfig() {

@@ -26,6 +26,9 @@ You need a **client ID** and **client secret**. The redirect URI to register is:
 https://your-traefik-manager.example.com/auth/oidc/callback
 ```
 
+If you set [`BASE_PATH`](env-vars.md#base-path), include it:
+`https://example.com/traefik-manager/auth/oidc/callback`.
+
 ### 2. Configure OIDC in Traefik Manager
 
 Go to **Settings → Authentication → OIDC / SSO** and fill in:
