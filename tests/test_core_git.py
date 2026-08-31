@@ -15,10 +15,13 @@ def _run(*args, **kw):
 
 
 @pytest.fixture
-def bare_remote(tmp_path):
-    _run('git', 'config', '--global', 'user.email', 'test@example.com')
-    _run('git', 'config', '--global', 'user.name', 'test')
-    _run('git', 'config', '--global', 'init.defaultBranch', 'main')
+def bare_remote(tmp_path, monkeypatch):
+    fake_global = tmp_path / 'gitconfig'
+    fake_global.write_text(
+        '[user]\n\tname = test\n\temail = test@example.com\n'
+        '[init]\n\tdefaultBranch = main\n')
+    monkeypatch.setenv('GIT_CONFIG_GLOBAL', str(fake_global))
+    monkeypatch.setenv('GIT_CONFIG_SYSTEM', '/dev/null')
     remote = str(tmp_path / 'remote.git')
     _run('git', 'init', '--bare', '-q', '-b', 'main', remote)
     return remote
@@ -118,3 +121,12 @@ def test_app_aliases_point_at_core(app_module):
     assert app_module._git_run is git._git_run
     assert app_module._git_push_configs is git._git_push_configs
     assert app_module._GIT_PROTO_HARDENING is git._GIT_PROTO_HARDENING
+
+
+def test_no_test_ever_touches_the_real_global_gitconfig():
+    import os
+    src = open(os.path.abspath(__file__), encoding='utf-8').read()
+    body = src.split('def test_no_test_ever_touches_the_real_global_gitconfig')[0]
+    assert "'--global'" not in body and '"--global"' not in body, (
+        'a --global git config write lands in the developer\'s real ~/.gitconfig and '
+        'silently changes the author of every commit they make afterwards')
