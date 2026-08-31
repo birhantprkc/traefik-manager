@@ -339,15 +339,16 @@ function _buildConfigSelectOptions(sel, files, allowNew) {
 async function _populateConfigFileSelect(which) {
     const isRoute = which === 'route';
     const isPluginMw = which === 'pluginMw';
-    const wrapId     = isPluginMw ? 'pluginMwFileSelectWrap' : isRoute ? 'configFileSelectWrap' : 'mwConfigFileSelectWrap';
-    const selId      = isPluginMw ? 'pluginMwFileSelect' : isRoute ? 'configFileSelect' : 'mwConfigFileSelect';
-    const newInputId = isPluginMw ? 'pluginMwNewFileName' : isRoute ? 'newRouteFileName' : 'newMwFileName';
+    const isService = which === 'service';
+    const wrapId     = isService ? 'svcConfigFileSelectWrap' : isPluginMw ? 'pluginMwFileSelectWrap' : isRoute ? 'configFileSelectWrap' : 'mwConfigFileSelectWrap';
+    const selId      = isService ? 'svcConfigFileSelect' : isPluginMw ? 'pluginMwFileSelect' : isRoute ? 'configFileSelect' : 'mwConfigFileSelect';
+    const newInputId = isService ? 'newSvcFileName' : isPluginMw ? 'pluginMwNewFileName' : isRoute ? 'newRouteFileName' : 'newMwFileName';
     const wrap    = document.getElementById(wrapId);
     const sel     = document.getElementById(selId);
     const newInput = document.getElementById(newInputId);
     if (!sel) return;
     if (newInput) { newInput.style.display = 'none'; newInput.value = ''; }
-    const onChange = isPluginMw ? onPluginMwFileChange : isRoute ? onRouteConfigFileChange : onMwConfigFileChange;
+    const onChange = isService ? onSvcConfigFileChange : isPluginMw ? onPluginMwFileChange : isRoute ? onRouteConfigFileChange : onMwConfigFileChange;
     if (_activeAgent) {
         if (wrap) wrap.style.display = '';
         try {

@@ -83,7 +83,10 @@ The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encr
 
 ## API keys
 
-API keys are used by the mobile app and scripts to access the API without a browser session.
+API keys are used by the mobile app and scripts to access the API without a browser session. A key
+grants the same access as a signed-in session - there are no per-key scopes - so a valid key can
+create, edit and delete routes, middlewares and services. Treat keys like passwords and revoke any
+you no longer use.
 
 - Up to **10 keys** can exist simultaneously, each with a **device name** for identification
 - Each key is **hashed with SHA-256** - the plaintext is shown once at creation and never stored

@@ -883,6 +883,7 @@ paths:
                 subdomain: { type: string, description: "Hostname (e.g. app.example.com)" }
                 targetIp: { type: string, description: "Single backend host. Ignored when the matching backendsJson* field is sent." }
                 targetPort: { type: string }
+                serviceRef: { type: string, description: "Name of an existing service for the router to point at. When sent, no <name>-service is created and the backend fields are ignored. Sent empty it is a 400." }
                 backendsJsonHttp:
                   type: string
                   description: |
@@ -893,6 +894,14 @@ paths:
                     (`{enabled, path, interval, timeout}` - Go durations, a bare number is read as
                     seconds), and `priority` (integer). Omitted or invalid JSON falls back to
                     `targetIp`/`targetPort`. Rows with an empty `host` are skipped.
+
+                    `children` (array of `{kind, address, scheme, name, weight, percent}`) turns the
+                    route's service into a composite of the type in `compositeType` (`weighted`,
+                    `mirroring` or `failover`). A `manual` child becomes its own
+                    `<route>-backend-<n>` service; a `service` child is referenced by `name` and
+                    never copied. Sending `children: []` reverts the route to a plain
+                    `loadBalancer`. The key is acted on only when **present**, so clients that never
+                    send it cannot flatten a composite by accident.
                   example: '{"servers":[{"scheme":"http","host":"192.168.1.10","port":"8080"},{"scheme":"http","host":"192.168.1.11","port":"8080"}],"sticky":{"enabled":true,"cookieName":"tm_sticky","secure":true,"httpOnly":true},"healthCheck":{"enabled":true,"path":"/health","interval":"10s","timeout":"3s"},"priority":10}'
                 backendsJsonTcp:
                   type: string
@@ -2631,6 +2640,95 @@ paths:
                 properties:
                   ok: { type: boolean }
                   version: { type: string, example: "3.2.0" }
+
+  /api/services:
+    post:
+      tags: [Services]
+      summary: Create or update a composite service
+      description: >
+        Creates a `weighted`, `mirroring` or `failover` service and the child services for any
+        IP:Port backends. Pass `originalName` to rename an existing managed service. Refuses to
+        overwrite a service Traefik Manager does not manage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, children]
+              properties:
+                name:         { type: string, example: api-pool }
+                type:         { type: string, enum: [weighted, mirroring, failover] }
+                originalName: { type: string, description: set when renaming }
+                configFile:   { type: string }
+                children:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      kind:    { type: string, enum: [manual, service] }
+                      address: { type: string, example: "10.0.0.10:80" }
+                      name:    { type: string, description: for kind service }
+                      scheme:  { type: string, enum: [http, https] }
+                      weight:  { type: integer }
+                      percent: { type: integer, description: mirroring only }
+      responses:
+        "200": { description: Saved }
+        "400": { description: Bad name, type or backends }
+        "403": { description: Not managed by Traefik Manager }
+        "409": { description: A service of that name already exists }
+
+  /api/services/{name}/ownership:
+    post:
+      tags: [Services]
+      summary: Take over or release management of a composite service
+      description: >
+        Records or removes a ledger entry only. No YAML is written, so adopting a hand-written
+        service leaves the file byte for byte unchanged. Only `weighted`, `mirroring`, `failover`
+        and `highestRandomWeight` services can be managed.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                adopt: { type: boolean, description: true to manage, false to release }
+      responses:
+        "200":
+          description: Management changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:    { type: boolean }
+                  owned: { type: boolean }
+        "400": { description: Not a composite service }
+        "404": { description: No such service }
+
+  /api/services/{name}:
+    delete:
+      tags: [Services]
+      summary: Delete a managed composite service
+      description: >
+        Removes the service and the child services it owns. Refuses while a router still points at
+        it or another service still lists it as a backend.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Deleted }
+        "403": { description: Not managed by Traefik Manager }
+        "404": { description: No such service }
+        "409": { description: Still in use }
 
   /api/storage/status:
     get:

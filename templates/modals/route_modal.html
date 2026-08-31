@@ -97,15 +97,30 @@
                                 <i class="ph-bold ph-plus text-xs"></i> Add backend
                             </button>
                         </div>
-                        <div id="httpTargetGrid" class="grid grid-cols-2 gap-3">
-                            <div>
-                                <input type="text" name="targetIp" id="targetIp" class="input-field" placeholder="10.0.0.10">
-                            </div>
-                            <div>
-                                <input type="text" name="targetPort" id="targetPort" class="input-field" placeholder="8080">
-                            </div>
+                        <div id="httpTargetGrid" class="tm-backend-row grid gap-3" style="grid-template-columns:104px 96px 1fr 1fr 74px">
+                            <select class="input-field bk-kind text-sm" onchange="_bkKindChanged(this)">
+                                <option value="manual">IP : Port</option>
+                                <option value="service">Service</option>
+                            </select>
+                            <select name="scheme" id="scheme" class="input-field bk-scheme text-sm">
+                                <option value="http">HTTP</option>
+                                <option value="https">HTTPS</option>
+                            </select>
+                            <input type="text" name="targetIp" id="targetIp" class="input-field bk-host" placeholder="10.0.0.10">
+                            <input type="text" name="targetPort" id="targetPort" class="input-field bk-port" placeholder="8080">
+                            <input type="number" class="input-field bk-weight text-sm" value="1" min="0" title="Weight" style="display:none">
+                            <select class="input-field bk-svc text-sm" style="display:none;grid-column:2 / span 3"></select>
                         </div>
                         <div id="httpBackendRows"></div>
+                        <div id="httpCompositeRow" class="flex items-center gap-2 mt-2" style="display:none">
+                            <span class="text-xs" style="color:var(--muted)">Combine backends as</span>
+                            <select id="httpCompositeType" class="input-field text-sm" style="width:150px" onchange="_bkCompositeChanged()">
+                                <option value="weighted">Weighted</option>
+                                <option value="mirroring">Mirroring</option>
+                                <option value="failover">Failover</option>
+                            </select>
+                            <span id="httpCompositeHint" class="text-xs" style="color:var(--muted)"></span>
+                        </div>
                         <p id="httpBackendsHint" class="text-xs mt-1" style="color:var(--muted)">Add more backends to load-balance across several servers.</p>
                     </div>
                     <div id="httpLbAdvanced">
@@ -173,13 +188,6 @@
                             <span class="text-xs" style="color:var(--muted);align-self:center">Loading...</span>
                         </div>
                         <input type="hidden" name="middlewares" id="middlewares">
-                    </div>
-                    <div>
-                        <label>Backend Scheme</label>
-                        <select name="scheme" id="scheme" class="input-field">
-                            <option value="http">HTTP</option>
-                            <option value="https">HTTPS</option>
-                        </select>
                     </div>
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">

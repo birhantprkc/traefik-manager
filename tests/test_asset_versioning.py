@@ -33,6 +33,20 @@ def test_every_versioned_asset_uses_the_app_version():
 
 def test_the_stylesheet_is_stamped_with_the_running_version(client):
     html = client.get('/').data.decode()
-    assert '/static/css/app.css?v=%s' % APP_VERSION in html, (
+    assert '/static/css/app.css?v=%s-' % APP_VERSION in html, (
         'app.css is not cache busted with the current version, so the redesigned '
         'stat panel would render against a cached copy of the old stylesheet')
+
+
+def test_the_asset_version_changes_when_a_static_file_changes(client, app_module):
+    import re as _re
+    html = client.get('/').data.decode()
+    m = _re.search(r'app\.css\?v=([\w.-]+)', html)
+    assert m, 'no versioned stylesheet found'
+    version = m.group(1)
+    assert version != APP_VERSION, (
+        'the bare app version never changes between beta builds, so every '
+        'iteration inside one release serves stale JS from the browser cache')
+    assert version.startswith(APP_VERSION + '-')
+    stamp = version.split('-', 1)[1]
+    assert stamp.isdigit() and int(stamp) > 0

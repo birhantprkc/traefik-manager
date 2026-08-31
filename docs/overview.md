@@ -51,7 +51,7 @@ Always visible. These tabs read and write your Traefik dynamic config.
 |-----|-------------|
 | [Routes](tab-routes.md) | Create, edit, delete, and enable/disable HTTP, TCP, and UDP routes |
 | [Middlewares](tab-middlewares.md) | Create and manage middlewares with built-in templates |
-| [Services](tab-services.md) | Read-only view of all services across every provider |
+| [Services](tab-services.md) | View services from every provider; create and edit the ones in your config files |
 
 **Multiple config files** - mount several dynamic config files with `CONFIG_DIR` or `CONFIG_PATHS`. A dropdown in the route and middleware forms picks the file each entry is written to. See [Environment Variables](env-vars.md).
 

@@ -1,4 +1,6 @@
 let _allServices = [];
+let _ownedChildNames = new Set();
+let _ownedServiceNames = new Set();
 let _svcFilter = 'all';
 let _protoLiveFilter = 'all';
 let _providerFilter = 'all';
@@ -79,6 +81,8 @@ async function refreshLiveView() {
         const http = (res.http || []).map(s => ({ ...s, _proto: 'HTTP' }));
         const tcp  = (res.tcp  || []).map(s => ({ ...s, _proto: 'TCP' }));
         const udp  = (res.udp  || []).map(s => ({ ...s, _proto: 'UDP' }));
+        _ownedChildNames = new Set(res.ownedChildren || []);
+        _ownedServiceNames = new Set(res.ownedServices || []);
         _allServices = [...http, ...tcp, ...udp].sort((a,b) => (a.name||'').localeCompare(b.name||''));
 
         if (_allServices.length === 0) {
@@ -120,8 +124,11 @@ function renderServicesTable() {
         return parts.length > 1 ? parts[parts.length-1] : 'file';
     };
 
-    const uniqueProtos = [...new Set(_allServices.map(s => s._proto).filter(Boolean))].sort();
-    const uniqueProviders = [...new Set(_allServices.map(providerOf))].sort();
+    const ownedIdx = _svcOwnedChildIndex(_allServices, _ownedChildNames);
+    const listed = _allServices.filter((s, i) => !ownedIdx.has(i));
+
+    const uniqueProtos = [...new Set(listed.map(s => s._proto).filter(Boolean))].sort();
+    const uniqueProviders = [...new Set(listed.map(providerOf))].sort();
     const protoMenu = document.getElementById('dd-proto-menu');
     if (protoMenu) {
         protoMenu.innerHTML = ['all', ...uniqueProtos].map(p => {
@@ -140,6 +147,7 @@ function renderServicesTable() {
     let items = [];
     for (let i = 0; i < _allServices.length; i++) {
         const s = _allServices[i];
+        if (ownedIdx.has(i) && !search) continue;
         if (_svcFilter !== 'all' && statusOf(s) !== _svcFilter) continue;
         if (_protoLiveFilter !== 'all' && s._proto !== _protoLiveFilter) continue;
         if (_providerFilter !== 'all' && providerOf(s) !== _providerFilter) continue;
@@ -162,6 +170,7 @@ function renderServicesTable() {
         const provider  = providerOf(s);
         const type      = typeOf(s);
         const st        = statusOf(s);
+        const ownerName = ownedIdx.has(globalIdx) ? _svcOwnerName(_allServices, s) : '';
 
         const stColor = st === 'success' ? 'var(--green)' : st === 'error' ? 'var(--red)' : 'var(--yellow)';
         const stLabel = st === 'success' ? 'Success'      : st === 'error' ? 'Error'      : 'Warning';
@@ -211,9 +220,9 @@ function renderServicesTable() {
                     <span class="tm-ic tm-ic-tile"><i class="ph-bold ${composite.length ? 'ph-share-network' : 'ph-hard-drives'}"></i><span class="status-dot ${dotCls}" title="${_esc(dotTitle)}"></span></span>
                     <div class="tm-head-txt">
                         <div class="tm-title">${proto !== 'HTTP' ? `<span class="tm-proto tm-proto-${proto.toLowerCase()}">${proto}</span>` : ''}<span class="tm-name">${_esc(name)}</span></div>
-                        <div class="tm-sub">${_esc(type || 'service')} \u00b7 ${_esc(provider)}</div>
+                        <div class="tm-sub">${_esc(type || 'service')} \u00b7 ${_esc(provider)}${ownerName ? ' \u00b7 backend of ' + _esc(ownerName) : ''}</div>
                     </div>
-                    <span class="tm-rail tm-rail-sm" onclick="event.stopPropagation()"><button type="button" class="tm-btn" title="Details" onclick="event.stopPropagation();openSvcDetail(${globalIdx})"><i class="ph-bold ph-info"></i></button></span>
+                    <span class="tm-rail tm-rail-sm" onclick="event.stopPropagation()"><button type="button" class="tm-btn" title="Details" onclick="event.stopPropagation();openSvcDetail(${globalIdx})"><i class="ph-bold ph-info"></i></button>${_svcEditable(s) ? `<button type="button" class="tm-btn" title="Edit" onclick="event.stopPropagation();openServiceModal(_allServices[${globalIdx}])"><i class="ph-bold ph-pencil-simple"></i></button>` : ''}</span>
                 </div>
                 ${rows ? `<div class="tm-vals">${rows}</div>` : ''}
                 <div class="tm-foot"><span class="tm-meta">${meta}</span>${usedTxt ? `<span class="tm-cf">${_esc(usedTxt)}</span>` : ''}</div>
@@ -230,7 +239,7 @@ function renderServicesTable() {
                     <span class="svc-status-dot" style="background:${stColor}"></span>${stLabel}
                 </span>
             </div>
-            <div class="svc-card-name">${_esc(name)}</div>
+            <div class="svc-card-name">${_esc(name)}${ownerName ? `<span class="svc-type-badge" style="margin-left:6px">backend of ${_esc(ownerName)}</span>` : ''}</div>
             <div class="svc-card-meta">
                 <span class="svc-meta-chip"><i class="ph-bold ph-database" style="font-size:10px"></i>${_esc(provider)}</span>
                 ${serverSummary ? `<span class="svc-meta-chip" style="color:${srvColor};background:color-mix(in srgb,${srvColor} 10%,transparent);border-color:color-mix(in srgb,${srvColor} 35%,transparent)"><i class="ph-bold ph-hard-drives" style="font-size:10px"></i>${serverSummary}</span>` : ''}
@@ -257,6 +266,7 @@ function renderServicesTable() {
             const serverSummary = serverEntries.length > 0 ? `${activeCount}/${serverEntries.length}` : null;
             const srvColor      = serverEntries.length > 0 && activeCount === serverEntries.length ? 'var(--green)' : 'var(--orange)';
             const usedBy        = s.usedBy || [];
+            const ownerName     = ownedIdx.has(globalIdx) ? _svcOwnerName(_allServices, s) : '';
             const lbServers     = (s.loadBalancer?.servers || []);
             const serverUrls    = lbServers.length > 0
                 ? lbServers
@@ -276,7 +286,7 @@ function renderServicesTable() {
                     <span class="d-flat d-proto d-proto-${proto.toLowerCase()}">${proto}</span>
                     ${type ? `<span class="d-flat d-blue">${type}</span>` : ''}
                 </div>
-                <div class="svc-list-col-name">${_esc(name)}</div>
+                <div class="svc-list-col-name">${_esc(name)}${ownerName ? ` <span class="d-flat d-off">backend of ${_esc(ownerName)}</span>` : ''}</div>
                 <div class="svc-list-col-url overflow-hidden">${serverUrlHtml}</div>
                 <div class="svc-list-col-provider"><span class="d-flat d-off"><i class="ph-bold ph-database" style="font-size:10px;margin-right:4px"></i>${_esc(provider)}</span></div>
                 <div class="svc-list-col-servers">${serverSummary ? `<span class="d-flat" style="color:${srvColor}"><i class="ph-bold ph-hard-drives" style="font-size:10px;margin-right:4px"></i>${serverSummary}</span>` : '<span class="d-flat d-off">-</span>'}</div>
@@ -298,7 +308,49 @@ function renderServicesTable() {
         document.getElementById('liveContent').innerHTML = `<div class="${cls}">${cards}${empty}</div>`;
     }
 
-    setTabCount('live', _allServices.length);
+    setTabCount('live', _allServices.length - ownedIdx.size);
+}
+
+function _svcProvider(s) {
+    return (s.name || '').includes('@') ? s.name.split('@').pop() : 'file';
+}
+
+function _svcEditable(s) {
+    const provider = (s.name || '').includes('@') ? s.name.split('@').pop() : 'file';
+    if (provider !== 'file') return false;
+    if (_ownedChildNames.has(_svcBareName(s.name))) return false;
+    const kind = _compositeTypeOf(s);
+    return !!kind || !!s.loadBalancer;
+}
+
+function _svcOwnershipHtml(s) {
+    const bare = _svcBareName(s.name);
+    const owned = _ownedServiceNames.has(bare);
+    return `<div class="text-xs" style="color:var(--muted)">${owned
+            ? 'Traefik Manager manages this service. Routes using it can edit their backends here.'
+            : 'This service is not managed by Traefik Manager, so routes using it are read only.'}</div>
+        <button type="button" class="btn-secondary text-xs mt-2" onclick="_setServiceOwnership('${_esc(bare)}', ${owned ? 'false' : 'true'})">
+            <i class="ph-bold ${owned ? 'ph-hand-withdraw' : 'ph-hand-deposit'} text-xs"></i> ${owned ? 'Stop managing' : 'Manage this service'}
+        </button>`;
+}
+
+async function _setServiceOwnership(name, adopt) {
+    try {
+        const res = await agentFetch('/api/services/' + encodeURIComponent(name) + '/ownership', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+            body: JSON.stringify({ adopt }),
+        });
+        const body = await res.json();
+        if (!res.ok || !body.ok) {
+            showToast(body.error || 'Could not change management', 'error');
+            return;
+        }
+        showToast(adopt ? 'Traefik Manager now manages ' + name : 'Released ' + name, 'success');
+        loadServices();
+    } catch (e) {
+        showToast('Could not change management', 'error');
+    }
 }
 
 function _compositeChildren(s) {
@@ -313,6 +365,53 @@ function _compositeChildren(s) {
     if (s.failover?.service)  out.push({ name: s.failover.service,  role: 'Primary',  share: '-' });
     if (s.failover?.fallback) out.push({ name: s.failover.fallback, role: 'Fallback', share: '-' });
     return out.filter(c => c.name);
+}
+
+function _svcBareName(name) {
+    return String(name || '').split('@')[0];
+}
+
+function _svcOwnedBases(parent) {
+    const bases = [];
+    const suffix = '-service';
+    const p = _svcBareName(parent && parent.name);
+    if (p.endsWith(suffix) && p.length > suffix.length) bases.push(p.slice(0, -suffix.length));
+    (((parent && parent.usedBy) || [])).forEach(r => {
+        const b = _svcBareName(r);
+        if (b) bases.push(b);
+    });
+    return bases;
+}
+
+function _svcOwnsChild(parent, child) {
+    if (!parent || !child || parent === child) return false;
+    if ((parent._proto || 'HTTP') !== (child._proto || 'HTTP')) return false;
+    if (!child.loadBalancer || _compositeChildren(child).length > 0) return false;
+    if ((child.usedBy || []).length > 0) return false;
+    const cName = _svcBareName(child.name);
+    if (!cName) return false;
+    const named = _svcOwnedBases(parent).some(base => {
+        const prefix = base + '-backend-';
+        return cName.startsWith(prefix) && /^[0-9]+$/.test(cName.slice(prefix.length));
+    });
+    if (!named) return false;
+    return _compositeChildren(parent).some(c => _svcBareName(c.name) === cName);
+}
+
+function _svcOwnedChildIndex(services, ledgerNames) {
+    const list = services || [];
+    const known = ledgerNames || new Set();
+    const owned = new Set();
+    for (let i = 0; i < list.length; i++) {
+        if (known.has(_svcBareName(list[i].name))) { owned.add(i); continue; }
+        if (list.some(p => _svcOwnsChild(p, list[i]))) owned.add(i);
+    }
+    return owned;
+}
+
+function _svcOwnerName(services, child) {
+    const parent = (services || []).find(p => _svcOwnsChild(p, child));
+    return parent ? _svcBareName(parent.name) : '';
 }
 
 function _openServiceByName(name) {
@@ -399,17 +498,35 @@ function openSvcDetail(idx) {
             `<button type="button" class="route-deep-chip" onclick="_openRouteByName('${_esc(String(r))}')" title="Open route"><i class="ph-bold ph-arrows-split"></i>${_esc(String(r).split('@')[0])}</button>`).join('')}</div>`
         : `<span class="text-xs" style="color:var(--muted)">-</span>`;
 
+    const ownerName = _svcOwnerName(_allServices, s);
+    const detailRows = [
+        ['Type', type, false],
+        ['Provider', _dText(provider, 'd-off'), true],
+        ['Status', statusBadge, true],
+        ['Pass Host Header', passHostHeader === '-' ? '-' : _dBool(passHostHeader === 'true'), true],
+    ];
+    if (ownerName) {
+        detailRows.splice(1, 0, ['Backend of',
+            `<button type="button" class="route-deep-chip" onclick="_openServiceByName('${_esc(ownerName)}')" title="Open service"><i class="ph-bold ph-stack"></i>${_esc(ownerName)}</button>`,
+            true]);
+    }
+
     body.innerHTML =
-        renderSection('Service Details', 'ph-info', [
-            ['Type', type, false],
-            ['Provider', _dText(provider, 'd-off'), true],
-            ['Status', statusBadge, true],
-            ['Pass Host Header', passHostHeader === '-' ? '-' : _dBool(passHostHeader === 'true'), true],
-        ])
+        renderSection('Service Details', 'ph-info', detailRows)
         + (children.length
             ? renderDetailBlock('Backends', 'ph-tree-structure', childrenHtml, _dCount(children.length))
             : renderDetailBlock('Servers', 'ph-globe', serversHtml, _dCount(servers.length)))
+        + (children.length && _svcProvider(s) === 'file' ? renderDetailBlock('Management', 'ph-user-gear', _svcOwnershipHtml(s)) : '')
         + renderDetailBlock('Used by Routers', 'ph-git-branch', usedByHtml);
+
+    const editBtn = document.getElementById('svcDetailEditBtn');
+    if (editBtn) {
+        const canEdit = _svcEditable(s);
+        editBtn.style.display = canEdit ? '' : 'none';
+        if (canEdit) {
+            editBtn.onclick = () => { closeSvcDetail(); openServiceModal(s); };
+        }
+    }
 
     backdrop.classList.add('open');
     panel.classList.add('open');
@@ -420,4 +537,241 @@ function closeSvcDetail() {
     setDetailDockOpen(false);
     document.getElementById('svcDetailPanel').classList.remove('open');
     document.getElementById('svcDetailBackdrop').classList.remove('open');
+}
+
+let _svcRowSeq = 0;
+
+function _svcTypeChanged() {
+    const kind = document.getElementById('svcType')?.value || 'weighted';
+    const hint = document.getElementById('svcTypeHint');
+    if (hint) {
+        hint.textContent = kind === 'loadBalancer' ? 'Requests are spread evenly across the servers.'
+            : kind === 'weighted' ? 'Traffic is split between the backends by weight.'
+            : kind === 'mirroring' ? 'The first backend serves every request; the rest receive a copy by percentage.'
+            : 'The first backend serves; the second takes over if it fails.';
+    }
+    const plain = kind === 'loadBalancer';
+    document.querySelectorAll('#svcRows .svc-row').forEach(r => {
+        const w = r.querySelector('.svc-weight');
+        if (w) { w.style.display = plain ? 'none' : ''; w.title = kind === 'mirroring' ? 'Percent' : 'Weight'; }
+        const k = r.querySelector('.svc-kind');
+        if (k) {
+            k.style.display = plain ? 'none' : '';
+            if (plain) { k.value = 'manual'; _svcRowKindChanged(k); }
+        }
+        r.style.gridTemplateColumns = plain ? '96px 1fr 32px' : '104px 96px 1fr 74px 32px';
+    });
+}
+
+async function addServiceRow(data) {
+    const wrap = document.getElementById('svcRows');
+    if (!wrap) return;
+    const d = data || {};
+    const id = 'svcrow' + (++_svcRowSeq);
+    const row = document.createElement('div');
+    row.className = 'svc-row tm-backend-row grid gap-3 mt-2';
+    row.style.gridTemplateColumns = '104px 96px 1fr 74px 32px';
+    row.id = id;
+    row.innerHTML =
+        `<select class="input-field svc-kind text-sm" onchange="_svcRowKindChanged(this)"><option value="manual">IP : Port</option><option value="service">Service</option></select>`
+        + `<select class="input-field svc-scheme text-sm"><option value="http">HTTP</option><option value="https">HTTPS</option></select>`
+        + `<input type="text" class="input-field svc-addr text-sm" placeholder="10.0.0.10:80">`
+        + `<select class="input-field svc-ref text-sm" style="display:none"></select>`
+        + `<input type="number" class="input-field svc-weight text-sm" value="1" min="0" title="Weight">`
+        + `<button type="button" onclick="this.closest('.svc-row').remove()" class="btn-secondary" title="Remove" style="padding:0;width:32px;display:flex;align-items:center;justify-content:center"><i class="ph-bold ph-trash text-xs" style="color:var(--red)"></i></button>`;
+    wrap.appendChild(row);
+    if (d.kind === 'service') row.querySelector('.svc-kind').value = 'service';
+    if (d.scheme) row.querySelector('.svc-scheme').value = d.scheme;
+    if (d.address) row.querySelector('.svc-addr').value = d.address;
+    if (d.weight != null) row.querySelector('.svc-weight').value = d.weight;
+    await _svcFillRefSelect(row, d.name);
+    _svcRowKindChanged(row.querySelector('.svc-kind'));
+    _svcTypeChanged();
+}
+
+async function _svcFillRefSelect(row, selected) {
+    const sel = row.querySelector('.svc-ref');
+    if (!sel) return;
+    const svcs = (await _ensureServicesList()).http || [];
+    const editing = (document.getElementById('svcOriginalName')?.value || '').trim();
+    const usable = svcs.filter(n => n !== editing);
+    sel.innerHTML = usable.length
+        ? usable.map(n => `<option value="${_esc(n)}">${_esc(n)}</option>`).join('')
+        : '<option value="">No other services to reference yet</option>';
+    if (selected && !usable.includes(selected)) {
+        sel.insertAdjacentHTML('afterbegin', `<option value="${_esc(selected)}">${_esc(selected)}</option>`);
+    }
+    if (selected) sel.value = selected;
+}
+
+function _svcRowKindChanged(select) {
+    if (!select) return;
+    const row = select.closest('.svc-row');
+    if (!row) return;
+    const isSvc = select.value === 'service';
+    const addr = row.querySelector('.svc-addr');
+    const ref = row.querySelector('.svc-ref');
+    const scheme = row.querySelector('.svc-scheme');
+    if (addr) addr.style.display = isSvc ? 'none' : '';
+    if (scheme) scheme.style.display = isSvc ? 'none' : '';
+    if (ref) { ref.style.display = isSvc ? '' : 'none'; ref.style.gridColumn = isSvc ? '2 / span 2' : ''; }
+}
+
+function _collectServiceRows() {
+    const kind = document.getElementById('svcType')?.value || 'weighted';
+    const out = [];
+    document.querySelectorAll('#svcRows .svc-row').forEach(r => {
+        const raw = parseInt(r.querySelector('.svc-weight')?.value, 10);
+        const share = isNaN(raw) ? (kind === 'mirroring' ? 0 : 1) : raw;
+        if (r.querySelector('.svc-kind')?.value === 'service') {
+            const name = (r.querySelector('.svc-ref')?.value || '').trim();
+            if (name) out.push({ kind: 'service', name, weight: share, percent: share });
+            return;
+        }
+        const address = (r.querySelector('.svc-addr')?.value || '').trim();
+        const scheme = r.querySelector('.svc-scheme')?.value || 'http';
+        if (address) out.push({ kind: 'manual', address, scheme, weight: share, percent: share });
+    });
+    return out;
+}
+
+async function openServiceModal(existing) {
+    closeOtherPanels('serviceModal');
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    set('svcOriginalName', existing ? _svcBareName(existing.name) : '');
+    set('svcName', existing ? _svcBareName(existing.name) : '');
+    set('svcType', existing ? (_compositeTypeOf(existing) || 'loadBalancer') : 'loadBalancer');
+    const err = document.getElementById('svcError');
+    if (err) err.style.display = 'none';
+    const title = document.getElementById('svcModalTitle');
+    if (title) title.textContent = existing ? 'Edit Service' : 'Add Service';
+    const del = document.getElementById('svcDeleteBtn');
+    if (del) del.style.display = existing ? '' : 'none';
+    const rows = document.getElementById('svcRows');
+    if (rows) rows.innerHTML = '';
+    await _populateConfigFileSelect('service');
+    if (existing && !_compositeTypeOf(existing)) {
+        const urls = ((existing.loadBalancer || {}).servers || [])
+            .map(sv => sv.url || sv.address).filter(Boolean);
+        if (urls.length) {
+            for (const u of urls) await addServiceRow(_svcUrlToRow(u));
+        } else {
+            await addServiceRow();
+        }
+    } else if (existing) {
+        for (const c of _compositeChildren(existing).map(_svcChildToRow)) await addServiceRow(c);
+    } else {
+        await addServiceRow();
+    }
+    _svcTypeChanged();
+    document.getElementById('serviceModal')?.classList.add('open');
+    document.getElementById('svcBackdrop')?.classList.add('open');
+    if (!setDetailDockOpen(true)) document.body.style.overflow = 'hidden';
+}
+
+function _compositeTypeOf(s) {
+    return s.weighted ? 'weighted' : s.mirroring ? 'mirroring' : s.failover ? 'failover' : '';
+}
+
+function _svcUrlToRow(url) {
+    const u = String(url || '');
+    return { kind: 'manual',
+             scheme: u.startsWith('https://') ? 'https' : 'http',
+             address: u.replace(/^https?:\/\//, '') };
+}
+
+function _svcChildToRow(label) {
+    const name = String(label).split(' ')[0];
+    const m = String(label).match(/\((\d+)%?\)/);
+    const weight = m ? m[1] : 1;
+    if (!_ownedChildNames.has(name)) return { kind: 'service', name, weight };
+    const child = _allServices.find(x => _svcBareName(x.name) === name);
+    const url = (((child || {}).loadBalancer || {}).servers || [])
+        .map(sv => sv.url || sv.address).filter(Boolean)[0] || '';
+    return { ..._svcUrlToRow(url), weight };
+}
+
+function onSvcConfigFileChange(sel) {
+    const newInput = document.getElementById('newSvcFileName');
+    if (!newInput) return;
+    if (sel.value === '__new__') {
+        newInput.style.display = '';
+        const svcName = (document.getElementById('svcName')?.value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        if (!newInput.value && svcName) newInput.value = `services-${svcName}.yml`;
+    } else {
+        newInput.style.display = 'none';
+        newInput.value = '';
+    }
+}
+
+function _svcTargetConfigFile() {
+    const sel = document.getElementById('svcConfigFileSelect');
+    if (sel && sel.value === '__new__') {
+        return (document.getElementById('newSvcFileName')?.value || '').trim();
+    }
+    return sel ? sel.value : '';
+}
+
+function closeServiceModal() {
+    setDetailDockOpen(false);
+    document.getElementById('serviceModal')?.classList.remove('open');
+    document.getElementById('svcBackdrop')?.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+async function saveServiceModal() {
+    const err = document.getElementById('svcError');
+    const show = (msg) => { if (err) { err.textContent = msg; err.style.display = ''; } };
+    const name = (document.getElementById('svcName')?.value || '').trim();
+    const children = _collectServiceRows();
+    if (!name) return show('Give the service a name.');
+    if (!children.length) return show('Add at least one backend.');
+    const btn = document.getElementById('svcSaveBtn');
+    if (btn) btn.disabled = true;
+    try {
+        const res = await agentFetch('/api/services', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+            body: JSON.stringify({
+                name,
+                type: document.getElementById('svcType')?.value || 'weighted',
+                originalName: (document.getElementById('svcOriginalName')?.value || '').trim(),
+                configFile: _svcTargetConfigFile(),
+                children,
+            }),
+        });
+        const body = await res.json();
+        if (!res.ok || !body.ok) return show(body.error || 'Could not save the service');
+        closeServiceModal();
+        showToast('Service ' + name + ' saved', 'success');
+        window._tmServices = null;
+        loadServices();
+    } catch (e) {
+        show('Could not save the service');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function deleteServiceFromModal() {
+    const name = (document.getElementById('svcOriginalName')?.value || '').trim();
+    if (!name) return;
+    if (!confirm('Delete the service ' + name + '? Its own backends are removed with it.')) return;
+    const err = document.getElementById('svcError');
+    try {
+        const res = await agentFetch('/api/services/' + encodeURIComponent(name), {
+            method: 'DELETE', headers: { 'X-Requested-With': 'fetch' },
+        });
+        const body = await res.json();
+        if (!res.ok || !body.ok) {
+            if (err) { err.textContent = body.error || 'Could not delete'; err.style.display = ''; }
+            return;
+        }
+        closeServiceModal();
+        showToast('Service ' + name + ' deleted', 'success');
+        window._tmServices = null;
+        loadServices();
+    } catch (e) {
+        if (err) { err.textContent = 'Could not delete'; err.style.display = ''; }
+    }
 }

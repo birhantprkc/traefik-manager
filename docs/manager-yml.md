@@ -565,6 +565,7 @@ Ownership ledger for the middlewares and `serversTransports` that traefik-manage
 |---|---|
 | `<route>-headers` | The middleware created by the [Security headers preset](./tab-routes#security-headers-preset) |
 | `tp::<name>` | A generated `serversTransport`. Written whenever a route needs one, including Skip TLS verification as well as the streaming preset |
+| `svc::<name>` | A composite service ([Services tab](./tab-services)) - the parent, and one entry per generated `<name>-backend-<n>` child. The entry records the type and child list, and ownership only holds while the file still matches it, so a hand edit or a restore makes the service read only instead of being overwritten |
 | `agent_<id>::...` | The same, on a remote agent - each server is tracked separately |
 
 Deleting a route removes the `<service>-transport` it owns and its ledger entry, unless another service or a disabled route still references it. Removing an agent drops every `agent_<id>::` entry.

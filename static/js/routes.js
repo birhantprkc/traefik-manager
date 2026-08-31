@@ -260,13 +260,13 @@ function setHttpRuleMode(mode) {
     if (!isAdv) { const el = document.getElementById('httpRule'); if (el) el.value = ''; }
 }
 
-function _applyServiceTypeNotice(svcType) {
-    const editable = !svcType || svcType === 'loadBalancer';
+function _applyServiceTypeNotice(svcType, owned) {
+    const editable = !svcType || svcType === 'loadBalancer' || !!owned;
     const notice = document.getElementById('svcTypeNotice');
     if (notice) notice.style.display = editable ? 'none' : 'flex';
     if (!editable) {
         const text = document.getElementById('svcTypeNoticeText');
-        if (text) text.textContent = `This route points at a ${svcType} service, which can't be edited here. The target field is ignored on save - use the Raw YAML editor to change it.`;
+        if (text) text.textContent = `This route points at a ${svcType} service, which can't be edited here. The target field is ignored on save - edit the service on the Services tab.`;
     }
     ['targetIp', 'targetPort', 'targetIpTcp', 'targetPortTcp', 'targetIpUdp', 'targetPortUdp'].forEach(id => {
         const el = document.getElementById(id);
@@ -1295,6 +1295,102 @@ function removeBackendRow(btn) {
     if (row) row.remove();
 }
 
+function _bkRows() {
+    const zero = document.getElementById('httpTargetGrid');
+    const rest = Array.from(document.querySelectorAll('#httpBackendRows .tm-backend-row'));
+    return zero ? [zero, ...rest] : rest;
+}
+
+function _bkKindOf(row) {
+    return row.querySelector('.bk-kind')?.value === 'service' ? 'service' : 'manual';
+}
+
+function _bkAnyServiceRow() {
+    return _bkRows().some(r => _bkKindOf(r) === 'service' && (r.querySelector('.bk-svc')?.value || ''));
+}
+
+function _bkKindChanged(select) {
+    if (!select) return;
+    const row = select.closest('.tm-backend-row');
+    if (!row) return;
+    const isSvc = select.value === 'service';
+    if (isSvc) {
+        const picker = row.querySelector('.bk-svc');
+        if (picker && !picker.options.length) {
+            _bkFillServiceSelect(row).then(() => _bkSyncWeights());
+        }
+    }
+    const show = (sel, on) => { const el = row.querySelector(sel); if (el) el.style.display = on ? '' : 'none'; };
+    show('.bk-host', !isSvc);
+    show('.bk-port', !isSvc);
+    show('.bk-scheme', !isSvc);
+    show('.bk-svc', isSvc);
+    const svcSel = row.querySelector('.bk-svc');
+    if (svcSel) svcSel.style.gridColumn = isSvc ? '2 / span 3' : '';
+    _bkSyncWeights();
+}
+
+function _bkSyncWeights() {
+    const on = _bkAnyServiceRow();
+    _bkRows().forEach(r => {
+        const w = r.querySelector('.bk-weight');
+        if (w) w.style.display = on ? '' : 'none';
+    });
+    const cRow = document.getElementById('httpCompositeRow');
+    if (cRow) cRow.style.display = on ? '' : 'none';
+    _bkCompositeChanged();
+}
+
+function _bkCompositeChanged() {
+    const kind = document.getElementById('httpCompositeType')?.value || 'weighted';
+    const hint = document.getElementById('httpCompositeHint');
+    if (hint) {
+        hint.textContent = kind === 'weighted' ? 'Traffic is split by weight.'
+            : kind === 'mirroring' ? 'The first backend serves; the rest receive a copy by percentage.'
+            : 'The first backend serves; the second takes over if it fails.';
+    }
+    _bkRows().forEach(r => {
+        const w = r.querySelector('.bk-weight');
+        if (w) w.title = kind === 'mirroring' ? 'Percent' : 'Weight';
+    });
+}
+
+async function _bkFillServiceSelect(row, selected) {
+    const sel = row.querySelector('.bk-svc');
+    if (!sel) return;
+    const svcs = (await _ensureServicesList()).http || [];
+    sel.innerHTML = svcs.length
+        ? svcs.map(n => `<option value="${_esc(n)}">${_esc(n)}</option>`).join('')
+        : '<option value="">No other services to reference yet</option>';
+    if (selected && !svcs.includes(selected)) {
+        sel.insertAdjacentHTML('afterbegin', `<option value="${_esc(selected)}">${_esc(selected)}</option>`);
+    }
+    if (selected) sel.value = selected;
+}
+
+function _collectBackendChildren() {
+    const kind = document.getElementById('httpCompositeType')?.value || 'weighted';
+    const out = [];
+    _bkRows().forEach(r => {
+        const weight = parseInt(r.querySelector('.bk-weight')?.value, 10);
+        const share = isNaN(weight) ? (kind === 'mirroring' ? 0 : 1) : weight;
+        if (_bkKindOf(r) === 'service') {
+            const name = (r.querySelector('.bk-svc')?.value || '').trim();
+            if (name) out.push({ kind: 'service', name, weight: share, percent: share });
+            return;
+        }
+        const host = (r.querySelector('.bk-host')?.value || '').trim();
+        if (!host) return;
+        const port = (r.querySelector('.bk-port')?.value || '').trim();
+        const scheme = r === document.getElementById('httpTargetGrid')
+            ? (document.getElementById('scheme')?.value || 'http')
+            : (r.querySelector('.bk-scheme')?.value || 'http');
+        out.push({ kind: 'manual', address: port ? host + ':' + port : host,
+                   scheme, weight: share, percent: share });
+    });
+    return out;
+}
+
 function addBackendRow(proto, data) {
     const wrap = document.getElementById(proto + 'BackendRows');
     if (!wrap) return;
@@ -1305,14 +1401,32 @@ function addBackendRow(proto, data) {
     const schemeCell = proto === 'http'
         ? `<select class="input-field bk-scheme"><option value="http">HTTP</option><option value="https">HTTPS</option></select>`
         : '';
-    row.innerHTML = schemeCell +
+    const kindCell = proto === 'http'
+        ? `<select class="input-field bk-kind text-sm" onchange="_bkKindChanged(this)"><option value="manual">IP : Port</option><option value="service">Service</option></select>`
+        : '';
+    row.innerHTML = kindCell + schemeCell +
         `<input type="text" class="input-field bk-host" placeholder="10.0.0.11">` +
         `<input type="text" class="input-field bk-port" placeholder="8080">` +
+        (proto === 'http' ? `<select class="input-field bk-svc text-sm" style="display:none"></select>` : '') +
+        (proto === 'http' ? `<input type="number" class="input-field bk-weight text-sm" value="1" min="0" title="Weight" style="display:none">` : '') +
         `<button type="button" onclick="removeBackendRow(this)" class="btn-secondary" title="Remove backend" style="padding:0;width:32px;display:flex;align-items:center;justify-content:center"><i class="ph-bold ph-trash text-xs" style="color:var(--red)"></i></button>`;
+    if (proto === 'http') row.style.gridTemplateColumns = '104px 96px 1fr 1fr 74px 32px';
     wrap.appendChild(row);
     if (proto === 'http' && d.scheme) row.querySelector('.bk-scheme').value = d.scheme;
     if (d.host) row.querySelector('.bk-host').value = d.host;
     if (d.port) row.querySelector('.bk-port').value = d.port;
+    if (proto === 'http') {
+        if (d.kind === 'service') {
+            const sel = row.querySelector('.bk-kind');
+            if (sel) sel.value = 'service';
+        }
+        if (d.weight != null) {
+            const w = row.querySelector('.bk-weight');
+            if (w) w.value = d.weight;
+        }
+        _bkFillServiceSelect(row, d.name);
+        _bkKindChanged(row.querySelector('.bk-kind'));
+    }
 }
 
 function _clearBackendRows(proto) {
@@ -1354,6 +1468,43 @@ function _populateBackends(proto, servers) {
     }
 }
 
+function _loadCompositeRows(app) {
+    const rows = (app && app.compositeChildren) || [];
+    const kindSel = document.getElementById('httpCompositeType');
+    if (kindSel) {
+        kindSel.value = ['weighted', 'mirroring', 'failover'].includes(app.serviceType)
+            ? app.serviceType : 'weighted';
+    }
+    if (!rows.length) return false;
+    _clearBackendRows('http');
+    const owned = new Set(app.ownedChildren || []);
+    const asRow = (c) => {
+        const isOwned = owned.has(c.name) || !!c.url;
+        const share = kindSel && kindSel.value === 'mirroring' ? c.percent : c.weight;
+        if (!isOwned) return { kind: 'service', name: c.name, weight: share };
+        const parts = _splitServer(c.url, 'http') || {};
+        return { kind: 'manual', host: parts.host || '', port: parts.port || '',
+                 scheme: parts.scheme || 'http', weight: share };
+    };
+    const first = asRow(rows[0]);
+    const zeroKind = document.querySelector('#httpTargetGrid .bk-kind');
+    if (zeroKind) zeroKind.value = first.kind;
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    setVal('targetIp', first.host);
+    setVal('targetPort', first.port);
+    if (first.scheme) setVal('scheme', first.scheme);
+    const zeroWeight = document.querySelector('#httpTargetGrid .bk-weight');
+    if (zeroWeight) zeroWeight.value = first.weight == null ? 1 : first.weight;
+    if (first.kind === 'service') {
+        const zeroGrid = document.getElementById('httpTargetGrid');
+        if (zeroGrid) _bkFillServiceSelect(zeroGrid, first.name);
+    }
+    if (zeroKind) _bkKindChanged(zeroKind);
+    rows.slice(1).forEach(c => addBackendRow('http', asRow(c)));
+    _bkSyncWeights();
+    return true;
+}
+
 function _serializeBackends(proto) {
     const ids = proto === 'http' ? ['targetIp', 'targetPort'] :
                 proto === 'tcp'  ? ['targetIpTcp', 'targetPortTcp'] : ['targetIpUdp', 'targetPortUdp'];
@@ -1371,8 +1522,13 @@ function _serializeBackends(proto) {
         if (proto === 'http') row.scheme = r.querySelector('.bk-scheme')?.value || 'http';
         servers.push(row);
     });
-    if (!servers.length) return null;
+    const children = proto === 'http' ? _collectBackendChildren() : [];
+    if (!servers.length && !children.length) return null;
     const payload = { servers };
+    if (proto === 'http' && _bkAnyServiceRow()) {
+        payload.children = children;
+        payload.compositeType = document.getElementById('httpCompositeType')?.value || 'weighted';
+    }
     if (proto === 'http') {
         payload.sticky = {
             enabled: !!document.getElementById('lbStickyEnabled')?.checked,
@@ -1628,9 +1784,11 @@ async function handleEdit(btn) {
 
     const proto = app.protocol || 'http';
     setProtocol(proto);
-    _applyServiceTypeNotice(app.serviceType);
+    _applyServiceTypeNotice(app.serviceType, app.serviceOwned);
     _resetLbAdvanced();
-    _populateBackends(proto, app.servers);
+    if (!(proto === 'http' && _loadCompositeRows(app))) {
+        _populateBackends(proto, app.servers);
+    }
     _applyLbAdvanced(app);
 
     const _svcList = (await _ensureServicesList())[proto] || [];

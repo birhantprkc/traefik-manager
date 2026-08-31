@@ -85,7 +85,7 @@ Click the pencil icon on any route card, or open the detail panel and click **Ed
 Saving rewrites only the parts the form owns: the rule, entry points, service reference, middlewares and TLS on the router, and the backends, `passHostHeader` and the insecure-TLS transport on the service. Sticky sessions, health checks and router `priority` are written when the form manages them - see [Multiple backends and load balancing](#multiple-backends-and-load-balancing). Anything else you wrote by hand is preserved, including your own `serversTransport`, and an existing route keeps the service name it already points at rather than being renamed to `<name>-service`.
 
 ::: warning Advanced service types
-If a router points at a `weighted`, `mirroring`, `failover` or `highestRandomWeight` service instead of a `loadBalancer`, that service is left untouched, so editing the target field in the route form has no effect on it. Edit those services directly in the config file. A service referenced by one of these, whether or not a router also points at it, is never removed when a route is deleted or disabled.
+If a router points at a `weighted`, `mirroring`, `failover` or `highestRandomWeight` service that Traefik Manager does not manage, that service is left untouched, so editing the target field in the route form has no effect on it. Edit it on the [Services tab](tab-services.md), which can also take over managing it. A composite Traefik Manager wrote itself is editable straight from this form. A service referenced by a composite, whether or not a router also points at it, is never removed when a route is deleted or disabled.
 :::
 
 ## Security headers preset
@@ -137,6 +137,14 @@ Like the headers preset, streaming is written only from the route form; other cl
 ## Multiple backends and load balancing
 
 An HTTP, TCP, or UDP route can point at more than one backend. Click **Add backend** under the target fields to add another server; Traefik load-balances across them (`loadBalancer.servers`). Route cards show a **+N** badge when a route has more than one backend.
+
+For HTTP routes, each backend row is either an **IP : Port** or an existing **Service**. With only
+IP:Port rows the route keeps a plain `loadBalancer`, byte for byte as before. The moment any row
+references a service, a weight field appears on every row and a **Combine backends as** selector
+picks how they combine - Weighted, Mirroring or Failover. Each IP:Port row then becomes its own
+child service named `<route>-backend-<n>`, so a 90/10 split between two raw addresses works, and a
+referenced service is stored by name, never copied. Removing the service rows again reverts the
+route to a plain `loadBalancer` and removes the generated children.
 
 For HTTP routes, the **Load balancing** section adds:
 

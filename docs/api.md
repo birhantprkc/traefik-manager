@@ -110,6 +110,11 @@ When multiple config files are loaded, route `id` is prefixed as `configFile::na
 
 HTTP routes also carry `passHostHeader`, `tlsDomains`, `tlsOptionsProfile`, `insecureSkipVerify`, `streaming` and `serviceType`.
 
+A route whose service is composite additionally carries `compositeChildren` - one
+`{name, url, weight, percent}` per backend, with `url` filled only for children Traefik Manager
+generated - and `serviceOwned`, true when Traefik Manager manages the service so the route form can
+edit it. For a composite, `passHostHeader` and friends are read from the first generated child.
+
 ---
 
 ### `GET /api/routes/all`
@@ -125,7 +130,13 @@ Use this for everything Traefik is serving, and `/api/routes` for only what this
 Create or update a route. Accepts `application/x-www-form-urlencoded`.
 
 | Field | Type | Description |
-|---|---|---|
+|
+`backendsJsonHttp` may also carry `children` and `compositeType` to make the route's service a
+`weighted`, `mirroring` or `failover` composite - see the [OpenAPI spec](#openapi-spec) for the row
+shape. The key only takes effect when present, so older clients cannot flatten a composite, and
+`children: []` reverts to a plain `loadBalancer`.
+
+---|---|---|
 | `serviceName` | string | Route name. Required |
 | `protocol` | string | `http`, `tcp`, or `udp` (default: `http`) |
 | `subdomain` | string | Hostname. A value containing a dot is used as-is; a bare label is combined with the configured domain(s). Becomes `Host()` for HTTP and `HostSNI()` for TCP |
@@ -1333,6 +1344,67 @@ Send a `HEAD` request to a route's domain from the TM server and return latency.
 On failure: `{ "ok": false, "error": "Timeout", "latency_ms": null }`
 
 A URL pointing at TM's own hostname, or at the configured self-route domain, short-circuits to `{ "ok": true, "latency_ms": 0, "status_code": 200, "self": true }` without a request. A successful fallback adds `"via_target": true`. Targets that fail the SSRF guard return `400`.
+
+---
+
+### `POST /api/services`
+
+Create or update a composite service without going through a route.
+
+```json
+{
+  "name": "api-pool",
+  "type": "weighted",
+  "children": [
+    { "kind": "manual",  "address": "10.0.0.10:80", "scheme": "http", "weight": 9 },
+    { "kind": "service", "name": "canary-svc", "weight": 1 }
+  ]
+}
+```
+
+Each `manual` backend becomes its own child service named `<name>-backend-<n>`, so every row can
+carry its own weight. A `service` backend is referenced by name and never copied, so changes to it
+follow automatically.
+
+`type` is `weighted`, `mirroring` or `failover`. For `mirroring` use `percent` instead of `weight`;
+the first backend is the one that serves. Pass `originalName` to rename a managed service, which
+moves its children with it.
+
+Refuses with `409` if a service of that name exists and Traefik Manager does not manage it, and with
+`403` when renaming something it does not manage.
+
+---
+
+### `DELETE /api/services/{name}`
+
+Delete a managed composite service and the child services it owns.
+
+Refuses with `409` while a router still points at it or another service still lists it as a backend,
+`403` if Traefik Manager does not manage it, and `404` if it does not exist.
+
+---
+
+### `POST /api/services/{name}/ownership`
+
+Take over or release management of a composite service.
+
+```json
+{ "adopt": true }
+```
+
+Records a ledger entry only. **No YAML is written**, so adopting a hand-written service leaves the
+config file byte for byte unchanged. Once managed, routes pointing at the service can edit their
+backends from the route form instead of being read only.
+
+Settings inside the type block that Traefik Manager does not author, such as `sticky` and
+`healthCheck` on a weighted service, are preserved on later saves.
+
+Only `weighted`, `mirroring`, `failover` and `highestRandomWeight` services can be managed. Anything
+else returns `400`, and an unknown name returns `404`.
+
+```json
+{ "ok": true, "owned": true }
+```
 
 ---
 

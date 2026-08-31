@@ -110,6 +110,33 @@ _merge_trusted_ips             = _rb._merge_trusted_ips
 _apply_managed_keys            = _rb._apply_managed_keys
 _merge_router                  = _rb._merge_router
 _merge_service                 = _rb._merge_service
+from core import composite_services as _composite
+from core import service_ownership as _svc_own
+
+
+def _router_resolves_to_composite(router_name: str, agent=None) -> bool:
+    if not router_name:
+        return False
+    try:
+        configs = list(_agent_load_configs(agent).values()) if agent else [
+            load_config(p) for p in env.CONFIG_PATHS]
+    except Exception:
+        return False
+    for cfg in configs:
+        for section in ('http', 'tcp', 'udp'):
+            routers = (cfg.get(section) or {}).get('routers') or {}
+            router = routers.get(router_name)
+            if not isinstance(router, dict):
+                continue
+            svc = str(router.get('service') or '').split('@')[0]
+            svc_def = ((cfg.get(section) or {}).get('services') or {}).get(svc)
+            if _svc_own.composite_type(svc_def):
+                return True
+    return False
+
+
+def _svc_ledger_key(name, agent_id=''):
+    return _svc_own.ledger_key(name, agent_id)
 _json_plain                    = _rb._json_plain
 _headers_preset_defaults       = _rb._headers_preset_defaults
 _build_permissions_policy      = _rb._build_permissions_policy
@@ -524,9 +551,26 @@ def inject_csrf():
     return {'csrf_token': _get_csrf_token()}
 
 
+def _static_build_stamp() -> str:
+    newest = 0.0
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+    for sub in ('css', 'js'):
+        root = os.path.join(static_dir, sub)
+        for dirpath, _dirs, files in os.walk(root):
+            for name in files:
+                try:
+                    newest = max(newest, os.path.getmtime(os.path.join(dirpath, name)))
+                except OSError:
+                    pass
+    return str(int(newest))
+
+
+ASSET_VERSION = f"{APP_VERSION}-{_static_build_stamp()}"
+
+
 @app.context_processor
 def inject_asset_version():
-    return {'asset_version': APP_VERSION}
+    return {'asset_version': ASSET_VERSION}
 
 @app.context_processor
 def inject_base_path():
@@ -1333,10 +1377,208 @@ def _traefik_proto_payload(kind):
 def api_routers():
     return jsonify(_traefik_proto_payload('routers'))
 
+@app.route('/api/services/<path:name>/ownership', methods=['POST'])
+@csrf_protect
+@login_required
+def api_service_ownership(name):
+    data   = request.get_json(silent=True) or {}
+    adopt  = bool(data.get('adopt'))
+    bare   = str(name).split('@')[0]
+    configs = [load_config(p) for p in env.CONFIG_PATHS]
+    svc_def, cfg_file = None, ''
+    for path, cfg in zip(env.CONFIG_PATHS, configs):
+        found = ((cfg.get('http') or {}).get('services') or {}).get(bare)
+        if isinstance(found, dict):
+            svc_def, cfg_file = found, os.path.basename(path)
+            break
+    if svc_def is None:
+        return jsonify({'ok': False, 'error': 'Service not found'}), 404
+    if adopt and not _svc_own.composite_type(svc_def):
+        return jsonify({'ok': False,
+                        'error': 'Only weighted, mirroring, failover and '
+                                 'highestRandomWeight services can be managed here'}), 400
+    settings = load_settings()
+    ledger   = dict(settings.get('managed_middlewares') or {})
+    key      = _svc_own.ledger_key(bare)
+    if adopt:
+        ledger[key] = _svc_own.ledger_entry(svc_def, cfg_file)
+    elif key in ledger:
+        del ledger[key]
+    else:
+        return jsonify({'ok': True, 'owned': False})
+    save_settings(
+        domains=settings['domains'], cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'], auth_enabled=settings['auth_enabled'],
+        password_hash=settings['password_hash'], visible_tabs=settings['visible_tabs'],
+        managed_middlewares=ledger,
+    )
+    logger.info(f"Service {bare!r} {'adopted' if adopt else 'released'} by {request.remote_addr}")
+    return jsonify({'ok': True, 'owned': adopt})
+
+
+_SERVICE_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$')
+
+
+def _service_routers_using(configs, name: str) -> list:
+    out = []
+    for cfg in configs:
+        for section in ('http', 'tcp', 'udp'):
+            for rname, rdata in ((cfg.get(section) or {}).get('routers') or {}).items():
+                if isinstance(rdata, dict) and str(rdata.get('service') or '').split('@')[0] == name:
+                    out.append(rname)
+    return out
+
+
+def _service_referenced_by(configs, name: str) -> list:
+    out = []
+    for cfg in configs:
+        for sname, sdef in ((cfg.get('http') or {}).get('services') or {}).items():
+            if sname == name:
+                continue
+            if name in _svc_own.child_names(sdef):
+                out.append(sname)
+    return out
+
+
+@app.route('/api/services', methods=['POST'])
+@csrf_protect
+@login_required
+def api_service_save():
+    data      = request.get_json(silent=True) or {}
+    name      = str(data.get('name') or '').strip()
+    kind      = str(data.get('type') or '').strip()
+    original  = str(data.get('originalName') or '').strip()
+    cfg_raw   = str(data.get('configFile') or '').strip()
+    children  = data.get('children') or []
+    if not _SERVICE_NAME_RE.match(name):
+        return jsonify({'ok': False, 'error': 'Use letters, numbers, dots, dashes or underscores'}), 400
+    if kind not in _composite.TYPES + ('loadBalancer',):
+        return jsonify({'ok': False,
+                        'error': 'Choose load balancer, weighted, mirroring or failover'}), 400
+    block, owned, _names = _composite.build(name, kind, children)
+    if not block:
+        return jsonify({'ok': False, 'error': 'Add at least one backend'}), 400
+
+    target_path = _resolve_config_path(cfg_raw) if cfg_raw else env.CONFIG_PATH
+    if not target_path:
+        return jsonify({'ok': False, 'error': f"Cannot write to '{cfg_raw}'"}), 400
+    cfg_filename = os.path.basename(target_path)
+    config       = load_config(target_path)
+    section      = config.setdefault('http', {}).setdefault('services', {})
+
+    settings = load_settings()
+    ledger   = dict(settings.get('managed_middlewares') or {})
+    existing = section.get(name)
+    if isinstance(existing, dict) and name != original \
+            and not _svc_own.is_owned(name, existing, ledger) \
+            and not (kind == 'loadBalancer' and 'loadBalancer' in existing):
+        return jsonify({'ok': False, 'error': f"A service named '{name}' already exists"}), 409
+    if original and original != name:
+        _orig_def = section.get(original)
+        if not _svc_own.is_owned(original, _orig_def, ledger) \
+                and not (isinstance(_orig_def, dict) and 'loadBalancer' in _orig_def):
+            return jsonify({'ok': False, 'error': 'That service is not managed here'}), 403
+        section.pop(original, None)
+        for gone in _composite.drop_orphan_children(section, original, set()):
+            ledger.pop(_svc_ledger_key(gone), None)
+        ledger.pop(_svc_ledger_key(original), None)
+
+    _composite.merge_into(section, name, block, owned)
+    for gone in _composite.drop_orphan_children(section, name, set(owned)):
+        ledger.pop(_svc_ledger_key(gone), None)
+    if kind in _composite.TYPES:
+        ledger.update(_composite.ledger_entries(name, block, owned, cfg_filename))
+    else:
+        ledger.pop(_svc_ledger_key(name), None)
+
+    create_backup(target_path)
+    save_config(_strip_empty_sections(config), target_path)
+    save_settings(
+        domains=settings['domains'], cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'], auth_enabled=settings['auth_enabled'],
+        password_hash=settings['password_hash'], visible_tabs=settings['visible_tabs'],
+        managed_middlewares=ledger,
+    )
+    logger.info(f"Service {name!r} saved by {request.remote_addr}")
+    add_notification('success', f'Service {name} saved', category='config')
+    threading.Thread(target=lambda: _git_push_if_enabled('service save'), daemon=True).start()
+    return jsonify({'ok': True, 'name': name})
+
+
+@app.route('/api/services/<path:name>', methods=['DELETE'])
+@csrf_protect
+@login_required
+def api_service_delete(name):
+    bare     = str(name).split('@')[0]
+    configs  = [load_config(p) for p in env.CONFIG_PATHS]
+    used_by  = _service_routers_using(configs, bare)
+    if used_by:
+        return jsonify({'ok': False,
+                        'error': 'Still used by ' + ', '.join(sorted(set(used_by))[:5])}), 409
+    parents = _service_referenced_by(configs, bare)
+    if parents:
+        return jsonify({'ok': False,
+                        'error': 'Still a backend of ' + ', '.join(sorted(set(parents))[:5])}), 409
+
+    settings = load_settings()
+    ledger   = dict(settings.get('managed_middlewares') or {})
+    removed  = False
+    for path in env.CONFIG_PATHS:
+        config  = load_config(path)
+        section = (config.get('http') or {}).get('services') or {}
+        if bare not in section:
+            continue
+        if not _svc_own.is_owned(bare, section.get(bare), ledger):
+            return jsonify({'ok': False, 'error': 'That service is not managed here'}), 403
+        del section[bare]
+        for gone in _composite.drop_orphan_children(section, bare, set()):
+            ledger.pop(_svc_ledger_key(gone), None)
+        ledger.pop(_svc_ledger_key(bare), None)
+        create_backup(path)
+        save_config(_strip_empty_sections(config), path)
+        removed = True
+        break
+    if not removed:
+        return jsonify({'ok': False, 'error': 'Service not found'}), 404
+    save_settings(
+        domains=settings['domains'], cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'], auth_enabled=settings['auth_enabled'],
+        password_hash=settings['password_hash'], visible_tabs=settings['visible_tabs'],
+        managed_middlewares=ledger,
+    )
+    logger.info(f"Service {bare!r} deleted by {request.remote_addr}")
+    add_notification('warning', f'Service {bare} deleted', category='config')
+    threading.Thread(target=lambda: _git_push_if_enabled('service delete'), daemon=True).start()
+    return jsonify({'ok': True})
+
+
+def _owned_child_services(agent_id: str = '') -> list:
+    prefix = f'agent_{agent_id}::svc::' if agent_id else 'svc::'
+    ledger = load_settings().get('managed_middlewares') or {}
+    return sorted(
+        key[len(prefix):] for key, value in ledger.items()
+        if isinstance(key, str) and key.startswith(prefix)
+        and isinstance(value, dict) and value.get('kind') == _svc_own.LEDGER_KIND
+        and value.get('child') is True)
+
+
+def _owned_parent_services(agent_id: str = '') -> list:
+    prefix = f'agent_{agent_id}::svc::' if agent_id else 'svc::'
+    ledger = load_settings().get('managed_middlewares') or {}
+    return sorted(
+        key[len(prefix):] for key, value in ledger.items()
+        if isinstance(key, str) and key.startswith(prefix)
+        and isinstance(value, dict) and value.get('kind') == _svc_own.LEDGER_KIND
+        and value.get('child') is not True)
+
+
 @app.route('/api/traefik/services')
 @login_required
 def api_services():
-    return jsonify(_traefik_proto_payload('services'))
+    payload = _traefik_proto_payload('services')
+    payload['ownedChildren'] = _owned_child_services()
+    payload['ownedServices'] = _owned_parent_services()
+    return jsonify(payload)
 
 @app.route('/api/traefik/middlewares')
 @login_required
@@ -1560,7 +1802,7 @@ def api_route_ping():
         ms, code = _ping(url)
         return jsonify({'ok': True, 'latency_ms': ms, 'status_code': code})
     except Exception as primary_err:
-        if fallback and fallback.startswith(('http://', 'https://')):
+        if fallback and fallback.startswith(('http://', 'https://')) and _ssrf_ok(fallback):
             try:
                 ms, code = _ping(fallback)
                 return jsonify({'ok': True, 'latency_ms': ms, 'status_code': code, 'via_target': True})
@@ -4355,12 +4597,21 @@ def _toggle_route(route_id: str, enable: bool):
     )
 
 
+def _self_route_service_name() -> str:
+    try:
+        return str((load_settings().get('self_route') or {}).get('router_name')
+                   or 'traefik-manager')
+    except Exception:
+        return 'traefik-manager'
+
+
 def _collect_file_services(configs):
     out = {'http': set(), 'tcp': set(), 'udp': set()}
+    skip = _self_route_service_name()
     for cfg in configs:
         for sec in out:
             out[sec].update(k for k in ((cfg.get(sec) or {}).get('services') or {})
-                            if isinstance(k, str) and k)
+                            if isinstance(k, str) and k and k != skip)
     return {sec: sorted(names) for sec, names in out.items()}
 
 
@@ -4803,7 +5054,10 @@ def save_entry():
                 return jsonify({'ok': False, 'message': _msg}), 400
             flash(_msg, "error")
             return redirect(url_for('index'))
-        if not target_ip and not _has_backends_json and not service_ref:
+        _existing_is_composite = _router_resolves_to_composite(
+            request.form.get('originalName', '').strip() or svc_name, agent)
+        if not target_ip and not _has_backends_json and not service_ref \
+                and not _existing_is_composite:
             _msg = (f"A backend host is required for {protocol.upper()} routes. "
                     f"Send targetIp (repeated per protocol, index "
                     f"{ {'http': 0, 'tcp': 1, 'udp': 2}[protocol] }) or {_backends_field}.")
@@ -5031,6 +5285,8 @@ def save_entry():
             else:
                 _be = _parse_backends_json(request.form.get('backendsJsonHttp'))
                 _managed_backends = False
+                _composite_posted = isinstance(_be, dict) and 'children' in _be
+                _composite_type = str((_be or {}).get('compositeType') or 'weighted').strip()
                 if _be is not None:
                     _servers = _backend_servers(_be.get('servers'), 'url', scheme)
                     if _servers:
@@ -5087,8 +5343,35 @@ def save_entry():
                 _http_managed = ('rule', 'entryPoints', 'service', 'middlewares', 'tls', 'priority') \
                     if _managed_backends else ('rule', 'entryPoints', 'service', 'middlewares', 'tls')
                 _merge_router(config['http']['routers'], router_name, r, _http_managed)
-                _merge_service(config['http']['services'], service_name, lb, 'url', transport_name,
-                               managed_backends=_managed_backends)
+                _svc_section = config['http']['services']
+                _cmp_block, _cmp_owned, _cmp_names = (
+                    _composite.build(router_name, _composite_type, _be.get('children'),
+                                     lb_extra={k: v for k, v in lb.items() if k != 'servers'})
+                    if _composite_posted else (None, {}, []))
+                if _cmp_block:
+                    _composite.merge_into(_svc_section, service_name, _cmp_block, _cmp_owned)
+                    for _gone in _composite.drop_orphan_children(_svc_section, router_name,
+                                                                 set(_cmp_owned)):
+                        _ledger.pop(_svc_ledger_key(_gone, agent_id), None)
+                        _ledger_changed = True
+                    for _k, _v in _composite.ledger_entries(service_name, _cmp_block, _cmp_owned,
+                                                            cfg_filename, agent_id).items():
+                        _ledger[_k] = _v
+                    _ledger_changed = True
+                else:
+                    if _composite_posted:
+                        for _gone in _composite.drop_orphan_children(_svc_section, router_name, set()):
+                            _ledger.pop(_svc_ledger_key(_gone, agent_id), None)
+                            _ledger_changed = True
+                        if _svc_ledger_key(service_name, agent_id) in _ledger:
+                            del _ledger[_svc_ledger_key(service_name, agent_id)]
+                            _ledger_changed = True
+                            _existing_svc = _svc_section.get(service_name)
+                            if isinstance(_existing_svc, dict):
+                                for _stale in _composite.TYPES + ('highestRandomWeight',):
+                                    _existing_svc.pop(_stale, None)
+                    _merge_service(_svc_section, service_name, lb, 'url', transport_name,
+                                   managed_backends=_managed_backends)
 
         elif protocol == 'tcp':
             if tcp_rule:
