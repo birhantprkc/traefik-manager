@@ -1320,20 +1320,17 @@ function _bkKindChanged(select) {
             _bkFillServiceSelect(row).then(() => _bkSyncWeights());
         }
     }
-    const put = (sel, on, col) => {
+    const show = (sel, on) => {
         const el = row.querySelector(sel);
-        if (!el) return;
-        el.style.display = on ? '' : 'none';
-        el.style.gridColumn = on ? col : '';
+        if (el) { el.style.display = on ? '' : 'none'; el.style.gridColumn = ''; }
     };
-    put('.bk-kind', true, '1');
-    put('.bk-scheme', !isSvc, '2');
-    put('.bk-host', !isSvc, '3');
-    put('.bk-port', !isSvc, '4');
-    put('.bk-svc', isSvc, '2 / span 3');
-    put('.bk-weight', true, '5');
-    const rm = row.querySelector('.btn-secondary[title="Remove backend"]');
-    if (rm) rm.style.gridColumn = '6';
+    show('.bk-scheme', !isSvc);
+    show('.bk-host', !isSvc);
+    show('.bk-port', !isSvc);
+    show('.bk-svc', isSvc);
+    const removable = !!row.querySelector('.btn-secondary[title="Remove backend"]');
+    row.style.gridTemplateColumns = (isSvc ? '104px 1fr 74px' : '104px 96px 1fr 1fr 74px')
+        + (removable ? ' 32px' : '');
     _bkSyncWeights();
 }
 
@@ -1574,10 +1571,22 @@ function _resetLbAdvanced() {
     set('lbPriority', ''); set('lbPriorityTcp', '');
     set('backendsJsonHttp', ''); set('backendsJsonTcp', ''); set('backendsJsonUdp', '');
     _lbSyncToggles();
+    _resetBackendKinds();
     const body = document.getElementById('httpLbAdvBody');
     if (body) body.style.display = 'none';
     const chev = document.getElementById('httpLbAdvChevron');
     if (chev) chev.className = 'ph-bold ph-caret-right text-xs';
+}
+
+function _resetBackendKinds() {
+    const zeroKind = document.querySelector('#httpTargetGrid .bk-kind');
+    if (zeroKind) zeroKind.value = 'manual';
+    const zeroWeight = document.querySelector('#httpTargetGrid .bk-weight');
+    if (zeroWeight) zeroWeight.value = '1';
+    const type = document.getElementById('httpCompositeType');
+    if (type) type.value = 'weighted';
+    if (zeroKind) _bkKindChanged(zeroKind);
+    else _bkSyncWeights();
 }
 
 function _applyLbAdvanced(app) {

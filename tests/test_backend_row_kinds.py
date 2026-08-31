@@ -154,16 +154,15 @@ def test_an_empty_service_list_says_so():
     assert 'svcs.length' in m.group(1), 'a blank dropdown with no explanation is what users hit'
 
 
-def test_every_cell_gets_an_explicit_column():
+def test_switching_mode_hides_the_cells_that_do_not_apply():
     src = _read(JS)
     m = re.search(r'function _bkKindChanged\(select\) \{(.*?)\n\}', src, re.S)
     assert m, 'the kind handler moved'
     body = m.group(1)
-    for cls in ('bk-kind', 'bk-scheme', 'bk-host', 'bk-port', 'bk-svc', 'bk-weight'):
-        assert f"'.{cls}'" in body, f'{cls} has no explicit placement'
-    assert 'gridColumn' in body, (
-        'hiding a cell removes it from grid auto-placement, so the next cell slides into its '
-        'column and the service picker wraps to a second line')
+    for cls in ('bk-scheme', 'bk-host', 'bk-port', 'bk-svc'):
+        assert f"'.{cls}'" in body, f'{cls} is never shown or hidden'
+    assert "gridColumn = ''" in body, (
+        'a leftover explicit column from an earlier version would fight the template')
 
 
 def test_combining_is_hidden_until_there_is_more_than_one_backend():
@@ -190,3 +189,39 @@ def test_the_backend_mode_labels_say_what_they_do():
     assert '>Manual</button>' not in html, \
         'Manual read as the opposite of existing, when it means build the list here'
     assert '>Existing service</button>' not in html
+
+
+def test_the_picker_precedes_the_weight_so_it_cannot_wrap():
+    html = _read(MODAL)
+    grid = html[html.index('<div id="httpTargetGrid"'):html.index('<div id="httpBackendRows">')]
+    assert grid.index('bk-svc') < grid.index('bk-weight'), (
+        'grid places items in dom order, so a picker after the weight gets pushed onto a '
+        'second line when it asks for an earlier column')
+    assert 'grid-column:2 / span 3' not in grid, 'spans are what caused the wrap'
+
+
+def test_the_row_template_follows_the_mode():
+    src = _read(JS)
+    m = re.search(r'function _bkKindChanged\(select\) \{(.*?)\n\}', src, re.S)
+    assert m, 'the kind handler moved'
+    body = m.group(1)
+    assert 'gridTemplateColumns' in body, 'the row must resize when cells hide, not span over them'
+    assert "'104px 1fr 74px'" in body, 'service mode has three visible cells'
+
+
+def test_opening_the_form_again_forgets_the_last_route():
+    src = _read(JS)
+    m = re.search(r'function _resetBackendKinds\(\) \{(.*?)\n\}', src, re.S)
+    assert m, 'the reset helper is missing'
+    body = m.group(1)
+    assert "zeroKind.value = 'manual'" in body, \
+        'a service row left over from the last route reappears on a new one'
+    assert "type.value = 'weighted'" in body
+    assert '_bkKindChanged' in body or '_bkSyncWeights' in body, \
+        'resetting the value without refreshing leaves the combine selector on screen'
+
+
+def test_the_reset_runs_when_the_form_resets():
+    src = _read(JS)
+    m = re.search(r'function _resetLbAdvanced\(\) \{(.*?)\n\}', src, re.S)
+    assert m and '_resetBackendKinds()' in m.group(1)

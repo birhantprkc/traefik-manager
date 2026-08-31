@@ -560,12 +560,7 @@ function _svcTypeChanged() {
     document.querySelectorAll('#svcRows .svc-row').forEach(r => {
         const w = r.querySelector('.svc-weight');
         if (w) { w.style.display = plain ? 'none' : ''; w.title = kind === 'mirroring' ? 'Percent' : 'Weight'; }
-        const k = r.querySelector('.svc-kind');
-        if (k) {
-            k.style.display = plain ? 'none' : '';
-            if (plain) { k.value = 'manual'; _svcRowKindChanged(k); }
-        }
-        r.style.gridTemplateColumns = plain ? '96px 1fr 32px' : '104px 96px 1fr 74px 32px';
+        _svcRowKindChanged(r.querySelector('.svc-kind'));
     });
 }
 
@@ -620,12 +615,20 @@ function _svcRowKindChanged(select) {
     const row = select.closest('.svc-row');
     if (!row) return;
     const isSvc = select.value === 'service';
-    const addr = row.querySelector('.svc-addr');
-    const ref = row.querySelector('.svc-ref');
-    const scheme = row.querySelector('.svc-scheme');
-    if (addr) addr.style.display = isSvc ? 'none' : '';
-    if (scheme) scheme.style.display = isSvc ? 'none' : '';
-    if (ref) { ref.style.display = isSvc ? '' : 'none'; ref.style.gridColumn = isSvc ? '2 / span 2' : ''; }
+    if (isSvc && (document.getElementById('svcType')?.value || '') === 'loadBalancer') {
+        const t = document.getElementById('svcType');
+        if (t) { t.value = 'weighted'; _svcTypeChanged(); return; }
+    }
+    const plain = (document.getElementById('svcType')?.value || '') === 'loadBalancer';
+    const set = (sel, on) => {
+        const el = row.querySelector(sel);
+        if (el) { el.style.display = on ? '' : 'none'; el.style.gridColumn = ''; }
+    };
+    set('.svc-addr', !isSvc);
+    set('.svc-scheme', !isSvc);
+    set('.svc-ref', isSvc);
+    row.style.gridTemplateColumns = plain ? '104px 96px 1fr 32px'
+        : isSvc ? '104px 1fr 74px 32px' : '104px 96px 1fr 74px 32px';
 }
 
 function _collectServiceRows() {
