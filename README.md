@@ -73,7 +73,9 @@ Open **http://your-server:5000** and the setup wizard takes it from there.
 
 **Routes** - HTTP, TCP and UDP. Multiple domains and backends per route, sticky sessions, health checks, priority, per-route certificate resolvers, wildcard certificates and TLS profiles. Guided presets for security headers and media streaming.
 
-**Middlewares** - 24 wizards covering auth, rate limiting, headers, CORS, redirects and prefixes, plus a raw YAML editor and your own reusable templates.
+**Services** - build a load balancer, weighted, mirroring or failover service on its own, or balance a route across a mix of raw addresses and existing services with a weight on each row. Services Traefik Manager did not write stay read only until you take them over, which records ownership without touching the file.
+
+**Middlewares** - 30 wizards covering auth, rate limiting, headers, CORS, redirects, prefixes, error pages and TLS client certificates, plus a raw YAML editor and your own reusable templates.
 
 **Dashboard and Route Map** - a homepage-style grid of your apps with icons and health, and a topology map from entry point through middlewares to backend, coloured per hop.
 
