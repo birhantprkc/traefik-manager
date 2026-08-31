@@ -40,10 +40,17 @@ Every template switches to **Wizard** mode - a structured form with labeled fiel
 |---|---|
 | Auth | Basic Auth, Digest Auth, Forward Auth, Forward Auth (Authentik), Forward Auth (Authelia), Forward Auth (Gatekeeper), OIDC Auth (traefik-oidc-auth) |
 | Security | IP Allow List, IP Allow List (Private Ranges), Rate Limit, Secure Headers, CORS Headers, Encoded Characters (Traefik 3.7+) |
-| Routing | Redirect to HTTPS, Redirect Regex, Strip Prefix, Add Prefix, Replace Path |
-| Advanced | Gzip Compress, Retry, Circuit Breaker, Buffering, Middleware Chain, In-Flight Limit |
+| Routing | Redirect to HTTPS, Redirect Regex, Strip Prefix, Strip Prefix Regex, Add Prefix, Replace Path, Replace Path Regex |
+| Advanced | Gzip Compress, Retry, Circuit Breaker, Buffering, Middleware Chain, In-Flight Limit, Custom Error Pages, Content Type, gRPC-Web, Pass TLS Client Cert |
 
 The Forward Auth wizards (including Authentik, Authelia, and Gatekeeper) expose an optional **Max Response Body Size** field (`maxResponseBodySize`, Traefik 3.7+) to cap the auth server's response. See [Traefik Security Hardening](hardening.md) for the recommended hardening middlewares and options.
+
+The **Custom Error Pages** wizard picks the service that serves the page from the services already
+defined in your config, so create that service first. Use `{status}` in the query to substitute the
+response code.
+
+The **Pass TLS Client Cert** wizard covers the whole certificate (`pem`) and the four most used
+`info` fields. Traefik supports more, use YAML mode for the rest.
 
 The **IP Allow List** wizard includes a **Client IP source** (`ipStrategy`) selector. When Traefik is exposed directly, leave it on **Direct connection**. When a reverse proxy (Cloudflare, another Traefik, nginx) sits in front, the allow-list would otherwise match the proxy's IP on every request - pick **trusted hop depth** to set `ipStrategy.depth` (the number of proxies in front), or **exclude proxy IPs** to set `ipStrategy.excludedIPs` when the proxy's own addresses vary. Depth and excluded IPs are mutually exclusive, matching Traefik's own constraint.
 

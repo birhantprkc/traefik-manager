@@ -67,6 +67,8 @@
                                 <option value="stripPrefix">Strip Prefix</option>
                                 <option value="addPrefix">Add Prefix</option>
                                 <option value="replacePath">Replace Path</option>
+                                <option value="replacePathRegex">Replace Path Regex</option>
+                                <option value="stripPrefixRegex">Strip Prefix Regex</option>
                             </optgroup>
                             <optgroup label="Advanced">
                                 <option value="compress">Gzip Compress</option>
@@ -75,6 +77,10 @@
                                 <option value="buffering">Buffering</option>
                                 <option value="chain">Middleware Chain</option>
                                 <option value="inFlightReq">In-Flight Limit</option>
+                                <option value="errors">Custom Error Pages</option>
+                                <option value="contentType">Content Type</option>
+                                <option value="grpcWeb">gRPC-Web</option>
+                                <option value="passTLSClientCert">Pass TLS Client Cert</option>
                             </optgroup>
                             <optgroup label="My Templates" id="mwCustomOptgroup" style="display:none"></optgroup>
                         </select>
@@ -393,6 +399,91 @@ X-Forwarded-Name: name</textarea>
                         <div>
                             <label>Prefixes <span class="text-xs font-normal" style="color:var(--muted)">(one per line)</span></label>
                             <textarea id="wizSpPrefixes" class="input-field font-mono text-sm" rows="4" placeholder="/api&#10;/v1"></textarea>
+                        </div>
+                    </div>
+
+                    <div id="mwWiz-stripPrefixRegex" class="mw-wiz-form space-y-3" style="display:none">
+                        <div>
+                            <label>Regexes <span class="text-xs font-normal" style="color:var(--muted)">(one per line)</span></label>
+                            <textarea id="wizSprRegex" class="input-field font-mono text-sm" rows="3" placeholder="^/api/v[0-9]+"></textarea>
+                            <p class="text-xs mt-1" style="color:var(--muted)">The matched prefix is removed before the request is forwarded. Anchor with <code class="font-mono">^</code> or it can match mid-path.</p>
+                        </div>
+                    </div>
+
+                    <div id="mwWiz-replacePathRegex" class="mw-wiz-form space-y-3" style="display:none">
+                        <div>
+                            <label>Regex</label>
+                            <input id="wizRprRegex" type="text" class="input-field font-mono text-sm" placeholder="^/foo/(.*)">
+                        </div>
+                        <div>
+                            <label>Replacement</label>
+                            <input id="wizRprReplacement" type="text" class="input-field font-mono text-sm" placeholder="/bar/$1">
+                            <p class="text-xs mt-1" style="color:var(--muted)">Capture groups are <code class="font-mono">$1</code>, <code class="font-mono">$2</code> and so on. In a compose file <code class="font-mono">$</code> must be written <code class="font-mono">$$</code>.</p>
+                        </div>
+                    </div>
+
+                    <div id="mwWiz-errors" class="mw-wiz-form space-y-3" style="display:none">
+                        <div>
+                            <label>Status codes <span class="text-xs font-normal" style="color:var(--muted)">(one per line)</span></label>
+                            <textarea id="wizErrStatus" class="input-field font-mono text-sm" rows="3" placeholder="500-599&#10;404"></textarea>
+                            <p class="text-xs mt-1" style="color:var(--muted)">Single codes or ranges. Only these responses are replaced.</p>
+                        </div>
+                        <div>
+                            <label>Service</label>
+                            <select id="wizErrService" class="input-field text-sm"></select>
+                            <p class="text-xs mt-1" style="color:var(--muted)">The service that serves the error page. It must already exist in this config.</p>
+                        </div>
+                        <div>
+                            <label>Query <span class="text-xs font-normal" style="color:var(--muted)">(optional)</span></label>
+                            <input id="wizErrQuery" type="text" class="input-field font-mono text-sm" placeholder="/{status}.html">
+                            <p class="text-xs mt-1" style="color:var(--muted)"><code class="font-mono">{status}</code> is replaced with the response code.</p>
+                        </div>
+                    </div>
+
+                    <div id="mwWiz-contentType" class="mw-wiz-form space-y-3" style="display:none">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="wizCtAutoDetect" class="rounded" style="accent-color:var(--blue)">
+                            <span class="text-sm" style="color:var(--text)">Auto-detect the content type</span>
+                        </div>
+                        <p class="text-xs" style="color:var(--muted)">Off leaves the Content-Type header alone when the backend does not set one. On restores Go's automatic detection.</p>
+                    </div>
+
+                    <div id="mwWiz-grpcWeb" class="mw-wiz-form space-y-3" style="display:none">
+                        <div>
+                            <label>Allowed origins <span class="text-xs font-normal" style="color:var(--muted)">(one per line)</span></label>
+                            <textarea id="wizGrpcOrigins" class="input-field font-mono text-sm" rows="3" placeholder="https://app.example.com&#10;*"></textarea>
+                            <p class="text-xs mt-1" style="color:var(--muted)">Converts gRPC-Web requests to gRPC before forwarding. <code class="font-mono">*</code> allows any origin.</p>
+                        </div>
+                    </div>
+
+                    <div id="mwWiz-passTLSClientCert" class="mw-wiz-form space-y-3" style="display:none">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="wizPtcPem" checked class="rounded" style="accent-color:var(--blue)">
+                            <span class="text-sm" style="color:var(--text)">Pass the whole certificate</span>
+                        </div>
+                        <p class="text-xs" style="color:var(--muted)">Adds <code class="font-mono">X-Forwarded-Tls-Client-Cert</code> carrying the PEM. Only forward this to a backend you trust.</p>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="wizPtcInfo" class="rounded" style="accent-color:var(--blue)" onchange="document.getElementById('wizPtcInfoFields').style.display=this.checked?'':'none'">
+                            <span class="text-sm" style="color:var(--text)">Also pass selected certificate fields</span>
+                        </div>
+                        <div id="wizPtcInfoFields" class="rounded-lg p-3 space-y-2.5" style="display:none;background:var(--input-bg);border:1px solid var(--border)">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="wizPtcSubjectCN" checked class="rounded" style="accent-color:var(--blue)">
+                                <span class="text-sm" style="color:var(--text)">Subject Common Name</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="wizPtcIssuerCN" class="rounded" style="accent-color:var(--blue)">
+                                <span class="text-sm" style="color:var(--text)">Issuer Common Name</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="wizPtcSerial" class="rounded" style="accent-color:var(--blue)">
+                                <span class="text-sm" style="color:var(--text)">Serial Number</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="wizPtcNotAfter" class="rounded" style="accent-color:var(--blue)">
+                                <span class="text-sm" style="color:var(--text)">Expiry Date</span>
+                            </div>
+                            <p class="text-xs" style="color:var(--muted)">Adds <code class="font-mono">X-Forwarded-Tls-Client-Cert-Info</code>. Traefik supports more fields than these, use the YAML editor for the rest.</p>
                         </div>
                     </div>
 
