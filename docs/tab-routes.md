@@ -61,7 +61,7 @@ Click **Add Route** in the top bar. Fields marked with a protocol apply to that 
 | Rule Mode | *(HTTP)* **Simple** (default) builds a `Host()` rule from the Subdomain + Domain chips. **Advanced rule** takes any valid Traefik rule (`PathPrefix`, `HostRegexp`, compound rules with `&&` / `\|\|`). A route with a complex rule opens in Advanced automatically. |
 | Subdomain + Domain(s) | *(HTTP, Simple mode)* The chip list combines the Domains from Settings - Connection with domains auto-detected from your existing routes, and a **+** chip takes any other domain on the spot. Several domains generate a multi-host rule: ``Host(`sub.d1.com`) \|\| Host(`sub.d2.com`)``. A Subdomain containing a dot is used as the full hostname. The domain list is a form convenience - it never affects your Traefik configuration. |
 | Rule (SNI) | *(TCP)* A raw SNI rule, e.g. ``HostSNI(`db.example.com`)``. Use ``HostSNI(`*`)`` to match all TLS, or leave it empty for passthrough. |
-| Backend | **Manual** (default) - a Target IP / Port for a service this route owns. **Existing service** - reference a service already defined in your config; see [Shared services](#shared-services) |
+| Backend | **Build backends** (default) - backend rows for a service this route owns. **Use a service** - point the router straight at a service already defined in your config, with no service of its own; see [Shared services](#shared-services) |
 | Target IP / Port | *(Manual mode)* Backend server to forward to |
 | Entry Points | Chips fetched from the Traefik API - click to toggle. `websecure` (or `https`) is pre-selected for HTTP. UDP is single-select. Falls back to a text input if the API returns no entry points. |
 | Middlewares | Chips fetched from the Traefik API - click to toggle. HTTP routes offer HTTP middlewares; TCP routes offer TCP middlewares (`ipAllowList`, `inFlightConn`). Falls back to a text input if the API returns none. |
@@ -166,7 +166,7 @@ The mobile app and older cached pages post only a single target. Saving from one
 
 Several routers can point at the same service - a native Traefik pattern, useful when one backend needs different middlewares per hostname (an internal name with no auth, an external one behind Authelia) or when an edge Traefik fans several domains into the same downstream instance (#125).
 
-Switch the **Backend** toggle to **Existing service** and pick any service from your config files. The route then writes only a router with `service: <name>`; that route never creates, modifies, or deletes the service block. The picker lists file-provider services for the active server across all config files.
+Switch the **Backend** toggle to **Use a service** and pick any service from your config files. The route then writes only a router with `service: <name>`; that route never creates, modifies, or deletes the service block. The picker lists file-provider services for the active server across all config files.
 
 Behavior worth knowing:
 

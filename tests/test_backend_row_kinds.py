@@ -152,3 +152,41 @@ def test_an_empty_service_list_says_so():
     m = re.search(r'async function _bkFillServiceSelect\(row, selected\) \{(.*?)\n\}', src, re.S)
     assert m, 'the picker filler moved'
     assert 'svcs.length' in m.group(1), 'a blank dropdown with no explanation is what users hit'
+
+
+def test_every_cell_gets_an_explicit_column():
+    src = _read(JS)
+    m = re.search(r'function _bkKindChanged\(select\) \{(.*?)\n\}', src, re.S)
+    assert m, 'the kind handler moved'
+    body = m.group(1)
+    for cls in ('bk-kind', 'bk-scheme', 'bk-host', 'bk-port', 'bk-svc', 'bk-weight'):
+        assert f"'.{cls}'" in body, f'{cls} has no explicit placement'
+    assert 'gridColumn' in body, (
+        'hiding a cell removes it from grid auto-placement, so the next cell slides into its '
+        'column and the service picker wraps to a second line')
+
+
+def test_combining_is_hidden_until_there_is_more_than_one_backend():
+    src = _read(JS)
+    m = re.search(r'function _bkSyncWeights\(\) \{(.*?)\n\}', src, re.S)
+    assert m, 'the sync helper moved'
+    assert 'rows.length > 1' in m.group(1), \
+        'combining one backend with nothing is meaningless, so the selector must stay hidden'
+
+
+def test_a_single_service_row_still_sends_its_payload():
+    src = _read(JS)
+    m = re.search(r'if \(proto === .http. && _bkAnyServiceRow\(\)\) \{', src)
+    assert m, 'the payload gate moved'
+    assert 'rows.length' not in src[m.start():m.start() + 200], (
+        'the payload must not be gated on row count, or a lone service row would save '
+        'with no backend at all')
+
+
+def test_the_backend_mode_labels_say_what_they_do():
+    html = _read(MODAL)
+    assert html.count('>Build backends</button>') == 3, 'http, tcp and udp each have the toggle'
+    assert html.count('>Use a service</button>') == 3
+    assert '>Manual</button>' not in html, \
+        'Manual read as the opposite of existing, when it means build the list here'
+    assert '>Existing service</button>' not in html

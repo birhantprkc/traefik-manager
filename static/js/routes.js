@@ -1320,19 +1320,27 @@ function _bkKindChanged(select) {
             _bkFillServiceSelect(row).then(() => _bkSyncWeights());
         }
     }
-    const show = (sel, on) => { const el = row.querySelector(sel); if (el) el.style.display = on ? '' : 'none'; };
-    show('.bk-host', !isSvc);
-    show('.bk-port', !isSvc);
-    show('.bk-scheme', !isSvc);
-    show('.bk-svc', isSvc);
-    const svcSel = row.querySelector('.bk-svc');
-    if (svcSel) svcSel.style.gridColumn = isSvc ? '2 / span 3' : '';
+    const put = (sel, on, col) => {
+        const el = row.querySelector(sel);
+        if (!el) return;
+        el.style.display = on ? '' : 'none';
+        el.style.gridColumn = on ? col : '';
+    };
+    put('.bk-kind', true, '1');
+    put('.bk-scheme', !isSvc, '2');
+    put('.bk-host', !isSvc, '3');
+    put('.bk-port', !isSvc, '4');
+    put('.bk-svc', isSvc, '2 / span 3');
+    put('.bk-weight', true, '5');
+    const rm = row.querySelector('.btn-secondary[title="Remove backend"]');
+    if (rm) rm.style.gridColumn = '6';
     _bkSyncWeights();
 }
 
 function _bkSyncWeights() {
-    const on = _bkAnyServiceRow();
-    _bkRows().forEach(r => {
+    const rows = _bkRows();
+    const on = _bkAnyServiceRow() && rows.length > 1;
+    rows.forEach(r => {
         const w = r.querySelector('.bk-weight');
         if (w) w.style.display = on ? '' : 'none';
     });

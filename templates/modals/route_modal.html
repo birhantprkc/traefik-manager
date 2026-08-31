@@ -82,8 +82,8 @@
                     </div>
                     <div>
                         <div class="flex gap-2 mb-3">
-                            <button type="button" id="httpSvcModeManualBtn" onclick="setServiceRefMode('http', false)" class="proto-btn active-http" style="padding:4px 12px;font-size:11px;border-radius:6px">Manual</button>
-                            <button type="button" id="httpSvcModeRefBtn" onclick="setServiceRefMode('http', true)" class="proto-btn" style="padding:4px 12px;font-size:11px;border-radius:6px">Existing service</button>
+                            <button type="button" id="httpSvcModeManualBtn" onclick="setServiceRefMode('http', false)" class="proto-btn active-http" style="padding:4px 12px;font-size:11px;border-radius:6px">Build backends</button>
+                            <button type="button" id="httpSvcModeRefBtn" onclick="setServiceRefMode('http', true)" class="proto-btn" style="padding:4px 12px;font-size:11px;border-radius:6px">Use a service</button>
                         </div>
                         <div id="httpRefBackend" style="display:none">
                             <label>Backend service</label>
@@ -290,8 +290,8 @@
                         <p class="text-xs mt-1" style="color:var(--muted)">Use <code class="font-mono">HostSNI(`*`)</code> to match all TLS or leave empty for passthrough</p>
                     </div>
                     <div class="flex gap-2 mb-3">
-                        <button type="button" id="tcpSvcModeManualBtn" onclick="setServiceRefMode('tcp', false)" class="proto-btn active-tcp" style="padding:4px 12px;font-size:11px;border-radius:6px">Manual</button>
-                        <button type="button" id="tcpSvcModeRefBtn" onclick="setServiceRefMode('tcp', true)" class="proto-btn" style="padding:4px 12px;font-size:11px;border-radius:6px">Existing service</button>
+                        <button type="button" id="tcpSvcModeManualBtn" onclick="setServiceRefMode('tcp', false)" class="proto-btn active-tcp" style="padding:4px 12px;font-size:11px;border-radius:6px">Build backends</button>
+                        <button type="button" id="tcpSvcModeRefBtn" onclick="setServiceRefMode('tcp', true)" class="proto-btn" style="padding:4px 12px;font-size:11px;border-radius:6px">Use a service</button>
                     </div>
                     <div id="tcpRefBackend" style="display:none">
                         <label>Backend service</label>
@@ -357,8 +357,8 @@
 
                 <div id="udpSection" class="protocol-section space-y-4">
                     <div class="flex gap-2 mb-3">
-                        <button type="button" id="udpSvcModeManualBtn" onclick="setServiceRefMode('udp', false)" class="proto-btn active-udp" style="padding:4px 12px;font-size:11px;border-radius:6px">Manual</button>
-                        <button type="button" id="udpSvcModeRefBtn" onclick="setServiceRefMode('udp', true)" class="proto-btn" style="padding:4px 12px;font-size:11px;border-radius:6px">Existing service</button>
+                        <button type="button" id="udpSvcModeManualBtn" onclick="setServiceRefMode('udp', false)" class="proto-btn active-udp" style="padding:4px 12px;font-size:11px;border-radius:6px">Build backends</button>
+                        <button type="button" id="udpSvcModeRefBtn" onclick="setServiceRefMode('udp', true)" class="proto-btn" style="padding:4px 12px;font-size:11px;border-radius:6px">Use a service</button>
                     </div>
                     <div id="udpRefBackend" style="display:none">
                         <label>Backend service</label>
