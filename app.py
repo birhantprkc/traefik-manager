@@ -1555,7 +1555,7 @@ def api_route_ping():
         ms, code = _ping(url)
         return jsonify({'ok': True, 'latency_ms': ms, 'status_code': code})
     except Exception as primary_err:
-        if fallback and fallback.startswith(('http://', 'https://')):
+        if fallback and fallback.startswith(('http://', 'https://')) and _ssrf_ok(fallback):
             try:
                 ms, code = _ping(fallback)
                 return jsonify({'ok': True, 'latency_ms': ms, 'status_code': code, 'via_target': True})
