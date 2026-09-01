@@ -86,6 +86,34 @@ Switch Certs, Plugins and Logs on in **Settings -> System Monitoring**; mounting
 
 > Mount `traefik.yml` without `:ro`. Read-only still lists plugins, but saving the static config or installing a plugin fails with a write error.
 
+### Named volumes
+
+Docker cannot mount a single file out of a named volume, so if Traefik stores its certificates or
+logs in one, mount the volume as a directory and name the file with an environment variable:
+
+```yaml
+services:
+  traefik-manager:
+    environment:
+      ACME_JSON_PATH: /traefik-certs/acme.json
+      ACCESS_LOG_PATH: /traefik-logs/access.log
+    volumes:
+      - traefik_certs:/traefik-certs:ro
+      - traefik_logs:/traefik-logs:ro
+
+volumes:
+  traefik_certs:
+    external: true
+  traefik_logs:
+    external: true
+```
+
+Both default to the bind-mount paths above (`/app/acme.json` and `/app/logs/access.log`), so an
+existing deployment needs no change. `STATIC_CONFIG_PATH` and `PLUGINS_DIR` work the same way, and
+so does the agent, which reads the same variables.
+
+Either can also be set in **Settings**, which takes precedence over the environment variable.
+
 ### Full compose example (all monitoring enabled)
 
 ```yaml

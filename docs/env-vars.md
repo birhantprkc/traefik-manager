@@ -529,6 +529,16 @@ Traefik writes one storage file per certificate resolver. Give them comma-separa
 
 Certificates from every file are shown together, each tagged with the file it came from.
 
+This is also how you read certificates out of a Docker named volume. Docker cannot mount a single
+file from one, so mount the volume as a directory and name the file here:
+
+```yaml
+environment:
+  ACME_JSON_PATH: /traefik-certs/acme.json
+volumes:
+  - traefik_certs:/traefik-certs:ro
+```
+
 :::tabs
 == Docker / Podman
 ```yaml
@@ -570,6 +580,16 @@ volumes:
 Environment=ACCESS_LOG_PATH=/var/log/traefik/access.log
 ```
 :::
+
+If Traefik writes its log into a Docker named volume, mount the volume as a directory and name the
+file here, since Docker cannot mount a single file out of one:
+
+```yaml
+environment:
+  ACCESS_LOG_PATH: /traefik-logs/access.log
+volumes:
+  - traefik_logs:/traefik-logs:ro
+```
 
 ---
 
