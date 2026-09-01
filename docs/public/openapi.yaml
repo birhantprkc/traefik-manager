@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Traefik Manager API
-  version: 1.12.1
+  version: 1.13.0
   description: |
     REST API powering the Traefik Manager web UI and official mobile app.
 
@@ -187,7 +187,10 @@ components:
         url: { type: string, example: "https://agent.example.com:8090", description: "Base URL of the agent, no trailing slash." }
         api_key: { type: string, example: "***", description: "Always redacted. The raw key is returned once, on create and on rotate." }
         created_at: { type: string, format: date-time }
+        install_method: { type: string, enum: [cli, manual], description: "How the agent was added: the tm CLI install, or the manual compose generator." }
         traefik_api_url: { type: string, example: "http://traefik:8080" }
+        traefik_api_user: { type: string, description: "Username for a Traefik API behind basic auth." }
+        traefik_api_password: { type: string, example: "***", description: "Always redacted. Send \"\" or \"***\" to keep the stored value." }
         traefik_insecure_skip_verify: { type: boolean }
         cert_resolver: { type: string, description: "Optional per-agent resolver, for resolvers no route uses yet." }
         config_path: { type: string, example: "/app/config" }
@@ -880,6 +883,7 @@ paths:
                 subdomain: { type: string, description: "Hostname (e.g. app.example.com)" }
                 targetIp: { type: string, description: "Single backend host. Ignored when the matching backendsJson* field is sent." }
                 targetPort: { type: string }
+                serviceRef: { type: string, description: "Name of an existing service for the router to point at. When sent, no <name>-service is created and the backend fields are ignored. Sent empty it is a 400." }
                 backendsJsonHttp:
                   type: string
                   description: |
@@ -890,6 +894,14 @@ paths:
                     (`{enabled, path, interval, timeout}` - Go durations, a bare number is read as
                     seconds), and `priority` (integer). Omitted or invalid JSON falls back to
                     `targetIp`/`targetPort`. Rows with an empty `host` are skipped.
+
+                    `children` (array of `{kind, address, scheme, name, weight, percent}`) turns the
+                    route's service into a composite of the type in `compositeType` (`weighted`,
+                    `mirroring` or `failover`). A `manual` child becomes its own
+                    `<route>-backend-<n>` service; a `service` child is referenced by `name` and
+                    never copied. Sending `children: []` reverts the route to a plain
+                    `loadBalancer`. The key is acted on only when **present**, so clients that never
+                    send it cannot flatten a composite by accident.
                   example: '{"servers":[{"scheme":"http","host":"192.168.1.10","port":"8080"},{"scheme":"http","host":"192.168.1.11","port":"8080"}],"sticky":{"enabled":true,"cookieName":"tm_sticky","secure":true,"httpOnly":true},"healthCheck":{"enabled":true,"path":"/health","interval":"10s","timeout":"3s"},"priority":10}'
                 backendsJsonTcp:
                   type: string
@@ -1116,6 +1128,7 @@ paths:
                   default_theme: { type: string, enum: [dark, light, system] }
                   crowdsec_lapi_url: { type: string }
                   crowdsec_api_key_set: { type: boolean, description: "true if a CrowdSec API key is saved" }
+                  crowdsec_alert_limit: { type: string, example: "500", description: "Alert row limit, 0 to 100000. Blank falls back to CROWDSEC_ALERT_LIMIT." }
                   crowdsec_enabled: { type: boolean, description: "true if both LAPI URL and API key are configured" }
     post:
       tags: [Settings]
@@ -1139,9 +1152,15 @@ paths:
                 static_config_path: { type: string }
                 crowdsec_lapi_url: { type: string }
                 crowdsec_api_key: { type: string, description: "Leave blank to keep existing key" }
+                crowdsec_alert_limit: { type: string, description: "Alert row limit, 0 to 100000. Blank falls back to CROWDSEC_ALERT_LIMIT." }
       responses:
         "200":
           description: Success
+        "400":
+          description: Invalid input, for example an alert limit that is not a whole number or is outside 0 to 100000
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /api/settings/self-route:
     get:
@@ -2122,6 +2141,7 @@ paths:
               properties:
                 name: { type: string, example: "vps-frankfurt" }
                 url: { type: string, example: "https://agent.example.com:8090" }
+                install_method: { type: string, enum: [cli, manual], default: manual }
                 traefik_api_url: { type: string }
                 config_path: { type: string }
                 domains: { type: array, items: { type: string } }
@@ -2137,7 +2157,7 @@ paths:
                   agent: { $ref: "#/components/schemas/Agent" }
                   api_key_raw: { type: string, description: "Shown once. Not retrievable later." }
         "400":
-          description: name and url are required
+          description: name and url are required, or the URL has no http/https scheme or no host
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -2174,7 +2194,7 @@ paths:
                   ok: { type: boolean }
                   agent: { $ref: "#/components/schemas/Agent" }
         "400":
-          description: Branch already in use by the Host or another agent
+          description: Empty name, a URL with no http/https scheme or no host, or a branch already in use by the Host or another agent
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -2183,7 +2203,11 @@ paths:
     delete:
       tags: [Agents]
       summary: Remove an agent
-      description: Removes the registration from this instance. The agent itself keeps running; stop it separately.
+      description: |
+        Removes the registration from this instance, along with the Host's per-agent git
+        clone and that agent's disabled-route and managed-middleware entries in
+        `manager.yml`. Idempotent: an unknown id also returns 200. The agent itself keeps
+        running; stop it separately.
       parameters:
         - name: agent_id
           in: path
@@ -2195,8 +2219,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/OkResponse" }
-        "404":
-          description: Agent not found
 
   /api/agents/{agent_id}/health:
     get:
@@ -2432,10 +2454,20 @@ paths:
     get:
       tags: [CrowdSec]
       summary: List recent alerts
-      description: Returns up to 50 recent CrowdSec alerts.
+      description: |
+        Returns the most recent CrowdSec alerts. The row limit is 500 by default and
+        is set by the `crowdsec_alert_limit` setting or the `CROWDSEC_ALERT_LIMIT`
+        env var, 0 to 100000, where 0 reads every alert.
       responses:
         "200":
           description: Alert list
+          headers:
+            X-CS-Alert-Limit:
+              description: The row limit applied to this response.
+              schema: { type: integer, example: 500 }
+            X-CS-Alert-Capped:
+              description: "1 when the response hit the limit, 0 otherwise."
+              schema: { type: string, enum: ["0", "1"] }
           content:
             application/json:
               schema:
@@ -2608,6 +2640,120 @@ paths:
                 properties:
                   ok: { type: boolean }
                   version: { type: string, example: "3.2.0" }
+
+  /api/services:
+    post:
+      tags: [Services]
+      summary: Create or update a composite service
+      description: >
+        Creates a `weighted`, `mirroring` or `failover` service and the child services for any
+        IP:Port backends. Pass `originalName` to rename an existing managed service. Refuses to
+        overwrite a service Traefik Manager does not manage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, children]
+              properties:
+                name:         { type: string, example: api-pool }
+                type:         { type: string, enum: [weighted, mirroring, failover] }
+                originalName: { type: string, description: set when renaming }
+                configFile:   { type: string }
+                children:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      kind:    { type: string, enum: [manual, service] }
+                      address: { type: string, example: "10.0.0.10:80" }
+                      name:    { type: string, description: for kind service }
+                      scheme:  { type: string, enum: [http, https] }
+                      weight:  { type: integer }
+                      percent: { type: integer, description: mirroring only }
+      responses:
+        "200": { description: Saved }
+        "400": { description: Bad name, type or backends }
+        "403": { description: Not managed by Traefik Manager }
+        "409": { description: A service of that name already exists }
+
+  /api/services/{name}/ownership:
+    post:
+      tags: [Services]
+      summary: Take over or release management of a composite service
+      description: >
+        Records or removes a ledger entry only. No YAML is written, so adopting a hand-written
+        service leaves the file byte for byte unchanged. Only `weighted`, `mirroring`, `failover`
+        and `highestRandomWeight` services can be managed.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                adopt: { type: boolean, description: true to manage, false to release }
+      responses:
+        "200":
+          description: Management changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:    { type: boolean }
+                  owned: { type: boolean }
+        "400": { description: Not a composite service }
+        "404": { description: No such service }
+
+  /api/services/{name}:
+    delete:
+      tags: [Services]
+      summary: Delete a managed composite service
+      description: >
+        Removes the service and the child services it owns. Refuses while a router still points at
+        it or another service still lists it as a backend.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Deleted }
+        "403": { description: Not managed by Traefik Manager }
+        "404": { description: No such service }
+        "409": { description: Still in use }
+
+  /api/storage/status:
+    get:
+      tags: [Utility]
+      summary: Whether the directories Traefik Manager writes to are writable
+      description: >
+        Probes the configuration, backup and dynamic config directories by writing and removing a
+        temporary file. An empty `problems` array means everything is writable. The result is cached
+        for 30 seconds.
+      responses:
+        "200":
+          description: Probe result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  problems:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        label: { type: string, example: Configuration }
+                        path:  { type: string, example: /app/config }
+                        error: { type: string, example: read-only file system }
 
   /api/health:
     get:

@@ -83,7 +83,7 @@ from `manager.yml` and restart.
 | `CROWDSEC_CA_CERT` | _(unset)_ | Fallback `crowdsec_ca_cert` | Path to the CA certificate that signed the LAPI's own certificate (private PKI) |
 | `CROWDSEC_READ_TIMEOUT` | `20` | - | Seconds to wait for the LAPI to answer. Capped at 25 |
 | `CROWDSEC_CONNECT_TIMEOUT` | `5` | - | Seconds to wait for the TCP/TLS connection itself |
-| `CROWDSEC_ALERT_LIMIT` | `500` | - | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
+| `CROWDSEC_ALERT_LIMIT` | `500` | Fallback `crowdsec_alert_limit` | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
 
 ### Agents
 
@@ -99,6 +99,7 @@ from `manager.yml` and restart.
 | `INACTIVITY_TIMEOUT_MINUTES` | `120` | - | Log out after this many minutes of inactivity |
 | `OTP_ENCRYPTION_KEY` | _(auto-generated)_ | - | Fernet key for every secret stored encrypted in `manager.yml` |
 | `PROXY_FIX_HOPS` | `1` | - | Number of trusted proxy hops in front of Traefik Manager for `X-Forwarded-For` |
+| `BASE_PATH` | _(none)_ | - | Serve Traefik Manager under a sub path, for example `/traefik-manager` |
 | `LOG_LEVEL` | `INFO` | - | Python log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
 ---
@@ -528,6 +529,16 @@ Traefik writes one storage file per certificate resolver. Give them comma-separa
 
 Certificates from every file are shown together, each tagged with the file it came from.
 
+This is also how you read certificates out of a Docker named volume. Docker cannot mount a single
+file from one, so mount the volume as a directory and name the file here:
+
+```yaml
+environment:
+  ACME_JSON_PATH: /traefik-certs/acme.json
+volumes:
+  - traefik_certs:/traefik-certs:ro
+```
+
 :::tabs
 == Docker / Podman
 ```yaml
@@ -569,6 +580,16 @@ volumes:
 Environment=ACCESS_LOG_PATH=/var/log/traefik/access.log
 ```
 :::
+
+If Traefik writes its log into a Docker named volume, mount the volume as a directory and name the
+file here, since Docker cannot mount a single file out of one:
+
+```yaml
+environment:
+  ACCESS_LOG_PATH: /traefik-logs/access.log
+volumes:
+  - traefik_logs:/traefik-logs:ro
+```
 
 ---
 
@@ -710,6 +731,8 @@ environment:
 
 How many of the most recent alerts the CrowdSec tab reads, newest first. The default keeps the tab responsive on a LAPI holding a large community blocklist. Set it to `0` to read every alert the LAPI still retains - on a large instance that can take longer than the read timeout allows, which is what the limit exists to prevent.
 
+**Alert limit** under **Settings - System Monitoring - CrowdSec** wins when it is set. It is written to `manager.yml` as `crowdsec_alert_limit` and survives a Settings save; this env var applies when the field is blank.
+
 ```yaml
 environment:
   - CROWDSEC_ALERT_LIMIT=1000
@@ -774,6 +797,36 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 ::: warning
 Lose this key and every stored secret becomes unreadable - 2FA must be re-enrolled and the other credentials re-entered. Back up `.otp_key` alongside your config volume.
 :::
+
+---
+
+### `BASE_PATH`
+
+**Default:** _(none)_
+
+Serves Traefik Manager under a sub path instead of the root of a host, for example
+`https://example.com/traefik-manager`. Leave it unset to serve from the root, which is the default
+and needs no configuration.
+
+The value must be a path starting with a single `/`, with no trailing slash and no scheme. Anything
+else is ignored and logged at startup.
+
+```yaml
+services:
+  traefik-manager:
+    environment:
+      BASE_PATH: /traefik-manager
+```
+
+A `stripPrefix` middleware in front is optional. Traefik Manager accepts the prefixed path whether or
+not Traefik has already removed it.
+
+::: warning OIDC redirect URI
+If you use OIDC, the callback URL changes when you set this. Update the redirect URI at your identity
+provider to include the prefix, or sign in will fail after the redirect.
+:::
+
+Use a sub domain instead where you can. It needs no configuration on either side.
 
 ---
 

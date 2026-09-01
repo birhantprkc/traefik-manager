@@ -1802,3 +1802,12 @@ html.tm-static-in-settings .sc-root .sc-fold-head { cursor: default; pointer-eve
 #mpanel-static #staticSearchWrap { display: none !important; }
 
 #serverSwitcherWrap, .nav-dup-sidenav { display: none !important; }
+
+.agent-door { display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left; padding: 14px; margin-bottom: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); cursor: pointer; transition: border-color .12s, background .12s; }
+.agent-door:hover { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 6%, var(--input-bg)); }
+.agent-door-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: rgba(36,161,222,0.12); color: var(--blue); font-size: 15px; }
+.agent-door-body { flex: 1; min-width: 0; }
+.agent-door-title { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.agent-door-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--blue); background: rgba(36,161,222,0.15); border: 1px solid rgba(36,161,222,0.35); border-radius: 4px; padding: 1px 5px; }
+.agent-door-desc { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
+.agent-door-go { color: var(--muted); font-size: 12px; align-self: center; flex-shrink: 0; }

@@ -13,7 +13,7 @@ curl -fsSL https://get-traefik.xyzlab.dev | bash
 | Command | What it does |
 |---|---|
 | `tm status` | Mode, directory, services, URLs, health |
-| `tm update` | Pulls images, `git pull`, or downloads the agent binary, then restarts |
+| `tm update` | Pulls images, `git pull`, or downloads the agent binary, then restarts. On a Linux service install it skips reinstalling dependencies and rebuilding assets when git reports no change, `--force` does it anyway |
 | `tm logs [service]` | Follows the logs (`--no-follow`, `-n <lines>`) |
 | `tm restart`, `tm start`, `tm stop` | Whole install, or one service |
 | `tm password` | Prints the temporary password from the logs |
@@ -21,9 +21,20 @@ curl -fsSL https://get-traefik.xyzlab.dev | bash
 | `tm add crowdsec` | Adds CrowdSec to an existing install |
 | `tm doctor` | Checks Docker, ports, DNS, `acme.json`, health endpoints, CrowdSec |
 | `tm uninstall` | Stops the services and removes the files tm wrote, keeping any you changed. `--purge` also removes configs, data and volumes |
+| `tm uninstall --self` | Removes `tm` itself. Any installs keep running, they just stop being managed |
 | `tm self-update` | Updates `tm` itself |
 
 Commands find the install from `--dir` or `TM_DIR`, then the current directory, then the installs `tm` already knows about.
+
+### Removing tm
+
+`tm uninstall` removes an install, not the CLI. To remove `tm` itself:
+
+```bash
+tm uninstall --self
+```
+
+It names any installs it still knows about first, since those keep running and serving traffic without it. Uninstall them first if that was the intent.
 
 | Mode | Secrets | tm's record of the install |
 |---|---|---|

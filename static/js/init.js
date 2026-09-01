@@ -83,7 +83,7 @@ else _initAutofillGuard();
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/sw.js')
+        navigator.serviceWorker.register(tmUrl('/static/sw.js'), { scope: tmUrl('/static/') })
             .then(reg => console.log('SW registered:', reg.scope))
             .catch(err => console.warn('SW registration failed:', err));
     });
@@ -134,6 +134,10 @@ window.addEventListener('appinstalled', () => {
     if (typeof refreshStaticTabAvailability === 'function') refreshStaticTabAvailability();
     window.addEventListener('resize', () => { if (window.innerWidth >= 768) closeSideNavDrawer(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSideNavDrawer(); });
+    if (typeof refreshStorageBanner === 'function') {
+        refreshStorageBanner();
+        setInterval(refreshStorageBanner, 300000);
+    }
     setInterval(fetchNotifications, 60000);
 })();
 

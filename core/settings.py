@@ -428,7 +428,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
                   notification_channels=None, notifications_read_until=None,
                   oidc_groups_claim=None, webhook_url=None, webhook_type=None,
                   webhook_username=None, webhook_password=None,
-                  crowdsec_lapi_url=None, crowdsec_api_key=None,
+                  crowdsec_lapi_url=None, crowdsec_api_key=None, crowdsec_alert_limit=None,
                   crowdsec_machine_id=None, crowdsec_machine_password=None,
                   crowdsec_client_cert=None, crowdsec_client_key=None,
                   crowdsec_ca_cert=None,
@@ -517,6 +517,8 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         crowdsec_lapi_url = _cur.get('crowdsec_lapi_url', '')
     if crowdsec_api_key is None:
         crowdsec_api_key = _cur.get('crowdsec_api_key', '')
+    if crowdsec_alert_limit is None:
+        crowdsec_alert_limit = _cur.get('crowdsec_alert_limit', '')
     if crowdsec_machine_id is None:
         crowdsec_machine_id = _cur.get('crowdsec_machine_id', '')
     if crowdsec_machine_password is None:
@@ -602,6 +604,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'webhook_password':     crypto.encrypt_secret(webhook_password) if webhook_password else '',
         'crowdsec_lapi_url':    crowdsec_lapi_url,
         'crowdsec_api_key':     crypto.encrypt_secret(crowdsec_api_key) if crowdsec_api_key else '',
+        'crowdsec_alert_limit':  str(crowdsec_alert_limit or '').strip(),
         'crowdsec_machine_id':       crowdsec_machine_id,
         'crowdsec_machine_password': crypto.encrypt_secret(crowdsec_machine_password) if crowdsec_machine_password else '',
         'crowdsec_client_cert':      str(crowdsec_client_cert).strip(),

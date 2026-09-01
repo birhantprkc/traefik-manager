@@ -40,7 +40,10 @@
             <span id="svcDetailProtoBadge" class="d-flat d-proto">HTTP</span>
             <h2 class="font-bold text-sm" style="color:var(--text)" id="svcDetailTitle">Service Details</h2>
         </div>
-        <button onclick="closeSvcDetail()" class="btn-icon"><i class="ph-bold ph-x"></i></button>
+        <div class="flex items-center gap-2">
+            <button id="svcDetailEditBtn" class="btn-secondary text-xs"><i class="ph-bold ph-pencil-simple"></i> Edit</button>
+            <button onclick="closeSvcDetail()" class="btn-icon"><i class="ph-bold ph-x"></i></button>
+        </div>
     </div>
     <div class="px-6 py-5 overflow-y-auto" id="svcDetailBody"></div>
 </div>

@@ -551,7 +551,7 @@ Controls which optional tabs are shown. Managed via the setup wizard, **Settings
 
 **Type:** map - **Default:** `{}`
 
-Stores the full config of disabled routes so they can be re-enabled without data loss. Managed automatically by the enable/disable toggle. Do not edit by hand.
+Stores the full config of disabled routes so they can be re-enabled without data loss. Managed automatically by the enable/disable toggle. Do not edit by hand. An agent's snapshots are keyed `agent_<id>::` and are removed when that agent is removed.
 
 ---
 
@@ -559,7 +559,16 @@ Stores the full config of disabled routes so they can be re-enabled without data
 
 **Type:** map - **Default:** `{}`
 
-Ownership ledger for middlewares that traefik-manager generated on your behalf - currently the `<route>-headers` middleware created by the [Security headers preset](./tab-routes#security-headers-preset). Each entry records that the tool created that middleware, so it will only ever update or remove middlewares it owns, and refuses to overwrite a same-named middleware you wrote by hand. Middlewares created on a remote agent are recorded with an `agent_<id>::` key prefix, so each server's generated middlewares are tracked separately. Managed automatically; do not edit by hand.
+Ownership ledger for the middlewares and `serversTransports` that traefik-manager generated on your behalf. Each entry records that the tool created it, so it will only ever update or remove what it owns, and refuses to overwrite a same-named entry you wrote by hand. Managed automatically; do not edit by hand.
+
+| Key | What it owns |
+|---|---|
+| `<route>-headers` | The middleware created by the [Security headers preset](./tab-routes#security-headers-preset) |
+| `tp::<name>` | A generated `serversTransport`. Written whenever a route needs one, including Skip TLS verification as well as the streaming preset |
+| `svc::<name>` | A composite service ([Services tab](./tab-services)) - the parent, and one entry per generated `<name>-backend-<n>` child. The entry records the type and child list, and ownership only holds while the file still matches it, so a hand edit or a restore makes the service read only instead of being overwritten |
+| `agent_<id>::...` | The same, on a remote agent - each server is tracked separately |
+
+Deleting a route removes the `<service>-transport` it owns and its ledger entry, unless another service or a disabled route still references it. Removing an agent drops every `agent_<id>::` entry.
 
 ```yaml
 managed_middlewares:
@@ -594,10 +603,10 @@ These sections are documented on their own pages. All are set through the UI and
 
 | Keys | Set in | Reference |
 |---|---|---|
-| `crowdsec_lapi_url`, `crowdsec_api_key`, `crowdsec_machine_id`, `crowdsec_machine_password`, `crowdsec_client_cert`, `crowdsec_client_key`, `crowdsec_ca_cert` | Settings - System Monitoring - CrowdSec | [CrowdSec tab](tab-crowdsec.md) |
+| `crowdsec_lapi_url`, `crowdsec_api_key`, `crowdsec_machine_id`, `crowdsec_machine_password`, `crowdsec_client_cert`, `crowdsec_client_key`, `crowdsec_ca_cert`, `crowdsec_alert_limit` | Settings - System Monitoring - CrowdSec | [CrowdSec tab](tab-crowdsec.md) |
 | `git_backup_enabled`, `git_backup_repo`, `git_backup_branch`, `git_backup_username`, `git_backup_token`, `git_backup_commit_message`, `git_backup_auto_push` | Settings - Backups - Git | [Git Backup](git-backup.md) |
 
-`crowdsec_read_timeout` and `crowdsec_alert_limit` are read from this file if you add them by hand, but TM never writes them - the next Settings save drops them. Use [`CROWDSEC_READ_TIMEOUT`](env-vars.md) and `CROWDSEC_ALERT_LIMIT` instead.
+`crowdsec_read_timeout` is read from this file if you add it by hand, but TM never writes it - the next Settings save drops it. Use [`CROWDSEC_READ_TIMEOUT`](env-vars.md) instead.
 
 `agent_api_rate_limit` is stored here but not enforced in this release. Registered agents live in `agents.yml`, not in this file.
 

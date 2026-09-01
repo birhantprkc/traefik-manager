@@ -27,6 +27,9 @@ CERT_INTERVAL     = 86400
 TRAEFIK_INTERVAL  = 60
 AGENT_INTERVAL    = 120
 GEOIP_INTERVAL    = 86400
+STORAGE_INTERVAL  = 300
+AGENT_EVENT_INTERVAL = 120
+AGENT_EVENT_MAX   = 10
 CROWDSEC_INTERVAL = 300
 
 CERT_ALERT_DAYS   = (14, 3, 0)
@@ -38,6 +41,7 @@ KEY_SEP           = '|'
 
 _state     = {}
 _cycle_up  = {}
+_cycle_auth = {}
 _run_lock  = threading.Lock()
 _stop_event = threading.Event()
 _thread    = None
@@ -57,6 +61,7 @@ def _state_path():
 
 
 _memory_state = {}
+_persist_ok = True
 
 
 def _remember_state(data):
@@ -65,6 +70,8 @@ def _remember_state(data):
 
 
 def _read_state():
+    if not _persist_ok:
+        return json.loads(json.dumps(_memory_state))
     try:
         with open(_state_path(), 'r') as f:
             data = json.load(f)
@@ -76,6 +83,7 @@ def _read_state():
 
 
 def _write_state():
+    global _persist_ok
     path = _state_path()
     tmp  = f"{path}.tmp.{os.getpid()}"
     _remember_state(_state)
@@ -83,8 +91,11 @@ def _write_state():
         with open(tmp, 'w') as f:
             json.dump(_state, f)
         cfg_mod._replace_or_copy(tmp, path)
+        _persist_ok = True
     except Exception:
-        logger.exception("Failed to save monitor state")
+        if _persist_ok:
+            logger.exception("Failed to save monitor state")
+        _persist_ok = False
     finally:
         try:
             if os.path.exists(tmp):
@@ -198,6 +209,24 @@ def _agent_reachable(agent) -> bool:
     return _cycle_up[agent_id]
 
 
+def _agent_key_accepted(agent) -> bool:
+    agent_id = str(agent.get('id') or '')
+    if agent_id in _cycle_auth:
+        return _cycle_auth[agent_id]
+    ok = True
+    try:
+        resp = agents_http_mod._agent_request(agent, 'GET', '/api/traefik/version')
+        ok = resp.status_code != 401
+    except Exception as e:
+        logger.debug(f"Auth probe failed for agent {agent.get('name', '')}: {e}")
+    _cycle_auth[agent_id] = ok
+    return ok
+
+
+def _agent_usable(agent) -> bool:
+    return _agent_reachable(agent) and _agent_key_accepted(agent)
+
+
 def _agent_servers():
     servers = []
     for agent in _agents():
@@ -248,7 +277,7 @@ def _cert_sources(servers):
         logger.exception("Certificate check failed for the host")
     for server, name, agent in servers:
         try:
-            if _agent_reachable(agent):
+            if _agent_usable(agent):
                 sources.append((server, name, _agent_certs(agent)))
         except Exception:
             logger.exception(f"Certificate check failed for agent {name}")
@@ -299,7 +328,7 @@ def _traefik_sources(servers):
         logger.exception("Traefik check failed for the host")
     for server, name, agent in servers:
         try:
-            if _agent_reachable(agent):
+            if _agent_usable(agent):
                 sources.append((server, name, _agent_traefik_up(agent)))
         except Exception:
             logger.exception(f"Traefik check failed for agent {name}")
@@ -336,13 +365,20 @@ def _check_agents():
         except Exception:
             logger.exception(f"Health check failed for agent {name}")
             continue
+        auth_ok = _agent_key_accepted(agent) if up else True
+        status = 'up' if (up and auth_ok) else ('badkey' if up else 'down')
         prev = state.get(agent_id)
-        seen[agent_id] = up
-        if up == prev:
+        if isinstance(prev, bool):
+            prev = 'up' if prev else 'down'
+        seen[agent_id] = status
+        if status == prev:
             continue
-        if up:
+        if status == 'up':
             if prev is not None:
                 raised.append(('success', f"Agent {name} is back online", 'agent'))
+        elif status == 'badkey':
+            raised.append(('error', f"Agent {name} rejected the API key - rotate it in "
+                                    f"Settings or fix TMA_API_KEY on the agent", 'agent'))
         else:
             raised.append(('error', f"Agent {name} is unreachable", 'agent'))
     known = {agent_id for agent_id, _name, _agent in servers}
@@ -396,7 +432,7 @@ def _check_crowdsec_agents():
     for server, name, agent in servers:
         key = _server_key(server, 'lapi')
         try:
-            if not _agent_reachable(agent):
+            if not _agent_usable(agent):
                 continue
             configured, up, alerts = _agent_crowdsec(agent)
             if not configured:
@@ -448,6 +484,83 @@ def _check_geoip():
     return [('warning', f"GeoIP database is out of date and could not be updated: {info}", 'update')]
 
 
+def _check_storage():
+    state  = _section('storage')
+    broken = {}
+    for label, path, err in env.unwritable_storage():
+        broken[path] = (label, err)
+    raised = []
+    for path, (label, err) in broken.items():
+        if state.get(path):
+            continue
+        raised.append(('error',
+                       f"{label} storage at {path} is not writable, so settings, backups and "
+                       f"scheduled checks will not survive a restart ({err})",
+                       'config'))
+    for path in state:
+        if path not in broken:
+            raised.append(('success', f"Storage at {path} is writable again", 'config'))
+    state.clear()
+    state.update({path: err for path, (_label, err) in broken.items()})
+    return raised
+
+
+_AGENT_EVENT_LABELS = {
+    'git':     'git backup',
+    'restart': 'restart',
+    'backup':  'backup',
+    'storage': 'storage',
+}
+
+
+def _check_agent_events():
+    state  = _section('agent_events')
+    raised = []
+    seen   = {}
+    for agent in _agents():
+        agent_id = str(agent.get('id') or '')
+        if not agent_id or not _agent_usable(agent):
+            seen[agent_id] = state.get(agent_id, 0)
+            continue
+        since = state.get(agent_id)
+        try:
+            resp = agents_http_mod._agent_request(
+                agent, 'GET', f'/api/events?since={int(since or 0)}')
+        except Exception as e:
+            logger.debug(f"Agent event poll failed for {agent.get('name', '')}: {e}")
+            seen[agent_id] = since or 0
+            continue
+        if resp is None or getattr(resp, 'status_code', 0) != 200:
+            seen[agent_id] = since or 0
+            continue
+        try:
+            data = resp.json() or {}
+        except Exception:
+            seen[agent_id] = since or 0
+            continue
+        events = data.get('events') or []
+        latest = data.get('latest') or since or 0
+        seen[agent_id] = latest
+        if since is None:
+            continue
+        name = str(agent.get('name') or agent_id)
+        for item in events[-AGENT_EVENT_MAX:]:
+            kind = str(item.get('kind') or '')
+            msg  = str(item.get('message') or '').strip()
+            if not msg:
+                continue
+            label = _AGENT_EVENT_LABELS.get(kind, kind or 'agent')
+            raised.append(('error', f"{name}: {label} - {msg}", 'agent'))
+        if len(events) > AGENT_EVENT_MAX:
+            raised.append(('error',
+                           f"{name}: {len(events) - AGENT_EVENT_MAX} more failures not shown, "
+                           f"check the agent log",
+                           'agent'))
+    state.clear()
+    state.update(seen)
+    return raised
+
+
 def register(name: str, interval_seconds: int, fn):
     entry = (str(name), max(1, int(interval_seconds)), fn)
     for i, check in enumerate(_checks):
@@ -463,6 +576,7 @@ def run_checks_once(force: bool = False) -> list:
         _state.clear()
         _state.update(_read_state())
         _cycle_up.clear()
+        _cycle_auth.clear()
         due = _section('due')
         ran = False
         for name, interval, fn in list(_checks):
@@ -566,4 +680,6 @@ _checks = [
     ('traefik',         TRAEFIK_INTERVAL,  _check_traefik),
     ('crowdsec_agents', CROWDSEC_INTERVAL, _check_crowdsec_agents),
     ('geoip',           GEOIP_INTERVAL,    _check_geoip),
+    ('storage',         STORAGE_INTERVAL,  _check_storage),
+    ('agent_events',    AGENT_EVENT_INTERVAL, _check_agent_events),
 ]

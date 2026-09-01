@@ -12,6 +12,8 @@ X-Api-Key: your-api-key-here
 
 `Authorization: Bearer <key>` works too.
 
+The key is trimmed of surrounding whitespace on both sides - in the header and in `TMA_API_KEY` - so a trailing newline from a secrets file or a copy-paste does not cause a `401`.
+
 TM handles authentication automatically when proxying calls through `/api/agents/proxy/<id>/...`.
 
 ## Rate limiting
@@ -23,6 +25,7 @@ TM handles authentication automatically when proxying calls through `/api/agents
 | Method | Path | Description |
 |---|---|---|
 | GET | `/health` | Health check - no auth required |
+| GET | `/api/events` | Failures the agent could not report in a response, newest last - `?since=<id>` returns only newer ones |
 | GET | `/api/traefik/overview` | Traefik API overview |
 | GET | `/api/traefik/routers` | Routers across all protocols - returns `{"http":[...],"tcp":[...],"udp":[...]}` |
 | GET | `/api/traefik/services` | Services across all protocols - returns `{"http":[...],"tcp":[...],"udp":[...]}` |
@@ -33,14 +36,14 @@ TM handles authentication automatically when proxying calls through `/api/agents
 | GET | `/api/traefik/certs` | Certificates from acme.json (requires `ACME_JSON_PATH`) |
 | GET | `/api/traefik/plugins` | Plugins declared in the agent's static config (requires `STATIC_CONFIG_PATH`) |
 | GET | `/api/configs` | Read dynamic config file(s) |
-| POST | `/api/configs` | Write a dynamic config file (creates a `.bak` before writing) - body: `{"name": "...", "content": "<yaml>"}` |
+| POST | `/api/configs` | Write a dynamic config file (creates a `.bak` first, and refuses to write if that fails) - body: `{"name": "...", "content": "<yaml>"}` |
 | GET | `/api/static` | Read static config (requires `STATIC_CONFIG_PATH`) |
 | POST | `/api/static` | Write static config - body: `{"content": "<yaml>"}` |
 | GET | `/api/static/status` | Restart method info |
 | POST | `/api/static/restart` | Restart Traefik (requires `RESTART_METHOD`) |
 | GET | `/api/crowdsec/decisions` | CrowdSec active decisions (requires CrowdSec config) |
 | POST | `/api/crowdsec/decisions` | Add a decision - body: `{"value": "<ip>", "type": "ban", "duration": "24h", "reason": "..."}`; `type` is `ban`, `captcha` or `bypass` |
-| GET | `/api/crowdsec/alerts` | CrowdSec recent alerts |
+| GET | `/api/crowdsec/alerts` | CrowdSec recent alerts - `?limit=N` (0 to 100000, defaults to `CROWDSEC_ALERT_LIMIT`). Returns `X-CS-Alert-Limit` and `X-CS-Alert-Capped` (`1` when the response hit the limit) |
 | DELETE | `/api/crowdsec/decisions/<id>` | Unban an IP |
 | GET | `/api/backups` | List local `.bak` backup files |
 | POST | `/api/backup/create` | Create `.bak` backups for all config files (one per file) |
@@ -58,6 +61,28 @@ TM handles authentication automatically when proxying calls through `/api/agents
 | GET | `/api/keys` | List API keys |
 | POST | `/api/keys` | Create an API key - body: `{"name": "..."}` |
 | DELETE | `/api/keys/<id>` | Delete an API key |
+
+## Failure events
+
+Some work happens after the agent has already answered: a git auto-push, or a Traefik restart. A
+failure there has no response left to report in, so the agent keeps the last 100 in memory and
+Traefik Manager collects them every two minutes and raises them as notifications.
+
+```
+GET /api/events?since=12
+```
+
+```json
+{
+  "events": [
+    { "id": 13, "at": 1756574400, "kind": "git", "message": "auto-push failed: no remote" }
+  ],
+  "latest": 13
+}
+```
+
+Pass the previous `latest` back as `since` to get only what is new. `kind` is one of `git`,
+`restart`, `backup` or `storage`. The list lives in memory, so it starts empty after a restart.
 
 ## Health check
 
@@ -118,4 +143,4 @@ Routes to:
 GET https://agent-host:8090/api/traefik/routers
 ```
 
-TM injects the `X-Api-Key` header automatically using the stored (encrypted) key.
+TM injects the `X-Api-Key` header automatically using the stored (encrypted) key, and passes the agent's `X-*` response headers back to the caller, except `x-api-key`, `x-csrf-token`, `x-frame-options` and `x-powered-by`.

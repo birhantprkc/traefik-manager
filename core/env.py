@@ -2,7 +2,7 @@ import logging
 import os
 
 GITHUB_REPO = "chr0nzz/traefik-manager"
-APP_VERSION = "1.12.1"
+APP_VERSION = "1.13.0"
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
@@ -10,6 +10,19 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
 )
 logger = logging.getLogger("traefik-manager")
+
+
+def base_path() -> str:
+    raw = os.environ.get('BASE_PATH', '').strip().rstrip('/')
+    if not raw:
+        return ''
+    if not raw.startswith('/') or raw.startswith('//') or '://' in raw:
+        logger.warning(f"Ignoring BASE_PATH {raw!r}: it must be a path starting with a single /")
+        return ''
+    return raw
+
+
+BASE_PATH = base_path()
 
 
 def proxy_fix_hops() -> int:
@@ -51,6 +64,43 @@ else:
 
 CONFIG_PATH  = CONFIG_PATHS[0]
 MULTI_CONFIG = len(CONFIG_PATHS) > 1
+
+
+def _probe_writable(path: str) -> str:
+    if not os.path.isdir(path):
+        try:
+            os.makedirs(path, exist_ok=True)
+        except Exception as e:
+            return f'cannot be created: {e}'
+    probe = os.path.join(path, f'.tm-write-probe.{os.getpid()}')
+    try:
+        with open(probe, 'w') as fh:
+            fh.write('probe')
+        os.remove(probe)
+    except Exception as e:
+        return str(e)
+    return ''
+
+
+def storage_targets():
+    seen = []
+    def _add(label, path):
+        full = os.path.abspath(path)
+        if all(full != p for _l, p in seen):
+            seen.append((label, full))
+    _add('Configuration', CONFIG_DIR)
+    _add('Backups', BACKUP_DIR)
+    for _p in CONFIG_PATHS:
+        _add('Dynamic config', os.path.dirname(os.path.abspath(_p)))
+    for _p in STATIC_CONFIG_DIRS:
+        _add('Static config', os.path.dirname(os.path.abspath(_p)))
+    return seen
+
+
+def unwritable_storage():
+    return [(label, path, err)
+            for label, path in storage_targets()
+            if (err := _probe_writable(path))]
 
 ALLOWED_API_SCHEMES = ('http://', 'https://')
 

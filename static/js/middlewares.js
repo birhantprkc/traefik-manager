@@ -134,7 +134,7 @@ function setMwMode(mode) {
     }
 }
 
-const _wizardTemplates = new Set(['basicAuth','digestAuth','forwardAuth','forwardAuthAuthentik','forwardAuthAuthelia','forwardAuthGatekeeper','oidcAuth','ipAllowList','ipAllowListPrivate','rateLimit','secureHeaders','corsHeaders','encodedCharacters','redirectScheme','redirectRegex','stripPrefix','addPrefix','replacePath','compress','retry','circuitBreaker','buffering','chain','inFlightReq']);
+const _wizardTemplates = new Set(['basicAuth','digestAuth','forwardAuth','forwardAuthAuthentik','forwardAuthAuthelia','forwardAuthGatekeeper','oidcAuth','ipAllowList','ipAllowListPrivate','rateLimit','secureHeaders','corsHeaders','encodedCharacters','redirectScheme','redirectRegex','stripPrefix','addPrefix','replacePath','compress','retry','circuitBreaker','buffering','chain','inFlightReq','stripPrefixRegex','replacePathRegex','errors','contentType','grpcWeb','passTLSClientCert']);
 
 const _wizKeyMap = {
     forwardAuthAuthentik: 'forwardAuth', forwardAuthAuthelia: 'forwardAuth',
@@ -149,6 +149,17 @@ function _wizIpStrategySync() {
     if (exRow)    exRow.style.display    = mode === 'excluded' ? '' : 'none';
 }
 
+async function _populateMwErrorService() {
+    const sel = document.getElementById('wizErrService');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Loading services...</option>';
+    let svcs = [];
+    try { svcs = (await _ensureServicesList()).http || []; } catch (e) { svcs = []; }
+    sel.innerHTML = svcs.length
+        ? svcs.map(n => `<option value="${_esc(n)}">${_esc(n)}</option>`).join('')
+        : '<option value="">No HTTP services defined yet</option>';
+}
+
 function _showMwWizard(tpl) {
     document.querySelectorAll('.mw-wiz-form').forEach(el => el.style.display = 'none');
     const none = document.getElementById('mwWiz-none');
@@ -159,6 +170,11 @@ function _showMwWizard(tpl) {
         sec.style.display = '';
         sec.querySelectorAll('input:not([type=checkbox]):not([type=radio]), textarea').forEach(el => { el.value = ''; });
         sec.querySelectorAll('input[type=checkbox]').forEach(el => { el.checked = el.defaultChecked; });
+    }
+    if (key === 'errors') _populateMwErrorService();
+    if (key === 'passTLSClientCert') {
+        const info = document.getElementById('wizPtcInfoFields');
+        if (info) info.style.display = 'none';
     }
     if (key === 'ipAllowList') {
         const strat = document.getElementById('wizIpStrategy');
@@ -317,6 +333,35 @@ function buildYamlFromWizard() {
     } else if (key === 'redirectRegex') {
         yaml = 'redirectRegex:\n  regex: ' + _q(_val('wizRrRegex')) + '\n  replacement: ' + _q(_val('wizRrReplacement')) + '\n  permanent: ' + _chk('wizRrPermanent',true);
 
+    } else if (key === 'stripPrefixRegex') {
+        const rx = _lines('wizSprRegex');
+        yaml = 'stripPrefixRegex:\n  regex:\n' + rx.map(r => '    - ' + _q(r)).join('\n');
+    } else if (key === 'replacePathRegex') {
+        yaml = 'replacePathRegex:\n  regex: ' + _q(_val('wizRprRegex'))
+             + '\n  replacement: ' + _q(_val('wizRprReplacement'));
+    } else if (key === 'errors') {
+        const st = _lines('wizErrStatus');
+        const q = _val('wizErrQuery');
+        yaml = 'errors:\n  status:\n' + st.map(x => '    - ' + _q(x) + '\n').join('')
+             + '  service: ' + _q(_val('wizErrService'))
+             + (q ? '\n  query: ' + _q(q) : '');
+    } else if (key === 'contentType') {
+        yaml = 'contentType:\n  autoDetect: ' + (_chk('wizCtAutoDetect') ? 'true' : 'false');
+    } else if (key === 'grpcWeb') {
+        const og = _lines('wizGrpcOrigins');
+        yaml = 'grpcWeb:\n  allowOrigins:\n' + og.map(o => '    - ' + _q(o)).join('\n');
+    } else if (key === 'passTLSClientCert') {
+        const info = _chk('wizPtcInfo');
+        yaml = 'passTLSClientCert:\n  pem: ' + (_chk('wizPtcPem', true) ? 'true' : 'false');
+        if (info) {
+            const sub = _chk('wizPtcSubjectCN', true);
+            const iss = _chk('wizPtcIssuerCN');
+            yaml += '\n  info:';
+            if (_chk('wizPtcSerial')) yaml += '\n    serialNumber: true';
+            if (_chk('wizPtcNotAfter')) yaml += '\n    notAfter: true';
+            if (sub) yaml += '\n    subject:\n      commonName: true';
+            if (iss) yaml += '\n    issuer:\n      commonName: true';
+        }
     } else if (key === 'stripPrefix') {
         const prefixes = _lines('wizSpPrefixes');
         yaml = 'stripPrefix:\n  prefixes:\n' + prefixes.map(p => '    - ' + _q(p) + '').join('\n');

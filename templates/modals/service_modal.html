@@ -1,0 +1,53 @@
+<div class="detail-backdrop" id="svcBackdrop" onclick="closeServiceModal()"></div>
+<div class="detail-panel" id="serviceModal">
+    <div class="detail-panel-form" style="height:100%">
+        <div class="sticky top-0 z-10 flex items-center justify-between px-6 py-4" style="background:var(--card);border-bottom:1px solid var(--border)">
+            <div class="flex items-center gap-3">
+                <i class="ph-bold ph-tree-structure" style="color:var(--blue)"></i>
+                <h2 class="font-bold text-sm" style="color:var(--text)" id="svcModalTitle">Add Service</h2>
+            </div>
+            <button type="button" onclick="closeServiceModal()" class="btn-icon"><i class="ph-bold ph-x text-base"></i></button>
+        </div>
+
+
+        <div class="px-6 py-5 space-y-4">
+            <input type="hidden" id="svcOriginalName" value="">
+            <div>
+                <label>Name</label>
+                <input type="text" id="svcName" class="input-field" placeholder="api-pool" autocomplete="off">
+                <p class="text-xs mt-1" style="color:var(--muted)">Letters, numbers, dots, dashes and underscores.</p>
+            </div>
+            <div>
+                <label>Type</label>
+                <select id="svcType" class="input-field" onchange="_svcTypeChanged()">
+                    <option value="loadBalancer">Load Balancer</option>
+                    <option value="weighted">Weighted</option>
+                    <option value="mirroring">Mirroring</option>
+                    <option value="failover">Failover</option>
+                </select>
+                <p id="svcTypeHint" class="text-xs mt-1" style="color:var(--muted)"></p>
+            </div>
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="mb-0">Backends</label>
+                    <button type="button" onclick="addServiceRow()" class="btn-secondary text-xs" style="height:24px;padding:0 8px">
+                        <i class="ph-bold ph-plus text-xs"></i> Add backend
+                    </button>
+                </div>
+                <div id="svcRows"></div>
+            </div>
+            <div id="svcConfigFileSelectWrap">
+                <label>Config file</label>
+                <select id="svcConfigFileSelect" class="input-field" onchange="onSvcConfigFileChange(this)"></select>
+                <input type="text" id="newSvcFileName" class="input-field mt-2" placeholder="new-file.yml" style="display:none">
+            </div>
+            <p id="svcError" class="text-xs" style="display:none;color:var(--red)"></p>
+        </div>
+
+        <div class="detail-panel-foot flex justify-end gap-2 px-6 py-4">
+            <button type="button" id="svcDeleteBtn" onclick="deleteServiceFromModal()" class="btn-secondary mr-auto" style="display:none">Delete</button>
+            <button type="button" onclick="closeServiceModal()" class="btn-secondary">Cancel</button>
+            <button type="button" onclick="saveServiceModal()" class="btn-primary" id="svcSaveBtn">Save Service</button>
+        </div>
+    </div>
+</div>

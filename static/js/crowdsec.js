@@ -14,6 +14,13 @@ let _csAlerts     = [];
 let _csLapiOk     = false;
 let _csAlertsOk   = false;
 let _csAltStatus  = 0;
+
+function _csAlertLimitParam() {
+    const n = parseInt(window._tmAlertLimit || '0', 10);
+    return (_activeAgent && n > 0) ? ('?limit=' + n) : '';
+}
+let _csAltCapped  = false;
+let _csAltLimit   = 0;
 let _csAltErr     = '';
 let _csDecErr     = '';
 let _csFetched    = 0;
@@ -532,7 +539,7 @@ async function _csRefreshInner() {
     try {
         [decRes, altRes] = await Promise.all([
             agentFetch('/api/crowdsec/decisions'),
-            agentFetch('/api/crowdsec/alerts'),
+            agentFetch('/api/crowdsec/alerts' + (_csAlertLimitParam())),
         ]);
     } catch (e) {
         _csLapiOk = false; _csAlertsOk = false;
@@ -540,6 +547,7 @@ async function _csRefreshInner() {
         _csAltErr = _csDecErr;
         _csDecStale = '';
         _csDecisions = []; _csAlerts = [];
+        _csAltCapped = false; _csAltLimit = 0;
         _csFetched = Date.now();
         _csRender();
         return;
@@ -565,6 +573,8 @@ async function _csRefreshInner() {
     }
     if (altRes.ok) {
         _csAlertsOk = true;
+        _csAltCapped = altRes.headers.get('X-CS-Alert-Capped') === '1';
+        _csAltLimit  = parseInt(altRes.headers.get('X-CS-Alert-Limit') || '0', 10) || 0;
         let raw = null;
         try { raw = await altRes.json(); } catch (_) { raw = null; }
         _csAlerts = (Array.isArray(raw) ? raw : [])
@@ -930,11 +940,19 @@ function _atkCardAgents(d) {
         return _atkFilteredCard('agents', 'var(--teal)', 'ph-fill ph-robot', 'Tooling', false, d.retained);
     }
     if (!d.alerts.some(a => a.uas.length)) {
+        const httpFired = d.alerts.some(a => a.uris.length || a.verbs.length || a.codes.length);
         return _atkBlindCard({
             key: 'agents', accent: 'var(--teal)', ic: 'ph-fill ph-robot', title: 'Tooling',
-            state: 'HTTP only', sub: 'no HTTP scenario fired here',
-            note: 'The <code>user_agent</code> meta key is written by HTTP scenarios. SSH buckets such as <code>crowdsecurity/ssh-bf</code> share none of the HTTP keys, '
-                + 'so this card stays out of the way rather than rendering an empty list.',
+            state: httpFired ? 'not logged' : 'HTTP only',
+            sub: httpFired ? 'the access log carries no user agent' : 'no HTTP scenario fired here',
+            note: httpFired
+                ? 'HTTP scenarios did fire and their paths, methods and status codes came through, so only the '
+                  + '<code>user_agent</code> key is missing. Traefik drops request headers from its access log unless '
+                  + 'you keep them, so CrowdSec never sees one. Add <code>User-Agent: keep</code> under '
+                  + '<code>accessLog.fields.headers.names</code> in the static config, then restart Traefik.'
+                : 'The <code>user_agent</code> meta key is written by HTTP scenarios. SSH buckets such as '
+                  + '<code>crowdsecurity/ssh-bf</code> share none of the HTTP keys, so this card stays out of the way '
+                  + 'rather than rendering an empty list.',
             go: 'clear=all', goLabel: 'clear filters', goTip: 'Remove every filter and look at the whole retained window'
         });
     }
@@ -1083,6 +1101,11 @@ function _atkVerdict(d, sel) {
             tip: 'Distinct scenarios that fired' }));
         items.push(_atkFlag({ cls: 'd-off', ic: 'ph-bold ph-pulse', n: ev, label: 'events', tag: 'span',
             tip: 'Sum of events_count, the raw log lines that rolled up into these alerts. Always larger than the alert count' }));
+        if (d.capped) {
+            items.push(_atkFlag({ cls: 'd-warn', ic: 'ph-bold ph-funnel', n: d.limit, label: 'alert cap reached', tag: 'span',
+                tip: 'CrowdSec returned as many alerts as the cap allows, so older ones are not counted here. '
+                   + 'Raise CROWDSEC_ALERT_LIMIT, or the alert limit in Settings, to see further back' }));
+        }
         if (loose > 0) {
             items.push(_atkFlag({ cls: 'd-warn', ic: 'ph-bold ph-lock-open', n: loose, label: 'no active ban',
                 go: _atkSpec({ outcome: 'loose' }),
@@ -1490,6 +1513,7 @@ function _csRender() {
     const sel = _atkSelect();
     const d = {
         lapiOk: _csLapiOk, alertsOk: _csAlertsOk, altStatus: _csAltStatus, altErr: _csAltErr, decErr: _csDecErr,
+        capped: _csAltCapped, limit: _csAltLimit,
         stale: _csDecStale,
         alerts: sel.alerts, decisions: _csDecisions, span: _csSpan, fetched: _csFetched,
         retained: _csAlerts.length,

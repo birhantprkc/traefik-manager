@@ -1,18 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="tm-base-path" content="{{ base_path }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% if reset_mode %}Set a New Password - Traefik Manager{% elif setup_mode %}Set Up Traefik Manager{% elif force_change_mode %}Change Password - Traefik Manager{% else %}Sign In - Traefik Manager{% endif %}</title>
-    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon.png">
-    <link rel="preload" href="/static/vendor/phosphor/Phosphor-Bold.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="/static/vendor/phosphor/Phosphor-Fill.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="/static/vendor/phosphor/Phosphor-Light.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="/static/vendor/fonts/inter.css">
-    <link rel="stylesheet" href="/static/vendor/fonts/jetbrains-mono.css">
-    <link rel="stylesheet" href="/static/vendor/phosphor.css">
-    <link rel="stylesheet" href="/static/css/tailwind.css?v={{ asset_version }}">
-    <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ base_path }}/static/icons/icon.png">
+    <link rel="preload" href="{{ base_path }}/static/vendor/phosphor/Phosphor-Bold.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ base_path }}/static/vendor/phosphor/Phosphor-Fill.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ base_path }}/static/vendor/phosphor/Phosphor-Light.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="{{ base_path }}/static/vendor/fonts/inter.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/vendor/fonts/jetbrains-mono.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/vendor/phosphor.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/css/tailwind.css?v={{ asset_version }}">
+    <link rel="stylesheet" href="{{ base_path }}/static/css/app.css?v={{ asset_version }}">
     <script>
         (function() {
             var t = '{{ default_theme }}' || localStorage.getItem('tm-theme') || 'dark';
@@ -203,7 +204,7 @@
 <div style="width:100%;max-width:380px">
     <div class="card card-login">
         <div class="logo">
-            <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
+            <img src="{{ base_path }}/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
             <span class="logo-text">Traefik <span>Manager</span></span>
         </div>
         <div class="step-title">Set your permanent password</div>
@@ -248,7 +249,7 @@
 <div style="width:100%;max-width:380px">
     <div class="card card-login">
         <div class="logo">
-            <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
+            <img src="{{ base_path }}/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
             <span class="logo-text">Traefik <span>Manager</span></span>
         </div>
         <div class="step-title">Two-factor authentication</div>
@@ -294,7 +295,7 @@
 <div style="width:100%;max-width:380px">
     <div class="card card-login">
         <div class="logo">
-            <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
+            <img src="{{ base_path }}/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
             <span class="logo-text">Traefik <span>Manager</span></span>
         </div>
         <div class="step-title">Sign in</div>
@@ -370,7 +371,7 @@
 <div style="width:100%;max-width:380px">
     <div class="card card-login">
         <div class="logo">
-            <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
+            <img src="{{ base_path }}/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:28px;height:28px">
             <span class="logo-text">Traefik <span>Manager</span></span>
         </div>
         <div class="step-title">Set a new password</div>
@@ -413,7 +414,7 @@
 
         <div class="wz-head">
             <div class="logo" style="margin:0">
-                <img src="/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:26px;height:26px">
+                <img src="{{ base_path }}/static/icons/icon-48x48.png" alt="logo" class="logo-icon" style="width:26px;height:26px">
                 <span class="logo-text">Traefik <span>Manager</span></span>
             </div>
             <div class="flex items-center gap-3">
@@ -1058,7 +1059,7 @@ async function testApi() {
     result.textContent = 'Testing…';
     result.style.color = 'var(--muted)';
     try {
-        const res = await fetch('/api/setup/test-connection', {
+        const res = await fetch('{{ url_for("api_setup_test_connection") }}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url, user, password: pw })

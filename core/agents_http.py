@@ -15,7 +15,7 @@ def _agent_by_id(agent_id: str):
 def _agent_request(agent: dict, method: str, path: str, **kwargs):
     url = agent['url'].rstrip('/') + '/' + path.lstrip('/')
     headers = kwargs.pop('headers', {})
-    headers['X-Api-Key'] = agent.get('api_key', '')
+    headers['X-Api-Key'] = str(agent.get('api_key', '') or '').strip()
     return requests.request(method, url, headers=headers, timeout=15, **kwargs)
 
 def _agent_load_configs(agent: dict) -> dict:

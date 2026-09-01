@@ -105,6 +105,7 @@ The overview: router, service and middleware counts with their health, the provi
 - Add a route with the form, or drop to raw YAML for anything the form does not cover
 - Multiple backends, sticky sessions, health checks and router priority
 - Per-route certificate resolver, wildcard domains, and **Skip TLS verification** for self-signed backends
+- Composite services (`weighted`, `mirroring`, `failover`) are shown but edited on the web - the app keeps their configuration intact when saving a route
 
 ### Middleware
 

@@ -359,7 +359,60 @@ function switchSystemTab(id, btn) {
     if (panel) panel.style.display = 'flex';
 }
 
+const AGENT_HIDDEN_MOBILE_ROWS = [
+    "switchSettingsPanel('auth')",
+    "openSettingsChild('auth'",
+    "switchSettingsPanel('connection')",
+    "switchSettingsPanel('notifications')",
+    "openSettingsChild('system', 'crowdsec')",
+];
+
+function _updateMobileRowsForAgent(active) {
+    document.querySelectorAll('#settingsMobileRoot .settings-mobile-row').forEach(btn => {
+        const target = btn.getAttribute('onclick') || '';
+        if (AGENT_HIDDEN_MOBILE_ROWS.some(p => target.includes(p))) {
+            btn.style.display = active ? 'none' : '';
+        }
+    });
+}
+
+function _settleSettingsLayout() {
+    const modal = document.getElementById('settingsModal');
+    if (!modal || modal.style.display === 'none') return;
+    ['settingsMobileRoot', 'settingsPanelWrapper'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.scrollTop = 0;
+    });
+    document.querySelectorAll('#settingsPanelWrapper .modal-panel').forEach(el => {
+        el.scrollTop = 0;
+    });
+}
+
+function _applySettingsBreakpoint() {
+    const modal = document.getElementById('settingsModal');
+    if (!modal || modal.style.display !== 'flex') return;
+    const wrapper = document.getElementById('settingsPanelWrapper');
+    const root = document.getElementById('settingsMobileRoot');
+    if (!wrapper || !root) return;
+    const narrow = window.innerWidth < 640;
+    const onRoot = root.style.display === 'flex';
+    const back = document.getElementById('settingsMobileBack');
+    if (!narrow && onRoot) {
+        root.style.display = 'none';
+        wrapper.style.display = 'flex';
+        if (back) back.style.display = 'none';
+    } else if (narrow && !onRoot && wrapper.style.display !== 'flex') {
+        root.style.display = 'flex';
+        if (back) back.style.display = 'none';
+    }
+    _settleSettingsLayout();
+}
+
+window.addEventListener('resize', _applySettingsBreakpoint);
+window.addEventListener('orientationchange', () => setTimeout(_applySettingsBreakpoint, 150));
+
 function _updateSettingsSidebarForAgent(active) {
+    _updateMobileRowsForAgent(active);
     const localOnly = ['auth', 'connection', 'notifications'];
     localOnly.forEach(id => {
         const btn = document.getElementById('msb-' + id);
@@ -498,6 +551,7 @@ async function openSettingsModal(panel) {
     document.getElementById('settingsModal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     _updateSettingsSidebarForAgent(!!_activeAgent);
+    requestAnimationFrame(_settleSettingsLayout);
 
     if (window.innerWidth < 640 && !panel) {
         document.getElementById('settingsMobileRoot').style.display = 'flex';
@@ -525,6 +579,8 @@ async function openSettingsModal(panel) {
         document.getElementById('settingsAccessLogPath').value    = data.access_log_path || '';
         document.getElementById('settingsStaticConfigPath').value = data.static_config_path || '';
         document.getElementById('settingsCrowdSecUrl').value      = data.crowdsec_lapi_url || '';
+        document.getElementById('settingsCrowdSecAlertLimit').value = data.crowdsec_alert_limit || '';
+        window._tmAlertLimit = data.crowdsec_alert_limit || '';
         const csKeyHint = document.getElementById('crowdsecKeySetHint');
         if (csKeyHint) csKeyHint.classList.toggle('hidden', !data.crowdsec_api_key_set);
         const csMidEl = document.getElementById('settingsCrowdSecMachineId');
@@ -1234,7 +1290,7 @@ async function saveSettings() {
         const res  = await fetch('/api/settings', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfHeaders()['X-CSRF-Token']},
-            body: JSON.stringify({ domains, cert_resolver: resolver, traefik_api_url: apiUrl, acme_json_path: acmeJsonPath, access_log_path: accessLogPath, static_config_path: staticConfigPath, webhook_url: webhookUrl, webhook_type: webhookType, webhook_username: webhookUsername, webhook_password: webhookPassword, crowdsec_lapi_url: crowdsecLapiUrl, crowdsec_api_key: crowdsecApiKey, crowdsec_machine_id: crowdsecMachineId, crowdsec_machine_password: crowdsecMachinePassword, crowdsec_client_cert: crowdsecClientCert, crowdsec_client_key: crowdsecClientKey, crowdsec_ca_cert: crowdsecCaCert, traefik_api_user: traefikApiUser, traefik_api_password: traefikApiPassword })
+            body: JSON.stringify({ domains, cert_resolver: resolver, traefik_api_url: apiUrl, acme_json_path: acmeJsonPath, access_log_path: accessLogPath, static_config_path: staticConfigPath, webhook_url: webhookUrl, webhook_type: webhookType, webhook_username: webhookUsername, webhook_password: webhookPassword, crowdsec_lapi_url: crowdsecLapiUrl, crowdsec_api_key: crowdsecApiKey, crowdsec_alert_limit: (document.getElementById('settingsCrowdSecAlertLimit')?.value || '').trim(), crowdsec_machine_id: crowdsecMachineId, crowdsec_machine_password: crowdsecMachinePassword, crowdsec_client_cert: crowdsecClientCert, crowdsec_client_key: crowdsecClientKey, crowdsec_ca_cert: crowdsecCaCert, traefik_api_user: traefikApiUser, traefik_api_password: traefikApiPassword })
         });
         if (!res.ok) { showToast(await _errText(res, 'Failed to save settings'), 'error'); return; }
         const data = await res.json();
@@ -1941,7 +1997,7 @@ async function oidcToggleEnabled() {
 
 function _redirectToLoginAfterAuthEnable(what) {
     showToast(`${what} - authentication is now required, redirecting to sign in`, 'info');
-    setTimeout(() => { window.location.href = '/login'; }, 1200);
+    setTimeout(() => { window.location.href = tmUrl('/login'); }, 1200);
 }
 
 async function saveOidcConfig() {
@@ -2003,6 +2059,15 @@ let _agentWizKey  = null;
 let _agentWizStep = 0;
 let _agentRestartMethod = '';
 
+async function refreshAgentRegistry() {
+    try {
+        const res = await fetch('/api/agents');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof updateServerSwitcher === 'function') updateServerSwitcher(data.agents || []);
+    } catch (e) {}
+}
+
 async function loadAgentsList() {
     const body = document.getElementById('agentsListBody');
     if (!body) return;
@@ -2028,11 +2093,9 @@ async function loadAgentsList() {
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full flex-shrink-0" id="agent-dot-${a.id}" style="background:var(--muted)"></span>
                         <span class="agent-name-label sc-set-n truncate">${_esc(a.name)}</span>
-                        <button onclick="inlineEditAgent('${a.id}','name','${_esc(a.name)}')" class="btn-icon agent-rename-btn flex-shrink-0" title="Rename" style="opacity:0.5;padding:0 2px;"><i class="ph-bold ph-pencil-simple" style="font-size:10px;"></i></button>
                     </div>
                     <div class="flex items-center gap-1">
                         <span class="agent-url-label sc-set-d truncate">${_esc(a.url)}</span>
-                        <button onclick="inlineEditAgent('${a.id}','url','${_esc(a.url)}')" class="btn-icon agent-url-btn flex-shrink-0" title="Edit URL" style="opacity:0.5;padding:0 2px;"><i class="ph-bold ph-pencil-simple" style="font-size:10px;"></i></button>
                     </div>
                 </div>
                 <div class="sc-set-v">
@@ -2061,8 +2124,8 @@ function openAgentKeys(agentId, agentName) {
 }
 
 function closeAgentKeys() {
-    document.getElementById('agentKeysView').style.display  = 'none';
-    document.getElementById('agentListView').style.display  = 'flex';
+    document.getElementById('agentKeysView').style.display = 'none';
+    loadAgentsList();
 }
 
 async function loadAgentKeys() {
@@ -2255,43 +2318,6 @@ async function pingAgent(id, url) {
     } catch(e) { if (dot) dot.style.background = 'var(--red)'; }
 }
 
-function inlineEditAgent(id, field, currentValue) {
-    const card = document.querySelector(`[data-agent-id="${id}"]`);
-    if (!card) return;
-    const isName = field === 'name';
-    const labelEl  = card.querySelector(isName ? '.agent-name-label' : '.agent-url-label');
-    const pencilBtn = card.querySelector(isName ? '.agent-rename-btn' : '.agent-url-btn');
-    if (!labelEl || !pencilBtn) return;
-    const input = document.createElement('input');
-    input.type = isName ? 'text' : 'url';
-    input.value = currentValue;
-    input.className = 'input-field text-xs';
-    input.style.cssText = isName ? 'padding:2px 6px;height:24px;width:120px;' : 'padding:2px 6px;height:24px;width:200px;';
-    labelEl.replaceWith(input);
-    pencilBtn.innerHTML = '<i class="ph-bold ph-check text-xs"></i>';
-    pencilBtn.style.color = 'var(--green)';
-    pencilBtn.style.opacity = '1';
-    input.focus();
-    input.select();
-    let _settled = false;
-    const submit = async () => {
-        if (_settled) return;
-        _settled = true;
-        const newVal = input.value.trim();
-        if (!newVal || newVal === currentValue) { loadAgentsList(); return; }
-        try {
-            const res  = await fetch('/api/agents/' + id, { method: 'PUT', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ [field]: newVal }) });
-            if (!res.ok) { showToast(await _errText(res, 'Update failed'), 'error'); loadAgentsList(); return; }
-            const data = await res.json();
-            if (data.ok) { showToast(`Agent ${isName ? 'renamed' : 'URL updated'}`, 'success'); }
-            else { showToast(`Update failed: ${data.error || data.message || 'the server did not say why'}`, 'error'); }
-        } catch(e) { showToast(_netErrText(e, 'Update failed'), 'error'); }
-        loadAgentsList();
-    };
-    pencilBtn.onclick = submit;
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { _settled = true; loadAgentsList(); } });
-    input.addEventListener('blur', () => setTimeout(submit, 150));
-}
 
 async function deleteAgent(id, name) {
     if (!await _confirm(`Remove agent "${name}"? This only removes it from TM settings - the agent service on the remote server is unaffected.`, 'Remove Agent', 'Remove')) return;
@@ -2304,17 +2330,89 @@ async function deleteAgent(id, name) {
     } catch(e) { showToast(_netErrText(e, 'Remove failed'), 'error'); }
 }
 
+let _agentAddMode = 'manual';
+
 function startAddAgent() {
+    document.getElementById('agentListView').style.display    = 'none';
+    document.getElementById('agentWizardView').style.display  = 'none';
+    document.getElementById('agentChooserView').style.display = 'flex';
+}
+
+function startAgentAdd(mode) {
+    _agentAddMode        = mode === 'cli' ? 'cli' : 'manual';
     _agentWizId          = null;
     _agentWizKey         = null;
     _agentWizStep        = 1;
     _agentRestartMethod  = '';
-    document.getElementById('agentListView').style.display   = 'none';
-    document.getElementById('agentWizardView').style.display = 'flex';
-    document.getElementById('agentWizardTitle').textContent  = 'Add Agent';
-    document.getElementById('agentWizardStepPills').style.display = '';
+    document.getElementById('agentChooserView').style.display = 'none';
+    document.getElementById('agentListView').style.display    = 'none';
+    document.getElementById('agentWizardView').style.display  = 'flex';
+    document.getElementById('agentWizardTitle').textContent   = _agentAddMode === 'cli'
+        ? 'Install with the tm CLI' : 'Add Agent';
+    document.getElementById('agentWizardStepPills').style.display = _agentAddMode === 'cli' ? 'none' : '';
     resetAgentWizard();
     showAgentWizStep(1);
+}
+
+function _renderAgentCliStep() {
+    const name = document.getElementById('agentWizName').value.trim();
+    const host = document.getElementById('agentCliHostName');
+    if (host) host.textContent = name || 'the remote host';
+    const cmd = document.getElementById('agentCliCmd');
+    if (cmd) {
+        cmd.textContent = `export TMA_API_KEY='${_agentWizKey || ''}'\n`
+                        + `curl -fsSL https://get-traefik.xyzlab.dev | bash -s -- --mode agent`;
+    }
+    const key = document.getElementById('agentCliKey');
+    if (key) key.textContent = _agentWizKey || '';
+    const res = _agentVerifyEl();
+    if (res) { res.textContent = ''; res.style.color = 'var(--muted)'; }
+}
+
+function copyAgentCliCmd() {
+    _agentCopy(document.getElementById('agentCliCmd').textContent, 'Command copied');
+}
+
+function _agentVerifyEl() {
+    const summary = document.getElementById('agentSummaryView');
+    if (summary && summary.style.display !== 'none' && summary.offsetParent !== null) {
+        return document.getElementById('agentVerifyResultEdit');
+    }
+    return document.getElementById('agentVerifyResult')
+        || document.getElementById('agentVerifyResultEdit');
+}
+
+async function verifyAgentInstall() {
+    const btn = document.getElementById('agentVerifyBtn');
+    const out = _agentVerifyEl();
+    if (!_agentWizId || !out) return;
+    btn.disabled = true;
+    out.style.color = 'var(--muted)';
+    out.textContent = 'Checking...';
+    const say = (text, color) => { out.textContent = text; out.style.color = color; };
+    try {
+        const health = await fetch('/api/agents/' + _agentWizId + '/health').then(r => r.json());
+        if (!health.ok) {
+            say(health.error || 'Not reachable yet - check the URL, the port and any firewall.', 'var(--red)');
+            return;
+        }
+        const keys = await fetch('/api/agents/proxy/' + _agentWizId + '/keys', { headers: _csrfHeaders() });
+        if (keys.status === 401) {
+            say('Reachable, but it is refusing this key. Re-run the command, or rotate the key.', 'var(--yellow)');
+            return;
+        }
+        const ver = await fetch('/api/agents/proxy/' + _agentWizId + '/traefik/version', { headers: _csrfHeaders() });
+        if (!ver.ok) {
+            say('Agent is up, but it cannot reach Traefik yet.', 'var(--yellow)');
+            return;
+        }
+        say('Connected. The agent is answering and can see Traefik.', 'var(--green)');
+        loadAgentsList();
+    } catch (e) {
+        say(_netErrText(e, 'Could not check the agent'), 'var(--red)');
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 async function openAgentSetup(id, titleOverride) {
@@ -2329,6 +2427,8 @@ async function openAgentSetup(id, titleOverride) {
     document.getElementById('agentRotatedKeyText').textContent = '';
     resetAgentWizardCfgFields();
     showAgentWizStep(3);
+    hideAgentComposeConfig();
+    document.getElementById('agentWizardTitle').textContent = titleOverride || 'Agent';
     document.getElementById('agentWizSaveBtn').style.display = 'inline-flex';
     document.getElementById('agentWizKeyDisplay').textContent = '';
     try {
@@ -2338,6 +2438,15 @@ async function openAgentSetup(id, titleOverride) {
         if (a) {
             document.getElementById('agCfgTraefikUrl').value = a.traefik_api_url || '';
             document.getElementById('agCfgCertResolver').value = a.cert_resolver || '';
+            _applyAgentInstallMethod(a.install_method);
+            _agEditOrig = { name: a.name || '', url: a.url || '' };
+            document.getElementById('agEditName').value = _agEditOrig.name;
+            document.getElementById('agEditUrl').value  = _agEditOrig.url;
+            _agentIdentityChanged();
+            document.getElementById('agCfgTraefikApiUser').value = a.traefik_api_user || '';
+            document.getElementById('agCfgTraefikApiPassword').value =
+                a.traefik_api_password === '***' ? '' : (a.traefik_api_password || '');
+            document.getElementById('agCfgGitCommitMessage').value = a.git_backup_commit_message || '';
             const tlsEl = document.getElementById('agCfgInsecureTLS');
             if (tlsEl) { tlsEl.classList.toggle('on', !!a.traefik_insecure_skip_verify); }
             document.getElementById('agCfgConfigPath').value = a.config_path || '';
@@ -2357,8 +2466,7 @@ async function openAgentSetup(id, titleOverride) {
             if (a.restart_method)     selectRestartMethod(a.restart_method, null);
             const container = a.traefik_container || '';
             if (container) {
-                document.getElementById('agCfgContainer').value       = container;
-                document.getElementById('agCfgSocketContainer').value = container;
+                document.getElementById('agCfgContainer').value = container;
             }
             document.getElementById('agCfgGitEnabled').checked = !!a.git_backup_enabled;
             document.getElementById('agentGitFields').style.display = a.git_backup_enabled ? 'block' : 'none';
@@ -2375,8 +2483,10 @@ async function openAgentSetup(id, titleOverride) {
 }
 
 function cancelAddAgent() {
+    const chooser = document.getElementById('agentChooserView');
+    if (chooser) chooser.style.display = 'none';
     document.getElementById('agentWizardView').style.display = 'none';
-    document.getElementById('agentListView').style.display   = 'flex';
+    loadAgentsList();
 }
 
 function resetAgentWizard() {
@@ -2384,6 +2494,80 @@ function resetAgentWizard() {
     document.getElementById('agentWizUrl').value  = '';
     document.getElementById('agentWizStep1Err').style.display = 'none';
     resetAgentWizardCfgFields();
+}
+
+function toggleAgentDockerOutputs() {
+    const el = document.getElementById('agentDockerOutputsWrap');
+    if (!el) return;
+    const open = !el.classList.contains('open');
+    el.classList.toggle('open', open);
+    try { localStorage.setItem('tmAgentComposeOpen', open ? '1' : '0'); } catch (e) {}
+}
+
+let _agEditOrig = { name: '', url: '' };
+
+function showAgentComposeConfig() {
+    document.getElementById('agentSummaryView').style.display = 'none';
+    document.getElementById('agentComposeConfig').style.display = '';
+    agentCfgChanged();
+}
+
+function hideAgentComposeConfig() {
+    document.getElementById('agentComposeConfig').style.display = 'none';
+    document.getElementById('agentSummaryView').style.display = '';
+}
+
+function _agentIdentityChanged() {
+    const name = document.getElementById('agEditName').value.trim();
+    const url  = document.getElementById('agEditUrl').value.trim();
+    const btn  = document.getElementById('agEditSaveBtn');
+    if (btn) btn.disabled = !name || !url || (name === _agEditOrig.name && url === _agEditOrig.url);
+    const msg = document.getElementById('agEditMsg');
+    if (msg) msg.textContent = '';
+}
+
+async function saveAgentIdentity() {
+    if (!_agentWizId) return;
+    const name = document.getElementById('agEditName').value.trim();
+    const url  = document.getElementById('agEditUrl').value.trim();
+    const msg  = document.getElementById('agEditMsg');
+    const btn  = document.getElementById('agEditSaveBtn');
+    btn.disabled = true;
+    try {
+        const res = await fetch('/api/agents/' + _agentWizId, {
+            method: 'PUT',
+            headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, url }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+            msg.textContent = data.error || data.message || await _errText(res, 'Save failed');
+            msg.style.color = 'var(--red)';
+            btn.disabled = false;
+            return;
+        }
+        _agEditOrig = { name, url };
+        msg.textContent = 'Saved';
+        msg.style.color = 'var(--green)';
+        refreshAgentRegistry();
+    } catch (e) {
+        msg.textContent = _netErrText(e, 'Save failed');
+        msg.style.color = 'var(--red)';
+        btn.disabled = false;
+    }
+}
+
+function _applyAgentInstallMethod(method) {
+    const cli = method === 'cli';
+    const wrap = document.getElementById('agentDockerOutputsWrap');
+    if (wrap) {
+        wrap.style.display = cli ? 'none' : '';
+        let open = false;
+        try { open = localStorage.getItem('tmAgentComposeOpen') === '1'; } catch (e) {}
+        wrap.classList.toggle('open', open);
+    }
+    const note = document.getElementById('agentCliManagedNote');
+    if (note) note.style.display = cli ? '' : 'none';
 }
 
 function resetAgentWizardCfgFields() {
@@ -2397,9 +2581,12 @@ function resetAgentWizardCfgFields() {
     document.getElementById('agCfgLogPath').value     = '';
     document.getElementById('agCfgPluginsDir').value  = '';
     document.getElementById('agCfgDockerHost').value  = '';
-    document.getElementById('agCfgContainer').value   = 'traefik';
+    document.getElementById('agCfgContainer').value = 'traefik';
+    _applyAgentInstallMethod('manual');
+    document.getElementById('agCfgTraefikApiUser').value = '';
+    document.getElementById('agCfgTraefikApiPassword').value = '';
+    document.getElementById('agCfgGitCommitMessage').value = '';
     document.getElementById('agCfgSignalFile').value  = '';
-    document.getElementById('agCfgSocketContainer').value = 'traefik';
     document.getElementById('agCfgGitEnabled').checked = false;
     document.getElementById('agentGitFields').style.display = 'none';
     document.getElementById('agCfgGitRepo').value     = '';
@@ -2422,6 +2609,8 @@ function resetAgentWizardCfgFields() {
 }
 
 function showAgentWizStep(n) {
+    const cliStep = document.getElementById('agentWizStepCli');
+    if (cliStep) cliStep.style.display = n === 'cli' ? '' : 'none';
     [1,2,3].forEach(i => {
         const el = document.getElementById('agentWizStep' + i);
         if (el) el.style.display = i === n ? '' : 'none';
@@ -2443,7 +2632,7 @@ async function agentWizStep1Next() {
     const btn = document.getElementById('agentWizStep1Btn');
     btn.disabled = true; btn.innerHTML = '<i class="ph-light ph-spinner-gap animate-spin text-xs"></i> Creating…';
     try {
-        const res  = await fetch('/api/agents', { method: 'POST', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ name, url }) });
+        const res  = await fetch('/api/agents', { method: 'POST', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ name, url, install_method: _agentAddMode === 'cli' ? 'cli' : 'manual' }) });
         if (!res.ok) { err.textContent = await _errText(res, 'Failed to create agent'); err.style.display = ''; return; }
         const data = await res.json();
         if (!data.ok) { err.textContent = data.error || data.message || 'Failed to create agent'; err.style.display = ''; return; }
@@ -2451,7 +2640,13 @@ async function agentWizStep1Next() {
         _agentWizKey = data.agent.api_key_raw;
         document.getElementById('agentWizKeyDisplay').textContent = _agentWizKey;
         err.style.display = 'none';
-        showAgentWizStep(2);
+        if (_agentAddMode === 'cli') {
+            _renderAgentCliStep();
+            showAgentWizStep('cli');
+        } else {
+            showAgentWizStep(2);
+        }
+        refreshAgentRegistry();
     } catch(e) { err.textContent = _netErrText(e, 'Failed to create agent'); err.style.display = ''; }
     finally { btn.disabled = false; btn.innerHTML = 'Continue <i class="ph-bold ph-caret-right text-xs"></i>'; }
 }
@@ -2459,6 +2654,7 @@ async function agentWizStep1Next() {
 function agentWizStep2Next() {
     document.getElementById('agentRotateKeyBanner').style.display = 'none';
     showAgentWizStep(3);
+    showAgentComposeConfig();
 }
 
 async function agentWizStep3Save() {
@@ -2468,7 +2664,7 @@ async function agentWizStep3Save() {
         const res  = await fetch('/api/agents/' + _agentWizId, { method: 'PUT', headers: { ..._csrfHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
         if (!res.ok) { showToast(await _errText(res, 'Save failed'), 'error'); return; }
         const data = await res.json();
-        if (data.ok) showToast('Agent config saved', 'success');
+        if (data.ok) { showToast('Agent config saved', 'success'); refreshAgentRegistry(); }
         else showToast('Save failed: ' + (data.error || data.message || 'the server did not say why'), 'error');
     } catch(e) { showToast(_netErrText(e, 'Save failed'), 'error'); }
 }
@@ -2549,6 +2745,8 @@ function selectRestartMethod(method, btn) {
     document.getElementById('restartProxyFields').style.display     = method === 'proxy'       ? '' : 'none';
     document.getElementById('restartPoisonPillFields').style.display = method === 'poison-pill' ? '' : 'none';
     document.getElementById('restartSocketFields').style.display    = method === 'socket'      ? '' : 'none';
+    const containerField = document.getElementById('restartContainerField');
+    if (containerField) containerField.style.display = (method === 'proxy' || method === 'socket') ? '' : 'none';
     agentCfgChanged();
 }
 
@@ -2570,7 +2768,10 @@ function buildAgentCfgPayload() {
         access_log_path:    document.getElementById('agCfgLogPath').value.trim(),
         plugins_dir:        document.getElementById('agCfgPluginsDir').value.trim(),
         restart_method:     _agentRestartMethod,
-        traefik_container:  (document.getElementById('agCfgContainer').value || document.getElementById('agCfgSocketContainer').value || 'traefik').trim(),
+        traefik_container:  (document.getElementById('agCfgContainer').value || 'traefik').trim(),
+        traefik_api_user:     document.getElementById('agCfgTraefikApiUser').value.trim(),
+        traefik_api_password: document.getElementById('agCfgTraefikApiPassword').value,
+        git_backup_commit_message: document.getElementById('agCfgGitCommitMessage').value.trim(),
         docker_host:        document.getElementById('agCfgDockerHost').value.trim(),
         signal_file_path:   document.getElementById('agCfgSignalFile').value.trim(),
         crowdsec_lapi_url:  document.getElementById('agCfgCsUrl').value.trim(),
@@ -2602,7 +2803,7 @@ function agentCfgChanged() {
     const logPath   = document.getElementById('agCfgLogPath').value.trim();
     const pluginsDir= document.getElementById('agCfgPluginsDir').value.trim();
     const restart   = _agentRestartMethod;
-    const container = (document.getElementById('agCfgContainer').value || document.getElementById('agCfgSocketContainer').value || 'traefik').trim();
+    const container = (document.getElementById('agCfgContainer').value || 'traefik').trim();
     const dockerHost= document.getElementById('agCfgDockerHost').value.trim();
     const signalFile= document.getElementById('agCfgSignalFile').value.trim();
     const csUrl     = document.getElementById('agCfgCsUrl').value.trim();
@@ -2627,6 +2828,12 @@ function agentCfgChanged() {
     if (agentPort !== '8090') envLines.push(`      - TMA_PORT=${agentPort}`);
     if (rateLimit && rateLimit !== '300') envLines.push(`      - TMA_RATE_LIMIT=${rateLimit}`);
     if (insecureTLS) envLines.push(`      - TRAEFIK_INSECURE_SKIP_VERIFY=true`);
+    const tApiUser = document.getElementById('agCfgTraefikApiUser')?.value.trim() || '';
+    const tApiPass = document.getElementById('agCfgTraefikApiPassword')?.value || '';
+    if (tApiUser) envLines.push(`      - TRAEFIK_API_USER=${tApiUser}`);
+    if (tApiPass) envLines.push(`      - TRAEFIK_API_PASSWORD=${tApiPass}`);
+    const gitMsg = document.getElementById('agCfgGitCommitMessage')?.value.trim() || '';
+    if (gitMsg) envLines.push(`      - GIT_BACKUP_COMMIT_MESSAGE=${gitMsg}`);
     if (staticPath)  envLines.push(`      - STATIC_CONFIG_PATH=${staticPath}`);
     if (restart)     envLines.push(`      - RESTART_METHOD=${restart}`);
     if (restart && container) envLines.push(`      - TRAEFIK_CONTAINER=${container}`);

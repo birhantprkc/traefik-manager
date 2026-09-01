@@ -12,9 +12,9 @@ import (
 
 func (a *App) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := r.Header.Get("X-Api-Key")
+		key := strings.TrimSpace(r.Header.Get("X-Api-Key"))
 		if key == "" {
-			key = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+			key = strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 		}
 		envKeyMatch := subtle.ConstantTimeCompare([]byte(key), []byte(a.cfg.APIKey)) == 1
 		if !envKeyMatch && !a.keys.validate(key) {

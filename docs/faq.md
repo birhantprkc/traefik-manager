@@ -67,6 +67,14 @@ Both seed `manager.yml` on first start only. After that the Settings values win 
 
 ---
 
+### Why can't I edit this route's backend?
+
+The route points at a `weighted`, `mirroring`, `failover` or `highestRandomWeight` service that
+Traefik Manager does not manage, so the target field is locked rather than silently ignored. Edit
+the service on the [Services tab](tab-services.md), or open its detail panel and choose **Manage
+this service** to let Traefik Manager take it over. Composites built by Traefik Manager itself are
+editable directly from the route form.
+
 ## Certificates
 
 ### The Certs tab says permission denied on acme.json

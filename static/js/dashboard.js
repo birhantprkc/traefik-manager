@@ -115,6 +115,15 @@ function _sdBackends(s) {
     return { total: keys.length, up: up, down: keys.length - up };
 }
 
+function _sdComposite(s) {
+    if (!s || typeof s !== 'object') return '';
+    if (s.weighted)            return 'weighted';
+    if (s.mirroring)           return 'mirroring';
+    if (s.failover)            return 'failover';
+    if (s.highestRandomWeight) return 'highest random weight';
+    return '';
+}
+
 function _sdSection(o) {
     const s = (o && typeof o === 'object') ? o : {};
     const n = k => (typeof s[k] === 'number' && isFinite(s[k]) ? s[k] : null);
@@ -185,7 +194,11 @@ function _sdObj(raw, kind, ctx) {
     }
     if (kind === 'service') {
         o.backends = _sdBackends(raw);
-        if (!o.backends) { o.cell = 'idle'; o.reason = 'no health check configured'; o.unchecked = true; return o; }
+        o.composite = _sdComposite(raw);
+        if (!o.backends) {
+            if (o.composite) { o.reason = o.composite + ' service, health lives on its children'; return o; }
+            o.cell = 'idle'; o.reason = 'no health check configured'; o.unchecked = true; return o;
+        }
         if (o.backends.down > 0) {
             o.cell = 'warn';
             o.reason = o.backends.down + ' of ' + o.backends.total + ' backends DOWN';
@@ -206,7 +219,8 @@ function _sdObj(raw, kind, ctx) {
 
 function _sdTally(objs) {
     const t = { total: objs.length, err: 0, warn: 0, idle: 0, ok: 0,
-                disabled: 0, warning: 0, unknown: 0, unbound: 0, unused: 0, unchecked: 0, degraded: 0 };
+                disabled: 0, warning: 0, unknown: 0, unbound: 0, unused: 0, unchecked: 0, degraded: 0,
+                composite: 0 };
     objs.forEach(o => {
         t[o.cell]++;
         if (o.status === 'disabled') t.disabled++;
@@ -216,6 +230,7 @@ function _sdTally(objs) {
         if (o.unused)    t.unused++;
         if (o.unchecked) t.unchecked++;
         if (o.degraded)  t.degraded++;
+        if (o.composite) t.composite++;
     });
     return t;
 }
@@ -389,6 +404,7 @@ function _sdAria(label, total, t) {
     if (t.degraded)  bits.push(t.degraded + ' degraded');
     if (t.unbound)   bits.push(t.unbound + ' unbound');
     if (t.unused)    bits.push(t.unused + ' unused');
+    if (t.composite) bits.push(t.composite + ' composite');
     if (t.unchecked) bits.push(t.unchecked + ' unchecked');
     if (t.unknown)   bits.push(t.unknown + ' unreported');
     bits.push(_sdNum(t.ok) + ' healthy');
@@ -678,6 +694,7 @@ function _sdCardModel(key, objs, ov, avail) {
         unbound:  objs.filter(o => o.unbound),
         unused:   objs.filter(o => o.unused),
         degraded: objs.filter(o => o.degraded),
+        composite: objs.filter(o => o.composite),
     };
     let total = objs.length;
     let truncated = 0;
@@ -691,6 +708,31 @@ function _sdCardModel(key, objs, ov, avail) {
     if (!known) total = null;
     return { key: key, objs: objs, t: t, provs: provs, cells: cells, groups: groups,
              total: total, truncated: truncated, known: known, listed: listed };
+}
+
+function _sdBackendRoll(objs) {
+    return _sdList(objs).reduce((a, o) => {
+        if (o.backends) {
+            a.total += o.backends.total;
+            a.up    += o.backends.up;
+            a.down  += o.backends.down;
+            a.checked++;
+        } else if (o.composite) {
+            a.composite++;
+        }
+        return a;
+    }, { total: 0, up: 0, down: 0, checked: 0, composite: 0 });
+}
+
+function _sdBackendTxt(b, total) {
+    const bits = [];
+    if (b.checked) {
+        bits.push(b.down === 0 ? _sdNum(b.up)   + ' of ' + _sdNum(b.total) + ' backends up'
+                               : _sdNum(b.down) + ' of ' + _sdNum(b.total) + ' backends down');
+    }
+    if (b.composite) bits.push(_sdNum(b.composite) + ' composite');
+    if (bits.length) return bits.join(SD_SEP);
+    return total ? 'no health checks configured' : '';
 }
 
 function _sdRender(model) {
@@ -755,14 +797,8 @@ function _sdRender(model) {
     });
 
     const v = m.service;
-    const b = v.objs.reduce((a, o) => {
-        if (o.backends) { a.total += o.backends.total; a.up += o.backends.up; a.down += o.backends.down; a.checked++; }
-        return a;
-    }, { total: 0, up: 0, down: 0, checked: 0 });
-    const backendTxt = b.checked === 0
-        ? (v.total ? 'no health checks configured' : '')
-        : (b.down === 0 ? _sdNum(b.up) + ' of ' + _sdNum(b.total) + ' backends up'
-                        : _sdNum(b.down) + ' of ' + _sdNum(b.total) + ' backends down');
+    const b = _sdBackendRoll(v.objs);
+    const backendTxt = _sdBackendTxt(b, v.total);
     cards.push({
         key: 'service', total: v.total, health: _sdHealth(v.t), cells: v.cells, provs: v.provs,
         aria: _sdAria('services', v.total, v.t),
@@ -772,6 +808,7 @@ function _sdRender(model) {
             v.t.disabled && _sdExc('d-bad',  'ph-fill ph-x-circle',            v.t.disabled, 'disabled',      'tab=live;svcstatus=error',   v.groups.disabled),
             v.t.degraded && _sdExc('d-warn', 'ph-fill ph-arrow-fat-line-down', v.t.degraded, 'backends down', 'tab=live;svcstatus=warning', v.groups.degraded),
             v.t.warning  && _sdExc('d-warn', 'ph-fill ph-warning',             v.t.warning,  'warnings',      'tab=live;svcstatus=warning', v.groups.warning),
+            v.t.composite && _sdExc('d-off', 'ph-bold ph-share-network',        v.t.composite, 'composite',    'tab=live',                   v.groups.composite),
         ].filter(Boolean),
     });
 

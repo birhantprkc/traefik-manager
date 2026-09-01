@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,7 +12,7 @@ import (
 	"time"
 )
 
-const Version = "1.12.1"
+const Version = "1.13.0"
 
 type Config struct {
 	APIKey                    string
@@ -57,6 +58,7 @@ type App struct {
 	httpClient *http.Client
 	csClient   *http.Client
 	keys       *keyStore
+	events     *eventLog
 }
 
 func buildCSClient(cfg *Config) *http.Client {
@@ -123,7 +125,7 @@ func envBool(key string, def bool) bool {
 
 func loadConfig() *Config {
 	return &Config{
-		APIKey:                    os.Getenv("TMA_API_KEY"),
+		APIKey:                    strings.TrimSpace(os.Getenv("TMA_API_KEY")),
 		Port:                      envOr("TMA_PORT", "8090"),
 		RateLimit:                 envInt("TMA_RATE_LIMIT", 300),
 		TraefikAPIURL:             envOr("TRAEFIK_API_URL", "http://traefik:8080"),
@@ -176,6 +178,14 @@ func main() {
 		httpClient: &http.Client{Transport: transport},
 		csClient:   buildCSClient(cfg),
 		keys:       newKeyStore(cfg.BackupDir),
+		events:     newEventLog(),
+	}
+
+	for _, problem := range unwritableStorage(cfg) {
+		log.Printf("storage: %s at %s is not writable (%s). Config writes and backups will fail.",
+			problem.Label, problem.Path, problem.Err)
+		app.events.record("storage", fmt.Sprintf("%s at %s is not writable (%s)",
+			problem.Label, problem.Path, problem.Err))
 	}
 
 	mux := http.NewServeMux()
@@ -193,6 +203,9 @@ func (a *App) router(w http.ResponseWriter, r *http.Request) {
 	m := r.Method
 
 	switch {
+	case p == "/api/events" && m == http.MethodGet:
+		a.eventsHandler(w, r)
+
 	case p == "/api/traefik/overview" && m == http.MethodGet:
 		a.traefikProxy(w, r, "/api/overview")
 	case p == "/api/traefik/routers" && m == http.MethodGet:

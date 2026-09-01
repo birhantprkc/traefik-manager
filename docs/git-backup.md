@@ -126,13 +126,18 @@ traefik-backups/
 
 Dynamic config files contain everything you define through the Traefik file provider - routes, middlewares, services, and `tls` options blocks. If you split them into multiple files (e.g. `routes.yml`, `middlewares.yml`, `tls.yml`), all files are backed up. TLS options defined inside any dynamic config file are included automatically.
 
+`manager.yml` is **not** part of the backup, and it holds the record of which composite services
+Traefik Manager manages. After a restore those services come back but read as not managed, so their
+routes go read only. Open the service's detail panel and choose **Manage this service** to take
+them back - it records ownership only and leaves the restored file byte for byte unchanged.
+
 ---
 
 ## Docker setup
 
 No extra configuration is needed. The `git` binary is included in the Traefik Manager Docker image.
 
-The local clone lives at `{BACKUP_DIR}/git-repo/` (default `/app/backups/git-repo/`), and each agent that uses the Host repository gets its own clone at `{BACKUP_DIR}/git-agent-<id>/`. To persist them across container restarts, mount `BACKUP_DIR` as a volume:
+The local clone lives at `{BACKUP_DIR}/git-repo/` (default `/app/backups/git-repo/`), and each agent that uses the Host repository gets its own clone at `{BACKUP_DIR}/git-agent-<id>/`. Removing an agent deletes its clone; the branch already pushed to the remote is left alone. To persist them across container restarts, mount `BACKUP_DIR` as a volume:
 
 ```yaml
 volumes:

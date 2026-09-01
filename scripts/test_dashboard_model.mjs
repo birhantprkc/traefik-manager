@@ -45,8 +45,8 @@ const sandbox = {
 sandbox.globalThis = sandbox;
 
 const ctx = vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.join(ROOT, 'static', 'js', 'dashboard.js'), 'utf8'),
-                ctx, { filename: 'dashboard.js' });
+const SRC = fs.readFileSync(path.join(ROOT, 'static', 'js', 'dashboard.js'), 'utf8');
+vm.runInContext(SRC, ctx, { filename: 'dashboard.js' });
 
 const M = name => vm.runInContext(name, ctx);
 
@@ -58,6 +58,11 @@ const _sdBuild     = M('_sdBuild');
 const _sdCardModel = M('_sdCardModel');
 const _sdTerse     = M('_sdTerse');
 const _sdSubOffender = M('_sdSubOffender');
+const _sdHealth      = M('_sdHealth');
+const _sdAria        = M('_sdAria');
+const _sdComposite   = M('_sdComposite');
+const _sdBackendRoll = M('_sdBackendRoll');
+const _sdBackendTxt  = M('_sdBackendTxt');
 
 const failures = [];
 let ran = 0;
@@ -212,6 +217,88 @@ test('a service with a DOWN backend is degraded', () => {
     });
     assert.equal(model.objs.service[0].degraded, true);
     assert.equal(model.objs.service[0].cell, 'warn');
+});
+
+const svc = (name, extra) => Object.assign({ name: name, status: 'enabled' }, extra || {});
+const svcModel = list => _sdBuild({ services: { http: list } }).objs.service;
+const noOv = { total: null, warnings: null, errors: null };
+
+test('every composite kind is named instead of being bucketed as unchecked', () => {
+    const kinds = {
+        weighted:            'weighted',
+        mirroring:           'mirroring',
+        failover:            'failover',
+        highestRandomWeight: 'highest random weight',
+    };
+    Object.keys(kinds).forEach(key => {
+        const raw = svc('c@file');
+        raw[key] = { services: [{ name: 'child@file' }] };
+        const o = svcModel([raw])[0];
+        assert.equal(o.composite, kinds[key], key + ' was not recognised as a composite');
+        assert.equal(o.cell, 'ok', key + ' must not land in the idle bucket');
+        assert.equal(!!o.unchecked, false, key + ' has no servers of its own to health check');
+        assert.equal(o.backends, null, key + ' must report no backends of its own');
+    });
+});
+
+test('a load balancer with no serverStatus is still unchecked', () => {
+    const o = svcModel([svc('s@file', { loadBalancer: { servers: [{ url: 'http://a:80' }] } })])[0];
+    assert.equal(o.composite, '');
+    assert.equal(o.cell, 'idle');
+    assert.equal(o.unchecked, true);
+    assert.equal(_sdComposite(null), '');
+    assert.equal(_sdComposite({ loadBalancer: { servers: [] } }), '');
+});
+
+test('a composite never moves the backends up and down counts', () => {
+    const objs = svcModel([
+        svc('lb@file', { serverStatus: { a: 'UP', b: 'UP' } }),
+        svc('w@file',  { weighted: { services: [{ name: 'lb@file' }] } }),
+    ]);
+    const b = _sdBackendRoll(objs);
+    assert.deepEqual([b.total, b.up, b.down, b.checked, b.composite], [2, 2, 0, 1, 1]);
+    assert.equal(textOf(_sdBackendTxt(b, objs.length)), '2 of 2 backends up · 1 composite');
+});
+
+test('composites alone do not flip the services card to no health checks configured', () => {
+    const objs = svcModel([
+        svc('w@file', { weighted: { services: [] } }),
+        svc('m@file', { mirroring: { service: 'a@file' } }),
+    ]);
+    const txt = textOf(_sdBackendTxt(_sdBackendRoll(objs), objs.length));
+    assert.equal(txt, '2 composite');
+    assert.ok(!txt.includes('no health check'), txt);
+});
+
+test('services with no health data at all still say so', () => {
+    const objs = svcModel([svc('s@file')]);
+    assert.equal(_sdBackendTxt(_sdBackendRoll(objs), objs.length), 'no health checks configured');
+    assert.equal(_sdBackendTxt(_sdBackendRoll([]), 0), '');
+});
+
+test('the tally, the groups and the aria line all surface composites', () => {
+    const objs = svcModel([
+        svc('w@file',  { weighted: { services: [] } }),
+        svc('lb@file', { serverStatus: { a: 'UP' } }),
+    ]);
+    const card = _sdCardModel('service', objs, noOv, true);
+    assert.equal(card.t.composite, 1);
+    assert.equal(card.t.unchecked, 0);
+    assert.equal(card.groups.composite.length, 1);
+    assert.equal(card.groups.composite[0].name, 'w@file');
+    assert.equal(_sdHealth(card.t), 'up', 'a healthy composite must not turn the card amber');
+    assert.ok(_sdAria('services', 2, card.t).includes('1 composite'), _sdAria('services', 2, card.t));
+});
+
+test('a composite that does report server status is still judged on it', () => {
+    const o = svcModel([svc('w@file', { weighted: { services: [] }, serverStatus: { a: 'DOWN' } })])[0];
+    assert.equal(o.degraded, true);
+    assert.equal(o.cell, 'warn');
+});
+
+test('the services card carries a composite chip so composites are visible, not silent', () => {
+    assert.ok(/v\.t\.composite && _sdExc\('d-off', 'ph-bold ph-share-network'/.test(SRC),
+        'the composite count needs its own neutral flag on the services card');
 });
 
 if (failures.length) {

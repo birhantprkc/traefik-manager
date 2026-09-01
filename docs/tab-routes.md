@@ -40,6 +40,8 @@ Click a card, or **More - View Details**. The panel shows a traffic flow diagram
 
 When Traefik is not serving the route, a banner says why: the API is unreachable, Traefik has loaded nothing at all from the file provider (usually the two containers do not share the config path, or `providers.file` is not watching it), or Traefik is serving other file routes but not this one.
 
+If the routes cannot be loaded for the selected server at all, the Routes and Middlewares grids are emptied and a banner names that server and the error, so nothing left on screen belongs to the server you switched away from.
+
 **More** also offers **Open** (for a simple `Host()` route), **Clone**, **Raw YAML**, and **Delete**.
 
 ## App icons
@@ -59,7 +61,7 @@ Click **Add Route** in the top bar. Fields marked with a protocol apply to that 
 | Rule Mode | *(HTTP)* **Simple** (default) builds a `Host()` rule from the Subdomain + Domain chips. **Advanced rule** takes any valid Traefik rule (`PathPrefix`, `HostRegexp`, compound rules with `&&` / `\|\|`). A route with a complex rule opens in Advanced automatically. |
 | Subdomain + Domain(s) | *(HTTP, Simple mode)* The chip list combines the Domains from Settings - Connection with domains auto-detected from your existing routes, and a **+** chip takes any other domain on the spot. Several domains generate a multi-host rule: ``Host(`sub.d1.com`) \|\| Host(`sub.d2.com`)``. A Subdomain containing a dot is used as the full hostname. The domain list is a form convenience - it never affects your Traefik configuration. |
 | Rule (SNI) | *(TCP)* A raw SNI rule, e.g. ``HostSNI(`db.example.com`)``. Use ``HostSNI(`*`)`` to match all TLS, or leave it empty for passthrough. |
-| Backend | **Manual** (default) - a Target IP / Port for a service this route owns. **Existing service** - reference a service already defined in your config; see [Shared services](#shared-services) |
+| Backend | **Build backends** (default) - backend rows for a service this route owns. **Use a service** - point the router straight at a service already defined in your config, with no service of its own; see [Shared services](#shared-services) |
 | Target IP / Port | *(Manual mode)* Backend server to forward to |
 | Entry Points | Chips fetched from the Traefik API - click to toggle. `websecure` (or `https`) is pre-selected for HTTP. UDP is single-select. Falls back to a text input if the API returns no entry points. |
 | Middlewares | Chips fetched from the Traefik API - click to toggle. HTTP routes offer HTTP middlewares; TCP routes offer TCP middlewares (`ipAllowList`, `inFlightConn`). Falls back to a text input if the API returns none. |
@@ -83,7 +85,7 @@ Click the pencil icon on any route card, or open the detail panel and click **Ed
 Saving rewrites only the parts the form owns: the rule, entry points, service reference, middlewares and TLS on the router, and the backends, `passHostHeader` and the insecure-TLS transport on the service. Sticky sessions, health checks and router `priority` are written when the form manages them - see [Multiple backends and load balancing](#multiple-backends-and-load-balancing). Anything else you wrote by hand is preserved, including your own `serversTransport`, and an existing route keeps the service name it already points at rather than being renamed to `<name>-service`.
 
 ::: warning Advanced service types
-If a router points at a `weighted`, `mirroring`, `failover` or `highestRandomWeight` service instead of a `loadBalancer`, that service is left untouched, so editing the target field in the route form has no effect on it. Edit those services directly in the config file. A service referenced by one of these, whether or not a router also points at it, is never removed when a route is deleted or disabled.
+If a router points at a `weighted`, `mirroring`, `failover` or `highestRandomWeight` service that Traefik Manager does not manage, that service is left untouched, so editing the target field in the route form has no effect on it. Edit it on the [Services tab](tab-services.md), which can also take over managing it. A composite Traefik Manager wrote itself is editable straight from this form. A service referenced by a composite, whether or not a router also points at it, is never removed when a route is deleted or disabled.
 :::
 
 ## Security headers preset
@@ -136,6 +138,14 @@ Like the headers preset, streaming is written only from the route form; other cl
 
 An HTTP, TCP, or UDP route can point at more than one backend. Click **Add backend** under the target fields to add another server; Traefik load-balances across them (`loadBalancer.servers`). Route cards show a **+N** badge when a route has more than one backend.
 
+For HTTP routes, each backend row is either an **IP : Port** or an existing **Service**. With only
+IP:Port rows the route keeps a plain `loadBalancer`, byte for byte as before. The moment any row
+references a service, a weight field appears on every row and a **Combine backends as** selector
+picks how they combine - Weighted, Mirroring or Failover. Each IP:Port row then becomes its own
+child service named `<route>-backend-<n>`, so a 90/10 split between two raw addresses works, and a
+referenced service is stored by name, never copied. Removing the service rows again reverts the
+route to a plain `loadBalancer` and removes the generated children.
+
 For HTTP routes, the **Load balancing** section adds:
 
 | Option | Writes | Notes |
@@ -156,7 +166,7 @@ The mobile app and older cached pages post only a single target. Saving from one
 
 Several routers can point at the same service - a native Traefik pattern, useful when one backend needs different middlewares per hostname (an internal name with no auth, an external one behind Authelia) or when an edge Traefik fans several domains into the same downstream instance (#125).
 
-Switch the **Backend** toggle to **Existing service** and pick any service from your config files. The route then writes only a router with `service: <name>`; that route never creates, modifies, or deletes the service block. The picker lists file-provider services for the active server across all config files.
+Switch the **Backend** toggle to **Use a service** and pick any service from your config files. The route then writes only a router with `service: <name>`; that route never creates, modifies, or deletes the service block. The picker lists file-provider services for the active server across all config files.
 
 Behavior worth knowing:
 
@@ -168,7 +178,7 @@ Behavior worth knowing:
 
 ## Deleting a route
 
-Open **More - Delete** on the route card and type `DELETE` to confirm. The route's service entry is removed with it, unless another router still references it.
+Open **More - Delete** on the route card and type `DELETE` to confirm. The route's service entry is removed with it, unless another router still references it. The `<service>-transport` `serversTransport` that traefik-manager generated for that service goes too, unless another service or a disabled route still points at it.
 
 ## Entrypoint middlewares
 
