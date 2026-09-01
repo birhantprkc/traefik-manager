@@ -56,18 +56,29 @@ def _state_path():
     return os.path.join(env.CONFIG_DIR, 'monitor.json')
 
 
+_memory_state = {}
+
+
+def _remember_state(data):
+    _memory_state.clear()
+    _memory_state.update(json.loads(json.dumps(data)))
+
+
 def _read_state():
     try:
         with open(_state_path(), 'r') as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else {}
+        if isinstance(data, dict):
+            return data
     except Exception:
-        return {}
+        pass
+    return json.loads(json.dumps(_memory_state))
 
 
 def _write_state():
     path = _state_path()
     tmp  = f"{path}.tmp.{os.getpid()}"
+    _remember_state(_state)
     try:
         with open(tmp, 'w') as f:
             json.dump(_state, f)

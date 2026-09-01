@@ -338,6 +338,15 @@ def _cs_apply_stream(payload, base: dict):
     return items
 
 
+CS_STALE_AFTER_SECONDS = 900
+
+
+def _cs_stale_mode(age, err):
+    if age is not None and age >= CS_STALE_AFTER_SECONDS:
+        return f'stale:{age}:{err}'
+    return 'cache'
+
+
 def cs_decisions_stream(force_full: bool = False):
     fp  = _cs_fingerprint()
     now = datetime.now(timezone.utc)
@@ -356,9 +365,10 @@ def cs_decisions_stream(force_full: bool = False):
             path  = '/v1/decisions/stream?startup=true' if full else '/v1/decisions/stream'
             try:
                 payload = _cs_request_strict('GET', path)
-            except CrowdSecUnavailable:
+            except CrowdSecUnavailable as e:
                 if doc['ready']:
-                    return _cs_mirror(doc), 'cache'
+                    age = int((now - doc['synced']).total_seconds()) if doc['synced'] else None
+                    return _cs_mirror(doc), _cs_stale_mode(age, e)
                 raise
             if not isinstance(payload, dict):
                 raise CrowdSecUnavailable('LAPI stream returned an unexpected payload')
