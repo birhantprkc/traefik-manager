@@ -75,7 +75,7 @@ See the [OIDC setup guide](oidc.md) for full configuration details.
 
 TM supports TOTP-based 2FA compatible with any standard authenticator app (Google Authenticator, Authy, etc.).
 
-The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encryption key is independent of the session signing key: it is taken from the `OTP_ENCRYPTION_KEY` environment variable, or generated once and persisted to `/app/config/.otp_key`. The same key encrypts every other stored secret - OIDC client secret, Traefik API password, CrowdSec keys, webhook password, git backup token. Only the encrypted values are stored in `manager.yml`.
+The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encryption key is independent of the session signing key: it is taken from the `OTP_ENCRYPTION_KEY` environment variable, or generated once and persisted to `/app/config/.otp_key`. The same key encrypts every other stored secret - OIDC client secret, Traefik API password, CrowdSec keys, webhook password, git backup token. A secret you write to `manager.yml` in plain text is read as written and encrypted in place on the next start, with a Security notification when that happens.
 
 2FA can be reset via the [reset password page](reset-password.md) if you lose access to your authenticator.
 

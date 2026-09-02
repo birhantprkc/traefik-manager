@@ -26,9 +26,30 @@ def encrypt_secret(secret: str) -> str:
     return get_otp_fernet().encrypt(secret.encode()).decode()
 
 
+FERNET_PREFIX = 'gAAAAA'
+_plaintext_count = 0
+
+
+def looks_encrypted(value: str) -> bool:
+    return isinstance(value, str) and value.startswith(FERNET_PREFIX)
+
+
+def plaintext_secrets_seen() -> bool:
+    return _plaintext_count > 0
+
+
+def clear_plaintext_seen():
+    global _plaintext_count
+    _plaintext_count = 0
+
+
 def decrypt_secret(token: str) -> str:
     if not token:
         return ''
+    if not looks_encrypted(token):
+        global _plaintext_count
+        _plaintext_count += 1
+        return token
     try:
         return get_otp_fernet().decrypt(token.encode()).decode()
     except (InvalidToken, Exception):

@@ -611,6 +611,43 @@ _monitor.register('crowdsec', _crowd.CS_ALERT_INTERVAL,
 _monitor.register('updates', _updates.UPDATE_INTERVAL, _updates.check_updates)
 _monitor.register('notify-flush', _noti.FLUSH_INTERVAL, _noti.flush_due)
 
+
+def _reencrypt_file(name, read, write):
+    crypto.clear_plaintext_seen()
+    content = read()
+    if not crypto.plaintext_secrets_seen():
+        return False
+    crypto.clear_plaintext_seen()
+    try:
+        write(content)
+    except Exception:
+        logger.exception(f"Could not re-encrypt the secrets in {name}")
+        return False
+    logger.info(f"Secrets written in plain text were re-encrypted in {name}")
+    return True
+
+
+def _reencrypt_plaintext_secrets():
+    rewritten = []
+    if _reencrypt_file('manager.yml', load_settings, lambda s: save_settings(
+            domains=s['domains'], cert_resolver=s['cert_resolver'],
+            traefik_api_url=s['traefik_api_url'], auth_enabled=s['auth_enabled'],
+            password_hash=s['password_hash'], visible_tabs=s['visible_tabs'])):
+        rewritten.append('manager.yml')
+    if _reencrypt_file('agents.yml', _ag.load_agents, _ag.save_agents_file):
+        rewritten.append('agents.yml')
+    crypto.clear_plaintext_seen()
+    return rewritten
+
+
+_reencrypted = _reencrypt_plaintext_secrets()
+if _reencrypted:
+    add_notification(
+        'warning',
+        f"A secret was written to {' and '.join(_reencrypted)} in plain text. It has been "
+        f"encrypted in place and is no longer stored in the clear",
+        category='security')
+
 for _label, _path, _err in env.unwritable_storage():
     logger.error(f"{_label} storage at {_path} is not writable ({_err}). "
                  f"Settings, backups and scheduled checks will not survive a restart. "

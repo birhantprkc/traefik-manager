@@ -38,6 +38,21 @@ from `manager.yml` and restart.
 | `AUTH_ENABLED` | `true` | Overrides `auth_enabled` | Set to `false` to disable built-in login entirely |
 | `ADMIN_PASSWORD` | _(unset)_ | Overrides `password_hash` | Admin password in plain text |
 
+### OIDC
+
+| Variable | Default | Precedence | Description |
+|---|---|---|---|
+| `OIDC_ENABLED` | `false` | Seeds `oidc_enabled` | Turn on OIDC login |
+| `OIDC_PROVIDER_URL` | _(unset)_ | Seeds `oidc_provider_url` | Issuer URL, without `/.well-known/openid-configuration` |
+| `OIDC_CLIENT_ID` | _(unset)_ | Seeds `oidc_client_id` | Client ID from your provider |
+| `OIDC_CLIENT_SECRET` | _(unset)_ | Seeds `oidc_client_secret` | Client secret (stored encrypted) |
+| `OIDC_DISPLAY_NAME` | `OIDC` | Seeds `oidc_display_name` | Name on the login button |
+| `OIDC_ALLOWED_EMAILS` | _(unset)_ | Seeds `oidc_allowed_emails` | Comma-separated email allowlist |
+| `OIDC_ALLOWED_GROUPS` | _(unset)_ | Seeds `oidc_allowed_groups` | Comma-separated group allowlist |
+| `OIDC_GROUPS_CLAIM` | `groups` | Seeds `oidc_groups_claim` | Claim holding the user's groups |
+| `OIDC_ALLOW_ANY_AUTHENTICATED` | `false` | Seeds `oidc_allow_any_authenticated` | Accept any account the provider authenticates |
+| `OIDC_AUTO_LOGIN` | `false` | Seeds `oidc_auto_login` | Skip the login page and go straight to the provider |
+
 ### Routes & Domains
 
 | Variable | Default | Precedence | Description |
@@ -210,6 +225,44 @@ Environment=ADMIN_PASSWORD=mysecretpassword
 
 ::: info
 When set, the in-UI password change and 2FA are bypassed. `flask reset-password` with `--prompt`, `--stdin` or `--password` exits with an error and writes nothing; with no password option it still writes a temporary password, which login then ignores. Remove the variable to switch back to `manager.yml`-managed passwords.
+:::
+
+---
+
+## OIDC
+
+### `OIDC_*`
+
+**Seeds:** the ten `oidc_*` keys in `manager.yml`
+
+Configure OIDC without opening Settings. Each variable seeds its matching key, so it applies while that key is absent from `manager.yml` and stops applying once the key is written there. Booleans accept `true`/`1`/`yes`/`on` and `false`/`0`/`no`/`off`.
+
+:::tabs
+== Docker / Podman
+```yaml
+environment:
+  - OIDC_ENABLED=true
+  - OIDC_PROVIDER_URL=https://id.example.com/application/o/tm/
+  - OIDC_CLIENT_ID=traefik-manager
+  - OIDC_CLIENT_SECRET=your-client-secret
+  - OIDC_DISPLAY_NAME=Authentik
+  - OIDC_ALLOWED_GROUPS=admins
+```
+== Linux (systemd)
+```ini
+Environment=OIDC_ENABLED=true
+Environment=OIDC_PROVIDER_URL=https://id.example.com/application/o/tm/
+Environment=OIDC_CLIENT_ID=traefik-manager
+Environment=OIDC_CLIENT_SECRET=your-client-secret
+Environment=OIDC_DISPLAY_NAME=Authentik
+Environment=OIDC_ALLOWED_GROUPS=admins
+```
+:::
+
+`OIDC_CLIENT_SECRET` is encrypted the first time it is written to `manager.yml`. See [OIDC](oidc.md) for the provider setup and [manager.yml](manager-yml.md) for each key.
+
+::: warning
+Leaving both `OIDC_ALLOWED_EMAILS` and `OIDC_ALLOWED_GROUPS` empty denies every login unless `OIDC_ALLOW_ANY_AUTHENTICATED` is `true`.
 :::
 
 ---

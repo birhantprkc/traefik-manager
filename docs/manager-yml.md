@@ -25,6 +25,24 @@ None of these need to be edited by hand. Back up the entire config directory to 
 
 ---
 
+## Hand-written secrets
+
+Encrypted fields are marked **Fernet-encrypted** below. You can write any of them in plain text and TM will read the value as written. On the next start TM encrypts it in place and raises a Security notification saying it did.
+
+| You write | TM does |
+| ---| ---|
+| `oidc_client_secret: my-secret` | Reads `my-secret`, rewrites the key encrypted on next start |
+| `oidc_client_secret: gAAAAA...` | Decrypts it, leaves the file alone |
+| A value encrypted with a different `.otp_key` | Reads it as empty and logs a warning |
+
+`agents.yml` works the same way, so a hand-written `api_key`, `crowdsec_api_key`, `crowdsec_machine_password` or `git_backup_token` is read and then encrypted.
+
+The rewrite needs the config directory to be writable. If it is not, the plain text keeps working and TM keeps the file as it is.
+
+Prefer [environment variables](env-vars.md) for scripted deployments: `OIDC_CLIENT_SECRET` and the other `OIDC_*` variables never put the secret in the file in the clear.
+
+---
+
 ## Example
 
 ```yaml
@@ -291,7 +309,7 @@ The client ID registered with your OIDC provider.
 
 **Type:** string (Fernet-encrypted) - **Default:** `""`
 
-The client secret. Stored encrypted at rest. Always set through the Settings UI, never edit by hand.
+The client secret. Stored encrypted at rest. Set it in the Settings UI, with `OIDC_CLIENT_SECRET`, or in plain text here - see [Hand-written secrets](#hand-written-secrets).
 
 ---
 

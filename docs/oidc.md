@@ -47,6 +47,22 @@ Go to **Settings → Authentication → OIDC / SSO** and fill in:
 
 Click **Test** next to the Provider URL to verify the discovery document is reachable, then click **Save OIDC Config** and toggle **Enable**.
 
+### Configure with environment variables
+
+Every field above has a matching variable, so OIDC can be set up without opening Settings:
+
+```yaml
+environment:
+  - OIDC_ENABLED=true
+  - OIDC_PROVIDER_URL=https://id.example.com/application/o/tm/
+  - OIDC_CLIENT_ID=traefik-manager
+  - OIDC_CLIENT_SECRET=your-client-secret
+  - OIDC_DISPLAY_NAME=Authentik
+  - OIDC_ALLOWED_GROUPS=admins
+```
+
+Each one applies while its key is absent from `manager.yml`, and stops applying once you save OIDC settings in the UI. See [Environment Variables](env-vars.md#oidc) for the full list.
+
 ---
 
 ## Automatic sign-in

@@ -150,6 +150,15 @@ def _dump_channels(channels):
     return out
 
 
+def _env_bool(name: str, fallback: bool) -> bool:
+    raw = os.environ.get(name, '').strip().lower()
+    if raw in ('1', 'true', 'yes', 'on'):
+        return True
+    if raw in ('0', 'false', 'no', 'off'):
+        return False
+    return fallback
+
+
 def _new_channel_id():
     import secrets as _s
     return 'ch_' + _s.token_hex(4)
@@ -177,16 +186,16 @@ def load_settings() -> dict:
         'acme_json_path':       '',
         'access_log_path':      '',
         'static_config_path':   '',
-        'oidc_enabled':         False,
-        'oidc_provider_url':    '',
-        'oidc_client_id':       '',
-        'oidc_client_secret':   '',
-        'oidc_display_name':    'OIDC',
-        'oidc_allowed_emails':  '',
-        'oidc_allowed_groups':  '',
-        'oidc_groups_claim':    'groups',
-        'oidc_allow_any_authenticated': False,
-        'oidc_auto_login':      False,
+        'oidc_enabled':         _env_bool('OIDC_ENABLED', False),
+        'oidc_provider_url':    os.environ.get('OIDC_PROVIDER_URL', ''),
+        'oidc_client_id':       os.environ.get('OIDC_CLIENT_ID', ''),
+        'oidc_client_secret':   os.environ.get('OIDC_CLIENT_SECRET', ''),
+        'oidc_display_name':    os.environ.get('OIDC_DISPLAY_NAME', 'OIDC'),
+        'oidc_allowed_emails':  os.environ.get('OIDC_ALLOWED_EMAILS', ''),
+        'oidc_allowed_groups':  os.environ.get('OIDC_ALLOWED_GROUPS', ''),
+        'oidc_groups_claim':    os.environ.get('OIDC_GROUPS_CLAIM', 'groups'),
+        'oidc_allow_any_authenticated': _env_bool('OIDC_ALLOW_ANY_AUTHENTICATED', False),
+        'oidc_auto_login':      _env_bool('OIDC_AUTO_LOGIN', False),
         'default_theme':        'dark',
         'ui_prefs':             {},
         'geoip_enabled':        False,
