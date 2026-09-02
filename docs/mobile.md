@@ -111,7 +111,7 @@ The overview: router, service and middleware counts with their health, the provi
 
 - Every middleware with its type, protocol and config
 - Search, and filter by type
-- **24 built-in wizards** covering Basic and Digest Auth, Forward Auth with Authentik, Authelia and Gatekeeper presets, OIDC Auth, IP Allow List, Rate Limit, In-Flight Requests, Secure Headers, CORS, redirects, prefix and path rewriting, Retry, Circuit Breaker, Buffering, Compress, Chain and Encoded Characters - the same set as the web app
+- **30 built-in wizards** covering Basic and Digest Auth, Forward Auth with Authentik, Authelia and Gatekeeper presets, OIDC Auth, IP Allow List, Rate Limit, In-Flight Requests, Secure Headers, CORS, redirects, prefix and path rewriting including the regex forms, Retry, Circuit Breaker, Buffering, Compress, Chain, Encoded Characters, Custom Error Pages, Content Type, gRPC-Web and Pass TLS Client Cert - the same set as the web app
 - **Templates** - your saved YAML templates, managed from the middleware screen
 - Raw YAML for anything the wizards do not cover
 
@@ -296,8 +296,12 @@ http:
           - url: http://traefik-manager:5000
 ```
 
-::: warning Keep built-in auth enabled
-With this split-route pattern, keep Traefik Manager's built-in auth **enabled** and generate API keys for your mobile devices. Without built-in auth, the `/api/*` route has no protection.
+::: warning Keep one form of auth enabled
+Generate API keys for your mobile devices. A valid key is accepted in every mode, so the `/api/*`
+route stays protected whether you sign in with the built-in password or with OIDC.
+
+The one combination that leaves it open is turning **both** off: with built-in auth disabled and no
+OIDC provider configured, `/api/*` answers without a key at all.
 :::
 
 ---
