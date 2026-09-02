@@ -46,7 +46,7 @@ The **compact stat cards** setting (**Settings → Interface**) applies here exa
 | **Scenarios** | alerts | Ranked on **alerts**, not decisions. The row kind carries the real bucket shape, `leaky 10/10s` or `trigger`. Flags count leaky against trigger buckets. |
 | **Targeted paths** | distinct paths | URIs from the alert-level `meta[]`. The verb flags (`GET`, `POST`, ...) are deep links. On an SSH-only host the same card becomes **Targeted accounts** and ranks `target_user` instead. |
 | **Tooling** | distinct user agents | Shortened product tokens (`curl/8.5.0`, `masscan/1.3`). The row kind separates a real `tool` from a copied `browser string`. |
-| **Bans in force** | active decisions | The doorway to the decisions view. The strip covers every decision grouped by origin: solid for your own detections, yellow for hand-added, rings for subscribed. The footer is four deep links, plus `wide` when Range or Country scoped decisions exist. |
+| **Bans in force** | active decisions | The doorway to the decisions view. The strip covers every decision grouped by origin: solid for your own detections, yellow for hand-added, rings for subscribed. The footer is four deep links, plus static `other` and `wide` items when a decision falls outside the four known origins or is Range or Country scoped. |
 
 Ranking is **worst first**: rows with the most sources holding no active decision sort above rows with the highest raw count. The percentage column and the row tooltip carry the volume.
 
@@ -62,13 +62,14 @@ Every count is clickable and filters the feed below. Filters combine with AND, c
 | A country in the Geography panel | `cc` |
 | A scenario row | `scenario` |
 | A path row | `uri` |
+| An account row on an SSH-only host | `user` |
 | A verb flag | `verb` |
 | A tooling row | `agent` |
-| `crowdsec` / `cscli` / `CAPI` / `lists` | `origin`, and switches to the decisions view |
+| `crowdsec` / `by hand` / `CAPI` / `lists` | `origin`, and switches to the decisions view |
 | `ban` / `captcha` on the Bans card | `type`, and switches to the decisions view |
 | `local detections only` in the window row | `origin=subscribed` in the decisions view, the CAPI and blocklist rows the cards leave out |
 
-`origin` and `type` only exist on decisions, so following one switches the view automatically unless the link named a view itself. `asn`, `cc`, `uri`, `verb`, `agent` and `outcome` only exist on alerts; if one is still active while you are looking at decisions the window row says so rather than silently dropping it.
+`origin` and `type` only exist on decisions, so following one switches the view automatically unless the link named a view itself. `asn`, `cc`, `uri`, `verb`, `user`, `agent` and `outcome` only exist on alerts; if one is still active while you are looking at decisions the window row says so rather than silently dropping it.
 
 ### Attack evidence
 
@@ -91,7 +92,7 @@ Click **+ Add Decision**:
 - **Duration** - 1 hour, 4 hours, 24 hours, 7 days, 30 days, or 1 year
 - **Reason** - optional label stored as the decision scenario
 
-Below the form, **Custom Decisions** lists every decision you added by hand, each with an unban button. CrowdSec records these with origin `cscli`; it has no `manual` origin.
+Below the form, **Custom Decisions** lists every decision you added by hand, each with an unban button. CrowdSec labels these `cscli` or `manual` depending on its version, and both count as added by hand.
 
 ## What the numbers do and do not mean
 

@@ -117,7 +117,7 @@ In Authentik: create an OAuth2/OpenID Provider and a corresponding Application. 
 
 Both filters are optional and independent:
 
-- **Allowed Emails** - if set, the user's `email` claim must be in this list, and the provider must report it as verified. Useful for allowing specific people from a shared provider (e.g. a Google Workspace domain).
+- **Allowed Emails** - if set, the user's `email` claim must be in this list, and the provider must not report it as unverified. A provider that omits `email_verified` is accepted. Useful for allowing specific people from a shared provider (e.g. a Google Workspace domain).
 - **Allowed Groups** - if set, at least one of the user's groups must match. Useful for restricting by Keycloak or Authentik role.
 
 If both are set, **both** conditions must pass.

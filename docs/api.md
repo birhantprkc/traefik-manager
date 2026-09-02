@@ -526,7 +526,7 @@ So `Jellyfin-Service` and `jellyfin` both resolve to `jellyfin`. Fall back to a 
 
 ### `GET /api/settings`
 
-Get current application settings. Every secret is stripped and replaced by a `*_set` boolean: password hash, OIDC client secret, Traefik API password, CrowdSec key and machine password, webhook password, OTP secret, git token. The `agents` list is stripped too - use `GET /api/agents`.
+Get current application settings. Every secret is stripped. Five come back as a `*_set` boolean - `traefik_api_password_set`, `oidc_client_secret_set`, `crowdsec_api_key_set`, `crowdsec_machine_password_set`, `git_backup_token_set`; `password_hash` becomes `has_password`; `webhook_password` and `otp_secret` are removed with no replacement. The `agents` list is stripped too - use `GET /api/agents`.
 
 | Field                      | Description                                        |
 | ----------------------------| ----------------------------------------------------|
@@ -557,7 +557,7 @@ Get current application settings. Every secret is stripped and replaced by a `*_
 
 Update settings. Full replace, not a patch: `domains` is required (`400` without it) and any omitted field resets to its default, so send the current values you want to keep.
 
-Exceptions: `git_backup_*`, `backup_keep_count` and `default_theme` are updated only when present, and blank `traefik_api_password`, `crowdsec_api_key`, `crowdsec_machine_password`, `webhook_password` and `git_backup_token` keep the stored secret.
+Exceptions: `git_backup_*`, `backup_keep_count`, `default_theme` and `notification_channels` are updated only when present, and blank `traefik_api_password`, `crowdsec_api_key`, `crowdsec_machine_password`, `webhook_password` and `git_backup_token` keep the stored secret.
 
 Returns `{ "success": true, "settings": { ... } }` with secrets stripped. `400` for a missing domain, an invalid `traefik_api_url`, an unsupported `git_backup_repo` scheme, a `crowdsec_alert_limit` that is not a whole number ("Alert limit must be a whole number") or one outside 0-100000 ("Alert limit must be between 0 and 100000").
 
@@ -932,17 +932,17 @@ Clear all notifications.
 
 ### `POST /api/notifications/add`
 
-Add a notification. Unlike `/log`, this also fires the configured webhook.
+Add a notification. Unlike `/log`, this also fires the configured webhook. `category` is one of the eight channel categories and falls back to `config`.
 
 ```json
-{ "type": "info", "message": "Deployment finished" }
+{ "type": "info", "message": "Deployment finished", "category": "config" }
 ```
 
 ---
 
 ### `POST /api/notifications/log`
 
-Record a UI toast in the notification history without firing a webhook. `type` is one of `info`, `success`, `warning`, `error` and falls back to `info`. The message is truncated to 300 characters.
+Record a UI toast in the notification history without firing a webhook. `type` is one of `info`, `success`, `warning`, `error` and falls back to `info`; `category` is one of the eight channel categories and falls back to `config`. The message is truncated to 300 characters.
 
 ```json
 { "ok": true, "stored": true }
@@ -966,11 +966,13 @@ Record an "update available" notification. `product` is `manager` for Traefik Ma
 
 Channels are where notifications are delivered. Each one has a `kind`, a category filter, a
 severity floor and an optional quiet window. Secrets (`token`, `token2`, `password`) read back
-as `***`.
+as `***`, and for `discord`, `slack`, `ntfy` and `generic` the `url` reads back as
+`scheme://host/***`. A `url` still containing `***` is ignored on write, so a channel can be
+echoed back unchanged.
 
 | Field | Values |
 | --- | --- |
-| `kind` | `discord`, `slack`, `ntfy`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
+| `kind` | `discord`, `slack`, `ntfy`, `unifiedpush`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
 | `categories` | any of `config`, `backup`, `security`, `traefik`, `certs`, `crowdsec`, `agent`, `update` |
 | `min_severity` | `info`, `success`, `warning`, `error` |
 | `digest` | `immediate`, `hourly`, `daily` |
@@ -985,7 +987,7 @@ List every channel, secrets redacted.
 
 ```json
 { "channels": [{ "id": "ch_1a2b3c4d", "name": "Ops Discord", "kind": "discord", "enabled": true,
-  "url": "https://discord.com/api/webhooks/...", "token": "", "token2": "", "password": "",
+  "url": "https://discord.com/***", "token": "", "token2": "", "password": "",
   "categories": ["certs", "crowdsec"], "min_severity": "warning", "digest": "immediate",
   "quiet_hours": "23:00-07:00", "break_through": true }] }
 ```
@@ -1309,7 +1311,13 @@ Returns `400` if the named entrypoint is absent or the config is not a mapping, 
 Get the deployed Traefik Manager version.
 
 ```json
-{ "version": "1.11.0", "repo": "chr0nzz/traefik-manager", "static_config_configured": true }
+{
+  "version": "1.13.0", "repo": "chr0nzz/traefik-manager", "static_config_configured": true,
+  "latest": "1.13.0", "release_url": "https://github.com/chr0nzz/traefik-manager/releases/tag/v1.13.0",
+  "release_notes": "...", "release_error": "",
+  "traefik_latest": "v3.6.25", "traefik_release_url": "https://github.com/traefik/traefik/releases/tag/v3.6.25",
+  "traefik_running": "v3.6.25"
+}
 ```
 
 ---
@@ -1330,6 +1338,26 @@ Test connectivity to a Traefik API URL during first-time setup. Accepts optional
 
 ```json
 { "url": "http://traefik:8080" }
+```
+
+---
+
+### `POST /setup/test-crowdsec`
+
+Test a CrowdSec LAPI URL and credentials during first-time setup. `404` once setup is complete, rate limited to 10/min.
+
+```json
+{ "url": "http://crowdsec:8080", "key": "..." }
+```
+
+---
+
+### `POST /setup/test-git`
+
+Test a git backup remote during first-time setup by running `git ls-remote`. `404` once setup is complete, rate limited to 10/min. Restricted by URL scheme (`https`, `http`, `ssh`, `git`) rather than by destination address.
+
+```json
+{ "repo_url": "https://github.com/you/traefik-backups.git", "username": "you", "token": "..." }
 ```
 
 ---
@@ -1680,7 +1708,7 @@ List all registered agents. The agent API key, the Traefik API password, the Cro
 
 ### `POST /api/agents`
 
-Register a new agent. `name` and `url` are required; every other agent field can be set here and otherwise takes its default. TM generates the API key and returns it once as `api_key_raw` - store it immediately, it is never returned again.
+Register a new agent. `name` and `url` are required, and most other agent fields can be set here. `traefik_api_user`, `traefik_api_password`, `traefik_insecure_skip_verify`, `backup_dir`, `domains`, `visible_tabs`, `git_host_backup`, `git_host_branch`, `tma_port` and `tma_rate_limit` are `PUT`-only; everything not sent takes its default. TM generates the API key and returns it once as `api_key_raw` - store it immediately, it is never returned again.
 
 `install_method` records which path added the agent: `"cli"` for the tm CLI install, `"manual"` for the compose generator. Anything else is stored as `"manual"`.
 
@@ -1720,7 +1748,7 @@ Update an agent's config fields (name, URL, paths, restart method, Traefik API b
 `404` for an unknown id. `400` for an empty `name`, for a `url` with no scheme or no host, or if the git branch collides with the Host's or another agent's.
 
 ::: warning
-`install_method`, `traefik_api_user` and `traefik_api_password` are written to `agents.yml` but not read back by the loader, so they do not survive a reload, and the password is stored unencrypted.
+`traefik_api_password` is stored unencrypted in `agents.yml`. The agent API key, CrowdSec API key, CrowdSec machine password and git token are all encrypted; this one is not.
 :::
 
 ---

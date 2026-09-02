@@ -28,6 +28,7 @@ TM handles authentication automatically when proxying calls through `/api/agents
 | GET | `/api/events` | Failures the agent could not report in a response, newest last - `?since=<id>` returns only newer ones |
 | GET | `/api/traefik/overview` | Traefik API overview |
 | GET | `/api/traefik/routers` | Routers across all protocols - returns `{"http":[...],"tcp":[...],"udp":[...]}` |
+| GET | `/api/traefik/router/{protocol}/{name}` | One router as Traefik reports it, including its provider labels |
 | GET | `/api/traefik/services` | Services across all protocols - returns `{"http":[...],"tcp":[...],"udp":[...]}` |
 | GET | `/api/traefik/middlewares` | Middlewares across all protocols - returns `{"http":[...],"tcp":[...]}` |
 | GET | `/api/traefik/entrypoints` | Entrypoints |
@@ -92,7 +93,7 @@ GET /health
 
 Response (no auth required):
 ```json
-{"ok": true, "version": "1.11.0"}
+{"ok": true, "version": "1.13.0"}
 ```
 
 ## Error responses
@@ -101,7 +102,7 @@ Response (no auth required):
 |---|---|
 | 400 | Bad request (invalid body or filename, `RESTART_METHOD` not configured) |
 | 401 | Missing or invalid API key |
-| 404 | Endpoint not available (e.g. `STATIC_CONFIG_PATH` not set) |
+| 404 | Endpoint not available: the static config and CrowdSec endpoints when their path or LAPI is unset. Plugins, certs and logs instead answer `200` with an `error` field and an empty list |
 | 429 | Rate limit exceeded |
 | 500 | Internal error |
 | 502 | Cannot reach Traefik or the CrowdSec LAPI |

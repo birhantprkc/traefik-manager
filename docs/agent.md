@@ -380,6 +380,23 @@ Removing an agent also deletes the state the Host kept for it, all of it on the 
 
 The agent service on the remote machine keeps running, and a branch already pushed to the git remote is left alone.
 
+## Failure reporting
+
+An agent answers Traefik Manager before it finishes the work behind the request, so a git push or
+a Traefik restart can fail after the reply has already gone. The agent records those on its own
+side and the Host collects them:
+
+| What | Behaviour |
+|---|---|
+| Where they are kept | A ring of the 100 most recent events on the agent, read back through `GET /api/events` |
+| How they arrive | The Host polls every agent every two minutes and raises what it has not seen, up to ten per cycle |
+| Where they show up | Notifications under the **Agents** category, prefixed with the agent's name |
+| What is reported | Failed git pushes, failed Traefik restarts, failed backups, and unwritable directories |
+
+At startup the agent also probes its config directory, its `BACKUP_DIR` and, when set, its static
+config path. Anything it cannot write is logged and raised as an event, so a bad mount is visible
+before it costs you a config write.
+
 ## Security
 
 - The API key is the only credential - keep it secret and use HTTPS between TM and TMA

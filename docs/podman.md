@@ -340,6 +340,8 @@ See the [Environment Variables](env-vars.md) reference for the full priority ord
 
 ## Behind Traefik (expose via subdomain)
 
+To serve Traefik Manager under a path rather than its own hostname, set [`BASE_PATH`](env-vars.md#base-path).
+
 Same as Docker. Remove `ports`, add labels, and put both containers on the same Podman network:
 
 ```yaml

@@ -11,9 +11,9 @@ The **Kubernetes** tab lists the routes Traefik discovered through its Kubernete
 ## What it shows
 
 - One card per route: status, name, rule, protocol, TLS state, service, entry points, middlewares
-- Provider badge, plus the namespace when the Traefik API returns one
-- Summary strip: route counts per protocol, plus any route not serving
-- Middlewares from the Kubernetes providers, listed under the routes
+- The provider kind (CRD, Ingress or Gateway) as the card subtitle, plus a Namespace row when the Traefik API returns one
+- Summary strip: route counts per protocol, the provider's middleware count, any route not serving, and a read-only marker
+- Middlewares from the Kubernetes providers, listed under the routes, when the provider has at least one route
 - Search, protocol filter, refresh
 
 Click a card for its detail panel.

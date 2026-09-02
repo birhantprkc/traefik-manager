@@ -48,7 +48,7 @@ If the routes cannot be loaded for the selected server at all, the Routes and Mi
 
 Enable **Settings - Interface - Routes - Show app icons** to put an app icon next to each route name, in grid and list view. It is **off by default** and stored server-side in `manager.yml` under `ui_prefs`, so it applies to every browser and session, on the Host and on agents.
 
-Icons use the same source and per-route overrides as the [Dashboard](tab-dashboard.md#icon): the slug is auto-detected from the route or service name and served from the selfh.st CDN, and any custom icon you set on a Dashboard card (a slug or a Custom URL) is used here too. An icon that cannot be resolved is hidden - no broken-image placeholder.
+Icons use the same source and per-route overrides as the [Dashboard](tab-dashboard.md#icon): the slug is auto-detected from the route or service name and served from jsDelivr's mirror of the selfh.st icon set, and any custom icon you set on a Dashboard card (a slug or a Custom URL) is used here too. An icon that cannot be resolved falls back to a two-letter monogram in grid view, and to nothing in list view.
 
 ## Creating a route
 
@@ -62,10 +62,11 @@ Click **Add Route** in the top bar. Fields marked with a protocol apply to that 
 | Subdomain + Domain(s) | *(HTTP, Simple mode)* The chip list combines the Domains from Settings - Connection with domains auto-detected from your existing routes, and a **+** chip takes any other domain on the spot. Several domains generate a multi-host rule: ``Host(`sub.d1.com`) \|\| Host(`sub.d2.com`)``. A Subdomain containing a dot is used as the full hostname. The domain list is a form convenience - it never affects your Traefik configuration. |
 | Rule (SNI) | *(TCP)* A raw SNI rule, e.g. ``HostSNI(`db.example.com`)``. Use ``HostSNI(`*`)`` to match all TLS, or leave it empty for passthrough. |
 | Backend | **Build backends** (default) - backend rows for a service this route owns. **Use a service** - point the router straight at a service already defined in your config, with no service of its own; see [Shared services](#shared-services) |
-| Target IP / Port | *(Manual mode)* Backend server to forward to |
+| Backends | *(HTTP)* One row per backend: its kind (**IP : Port** or **Service**), its scheme, the address or service, and a weight once there is more than one row |
+| Target IP / Host + Port | *(TCP, UDP)* Backend server to forward to |
 | Entry Points | Chips fetched from the Traefik API - click to toggle. `websecure` (or `https`) is pre-selected for HTTP. UDP is single-select. Falls back to a text input if the API returns no entry points. |
-| Middlewares | Chips fetched from the Traefik API - click to toggle. HTTP routes offer HTTP middlewares; TCP routes offer TCP middlewares (`ipAllowList`, `inFlightConn`). Falls back to a text input if the API returns none. |
-| Backend Scheme | *(HTTP)* `HTTP` or `HTTPS` - the scheme Traefik uses to reach your backend. Use `HTTPS` when the backend serves TLS itself. |
+| Middlewares | Chips from the Traefik API and your config files - click to toggle. HTTP routes offer HTTP middlewares; TCP routes offer TCP middlewares (`ipAllowList`, `inFlightConn`). Falls back to a text input only when neither source yields any. |
+| Scheme | `HTTP` or `HTTPS` - the scheme Traefik uses to reach your backend. Use `HTTPS` when the backend serves TLS itself. On HTTP routes it sits on each backend row; on TCP and UDP it is a single field. |
 | Pass Host Header | *(HTTP)* Enabled by default. Disable if the backend needs to see its own hostname instead of the original `Host` header; writes `passHostHeader: false` on the service. |
 | TLS Mode | *(TCP)* **No TLS**, **TLS** (reveals Cert Resolver), or **Passthrough**, which writes `tls.passthrough: true` |
 | Cert Resolver | *(HTTP, TCP)* **No TLS** (default, HTTP) omits the `tls` key; a **named resolver** issues a certificate via ACME; **None (external / custom cert)** writes `tls: {}` for certificates managed in `tls.yml` or elsewhere. Named resolvers come from the Cert Resolver field in Settings plus your static config's `certificatesResolvers`, so a custom resolver needs no re-typing. A remote agent contributes its own resolvers. |
@@ -140,8 +141,8 @@ An HTTP, TCP, or UDP route can point at more than one backend. Click **Add backe
 
 For HTTP routes, each backend row is either an **IP : Port** or an existing **Service**. With only
 IP:Port rows the route keeps a plain `loadBalancer`, byte for byte as before. The moment any row
-references a service, a weight field appears on every row and a **Combine backends as** selector
-picks how they combine - Weighted, Mirroring or Failover. Each IP:Port row then becomes its own
+references a service, and there is more than one row, a weight field appears on every row and a
+**Combine backends as** selector picks how they combine - Weighted, Mirroring or Failover. Each IP:Port row then becomes its own
 child service named `<route>-backend-<n>`, so a 90/10 split between two raw addresses works, and a
 referenced service is stored by name, never copied. Removing the service rows again reverts the
 route to a plain `loadBalancer` and removes the generated children.

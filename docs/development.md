@@ -35,7 +35,7 @@ env -> crypto, config -> agents_store -> settings -> auth, backups, notification
                                                      crowdsec, routes_build, git
 ```
 
-`certs` and `self_route` stop at `config` and never reach `settings`. `git` also pulls `agents_http` and `notifications`; `routes_build` also pulls `traefik`.
+`certs` and `self_route` stop at `config` and never reach `settings`. `git` also pulls `agents_http` and `notifications`; `routes_build` also pulls `traefik` and, lazily, `service_ownership`. `notifications` pulls `notify_providers`, `composite_services` pulls `service_ownership`, and `monitor` and `updates` sit on top of the rest.
 
 | Module | Owns |
 |---|---|
@@ -50,7 +50,12 @@ env -> crypto, config -> agents_store -> settings -> auth, backups, notification
 | `git` | Git backup: repo management, commits, pushes |
 | `traefik` | Read-only Traefik API client |
 | `agents_http` | HTTP client for remote agents |
-| `notifications` | In-app log and webhook delivery |
+| `notifications` | In-app log, queueing and delivery scheduling |
+| `notify_providers` | The per-destination senders behind those channels |
+| `monitor` | The background check loop and its schedule |
+| `updates` | Release checks for Traefik Manager and Traefik |
+| `service_ownership` | The `svc::` ledger: what Traefik Manager wrote and may rewrite |
+| `composite_services` | Building and merging weighted, mirroring and failover services |
 | `geoip`, `crowdsec`, `certs`, `self_route` | Feature-specific helpers |
 
 Two conventions exist because breaking them caused real bugs:

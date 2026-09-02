@@ -1,6 +1,6 @@
 # Services Tab
 
-The **Services** tab shows all services registered in Traefik across every provider - `@file`, `@docker`, `@kubernetes`, and so on - pulled live from the Traefik API. Services from your own config files can be created and edited here; services from other providers are read only.
+The **Services** tab shows all services registered in Traefik across every provider - `@file`, `@docker`, `@kubernetes`, and so on - pulled live from the Traefik API. HTTP services from your own config files can be created and edited here; TCP and UDP services, and services from other providers, are read only.
 
 ## What it shows
 
@@ -20,6 +20,8 @@ Grid view shows the service name with its type and provider below it, a status d
 - **Status** - All / Success / Warnings / Errors
 - **Protocol** - the protocols actually present
 - **Provider** - the providers actually present
+
+The bar also carries a button to clear every filter and one to refresh the list.
 
 A service Traefik reports as `enabled` counts as a warning when any of its backends is not `UP`, which is what the stat panel's **backends down** count measures. Services whose status Traefik does not report at all also land in the Warnings filter, so the two counts can differ.
 
@@ -43,13 +45,29 @@ row carries its own weight. A row referencing an existing service is stored by n
 copied, so changes to that service follow automatically. The generated children are hidden from
 the list and shown on their parent's card; searching reveals them.
 
-A `@file` service opened from its card or detail panel shows an **Edit** button. Editing keeps
-settings the form does not manage - `sticky`, `healthCheck`, `service.middlewares`, mirror body
-options - and only replaces what you changed. Deleting a service refuses while a route still
-points at it or another service lists it as a backend.
+An HTTP `@file` service opened from its card or detail panel shows an **Edit** button, whoever
+wrote it. Editing keeps settings the form does not manage - `sticky`, `healthCheck`,
+`service.middlewares`, mirror body options - and only replaces what you changed. Change the name
+in that form to rename the service: the old key and its generated children go, and the new name
+takes over their ownership.
 
-A hand-written composite is read only until you choose **Manage this service** in its detail
-panel. That records ownership without touching the file - it stays byte for byte unchanged.
+Deleting refuses while a route still points at the service, while another service lists it as a
+backend, or when it is a composite Traefik Manager does not manage.
+
+**Manage this service** in the detail panel records ownership of a hand-written composite without
+touching the file - it stays byte for byte unchanged. Ownership is what deleting, renaming and
+choosing that service as a route backend require; editing it in place does not.
+
+## Detail panel
+
+Clicking a card opens the panel on the right.
+
+| Block | Shows |
+|---|---|
+| Service Details | Type, provider, status, pass host header, and a **backend of** chip on a generated child |
+| Backends | For a composite, each backend with its role and share; for a load balancer, its servers |
+| Management | Composites only: whether Traefik Manager manages it, and the button to change that |
+| Used by Routers | Every router pointing at the service |
 
 ## Requirements
 

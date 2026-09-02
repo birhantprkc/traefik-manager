@@ -40,7 +40,7 @@ Supported platforms: GitHub, Gitea, Forgejo, GitLab, and any Git host accessible
 | Username | Your Git username (required for most hosts) |
 | Token / Password | The access token you generated |
 | Commit message template | Use `{action}` and `{timestamp}` as placeholders |
-| Auto-push on save | Push automatically after every route, middleware, or static config change |
+| Auto-push on save | Push automatically after every route, service, middleware, or static config change |
 
 **5. Click "Test"** to verify the connection, then **"Save Git Settings"**.
 
@@ -54,7 +54,9 @@ When auto-push is enabled, Traefik Manager pushes to your repository in the back
 
 - Adding, editing, deleting, enabling, or disabling a **route** (including raw-YAML route edits)
 - Adding, editing, or deleting a **middleware**
+- Adding, editing, renaming or deleting a **service**
 - Saving the **static config** (via the Static Config editor)
+- Any config change made on an **agent** through Traefik Manager
 
 The push runs in the background and does not block the UI. If it fails, a warning is logged and the config change is still saved locally.
 
@@ -98,7 +100,7 @@ The default template is:
 traefik-manager: {action} at {timestamp}
 ```
 
-`{action}` is the operation (`route save`, `route delete`, `route toggle`, `route raw save`, `middleware save`, `middleware delete`, `static config save`, or `manual`) and `{timestamp}` is the current date and time.
+`{action}` is the operation (`route save`, `route delete`, `route toggle`, `route raw save`, `middleware save`, `middleware delete`, `service save`, `service delete`, `static config save`, `config change` for an agent, or `manual`) and `{timestamp}` is the current date and time.
 
 Custom examples:
 - `[TM] {action} - {timestamp}`

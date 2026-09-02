@@ -7,8 +7,8 @@ The **Consul KV** tab lists the routes Traefik reads from its Consul KV provider
 ## What it shows
 
 - One card per route: status, name, rule, protocol, TLS state, service, entry points, middlewares
-- Summary strip: route counts per protocol, plus any route not serving
-- Middlewares from the Consul KV provider, listed under the routes
+- Summary strip: route counts per protocol, the provider's middleware count, any route not serving, and a read-only marker
+- Middlewares from the Consul KV provider, listed under the routes, when the provider has at least one route
 - Search, protocol filter, refresh
 
 Click a card for its detail panel.

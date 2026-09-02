@@ -18,6 +18,7 @@ TM stores some data in separate files alongside `manager.yml` in the same config
 | `notifications.yml`         | Recent notification history, capped at the 200 newest entries                                                                   |
 | `notifications.yml.lock`    | Empty lock file that keeps the workers from overwriting each other's notifications. Safe to delete while TM is stopped          |
 | `notifications.yml.next_id` | The next notification id, so ids are never reused after a clear. Safe to delete while TM is stopped                             |
+| `notification_queue.json`   | What a digest or quiet-hours window is holding, up to 500 per channel. Safe to delete while TM is stopped                        |
 | `dashboard.yml`             | Dashboard custom groups and per-card overrides, kept per server                                                                 |
 | `.secret_key`, `.otp_key`   | Auto-generated session key and the Fernet key for every encrypted field below. Lose `.otp_key` and those secrets are unreadable |
 
@@ -373,7 +374,7 @@ Notification destinations, each with its own type, credentials, filters and sche
 |---|---|---|
 | `id` | string | Generated, e.g. `ch_1a2b3c4d` |
 | `name` | string | Label shown in the UI |
-| `kind` | string | `discord`, `slack`, `ntfy`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
+| `kind` | string | `discord`, `slack`, `ntfy`, `unifiedpush`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
 | `enabled` | boolean | Default `true` |
 | `url` | string | Webhook, topic or server URL |
 | `token` | string (Fernet-encrypted) | Gotify app token, Pushover app token, Pushbullet access token, Telegram bot token |
@@ -560,6 +561,14 @@ Controls which optional tabs are shown. Managed via the setup wizard, **Settings
 | `plugins` | Plugins tab |
 | `logs` | Logs tab |
 | `static` | Static Config tab - kept in step with `ui_prefs.staticPlacement` |
+
+---
+
+### `notifications_read_until`
+
+**Type:** integer - **Default:** `0`
+
+Epoch seconds of the last time notifications were marked read, so the unread badge survives a restart. Set by the bell menu; do not edit by hand.
 
 ---
 
