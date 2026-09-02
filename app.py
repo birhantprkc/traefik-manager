@@ -1725,11 +1725,15 @@ def api_cs_alerts():
         else:
             headers = {'X-Api-Key': _cs_api_key(), 'Accept': 'application/json'}
         _limit = cs_alert_limit()
-        resp = requests.get(
-            f"{lapi.rstrip('/')}/v1/alerts?limit={_limit}&with_decisions=false",
-            headers=headers,
-            timeout=cs_timeout(), **_cs_tls_kwargs(),
-        )
+        _url = f"{lapi.rstrip('/')}/v1/alerts?limit={_limit}&with_decisions=false"
+        resp = requests.get(_url, headers=headers, timeout=cs_timeout(), **_cs_tls_kwargs())
+        if resp.status_code == 401 and _cs_has_machine():
+            logger.info("CrowdSec refused the machine token on /v1/alerts, logging in again")
+            _crowd.cs_jwt_reset()
+            token = _cs_jwt(lapi)
+            if token:
+                headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
+                resp = requests.get(_url, headers=headers, timeout=cs_timeout(), **_cs_tls_kwargs())
         if not resp.ok:
             try:
                 msg = resp.json().get('message') or resp.json().get('error') or resp.text

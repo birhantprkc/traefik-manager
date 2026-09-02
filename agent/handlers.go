@@ -511,8 +511,14 @@ func (a *App) csHasMachine() bool {
 	return (a.cfg.CrowdSecMachineID != "" && a.cfg.CrowdSecMachinePassword != "") || a.csHasCert()
 }
 
-func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Reader, useJWT bool) (*http.Response, error) {
-	target := strings.TrimRight(a.cfg.CrowdSecLAPIURL, "/") + csPath
+func csJWTReset() {
+	csJWTMu.Lock()
+	defer csJWTMu.Unlock()
+	csJWT = ""
+	csJWTExpiry = time.Time{}
+}
+
+func (a *App) csSend(ctx context.Context, method, target string, body io.Reader, useJWT bool) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, target, body)
 	if err != nil {
 		return nil, err
@@ -530,6 +536,21 @@ func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Read
 		req.Header.Set("Content-Type", "application/json")
 	}
 	return a.cs().Do(req)
+}
+
+func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Reader, useJWT bool) (*http.Response, error) {
+	target := strings.TrimRight(a.cfg.CrowdSecLAPIURL, "/") + csPath
+	resp, err := a.csSend(ctx, method, target, body, useJWT)
+	if err != nil || resp == nil {
+		return resp, err
+	}
+	if resp.StatusCode != http.StatusUnauthorized || !useJWT || !a.csHasMachine() || body != nil {
+		return resp, nil
+	}
+	resp.Body.Close()
+	log.Printf("crowdsec: machine token refused, logging in again")
+	csJWTReset()
+	return a.csSend(ctx, method, target, nil, useJWT)
 }
 
 func (a *App) csPageJSON(ctx context.Context, path string, useJWT bool) ([]json.RawMessage, error) {

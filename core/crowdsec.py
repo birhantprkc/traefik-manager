@@ -188,15 +188,31 @@ def _cs_jwt(lapi: str = None) -> str:
         return ''
 
 
+def cs_jwt_reset():
+    _cs_jwt_cache['token'] = ''
+    _cs_jwt_cache['expiry'] = None
+
+
+def _cs_machine_send(lapi: str, token: str, method: str, path: str, **kwargs):
+    return requests.request(method, f"{lapi}{path}",
+                            headers={'Authorization': f'Bearer {token}', 'Accept': 'application/json'},
+                            timeout=cs_timeout(), **_cs_tls_kwargs(), **kwargs)
+
+
 def _cs_machine_request(method: str, path: str, **kwargs):
     lapi  = _cs_lapi_url().rstrip('/')
     token = _cs_jwt(lapi)
     if not (lapi and token):
         return None
     try:
-        resp = requests.request(method, f"{lapi}{path}",
-                                headers={'Authorization': f'Bearer {token}', 'Accept': 'application/json'},
-                                timeout=cs_timeout(), **_cs_tls_kwargs(), **kwargs)
+        resp = _cs_machine_send(lapi, token, method, path, **kwargs)
+        if resp.status_code == 401:
+            logger.info("CrowdSec refused the machine token, logging in again")
+            cs_jwt_reset()
+            token = _cs_jwt(lapi)
+            if not token:
+                return None
+            resp = _cs_machine_send(lapi, token, method, path, **kwargs)
         resp.raise_for_status()
         return resp.json() if resp.content else {}
     except Exception as e:
