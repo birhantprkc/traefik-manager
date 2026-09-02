@@ -219,3 +219,46 @@ def test_failover_with_two_backends_creates_exactly_two_children(client):
     assert _svc('fo')['failover'] == {'service': 'fo-backend-1', 'fallback': 'fo-backend-2'}
     assert _svc('fo-backend-1') is not None and _svc('fo-backend-2') is not None
     assert _svc('fo-backend-3') is None
+
+
+def test_a_load_balancer_we_created_can_be_deleted(client):
+    r = _save(client, 'plainsvc', [_manual('10.0.0.5:80')], kind='loadBalancer')
+    assert r.status_code == 200, r.get_json()
+    r = client.delete('/api/services/plainsvc', headers=HDR)
+    assert r.status_code == 200, r.get_json()
+    assert _svc('plainsvc') is None
+
+
+def test_a_hand_written_load_balancer_can_be_deleted(client):
+    write_config("""
+http:
+  routers: {}
+  services:
+    theirs:
+      loadBalancer:
+        servers:
+          - url: http://10.0.0.9:80
+""")
+    r = client.delete('/api/services/theirs', headers=HDR)
+    assert r.status_code == 200, r.get_json()
+    assert _svc('theirs') is None
+
+
+def test_a_composite_we_do_not_manage_still_cannot_be_deleted(client):
+    write_config("""
+http:
+  routers: {}
+  services:
+    theirs:
+      weighted:
+        services:
+          - name: a
+            weight: 1
+    a:
+      loadBalancer:
+        servers:
+          - url: http://10.0.0.9:80
+""")
+    r = client.delete('/api/services/theirs', headers=HDR)
+    assert r.status_code == 403
+    assert _svc('theirs') is not None

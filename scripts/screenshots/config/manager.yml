@@ -19,6 +19,14 @@ self_route:
   domain: manager.example.com
   router_name: traefik-manager
   entry_point: websecure
+managed_middlewares:
+  svc::jellyfin-service:
+    kind: composite-service
+    type: weighted
+    children:
+      - jellyfin-service-backend-1
+      - jellyfin-service-backend-2
+    file: /config/dynamic.yml
 notification_channels:
   - id: ch-discord
     name: Homelab Alerts
