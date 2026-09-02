@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -128,5 +129,54 @@ func TestABouncerKeyRequestIsUnaffected(t *testing.T) {
 	defer resp.Body.Close()
 	if *logins != 0 {
 		t.Fatalf("a bouncer key request must never log in, got %d logins", *logins)
+	}
+}
+
+func TestCacheResetClearsEverything(t *testing.T) {
+	csCache.mu.Lock()
+	csCache.items = map[int64]json.RawMessage{1: json.RawMessage(`{"id":1}`)}
+	csCache.ready = true
+	csCache.mu.Unlock()
+
+	csCacheReset()
+
+	csCache.mu.Lock()
+	defer csCache.mu.Unlock()
+	if len(csCache.items) != 0 || csCache.ready {
+		t.Fatal("a newly added decision stays invisible while a stale cache is served")
+	}
+	if !csCache.sync.IsZero() {
+		t.Fatal("the sync stamp must be cleared too, or freshness is computed from an old read")
+	}
+}
+
+func TestAddingADecisionResetsTheCache(t *testing.T) {
+	src, err := os.ReadFile("handlers.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(src)
+	i := strings.Index(body, "func (a *App) crowdsecAddDecisionHandler")
+	if i < 0 {
+		t.Fatal("the add handler moved")
+	}
+	end := strings.Index(body[i:], "\nfunc ")
+	if !strings.Contains(body[i:i+end], "csCacheReset()") {
+		t.Fatal("adding a decision must drop the cache, or the list shows the old one")
+	}
+}
+
+func TestDeletingADecisionResetsTheCache(t *testing.T) {
+	src, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(src)
+	i := strings.Index(body, `"/api/crowdsec/decisions/"`)
+	if i < 0 {
+		t.Fatal("the delete route moved")
+	}
+	if !strings.Contains(body[i:i+300], "csCacheReset()") {
+		t.Fatal("deleting a decision must drop the cache too")
 	}
 }

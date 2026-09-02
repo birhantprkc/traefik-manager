@@ -4,6 +4,7 @@ const ATK_ROW_CAP      = 6;
 const ATK_FEED_PAGE    = 20;
 const ATK_EV_CAP       = 400;
 const ATK_SUBSCRIBED   = { capi: 1, lists: 1 };
+const ATK_BY_HAND      = { cscli: 1, manual: 1 };
 let _csDecStale = '';
 const ATK_ALERT_ONLY   = { asn: 1, cc: 1, uri: 1, user: 1, agent: 1, verb: 1, outcome: 1 };
 const ATK_PULL_SCOPE   = /^(capi|lists)$/i;
@@ -466,6 +467,7 @@ function _atkMatchDec(d, q) {
     if (f.type && d.type !== f.type) return false;
     if (f.origin === 'subscribed') { if (d.own) return false; }
     else if (f.origin === 'own') { if (!d.own) return false; }
+    else if (f.origin === 'byhand') { if (!ATK_BY_HAND[d.origin]) return false; }
     else if (f.origin && d.origin !== f.origin) return false;
     if (f.ip && d.value !== f.ip) return false;
     if (f.scenario && d.scenario !== f.scenario) return false;
@@ -993,8 +995,8 @@ function _atkCardBans(d) {
     const subscribed = dec.filter(x => !x.own);
     const local = own.filter(x => x.origin === 'crowdsec');
     const hand = own.filter(x => x.origin !== 'crowdsec');
-    const cscli = own.filter(x => x.origin === 'cscli');
-    const otherOwn = own.filter(x => x.origin !== 'crowdsec' && x.origin !== 'cscli');
+    const cscli = own.filter(x => ATK_BY_HAND[x.origin]);
+    const otherOwn = own.filter(x => x.origin !== 'crowdsec' && !ATK_BY_HAND[x.origin]);
     const capi = dec.filter(x => x.origin === 'capi');
     const lists = dec.filter(x => x.origin === 'lists');
     const bans = dec.filter(x => x.type === 'ban');
@@ -1021,8 +1023,8 @@ function _atkCardBans(d) {
             { noun: 'decisions', empty: 'nothing blocked' }),
         foot: _atkProv({ ic: 'ph-bold ph-crosshair', n: local.length, label: 'crowdsec', go: _atkSpec({ origin: 'crowdsec' }),
                 tip: 'Raised by your own scenarios. These are the only decisions that prove something reached this host' })
-            + _atkProv({ ic: 'ph-bold ph-terminal', n: cscli.length, label: 'cscli', cls: 'sig-prov-warn', go: _atkSpec({ origin: 'cscli' }),
-                tip: 'Added by hand, from this UI or from the CLI. CrowdSec labels these cscli, never manual' })
+            + _atkProv({ ic: 'ph-bold ph-terminal', n: cscli.length, label: 'by hand', cls: 'sig-prov-warn', go: _atkSpec({ origin: 'byhand' }),
+                tip: 'Added by hand, from this UI or from the CLI. CrowdSec labels these cscli or manual depending on its version' })
             + _atkProv({ ic: 'ph-bold ph-users-three', n: capi.length, label: 'CAPI', go: _atkSpec({ origin: 'capi' }),
                 tip: 'Pulled from the central API community blocklist. Preventive, not evidence of an attack on you' })
             + _atkProv({ ic: 'ph-bold ph-list-bullets', n: lists.length, label: 'lists', go: _atkSpec({ origin: 'lists' }),

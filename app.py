@@ -1785,6 +1785,7 @@ def api_cs_add_decision():
         result = _cs_request('POST', '/v1/alerts', lapi=lapi, key=key, json=payload)
     if result is None:
         return jsonify({'error': 'Failed to add decision - check LAPI permissions'}), 502
+    _crowd.cs_stream_reset()
     return jsonify({'ok': True})
 
 @app.route('/api/crowdsec/decisions/<int:decision_id>', methods=['DELETE'])
@@ -1799,6 +1800,7 @@ def api_cs_unban(decision_id):
         result = _cs_request('DELETE', f'/v1/decisions/{decision_id}')
     if result is None:
         return jsonify({'error': 'Failed to delete decision'}), 500
+    _crowd.cs_stream_reset()
     add_notification('success', f'Decision {decision_id} deleted (IP unbanned)', category='crowdsec')
     return jsonify({'ok': True})
 

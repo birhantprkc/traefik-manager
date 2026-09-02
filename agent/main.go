@@ -248,6 +248,7 @@ func (a *App) router(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(p, "/api/crowdsec/decisions/") && m == http.MethodDelete:
 		id := strings.TrimPrefix(p, "/api/crowdsec/decisions/")
 		a.crowdsecProxy(w, r, http.MethodDelete, "/v1/decisions/"+id)
+		csCacheReset()
 
 	case p == "/api/backups" && m == http.MethodGet:
 		a.backupsListHandler(w, r)

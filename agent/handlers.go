@@ -741,6 +741,7 @@ func (a *App) crowdsecAddDecisionHandler(w http.ResponseWriter, r *http.Request)
 		jsonError(w, "failed to add decision: "+strings.TrimSpace(string(b)), resp.StatusCode)
 		return
 	}
+	csCacheReset()
 	jsonOK(w, map[string]any{"ok": true})
 }
 
@@ -1793,6 +1794,14 @@ func decID(raw json.RawMessage) int64 {
 		return 0
 	}
 	return d.ID
+}
+
+func csCacheReset() {
+	csCache.mu.Lock()
+	defer csCache.mu.Unlock()
+	csCache.items = map[int64]json.RawMessage{}
+	csCache.ready = false
+	csCache.sync = time.Time{}
 }
 
 func (a *App) csDecisionsStream(ctx context.Context, forceFull bool) ([]json.RawMessage, bool, error) {
