@@ -366,6 +366,7 @@ const TRAEFIK_ADVISORIES = [
         url: 'https://github.com/traefik/traefik/security/advisories/GHSA-5m6w-wvh7-57vm',
         forwardAuthRelated: true,
         summary: 'ForwardAuth authentication bypass via forwarded header aliases',
+        fixedIn: 'v3.6.14 or v2.11.43',
         affected: (p) => {
             const [maj, min, pat] = p;
             if (maj < 2) return true;

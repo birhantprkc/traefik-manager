@@ -262,3 +262,57 @@ http:
     r = client.delete('/api/services/theirs', headers=HDR)
     assert r.status_code == 403
     assert _svc('theirs') is not None
+
+
+def test_a_tcp_service_name_is_refused_by_the_save_endpoint(client):
+    write_config("""
+http:
+  routers: {}
+  services: {}
+tcp:
+  routers: {}
+  services:
+    postgres:
+      loadBalancer:
+        servers:
+          - address: 10.0.0.9:5432
+""")
+    r = _save(client, 'postgres', [_manual('10.0.0.5:80')], kind='loadBalancer')
+    assert r.status_code == 400
+    assert 'TCP' in r.get_json()['error']
+    assert _svc('postgres') is None, 'no http service is written over the tcp one'
+
+
+def test_a_udp_service_name_is_refused_by_the_save_endpoint(client):
+    write_config("""
+http:
+  routers: {}
+  services: {}
+udp:
+  routers: {}
+  services:
+    wireguard:
+      loadBalancer:
+        servers:
+          - address: 10.0.0.9:51820
+""")
+    r = _save(client, 'wireguard', [_manual('10.0.0.5:80')], kind='loadBalancer')
+    assert r.status_code == 400
+    assert 'UDP' in r.get_json()['error']
+
+
+def test_an_unrelated_http_name_is_still_accepted(client):
+    write_config("""
+http:
+  routers: {}
+  services: {}
+tcp:
+  routers: {}
+  services:
+    postgres:
+      loadBalancer:
+        servers:
+          - address: 10.0.0.9:5432
+""")
+    r = _save(client, 'webpool', [_manual('10.0.0.5:80')], kind='loadBalancer')
+    assert r.status_code == 200, r.get_json()

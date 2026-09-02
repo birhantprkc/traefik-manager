@@ -1427,7 +1427,7 @@ function _renderStaticProviders(providersData) {
 const PROVIDER_TEMPLATES = {
     swarm:              `endpoint: "unix:///var/run/docker.sock"\nexposedByDefault: false\nwatch: true`,
     http:               `endpoint: "http://your-config-server/api/config"\npollInterval: "5s"\npollTimeout: "5s"`,
-    kubernetes:         `endpoint: ""\ntoken: ""\ncertAuthFilePath: ""\nnamespaces: []\nlabelselector: ""`,
+    kubernetesCRD:      `endpoint: ""\ntoken: ""\ncertAuthFilePath: ""\nnamespaces: []\nlabelselector: ""`,
     kubernetesIngress:  `endpoint: ""\ntoken: ""\nnamespaces: []\ningressClass: ""\ningressEndpoint:\n  publishedService: ""`,
     kubernetesGateway:  `endpoint: ""\nexperimentalChannel: false`,
     nomad:              `endpoint: "http://localhost:4646"\nprefix: "traefik"\nstale: false\nnamespaces: []`,
@@ -2186,7 +2186,7 @@ function _buildStaticClassicHTML() {
                     <option value="">Select provider...</option>
                     <option value="swarm">Docker Swarm</option>
                     <option value="http">HTTP</option>
-                    <option value="kubernetes">Kubernetes (CRD)</option>
+                    <option value="kubernetesCRD">Kubernetes (CRD)</option>
                     <option value="kubernetesIngress">Kubernetes Ingress</option>
                     <option value="kubernetesGateway">Kubernetes Gateway</option>
                     <option value="nomad">HashiCorp Nomad</option>

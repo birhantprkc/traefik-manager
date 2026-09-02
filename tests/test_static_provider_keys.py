@@ -1,4 +1,6 @@
 import json
+import os
+import re
 
 import pytest
 
@@ -89,3 +91,52 @@ def test_disabling_docker_still_removes_the_block(client):
     raw = res.get_json().get('raw', '')
     assert 'docker:' not in raw
     assert 'network: web' not in raw
+
+
+TRAEFIK_PROVIDER_KEYS = {
+    'docker', 'swarm', 'file', 'http', 'kubernetesCRD', 'kubernetesIngress',
+    'kubernetesGateway', 'nomad', 'ecs', 'consulCatalog', 'consul', 'redis',
+    'etcd', 'zooKeeper', 'plugin',
+}
+STATIC_JS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         'static', 'js', 'static-config.js')
+
+
+def _static_js():
+    with open(STATIC_JS, encoding='utf-8') as fh:
+        return fh.read()
+
+
+def _dropdown_values():
+    src = _static_js()
+    block = src[src.index('id="sfProviderType"'):]
+    block = block[:block.index('</select>')]
+    return [v for v in re.findall(r'<option value="([^"]*)"', block) if v]
+
+
+def _template_keys():
+    src = _static_js()
+    block = src[src.index('const PROVIDER_TEMPLATES = {'):]
+    block = block[:block.index('\n};')]
+    return re.findall(r'^\s{4}(\w+):', block, re.M)
+
+
+def test_every_provider_option_is_a_key_traefik_understands():
+    for value in _dropdown_values():
+        assert value in TRAEFIK_PROVIDER_KEYS, \
+            f'{value!r} is not a Traefik static provider key, so the section it writes is ignored'
+
+
+def test_every_template_is_a_key_traefik_understands():
+    for key in _template_keys():
+        assert key in TRAEFIK_PROVIDER_KEYS, f'{key!r} is not a Traefik static provider key'
+
+
+def test_every_option_has_a_template():
+    templates = set(_template_keys())
+    for value in _dropdown_values():
+        assert value in templates, f'{value} is offered with no template behind it'
+
+
+def test_the_crd_provider_is_offered():
+    assert 'kubernetesCRD' in _dropdown_values()

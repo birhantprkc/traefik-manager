@@ -318,6 +318,7 @@ function _svcProvider(s) {
 function _svcEditable(s) {
     const provider = (s.name || '').includes('@') ? s.name.split('@').pop() : 'file';
     if (provider !== 'file') return false;
+    if ((s._proto || 'HTTP') !== 'HTTP') return false;
     if (_ownedChildNames.has(_svcBareName(s.name))) return false;
     const kind = _compositeTypeOf(s);
     return !!kind || !!s.loadBalancer;

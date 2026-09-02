@@ -1466,6 +1466,18 @@ def _service_routers_using(configs, name: str) -> list:
     return out
 
 
+def _stream_service_proto(name: str) -> str:
+    bare = str(name or '').split('@')[0]
+    if not bare:
+        return ''
+    for path in env.CONFIG_PATHS:
+        config = load_config(path)
+        for section, label in (('tcp', 'TCP'), ('udp', 'UDP')):
+            if bare in ((config.get(section) or {}).get('services') or {}):
+                return label
+    return ''
+
+
 def _service_referenced_by(configs, name: str) -> list:
     out = []
     for cfg in configs:
@@ -1499,6 +1511,11 @@ def api_service_save():
     block, owned, _names = _composite.build(name, kind, children)
     if not block:
         return jsonify({'ok': False, 'error': 'Add at least one backend'}), 400
+    clash = _stream_service_proto(name) or (_stream_service_proto(original) if original else '')
+    if clash:
+        return jsonify({'ok': False,
+                        'error': f'That name belongs to a {clash} service, '
+                                 f'and only HTTP services can be edited here'}), 400
 
     target_path = _resolve_config_path(cfg_raw) if cfg_raw else env.CONFIG_PATH
     if not target_path:
@@ -1569,7 +1586,9 @@ def api_service_delete(name):
         section = (config.get('http') or {}).get('services') or {}
         if bare not in section:
             continue
-        if not _svc_own.is_owned(bare, section.get(bare), ledger):
+        _def = section.get(bare)
+        if not _svc_own.is_owned(bare, _def, ledger) \
+                and not (isinstance(_def, dict) and 'loadBalancer' in _def):
             return jsonify({'ok': False, 'error': 'That service is not managed here'}), 403
         del section[bare]
         for gone in _composite.drop_orphan_children(section, bare, set()):
@@ -1808,7 +1827,7 @@ def api_cs_add_decision():
     now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     payload = [{
         'capacity': 0,
-        'decisions': [{'duration': duration, 'origin': 'cscli', 'scenario': reason,
+        'decisions': [{'duration': duration, 'origin': 'manual', 'scenario': reason,
                        'scope': 'Ip', 'type': dtype, 'value': ip, 'simulated': False}],
         'events': [], 'events_count': 1, 'labels': None, 'leakspeed': '0',
         'message': reason, 'scenario': reason, 'scenario_hash': '', 'scenario_version': '',

@@ -14,6 +14,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,6 +53,19 @@ func (a *App) applyTraefikAuth(req *http.Request) {
 
 func (a *App) healthHandler(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"ok": true, "version": Version})
+}
+
+func (a *App) routerDetailHandler(w http.ResponseWriter, r *http.Request, rest string) {
+	parts := strings.SplitN(rest, "/", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		jsonError(w, "router name is required", http.StatusBadRequest)
+		return
+	}
+	proto := strings.ToLower(parts[0])
+	if proto != "http" && proto != "tcp" && proto != "udp" {
+		proto = "http"
+	}
+	a.traefikProxy(w, r, "/api/"+proto+"/routers/"+url.PathEscape(parts[1]))
 }
 
 func (a *App) traefikProxy(w http.ResponseWriter, r *http.Request, traefikPath string) {

@@ -210,6 +210,8 @@ func (a *App) router(w http.ResponseWriter, r *http.Request) {
 		a.traefikProxy(w, r, "/api/overview")
 	case p == "/api/traefik/routers" && m == http.MethodGet:
 		a.routersHandler(w, r)
+	case strings.HasPrefix(p, "/api/traefik/router/") && m == http.MethodGet:
+		a.routerDetailHandler(w, r, strings.TrimPrefix(p, "/api/traefik/router/"))
 	case p == "/api/traefik/services" && m == http.MethodGet:
 		a.servicesHandler(w, r)
 	case p == "/api/traefik/middlewares" && m == http.MethodGet:
