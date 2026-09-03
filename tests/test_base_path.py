@@ -111,3 +111,31 @@ def test_the_service_worker_registers_under_the_prefix():
 def test_both_page_templates_publish_the_base_path():
     for tpl in ('index.html', 'login.html'):
         assert 'name="tm-base-path"' in _read('templates', tpl), tpl
+
+
+def test_no_script_hardcodes_a_static_path_outside_fetch():
+    offenders = []
+    js_dir = os.path.join(ROOT, 'static', 'js')
+    for name in sorted(os.listdir(js_dir)):
+        if not name.endswith('.js'):
+            continue
+        rel = os.path.join('static', 'js', name)
+        for i, line in enumerate(_read(rel).splitlines(), 1):
+            for hit in re.finditer(r"""['"]/static/""", line):
+                before = line[:hit.start()]
+                if before.rstrip().endswith('fetch('):
+                    continue
+                if 'tmUrl(' in line[max(0, hit.start() - 12):hit.start()]:
+                    continue
+                offenders.append('%s:%d' % (rel, i))
+    assert not offenders, (
+        'these bypass BASE_PATH - wrap them in tmUrl(), since only fetch() is '
+        'rewritten automatically: %s' % offenders)
+
+
+def test_the_monaco_loader_follows_the_base_path():
+    src = _read(os.path.join('static', 'js', 'static-config.js'))
+    first = src.splitlines()[0]
+    assert 'require.config' in first, 'the Monaco loader config moved'
+    assert 'tmUrl(' in first, \
+        'the AMD loader injects script tags, so the fetch wrapper never sees it'

@@ -1,4 +1,5 @@
 let currentProtoFilter = 'all';
+let _routeWasComposite = false;
 let _routeCardEls = [];
 
 let _apiStatusFilter = '';
@@ -440,6 +441,7 @@ function _applyStreamingPreset(on) {
 }
 
 async function openModal() {
+    _routeWasComposite = false;
     closeOtherPanels('appModal');
     document.getElementById('isEdit').value = 'false';
     document.getElementById('modalTitle').innerText = 'Add Route';
@@ -722,7 +724,7 @@ function _routeIconUrl(app) {
     if (ov.icon_type === 'url'  && ov.icon_url)  return ov.icon_url;
     if (ov.icon_type === 'slug' && ov.icon_slug) return `${_ROUTE_ICON_CDN}/${ov.icon_slug}.png`;
     const tmName = (cfg.tm_route_name || 'traefik-manager').toLowerCase();
-    if ((app.name || '').toLowerCase() === tmName) return '/static/icons/icon.png';
+    if ((app.name || '').toLowerCase() === tmName) return tmUrl('/static/icons/icon.png');
     const s = _routeIconSlug(app);
     return s ? `${_ROUTE_ICON_CDN}/${s}.png` : '';
 }
@@ -1399,6 +1401,13 @@ function _collectBackendChildren() {
 function addBackendRow(proto, data) {
     const wrap = document.getElementById(proto + 'BackendRows');
     if (!wrap) return;
+    const kind = document.getElementById('httpCompositeType')?.value || 'weighted';
+    if (proto === 'http' && kind === 'failover' && !data
+            && wrap.querySelectorAll('.tm-backend-row').length >= 2) {
+        showToast('Failover takes two backends: the one that serves and the one that takes over',
+                  'error');
+        return;
+    }
     const d = data || {};
     const row = document.createElement('div');
     row.className = 'tm-backend-row grid gap-3 mt-2';
@@ -1474,6 +1483,7 @@ function _populateBackends(proto, servers) {
 }
 
 function _loadCompositeRows(app) {
+    _routeWasComposite = false;
     const rows = (app && app.compositeChildren) || [];
     const kindSel = document.getElementById('httpCompositeType');
     if (kindSel) {
@@ -1481,6 +1491,7 @@ function _loadCompositeRows(app) {
             ? app.serviceType : 'weighted';
     }
     if (!rows.length) return false;
+    _routeWasComposite = true;
     _clearBackendRows('http');
     const owned = new Set(app.ownedChildren || []);
     const asRow = (c) => {
@@ -1530,7 +1541,7 @@ function _serializeBackends(proto) {
     const children = proto === 'http' ? _collectBackendChildren() : [];
     if (!servers.length && !children.length) return null;
     const payload = { servers };
-    if (proto === 'http' && _bkAnyServiceRow()) {
+    if (proto === 'http' && (_bkAnyServiceRow() || _routeWasComposite)) {
         payload.children = children;
         payload.compositeType = document.getElementById('httpCompositeType')?.value || 'weighted';
     }

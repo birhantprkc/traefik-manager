@@ -1506,6 +1506,16 @@ def _service_referenced_by(configs, name: str) -> list:
     return out
 
 
+def _service_home_path(name: str) -> str:
+    bare = str(name or '').split('@')[0]
+    if not bare:
+        return ''
+    for path in env.CONFIG_PATHS:
+        if bare in ((load_config(path).get('http') or {}).get('services') or {}):
+            return path
+    return ''
+
+
 def _children_claimed_by_another(ledger, parent: str, agent_id: str = ''):
     prefix = f'{parent}-backend-'
     for key, value in (ledger or {}).items():
@@ -1569,7 +1579,8 @@ def api_service_save():
                         'error': f'That name belongs to a {clash} service, '
                                  f'and only HTTP services can be edited here'}), 400
 
-    target_path = _resolve_config_path(cfg_raw) if cfg_raw else env.CONFIG_PATH
+    target_path = _service_home_path(original or name) \
+        or (_resolve_config_path(cfg_raw) if cfg_raw else env.CONFIG_PATH)
     if not target_path:
         return jsonify({'ok': False, 'error': f"Cannot write to '{cfg_raw}'"}), 400
     cfg_filename = os.path.basename(target_path)
@@ -1697,10 +1708,32 @@ def _owned_parent_services(agent_id: str = '') -> list:
         and value.get('child') is not True)
 
 
+def _prune_service_ledger(agent_id: str = ''):
+    settings = load_settings()
+    ledger   = settings.get('managed_middlewares') or {}
+    if not any(isinstance(k, str) and 'svc::' in k for k in ledger):
+        return
+    if _get_config_parse_errors():
+        return
+    configs = [load_config(p) for p in env.CONFIG_PATHS]
+    if not any(cfg for cfg in configs):
+        return
+    kept, dropped = _svc_own.prune(ledger, configs, agent_id)
+    if not dropped:
+        return
+    save_settings(
+        domains=settings['domains'], cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'], auth_enabled=settings['auth_enabled'],
+        password_hash=settings['password_hash'], visible_tabs=settings['visible_tabs'],
+        managed_middlewares=kept,
+    )
+
+
 @app.route('/api/traefik/services')
 @login_required
 def api_services():
     payload = _traefik_proto_payload('services')
+    _prune_service_ledger()
     payload['ownedChildren'] = _owned_child_services()
     payload['ownedServices'] = _owned_parent_services()
     return jsonify(payload)
@@ -5446,6 +5479,14 @@ def save_entry():
                 _managed_backends = False
                 _composite_posted = isinstance(_be, dict) and 'children' in _be
                 _composite_type = str((_be or {}).get('compositeType') or 'weighted').strip()
+                if _composite_posted and _composite_type == 'failover' \
+                        and len(_composite.normalise_children(_be.get('children'))) > 2:
+                    _fo_msg = ('Failover takes two backends: the one that serves '
+                               'and the one that takes over')
+                    if fetch:
+                        return jsonify({'ok': False, 'message': _fo_msg}), 400
+                    flash(_fo_msg, "error")
+                    return redirect(url_for('index'))
                 if _be is not None:
                     _servers = _backend_servers(_be.get('servers'), 'url', scheme)
                     if _servers:
@@ -5509,10 +5550,14 @@ def save_entry():
                     if _composite_posted else (None, {}, []))
                 if _cmp_block:
                     _composite.merge_into(_svc_section, service_name, _cmp_block, _cmp_owned)
-                    for _gone in _composite.drop_orphan_children(_svc_section, router_name,
-                                                                 set(_cmp_owned)):
-                        _ledger.pop(_svc_ledger_key(_gone, agent_id), None)
-                        _ledger_changed = True
+                    _stale_prefixes = [router_name]
+                    if is_edit and plain_original_id and plain_original_id != router_name:
+                        _stale_prefixes.append(plain_original_id)
+                    for _prefix in _stale_prefixes:
+                        for _gone in _composite.drop_orphan_children(_svc_section, _prefix,
+                                                                     set(_cmp_owned)):
+                            _ledger.pop(_svc_ledger_key(_gone, agent_id), None)
+                            _ledger_changed = True
                     for _k, _v in _composite.ledger_entries(service_name, _cmp_block, _cmp_owned,
                                                             cfg_filename, agent_id).items():
                         _ledger[_k] = _v
@@ -5740,6 +5785,13 @@ def delete_entry(router_id):
                             del s['services'][svc]
                             if _drop_owned_transport(config, svc, _del_ledger):
                                 _del_ledger_changed = True
+                            if sec == 'http':
+                                for _gone in _composite.drop_orphan_children(
+                                        s['services'], plain_id, set()):
+                                    _del_ledger.pop(_svc_ledger_key(_gone, agent_id), None)
+                                    _del_ledger_changed = True
+                                if _del_ledger.pop(_svc_ledger_key(svc, agent_id), None):
+                                    _del_ledger_changed = True
                         create_backup(target_path)
                         save_config(_strip_empty_sections(config), target_path)
                         deleted = True

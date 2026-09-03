@@ -1418,7 +1418,7 @@ function _showBrowserNotif(type, body, tag) {
         const notif = new Notification(_BROWSER_NOTIF_TITLES[type] || _BROWSER_NOTIF_TITLES.info, {
             body: body,
             tag:  'tm-' + tag,
-            icon: '/static/icons/icon-192x192.png',
+            icon: tmUrl('/static/icons/icon-192x192.png'),
         });
         notif.onclick = () => {
             window.focus();

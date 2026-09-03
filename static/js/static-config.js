@@ -1,4 +1,4 @@
-require.config({ paths: { vs: '/static/vendor/monaco/vs' } });
+require.config({ paths: { vs: tmUrl('/static/vendor/monaco/vs') } });
 
 let _staticMonaco          = null;
 let _staticRawContent      = '';

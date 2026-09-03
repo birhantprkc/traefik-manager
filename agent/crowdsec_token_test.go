@@ -100,7 +100,7 @@ func TestASecondRefusalIsNotRetriedForever(t *testing.T) {
 	}
 }
 
-func TestARequestWithABodyIsNotRetried(t *testing.T) {
+func TestARequestWithABodyIsRetriedToo(t *testing.T) {
 	srv, _, calls := csTokenServer(t, 99)
 	defer srv.Close()
 	csJWTReset()
@@ -111,8 +111,8 @@ func TestARequestWithABodyIsNotRetried(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	if *calls != 1 {
-		t.Fatalf("a body is a one shot reader and cannot be replayed, got %d calls", *calls)
+	if *calls != 2 {
+		t.Fatalf("the body is buffered so it can be replayed once, got %d calls", *calls)
 	}
 }
 

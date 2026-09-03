@@ -129,12 +129,16 @@ def test_a_port_less_address_is_passed_through():
     assert out[0]['address'] == 'unix:///var/run/x.sock'
 
 
-def test_the_composite_payload_is_only_sent_when_a_service_row_exists():
+def test_the_composite_payload_is_sent_for_a_service_row_or_a_composite_route():
     src = _read(JS)
-    m = re.search(r'if \(proto === .http. && _bkAnyServiceRow\(\)\) \{(.*?)\n    \}', src, re.S)
-    assert m, 'the composite payload must be gated on an actual service row'
-    assert 'payload.children' in m.group(1)
-    assert 'compositeType' in m.group(1)
+    m = re.search(r'if \(proto === .http. && \((.*?)\)\) \{(.*?)\n    \}', src, re.S)
+    assert m, 'the composite payload gate moved'
+    assert '_bkAnyServiceRow()' in m.group(1), 'a service row must still send the payload'
+    assert '_routeWasComposite' in m.group(1), (
+        'a route that loaded as a composite must keep sending children, or removing its '
+        'last service row silently discards the edit')
+    assert 'payload.children' in m.group(2)
+    assert 'compositeType' in m.group(2)
 
 
 def test_switching_a_row_to_service_fills_its_picker():
@@ -175,7 +179,7 @@ def test_combining_is_hidden_until_there_is_more_than_one_backend():
 
 def test_a_single_service_row_still_sends_its_payload():
     src = _read(JS)
-    m = re.search(r'if \(proto === .http. && _bkAnyServiceRow\(\)\) \{', src)
+    m = re.search(r'if \(proto === .http. && \(.*?\)\) \{', src)
     assert m, 'the payload gate moved'
     assert 'rows.length' not in src[m.start():m.start() + 200], (
         'the payload must not be gated on row count, or a lone service row would save '

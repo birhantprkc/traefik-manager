@@ -554,17 +554,30 @@ func (a *App) csSend(ctx context.Context, method, target string, body io.Reader,
 
 func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Reader, useJWT bool) (*http.Response, error) {
 	target := strings.TrimRight(a.cfg.CrowdSecLAPIURL, "/") + csPath
-	resp, err := a.csSend(ctx, method, target, body, useJWT)
+	var buf []byte
+	if body != nil {
+		var err error
+		if buf, err = io.ReadAll(body); err != nil {
+			return nil, err
+		}
+	}
+	replay := func() io.Reader {
+		if body == nil {
+			return nil
+		}
+		return bytes.NewReader(buf)
+	}
+	resp, err := a.csSend(ctx, method, target, replay(), useJWT)
 	if err != nil || resp == nil {
 		return resp, err
 	}
-	if resp.StatusCode != http.StatusUnauthorized || !useJWT || !a.csHasMachine() || body != nil {
+	if resp.StatusCode != http.StatusUnauthorized || !useJWT || !a.csHasMachine() {
 		return resp, nil
 	}
 	resp.Body.Close()
 	log.Printf("crowdsec: machine token refused, logging in again")
 	csJWTReset()
-	return a.csSend(ctx, method, target, nil, useJWT)
+	return a.csSend(ctx, method, target, replay(), useJWT)
 }
 
 func (a *App) csPageJSON(ctx context.Context, path string, useJWT bool) ([]json.RawMessage, error) {

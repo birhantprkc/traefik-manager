@@ -299,7 +299,7 @@ function rmGetIconUrl(route) {
     if (ov.icon_type === 'url' && ov.icon_url)   return ov.icon_url;
     if (ov.icon_type === 'slug' && ov.icon_slug) return `${RM_ICON_CDN}/${ov.icon_slug}.png`;
     const tmName = (_rmConfig.tm_route_name || 'traefik-manager').toLowerCase();
-    if ((route.name || '').toLowerCase() === tmName) return '/static/icons/icon.png';
+    if ((route.name || '').toLowerCase() === tmName) return tmUrl('/static/icons/icon.png');
     return `${RM_ICON_CDN}/${window.rmIconSlug(route)}.png`;
 }
 
