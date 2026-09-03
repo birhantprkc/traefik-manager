@@ -330,7 +330,7 @@ function _svcOwnershipHtml(s) {
     return `<div class="text-xs" style="color:var(--muted)">${owned
             ? 'Traefik Manager manages this service. Routes using it can edit their backends here.'
             : 'This service is not managed by Traefik Manager, so routes using it are read only.'}</div>
-        <button type="button" class="btn-secondary text-xs mt-2" onclick="_setServiceOwnership('${_esc(bare)}', ${owned ? 'false' : 'true'})">
+        <button type="button" class="btn-secondary text-xs mt-2" onclick="_setServiceOwnership(${_jsArg(bare)}, ${owned ? 'false' : 'true'})">
             <i class="ph-bold ${owned ? 'ph-hand-withdraw' : 'ph-hand-deposit'} text-xs"></i> ${owned ? 'Stop managing' : 'Manage this service'}
         </button>`;
 }
@@ -486,7 +486,7 @@ function openSvcDetail(idx) {
                 <tr style="border-top:1px solid var(--border)">
                     <td class="px-3 py-2.5 text-xs" style="color:var(--muted)">${_esc(c.role)}</td>
                     <td class="px-3 py-2.5">
-                        <button type="button" class="route-deep-chip" onclick="_openServiceByName('${_esc(c.name)}')" title="Open service"><i class="ph-bold ph-stack"></i>${_esc(String(c.name).split('@')[0])}</button>
+                        <button type="button" class="route-deep-chip" onclick="_openServiceByName(${_jsArg(c.name)})" title="Open service"><i class="ph-bold ph-stack"></i>${_esc(String(c.name).split('@')[0])}</button>
                     </td>
                     <td class="px-3 py-2.5 font-mono text-xs" style="color:var(--text)">${_esc(c.share)}</td>
                 </tr>`).join('')}
@@ -496,7 +496,7 @@ function openSvcDetail(idx) {
     const usedBy = s.usedBy || [];
     const usedByHtml = usedBy.length > 0
         ? `<div class="flex flex-wrap gap-1.5">${usedBy.map(r =>
-            `<button type="button" class="route-deep-chip" onclick="_openRouteByName('${_esc(String(r))}')" title="Open route"><i class="ph-bold ph-arrows-split"></i>${_esc(String(r).split('@')[0])}</button>`).join('')}</div>`
+            `<button type="button" class="route-deep-chip" onclick="_openRouteByName(${_jsArg(String(r))})" title="Open route"><i class="ph-bold ph-arrows-split"></i>${_esc(String(r).split('@')[0])}</button>`).join('')}</div>`
         : `<span class="text-xs" style="color:var(--muted)">-</span>`;
 
     const ownerName = _svcOwnerName(_allServices, s);
@@ -508,7 +508,7 @@ function openSvcDetail(idx) {
     ];
     if (ownerName) {
         detailRows.splice(1, 0, ['Backend of',
-            `<button type="button" class="route-deep-chip" onclick="_openServiceByName('${_esc(ownerName)}')" title="Open service"><i class="ph-bold ph-stack"></i>${_esc(ownerName)}</button>`,
+            `<button type="button" class="route-deep-chip" onclick="_openServiceByName(${_jsArg(ownerName)})" title="Open service"><i class="ph-bold ph-stack"></i>${_esc(ownerName)}</button>`,
             true]);
     }
 

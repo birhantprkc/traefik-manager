@@ -696,6 +696,20 @@ def set_security_headers(response):
     return response
 
 
+def _close_reset_window(settings):
+    if not settings.get('setup_password_reset'):
+        return
+    save_settings(
+        domains=settings['domains'], cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'],
+        auth_enabled=settings.get('auth_enabled', True),
+        password_hash=settings.get('password_hash', ''),
+        visible_tabs=settings['visible_tabs'],
+        setup_password_reset=False,
+    )
+    logger.warning("Password reset window closed after a successful login")
+
+
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute", methods=["POST"])
 def login():
@@ -753,6 +767,7 @@ def login():
             session.permanent = remember
             logger.info(f"Successful login from {request.remote_addr}")
             add_notification('info', f"Login from {request.remote_addr}", category='security')
+            _close_reset_window(settings)
 
             if settings.get('must_change_password', False) and not admin_pw:
                 if not settings.get('setup_complete', False):
@@ -1041,6 +1056,7 @@ def force_change_password():
                 password_hash=_hash_password(new_pw),
                 visible_tabs=settings['visible_tabs'],
                 must_change_password=False,
+                setup_password_reset=False,
                 setup_complete=True,
             )
             logger.info(f"Forced password change completed from {request.remote_addr}")
@@ -1160,6 +1176,7 @@ def api_change_password():
         password_hash=_hash_password(new_pw),
         visible_tabs=settings['visible_tabs'],
         must_change_password=False,
+        setup_password_reset=False,
     )
     logger.info(f"Password changed successfully from {request.remote_addr}")
     return jsonify({'success': True})
@@ -1489,6 +1506,41 @@ def _service_referenced_by(configs, name: str) -> list:
     return out
 
 
+def _children_claimed_by_another(ledger, parent: str, agent_id: str = ''):
+    prefix = f'{parent}-backend-'
+    for key, value in (ledger or {}).items():
+        if not (isinstance(key, str) and isinstance(value, dict)):
+            continue
+        bare = key.split('svc::', 1)[-1]
+        if not bare.startswith(prefix) or not value.get('child'):
+            continue
+        owner = value.get('parent')
+        if owner and owner != parent:
+            return (bare, owner)
+    return None
+
+
+def _children_still_in_use(configs, parent: str, keep) -> list:
+    prefix = f'{parent}-backend-'
+    keep   = set(keep or ())
+    blocked = []
+    for cfg in configs:
+        for child in ((cfg.get('http') or {}).get('services') or {}):
+            if not (isinstance(child, str) and child.startswith(prefix)) or child in keep:
+                continue
+            users = _service_routers_using(configs, child)
+            owners = [o for o in _service_referenced_by(configs, child) if o != parent]
+            if users or owners:
+                blocked.append((child, sorted(set(users + owners))))
+    return blocked
+
+
+def _in_use_error(blocked):
+    child, users = blocked[0]
+    return jsonify({'ok': False,
+                    'error': f"{child} is still used by " + ', '.join(users[:5])}), 409
+
+
 @app.route('/api/services', methods=['POST'])
 @csrf_protect
 @login_required
@@ -1541,6 +1593,16 @@ def api_service_save():
             ledger.pop(_svc_ledger_key(gone), None)
         ledger.pop(_svc_ledger_key(original), None)
 
+    blocked = _children_still_in_use([config], name, owned)
+    if blocked:
+        return _in_use_error(blocked)
+
+    claimed = _children_claimed_by_another(ledger, name)
+    if claimed:
+        return jsonify({'ok': False,
+                        'error': f"{claimed[0]} already belongs to {claimed[1]}. "
+                                 f"Pick a different name"}), 409
+
     _composite.merge_into(section, name, block, owned)
     for gone in _composite.drop_orphan_children(section, name, set(owned)):
         ledger.pop(_svc_ledger_key(gone), None)
@@ -1590,6 +1652,9 @@ def api_service_delete(name):
         if not _svc_own.is_owned(bare, _def, ledger) \
                 and not (isinstance(_def, dict) and 'loadBalancer' in _def):
             return jsonify({'ok': False, 'error': 'That service is not managed here'}), 403
+        child_users = _children_still_in_use(configs, bare, set())
+        if child_users:
+            return _in_use_error(child_users)
         del section[bare]
         for gone in _composite.drop_orphan_children(section, bare, set()):
             ledger.pop(_svc_ledger_key(gone), None)
@@ -3309,6 +3374,11 @@ def api_git_backup_push():
     add_notification('error', f'Git push failed: {err}', category='backup')
     return jsonify({'ok': False, 'error': err}), 400
 
+def _same_git_remote(a: str, b: str) -> bool:
+    a, b = (a or '').strip().rstrip('/'), (b or '').strip().rstrip('/')
+    return bool(a) and bool(b) and a.lower() == b.lower()
+
+
 @app.route('/api/backup/git/test', methods=['POST'])
 @csrf_protect
 @login_required
@@ -3317,7 +3387,9 @@ def api_git_backup_test():
     s        = load_settings()
     repo_url = (body.get('repo_url') or s.get('git_backup_repo', '')).strip()
     username = (body.get('username') or s.get('git_backup_username', '')).strip()
-    token    = (body.get('token') or s.get('git_backup_token', '')).strip()
+    token    = (body.get('token') or '').strip()
+    if not token and _same_git_remote(repo_url, s.get('git_backup_repo', '')):
+        token = str(s.get('git_backup_token', '')).strip()
     if not repo_url:
         return jsonify({'ok': False, 'error': 'No repository URL configured'}), 400
     if not _valid_git_url(repo_url):

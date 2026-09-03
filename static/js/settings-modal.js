@@ -2099,9 +2099,9 @@ async function loadAgentsList() {
                     </div>
                 </div>
                 <div class="sc-set-v">
-                    <button onclick="openAgentKeys('${a.id}','${_esc(a.name)}')" class="btn-icon" title="API Keys"><i class="ph-bold ph-key text-xs"></i></button>
+                    <button onclick="openAgentKeys('${a.id}',${_jsArg(a.name)})" class="btn-icon" title="API Keys"><i class="ph-bold ph-key text-xs"></i></button>
                     <button onclick="openAgentSetup('${a.id}')" class="btn-icon" title="Edit Settings"><i class="ph-bold ph-gear text-xs"></i></button>
-                    <button onclick="deleteAgent('${a.id}','${_esc(a.name)}')" class="btn-icon" title="Remove" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button>
+                    <button onclick="deleteAgent('${a.id}',${_jsArg(a.name)})" class="btn-icon" title="Remove" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button>
                 </div>
             </div>`).join('');
         agents.forEach(a => pingAgent(a.id, a.url));
@@ -2150,7 +2150,7 @@ async function loadAgentKeys() {
                     <div class="sc-set-n">${_esc(k.name)}</div>
                     <div class="sc-set-d">Created ${new Date(k.created_at).toLocaleDateString()}${k.last_used_at ? ' &middot; Last used ' + new Date(k.last_used_at).toLocaleDateString() : ''}</div>
                 </div>
-                <div class="sc-set-v"><button onclick="deleteAgentKey('${_keysAgentId}','${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button></div>
+                <div class="sc-set-v"><button onclick="deleteAgentKey('${_keysAgentId}','${k.id}',${_jsArg(k.name)})" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button></div>
             </div>`).join('');
     } catch(e) {
         list.innerHTML = `<div class="text-xs" style="color:var(--red)">${_esc(_netErrText(e, 'Failed to load keys'))}</div>`;
@@ -2241,7 +2241,7 @@ async function loadActiveAgentKeys() {
                     <div class="sc-set-n">${_esc(k.name)}</div>
                     <div class="sc-set-d">Created ${new Date(k.created_at).toLocaleDateString()}${k.last_used_at ? ' &middot; Last used ' + new Date(k.last_used_at).toLocaleDateString() : ''}</div>
                 </div>
-                <div class="sc-set-v"><button onclick="deleteActiveAgentKey('${k.id}','${_esc(k.name)}')" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button></div>
+                <div class="sc-set-v"><button onclick="deleteActiveAgentKey('${k.id}',${_jsArg(k.name)})" class="btn-icon flex-shrink-0" title="Revoke" style="color:var(--red)"><i class="ph-bold ph-trash text-xs"></i></button></div>
             </div>`).join('');
     } catch(e) {
         list.innerHTML = `<div class="text-xs" style="color:var(--red)">${_esc(_netErrText(e, 'Failed to load keys'))}</div>`;

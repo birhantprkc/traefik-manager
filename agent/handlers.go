@@ -992,6 +992,13 @@ func validGitURL(u string) bool {
 		strings.HasPrefix(l, "git://")
 }
 
+func sameGitRemote(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	return strings.EqualFold(strings.TrimRight(a, "/"), strings.TrimRight(b, "/"))
+}
+
 func (a *App) gitAskpassScript() (string, error) {
 	path := filepath.Join(a.cfg.BackupDir, ".git-askpass.sh")
 	if _, err := os.Stat(path); err == nil {
@@ -1203,7 +1210,7 @@ func (a *App) gitTestHandler(w http.ResponseWriter, r *http.Request) {
 		username = a.cfg.GitBackupUsername
 	}
 	token := body.Token
-	if token == "" {
+	if token == "" && sameGitRemote(repo, a.cfg.GitBackupRepo) {
 		token = a.cfg.GitBackupToken
 	}
 	if repo == "" {

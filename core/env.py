@@ -123,11 +123,21 @@ def allowed_file_prefixes() -> tuple:
 ALLOWED_FILE_PREFIXES = allowed_file_prefixes()
 
 
+ALLOWED_FILES = []
+
+
 def register_static_path(path: str):
-    global STATIC_CONFIG_DIRS, ALLOWED_FILE_PREFIXES
-    if path and path not in STATIC_CONFIG_DIRS:
-        STATIC_CONFIG_DIRS = sorted(STATIC_CONFIG_DIRS + [path])
-        ALLOWED_FILE_PREFIXES = allowed_file_prefixes()
+    global STATIC_CONFIG_DIRS, ALLOWED_FILE_PREFIXES, ALLOWED_FILES
+    if not path:
+        return
+    if os.path.isdir(path):
+        if path not in STATIC_CONFIG_DIRS:
+            STATIC_CONFIG_DIRS = sorted(STATIC_CONFIG_DIRS + [path])
+            ALLOWED_FILE_PREFIXES = allowed_file_prefixes()
+        return
+    real = os.path.realpath(path)
+    if real not in ALLOWED_FILES:
+        ALLOWED_FILES = sorted(ALLOWED_FILES + [real])
 
 
 READ_PATHS = []

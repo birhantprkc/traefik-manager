@@ -1413,7 +1413,7 @@ function _renderStaticProviders(providersData) {
                             <i class="ph-bold ph-cloud" style="color:var(--teal)"></i>
                             <span class="font-medium">${_esc(k)}</span>
                         </div>
-                        <button onclick="removeStaticItem('providers','${_esc(k)}')" class="btn-secondary text-xs flex items-center gap-1" style="height:24px;padding:0 8px;color:var(--red)">
+                        <button onclick="removeStaticItem('providers',${_jsArg(k)})" class="btn-secondary text-xs flex items-center gap-1" style="height:24px;padding:0 8px;color:var(--red)">
                             <i class="ph-bold ph-trash text-sm"></i>
                         </button>
                     </div>`).join('') +

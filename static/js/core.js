@@ -460,6 +460,10 @@ function _esc(s) {
     return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+function _jsArg(v) {
+    return _esc(JSON.stringify(v == null ? '' : String(v)));
+}
+
 let _backdropMd = null;
 function _onBackdropClick(e, fn) {
     if (e.target === e.currentTarget && _backdropMd === e.currentTarget) fn();
@@ -1212,7 +1216,7 @@ function _renderNotifFilters() {
     row.style.display = '';
     const chip = (cat, label, icon, count) => {
         const on = _notifCatFilter === cat;
-        return `<button class="notif-cat-chip${on ? ' active' : ''}" onclick="setNotifCategory('${_esc(cat)}', event)"`
+        return `<button class="notif-cat-chip${on ? ' active' : ''}" onclick="setNotifCategory(${_jsArg(cat)}, event)"`
              + ` title="${_esc(label)} (${count})" aria-label="${_esc(label)}"><i class="ph-bold ${icon}"></i></button>`;
     };
     row.innerHTML = chip('', 'All', 'ph-stack', _notifData.length)
@@ -1263,7 +1267,7 @@ function _renderNotifPanel() {
                 <div class="notif-msg">${_esc(n.msg)}</div>
                 <div class="notif-ts">${_notifRelTime(n.ts)}<span class="notif-cat">${_esc(NOTIF_CATEGORY_LABELS[n.category] || n.category || 'Config')}</span></div>
             </div>
-            <button class="notif-delete-btn" onclick="deleteNotification('${_esc(n.ts)}', ${Number(n.id) || 0})" title="Dismiss"><i class="ph-bold ph-x"></i></button>
+            <button class="notif-delete-btn" onclick="deleteNotification(${_jsArg(n.ts)}, ${Number(n.id) || 0})" title="Dismiss"><i class="ph-bold ph-x"></i></button>
         </div>`;
     }).join('');
 }

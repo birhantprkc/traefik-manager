@@ -61,6 +61,8 @@ def safe_file_path(path: str) -> str:
     if not path:
         return ''
     resolved = os.path.realpath(path)
+    if resolved in getattr(env, 'ALLOWED_FILES', []):
+        return resolved
     if any(resolved.startswith(p) for p in env.ALLOWED_FILE_PREFIXES):
         return resolved
     logger.warning(f"Blocked unsafe file path: {path!r}")
@@ -73,15 +75,18 @@ def readable_config_path(path: str) -> str:
     resolved = os.path.realpath(path)
     allowed  = list(env.ALLOWED_FILE_PREFIXES)
     exact    = []
-    candidates = []
+    from_env = []
     for ev in ('STATIC_CONFIG_PATH', 'ACCESS_LOG_PATH', 'ACME_JSON_PATH', 'PLUGINS_DIR'):
-        candidates.extend(os.environ.get(ev, '').split(','))
-    candidates.extend(getattr(env, 'READ_PATHS', []))
-    for part in candidates:
+        from_env.extend(os.environ.get(ev, '').split(','))
+    for part, trusted in ([(p, True) for p in from_env]
+                          + [(p, False) for p in getattr(env, 'READ_PATHS', [])]):
         part = part.strip()
         if not part:
             continue
         real = os.path.realpath(part)
+        if not trusted and not os.path.isdir(real):
+            exact.append(real)
+            continue
         base = real if os.path.isdir(real) else os.path.dirname(real)
         if base and base != os.sep:
             allowed.append(base.rstrip(os.sep) + os.sep)

@@ -516,7 +516,7 @@ function _tmMwChained(mw) {
 
 function _tmMwCard(mw, showCf) {
     const mwJson = JSON.stringify(mw).replace(/'/g, '&#39;');
-    const cfArg  = mw.configFile ? `,'${_esc(mw.configFile)}'` : ",''";
+    const cfArg  = `,${_jsArg(mw.configFile || '')}`;
     const typeLower = (mw.type || 'http').toLowerCase();
     const used = _tmMwUsage(mw);
     const chained = used ? false : _tmMwChained(mw);
@@ -525,7 +525,7 @@ function _tmMwCard(mw, showCf) {
     const yaml = String(mw.yaml || '').split('\n').slice(0, 4).join('\n');
     const rail = `<span class="tm-rail tm-rail-sm" onclick="event.stopPropagation()">` +
         `<button type="button" class="tm-btn" title="Edit" data-mw='${mwJson}' onclick="event.stopPropagation();handleMwEdit(this)"><i class="ph-bold ph-pencil-simple"></i></button>` +
-        `<button type="button" class="tm-btn" title="Delete" onclick="event.stopPropagation();deleteMw('${_esc(mw.name)}'${cfArg})"><i class="ph-bold ph-trash"></i></button>` +
+        `<button type="button" class="tm-btn" title="Delete" onclick="event.stopPropagation();deleteMw(${_jsArg(mw.name)}${cfArg})"><i class="ph-bold ph-trash"></i></button>` +
         '</span>';
     return `<div class="tm-card mw-card" data-mwname="${_esc(mw.name.toLowerCase())}" data-mwtype="${typeLower}" style="--tm-accent:var(--purple)" data-mw='${mwJson}' onclick="openMwDetail(this)">
         <div class="tm-head">
@@ -554,10 +554,10 @@ function renderMwGrid(middlewares) {
         const typeUpper = typeLower === 'tcp' ? 'TCP' : 'HTTP';
         const badgeClass = typeLower === 'tcp' ? 'badge-tcp' : 'badge-http';
         const mwJson = JSON.stringify(mw).replace(/'/g, '&#39;');
-        const mwCfArg = mw.configFile ? `,'${_esc(mw.configFile)}'` : ',\'\'';
+        const mwCfArg = `,${_jsArg(mw.configFile || '')}`;
         const mwCfBadge = mw.configFile ? `<span class="badge badge-muted" style="font-size:9px;white-space:nowrap">${_esc(mw.configFile)}</span>` : '';
         const dataAttrs = `data-mwname="${_esc(mw.name.toLowerCase())}" data-mwtype="${typeLower}"`;
-        const actions = `<div class="flex gap-1.5"><button type="button" data-mw='${mwJson}' onclick="openMwDetail(this)" class="pill-btn pill-btn-blue" title="View details"><i class="ph-bold ph-info text-xs"></i></button><button type="button" onclick="deleteMw('${_esc(mw.name)}'${mwCfArg})" class="pill-btn pill-btn-red" title="Delete"><i class="ph-bold ph-trash text-xs"></i></button><button type="button" data-mw='${mwJson}' onclick="handleMwEdit(this)" class="pill-btn pill-btn-blue" title="Edit"><i class="ph-bold ph-pencil-simple text-xs"></i></button></div>`;
+        const actions = `<div class="flex gap-1.5"><button type="button" data-mw='${mwJson}' onclick="openMwDetail(this)" class="pill-btn pill-btn-blue" title="View details"><i class="ph-bold ph-info text-xs"></i></button><button type="button" onclick="deleteMw(${_jsArg(mw.name)}${mwCfArg})" class="pill-btn pill-btn-red" title="Delete"><i class="ph-bold ph-trash text-xs"></i></button><button type="button" data-mw='${mwJson}' onclick="handleMwEdit(this)" class="pill-btn pill-btn-blue" title="Edit"><i class="ph-bold ph-pencil-simple text-xs"></i></button></div>`;
         if (_mwViewMode === 'list') {
             return `<div class="svc-list-row mw-list-grid mw-card" ${dataAttrs}><div style="display:flex;align-items:center"><span class="d-flat d-proto d-proto-${typeLower}">${typeUpper}</span></div><div class="svc-list-col-name">${_esc(mw.name)}</div><div>${mw.configFile ? `<span class="d-flat d-off" style="white-space:nowrap">${_esc(mw.configFile)}</span>` : ''}</div>${actions}</div>`;
         }
@@ -775,10 +775,10 @@ function renderMwDetailPanel(mw) {
     } else {
         usedHtml += '<div class="flex flex-wrap gap-1.5">'
             + routes.map(({ a, viaEp }) =>
-                `<button type="button" class="route-deep-chip" onclick="_mwOpenRoute('${_esc(String(a.id))}')" title="${viaEp ? 'Attached via entry point' : 'Open route'}">`
+                `<button type="button" class="route-deep-chip" onclick="_mwOpenRoute(${_jsArg(String(a.id))})" title="${viaEp ? 'Attached via entry point' : 'Open route'}">`
                 + `<i class="ph-bold ${viaEp ? 'ph-arrows-in' : 'ph-arrows-split'}"></i>${_esc(a.name)}</button>`).join('')
             + chains.map(c =>
-                `<button type="button" class="route-deep-chip" onclick="_mwOpenSibling('${_esc(c.name)}')" title="Referenced by this middleware">`
+                `<button type="button" class="route-deep-chip" onclick="_mwOpenSibling(${_jsArg(c.name)})" title="Referenced by this middleware">`
                 + `<i class="ph-bold ph-stack"></i>${_esc(c.name.split('@')[0])}</button>`).join('')
             + '</div>';
     }
@@ -1151,14 +1151,14 @@ function renderPluginCards() {
         const repoUrl    = moduleName.startsWith('github.com/') ? 'https://' + moduleName : '';
         const mgmtBtns   = _pluginCanManage ? `
             <button onclick="openPluginForm(${idx})" class="btn-icon" title="Edit" style="padding:4px 6px"><i class="ph-bold ph-pencil text-sm"></i></button>
-            <button onclick="deletePlugin('${_esc(name)}')" class="btn-icon" title="Remove" style="padding:4px 6px;color:var(--red)"><i class="ph-bold ph-trash text-sm"></i></button>` : '';
+            <button onclick="deletePlugin(${_jsArg(name)})" class="btn-icon" title="Remove" style="padding:4px 6px;color:var(--red)"><i class="ph-bold ph-trash text-sm"></i></button>` : '';
         const pluginUse = _tmPluginUsage(name);
         const rail = `<span class="tm-rail" onclick="event.stopPropagation()">` +
             (repoUrl ? `<a href="${_esc(repoUrl)}" target="_blank" rel="noopener" class="tm-btn" title="View on GitHub" onclick="event.stopPropagation()"><i class="ph-bold ph-github-logo"></i></a>` : '') +
             `<button type="button" class="tm-btn" title="Details" onclick="event.stopPropagation();openPluginDetail(${idx})"><i class="ph-bold ph-info"></i></button>` +
             (_pluginCanManage
                 ? `<button type="button" class="tm-btn" title="Edit" onclick="event.stopPropagation();openPluginForm(${idx})"><i class="ph-bold ph-pencil-simple"></i></button>` +
-                  `<button type="button" class="tm-btn" title="Remove" onclick="event.stopPropagation();deletePlugin('${_esc(name)}')"><i class="ph-bold ph-trash"></i></button>`
+                  `<button type="button" class="tm-btn" title="Remove" onclick="event.stopPropagation();deletePlugin(${_jsArg(name)})"><i class="ph-bold ph-trash"></i></button>`
                 : '') +
             '</span>';
         return `<div class="tm-card" style="--tm-accent:var(--blue)" onclick="openPluginDetail(${idx})">
@@ -1214,7 +1214,7 @@ function openPluginDetail(idx) {
     const usedSection = `
         ${renderDetailBlock('Used by', 'ph-stack', mws.length
             ? '<div class="flex flex-wrap gap-1.5">' + mws.map(m =>
-                `<button type="button" class="route-deep-chip" onclick="_pluginOpenMw('${_esc(m.name)}')" title="Open middleware"><i class="ph-bold ph-stack"></i>${_esc(m.name.split('@')[0])}</button>`).join('') + '</div>'
+                `<button type="button" class="route-deep-chip" onclick="_pluginOpenMw(${_jsArg(m.name)})" title="Open middleware"><i class="ph-bold ph-stack"></i>${_esc(m.name.split('@')[0])}</button>`).join('') + '</div>'
             : '<span class="text-xs" style="color:var(--yellow)">No middleware references this plugin</span>')}`;
 
     document.getElementById('pluginDetailBody').innerHTML = `
