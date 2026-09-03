@@ -67,7 +67,7 @@ async function refreshLiveView() {
     container.innerHTML = `<div class="text-center py-16" style="color:var(--muted)"><i class="ph-light ph-spinner-gap text-4xl block mb-3 animate-spin opacity-40"></i><p>Loading services...</p></div>`;
 
     try {
-        const r = await agentFetch('/api/traefik/services');
+        const r = await fetch(_svcApiPath('/api/traefik/services'), { headers: _csrfHeaders() });
         if (!r.ok) {
             const why = await _errText(r, 'Could not load services');
             container.innerHTML = `<div class="text-center py-16 rounded-xl" style="color:var(--muted);border:1px solid var(--border)"><i class="ph-light ph-cloud-slash text-5xl block mb-3 opacity-30"></i><p class="font-medium">Could not load services</p><p class="text-sm mt-2 px-4" style="color:var(--text-secondary);word-break:break-word">${_esc(why)}</p></div>`;

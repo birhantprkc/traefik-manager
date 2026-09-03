@@ -1400,12 +1400,20 @@ Each `manual` backend becomes its own child service named `<name>-backend-<n>`, 
 carry its own weight. A `service` backend is referenced by name and never copied, so changes to it
 follow automatically.
 
-`type` is `weighted`, `mirroring` or `failover`. For `mirroring` use `percent` instead of `weight`;
-the first backend is the one that serves. Pass `originalName` to rename a managed service, which
-moves its children with it.
+`type` is `loadBalancer`, `weighted`, `mirroring` or `failover`. For `mirroring` use `percent`
+instead of `weight`; the first backend is the one that serves. `failover` takes exactly two
+backends and refuses a third with `400`. Pass `originalName` to rename a managed service, which
+moves its children with it. `configFile` picks the file for a new service; an existing service is
+always rewritten in the file it already lives in.
 
-Refuses with `409` if a service of that name exists and Traefik Manager does not manage it, and with
-`403` when renaming something it does not manage.
+Pass `agent_id` to author on a remote agent instead of the Host. The service is written to that
+agent's config files and its ownership is recorded against that server, so the same name can be
+managed independently on the Host and on each agent.
+
+Refuses with `409` if a service of that name exists and Traefik Manager does not manage it, if one
+of its generated children is still used elsewhere, or if that child name already belongs to another
+service; with `403` when renaming something it does not manage; and with `400` for an invalid name,
+type, or a name that belongs to a TCP or UDP service.
 
 ---
 
@@ -1413,8 +1421,11 @@ Refuses with `409` if a service of that name exists and Traefik Manager does not
 
 Delete a managed composite service and the child services it owns.
 
-Refuses with `409` while a router still points at it or another service still lists it as a backend,
-`403` if Traefik Manager does not manage it, and `404` if it does not exist.
+Refuses with `409` while a router still points at it, while another service still lists it as a
+backend, or while one of its generated children is still used elsewhere; `403` if Traefik Manager
+does not manage it, and `404` if it does not exist.
+
+Pass `?agent_id=<id>` to delete on a remote agent.
 
 ---
 
@@ -1425,6 +1436,8 @@ Take over or release management of a composite service.
 ```json
 { "adopt": true }
 ```
+
+Pass `?agent_id=<id>` to manage a service on a remote agent.
 
 Records a ledger entry only. **No YAML is written**, so adopting a hand-written service leaves the
 config file byte for byte unchanged. Once managed, routes pointing at the service can edit their

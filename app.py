@@ -1789,10 +1789,18 @@ def _prune_service_ledger(agent_id: str = ''):
 @app.route('/api/traefik/services')
 @login_required
 def api_services():
-    payload = _traefik_proto_payload('services')
-    _prune_service_ledger()
-    payload['ownedChildren'] = _owned_child_services()
-    payload['ownedServices'] = _owned_parent_services()
+    agent_id, agent, err = _svc_agent_ctx()
+    if err:
+        return err
+    if agent:
+        resp = _agent_request(agent, 'GET', '/api/traefik/services')
+        payload = resp.json() if resp.ok else {'http': [], 'tcp': [], 'udp': [],
+                                               'reachable': False}
+    else:
+        payload = _traefik_proto_payload('services')
+        _prune_service_ledger()
+    payload['ownedChildren'] = _owned_child_services(agent_id)
+    payload['ownedServices'] = _owned_parent_services(agent_id)
     return jsonify(payload)
 
 @app.route('/api/traefik/middlewares')

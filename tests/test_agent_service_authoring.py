@@ -149,3 +149,31 @@ def test_the_client_sends_the_agent_id_rather_than_proxying():
         body = re.search(r'async function ' + name + r'\(.*?\n\}', src, re.S).group(0)
         assert '_svcApiPath(' in body, '%s must pass the agent id' % name
         assert '_csrfHeaders()' in body, '%s lost its CSRF header' % name
+
+
+def test_the_services_list_reports_ownership_for_an_agent(client, monkeypatch):
+    _install(monkeypatch)
+    client.post('/api/services', headers=HDR, json={
+        'name': 'pool', 'type': 'weighted', 'agent_id': 'a1',
+        'children': [_manual('10.0.0.1:80'), _manual('10.0.0.2:80')]})
+
+    import app as A
+    monkeypatch.setattr(A, '_agent_request', lambda *a, **k: _StubResp())
+    r = client.get('/api/traefik/services?agent_id=a1')
+    assert r.status_code == 200, r.get_data(as_text=True)
+    body = r.get_json()
+    assert 'pool' in (body.get('ownedServices') or []), \
+        'the agent list must report what is managed there: %r' % body.get('ownedServices')
+    assert 'pool-backend-1' in (body.get('ownedChildren') or []), \
+        'generated children must be reported so the list can fold them into their parent'
+
+
+def test_the_client_lists_services_through_the_host():
+    import os
+    import re
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src = open(os.path.join(root, 'static', 'js', 'services.js'), encoding='utf-8').read()
+    assert "agentFetch('/api/traefik/services')" not in src, (
+        'proxying the list to the agent loses ownership, since the ledger lives on the Host')
+    assert re.search(r"fetch\(_svcApiPath\('/api/traefik/services'\)", src), \
+        'the list must be fetched from the Host with the agent id'
