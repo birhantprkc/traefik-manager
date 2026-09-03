@@ -52,7 +52,9 @@ in that form to rename the service: the old key and its generated children go, a
 takes over their ownership.
 
 Deleting refuses while a route still points at the service, while another service lists it as a
-backend, or when it is a composite Traefik Manager does not manage.
+backend, when one of its generated children is still used elsewhere, or when it is a composite
+Traefik Manager does not manage. Editing always writes to the config file the service already
+lives in, whichever file is selected.
 
 **Manage this service** in the detail panel records ownership of a hand-written composite without
 touching the file - it stays byte for byte unchanged. Ownership is what deleting, renaming and

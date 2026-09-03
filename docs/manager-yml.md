@@ -217,9 +217,10 @@ When `true`, the user is redirected to a forced password-change screen after log
 **Type:** boolean - **Default:** `false`
 
 When `true`, opening Traefik Manager asks for a new password and nothing else - the setup wizard is
-skipped and the rest of `manager.yml` is left alone. Clears itself once the password is set. Set by the
-CLI reset command when run with no password option, or by hand to recover from a lost password (see
-[Reset Password](/reset-password#method-3-manual-reset-via-manager-yml)).
+skipped and the rest of `manager.yml` is left alone. While it is `true` that page is open to anyone who
+can reach Traefik Manager, so use it promptly. It clears on any password change and on the next
+successful login. Set by the CLI reset command when run with no password option, or by hand to recover
+from a lost password (see [Reset Password](/reset-password#method-3-manual-reset-via-manager-yml)).
 
 ---
 

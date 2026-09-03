@@ -111,7 +111,7 @@ SETTINGS_PATH=/var/lib/traefik-manager/manager.yml \
 :::
 
 ::: warning Temporary passwords only
-This form also sets `setup_password_reset: true` in `manager.yml`, which leaves the `/setup` page open to anyone who can reach Traefik Manager. Only setting a password on that page clears the flag - the forced-change screen does not. So either set your new password at `https://your-traefik-manager.example.com/setup`, or remove the key from `manager.yml` afterwards and restart. `--prompt`, `--stdin` and `--password` never set the flag.
+This form also sets `setup_password_reset: true` in `manager.yml`, which leaves `/setup` open to anyone who can reach Traefik Manager until you use it. Set your new password promptly. The flag clears on any password change and on your next successful login. `--prompt`, `--stdin` and `--password` never set it.
 :::
 
 ---
