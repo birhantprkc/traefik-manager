@@ -335,11 +335,16 @@ function _svcOwnershipHtml(s) {
         </button>`;
 }
 
+function _svcApiPath(path) {
+    return _activeAgent ? path + '?agent_id=' + encodeURIComponent(_activeAgent.id) : path;
+}
+
 async function _setServiceOwnership(name, adopt) {
     try {
-        const res = await agentFetch('/api/services/' + encodeURIComponent(name) + '/ownership', {
+        const res = await fetch(_svcApiPath('/api/services/' + encodeURIComponent(name) + '/ownership'), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch',
+                       ..._csrfHeaders() },
             body: JSON.stringify({ adopt }),
         });
         const body = await res.json();
@@ -744,14 +749,16 @@ async function saveServiceModal() {
     const btn = document.getElementById('svcSaveBtn');
     if (btn) btn.disabled = true;
     try {
-        const res = await agentFetch('/api/services', {
+        const res = await fetch('/api/services', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch',
+                       ..._csrfHeaders() },
             body: JSON.stringify({
                 name,
                 type: document.getElementById('svcType')?.value || 'weighted',
                 originalName: (document.getElementById('svcOriginalName')?.value || '').trim(),
                 configFile: _svcTargetConfigFile(),
+                agent_id: _activeAgent ? _activeAgent.id : '',
                 children,
             }),
         });
@@ -774,8 +781,8 @@ async function deleteServiceFromModal() {
     if (!confirm('Delete the service ' + name + '? Its own backends are removed with it.')) return;
     const err = document.getElementById('svcError');
     try {
-        const res = await agentFetch('/api/services/' + encodeURIComponent(name), {
-            method: 'DELETE', headers: { 'X-Requested-With': 'fetch' },
+        const res = await fetch(_svcApiPath('/api/services/' + encodeURIComponent(name)), {
+            method: 'DELETE', headers: { 'X-Requested-With': 'fetch', ..._csrfHeaders() },
         });
         const body = await res.json();
         if (!res.ok || !body.ok) {

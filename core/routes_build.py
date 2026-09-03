@@ -57,14 +57,14 @@ def _merge_router(section: dict, name: str, new: dict, managed: tuple) -> None:
         return
     _apply_managed_keys(existing, new, managed)
 
-def _service_is_owned(name: str, svc_def) -> bool:
+def _service_is_owned(name: str, svc_def, agent_id: str = '') -> bool:
     from core import service_ownership as own_mod
     from core import settings as settings_mod
     try:
         ledger = settings_mod.load_settings().get('managed_middlewares') or {}
     except Exception:
         return False
-    return own_mod.is_owned(str(name).split('@')[0], svc_def, ledger)
+    return own_mod.is_owned(str(name).split('@')[0], svc_def, ledger, agent_id)
 
 
 def _composite_children_rows(services: dict, svc_def) -> list:
@@ -253,7 +253,7 @@ def _service_type(svc_def) -> str:
                 return t
     return 'loadBalancer'
 
-def _build_apps(config, config_file='', extra_http_svcs=None, extra_tcp_svcs=None, extra_udp_svcs=None, api_svc_urls=None):
+def _build_apps(config, config_file='', extra_http_svcs=None, extra_tcp_svcs=None, extra_udp_svcs=None, api_svc_urls=None, agent_id=''):
     apps = []
     http_config = config.get('http') or {}
     http_svcs = dict(http_config.get('services') or {})
@@ -303,7 +303,7 @@ def _build_apps(config, config_file='', extra_http_svcs=None, extra_tcp_svcs=Non
                      'priority': rdata.get('priority'),
                      'serviceType': _service_type(http_svcs.get(svc_key)),
                      'compositeChildren': _composite_children_rows(http_svcs, http_svcs.get(svc_key)),
-                     'serviceOwned': _service_is_owned(svc_key, http_svcs.get(svc_key)),
+                     'serviceOwned': _service_is_owned(svc_key, http_svcs.get(svc_key), agent_id),
                      'configFile': config_file, 'provider': 'file'})
     tcp_config = config.get('tcp') or {}
     tcp_svcs = dict(tcp_config.get('services') or {})

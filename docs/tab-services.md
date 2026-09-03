@@ -77,6 +77,8 @@ Viewing needs no volume mounts: the list is read from the Traefik API (`/api/htt
 
 Creating, editing and deleting write to your dynamic config files, so those need the same mount the Routes tab uses. Without it the tab still works as a read-only view.
 
+With a remote agent selected, the same actions write to that agent's config files instead, and ownership is recorded against that server.
+
 ## Notes
 
 - This tab is always visible - it cannot be disabled

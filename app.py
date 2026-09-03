@@ -1438,12 +1438,18 @@ def api_service_ownership(name):
     data   = request.get_json(silent=True) or {}
     adopt  = bool(data.get('adopt'))
     bare   = str(name).split('@')[0]
-    configs = [load_config(p) for p in env.CONFIG_PATHS]
+    agent_id, agent, err = _svc_agent_ctx()
+    if err:
+        return err
+    if agent:
+        pairs = [(fname, cfg) for fname, cfg in _agent_load_configs(agent).items()]
+    else:
+        pairs = [(os.path.basename(p), load_config(p)) for p in env.CONFIG_PATHS]
     svc_def, cfg_file = None, ''
-    for path, cfg in zip(env.CONFIG_PATHS, configs):
+    for fname, cfg in pairs:
         found = ((cfg.get('http') or {}).get('services') or {}).get(bare)
         if isinstance(found, dict):
-            svc_def, cfg_file = found, os.path.basename(path)
+            svc_def, cfg_file = found, fname
             break
     if svc_def is None:
         return jsonify({'ok': False, 'error': 'Service not found'}), 404
@@ -1453,7 +1459,7 @@ def api_service_ownership(name):
                                  'highestRandomWeight services can be managed here'}), 400
     settings = load_settings()
     ledger   = dict(settings.get('managed_middlewares') or {})
-    key      = _svc_own.ledger_key(bare)
+    key      = _svc_own.ledger_key(bare, agent_id)
     if adopt:
         ledger[key] = _svc_own.ledger_entry(svc_def, cfg_file)
     elif key in ledger:
@@ -1551,6 +1557,27 @@ def _in_use_error(blocked):
                     'error': f"{child} is still used by " + ', '.join(users[:5])}), 409
 
 
+def _agent_service_home(agent_configs: dict, name: str) -> str:
+    bare = str(name or '').split('@')[0]
+    if not bare:
+        return ''
+    for fname, cfg in (agent_configs or {}).items():
+        if bare in (((cfg or {}).get('http') or {}).get('services') or {}):
+            return fname
+    return ''
+
+
+def _svc_agent_ctx():
+    agent_id = (request.args.get('agent_id')
+                or (request.get_json(silent=True) or {}).get('agent_id') or '').strip()
+    if not agent_id:
+        return '', None, None
+    agent = _agent_by_id(agent_id)
+    if not agent:
+        return agent_id, None, (jsonify({'ok': False, 'error': 'Agent not found'}), 404)
+    return agent_id, agent, None
+
+
 @app.route('/api/services', methods=['POST'])
 @csrf_protect
 @login_required
@@ -1579,36 +1606,47 @@ def api_service_save():
                         'error': f'That name belongs to a {clash} service, '
                                  f'and only HTTP services can be edited here'}), 400
 
-    target_path = _service_home_path(original or name) \
-        or (_resolve_config_path(cfg_raw) if cfg_raw else env.CONFIG_PATH)
-    if not target_path:
-        return jsonify({'ok': False, 'error': f"Cannot write to '{cfg_raw}'"}), 400
-    cfg_filename = os.path.basename(target_path)
-    config       = load_config(target_path)
-    section      = config.setdefault('http', {}).setdefault('services', {})
+    agent_id, agent, err = _svc_agent_ctx()
+    if err:
+        return err
+
+    if agent:
+        agent_configs = _agent_load_configs(agent)
+        cfg_filename = _agent_service_home(agent_configs, original or name) \
+            or (cfg_raw if cfg_raw in agent_configs else next(iter(agent_configs), 'dynamic.yml'))
+        config = agent_configs.get(cfg_filename) or {}
+        target_path = None
+    else:
+        target_path = _service_home_path(original or name) \
+            or (_resolve_config_path(cfg_raw) if cfg_raw else env.CONFIG_PATH)
+        if not target_path:
+            return jsonify({'ok': False, 'error': f"Cannot write to '{cfg_raw}'"}), 400
+        cfg_filename = os.path.basename(target_path)
+        config       = load_config(target_path)
+    section = config.setdefault('http', {}).setdefault('services', {})
 
     settings = load_settings()
     ledger   = dict(settings.get('managed_middlewares') or {})
     existing = section.get(name)
     if isinstance(existing, dict) and name != original \
-            and not _svc_own.is_owned(name, existing, ledger) \
+            and not _svc_own.is_owned(name, existing, ledger, agent_id) \
             and not (kind == 'loadBalancer' and 'loadBalancer' in existing):
         return jsonify({'ok': False, 'error': f"A service named '{name}' already exists"}), 409
     if original and original != name:
         _orig_def = section.get(original)
-        if not _svc_own.is_owned(original, _orig_def, ledger) \
+        if not _svc_own.is_owned(original, _orig_def, ledger, agent_id) \
                 and not (isinstance(_orig_def, dict) and 'loadBalancer' in _orig_def):
             return jsonify({'ok': False, 'error': 'That service is not managed here'}), 403
         section.pop(original, None)
         for gone in _composite.drop_orphan_children(section, original, set()):
-            ledger.pop(_svc_ledger_key(gone), None)
-        ledger.pop(_svc_ledger_key(original), None)
+            ledger.pop(_svc_ledger_key(gone, agent_id), None)
+        ledger.pop(_svc_ledger_key(original, agent_id), None)
 
     blocked = _children_still_in_use([config], name, owned)
     if blocked:
         return _in_use_error(blocked)
 
-    claimed = _children_claimed_by_another(ledger, name)
+    claimed = _children_claimed_by_another(ledger, name, agent_id)
     if claimed:
         return jsonify({'ok': False,
                         'error': f"{claimed[0]} already belongs to {claimed[1]}. "
@@ -1616,14 +1654,17 @@ def api_service_save():
 
     _composite.merge_into(section, name, block, owned)
     for gone in _composite.drop_orphan_children(section, name, set(owned)):
-        ledger.pop(_svc_ledger_key(gone), None)
+        ledger.pop(_svc_ledger_key(gone, agent_id), None)
     if kind in _composite.TYPES:
-        ledger.update(_composite.ledger_entries(name, block, owned, cfg_filename))
+        ledger.update(_composite.ledger_entries(name, block, owned, cfg_filename, agent_id))
     else:
-        ledger.pop(_svc_ledger_key(name), None)
+        ledger.pop(_svc_ledger_key(name, agent_id), None)
 
-    create_backup(target_path)
-    save_config(_strip_empty_sections(config), target_path)
+    if agent:
+        _agent_write_config(agent, cfg_filename, config)
+    else:
+        create_backup(target_path)
+        save_config(_strip_empty_sections(config), target_path)
     save_settings(
         domains=settings['domains'], cert_resolver=settings['cert_resolver'],
         traefik_api_url=settings['traefik_api_url'], auth_enabled=settings['auth_enabled'],
@@ -1632,7 +1673,11 @@ def api_service_save():
     )
     logger.info(f"Service {name!r} saved by {request.remote_addr}")
     add_notification('success', f'Service {name} saved', category='config')
-    threading.Thread(target=lambda: _git_push_if_enabled('service save'), daemon=True).start()
+    if agent:
+        threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'service save'),
+                         daemon=True).start()
+    else:
+        threading.Thread(target=lambda: _git_push_if_enabled('service save'), daemon=True).start()
     return jsonify({'ok': True, 'name': name})
 
 
@@ -1641,7 +1686,11 @@ def api_service_save():
 @login_required
 def api_service_delete(name):
     bare     = str(name).split('@')[0]
-    configs  = [load_config(p) for p in env.CONFIG_PATHS]
+    agent_id, agent, err = _svc_agent_ctx()
+    if err:
+        return err
+    agent_configs = _agent_load_configs(agent) if agent else {}
+    configs  = list(agent_configs.values()) if agent else [load_config(p) for p in env.CONFIG_PATHS]
     used_by  = _service_routers_using(configs, bare)
     if used_by:
         return jsonify({'ok': False,
@@ -1654,13 +1703,14 @@ def api_service_delete(name):
     settings = load_settings()
     ledger   = dict(settings.get('managed_middlewares') or {})
     removed  = False
-    for path in env.CONFIG_PATHS:
-        config  = load_config(path)
+    targets = ([(fname, cfg) for fname, cfg in agent_configs.items()] if agent
+               else [(path, load_config(path)) for path in env.CONFIG_PATHS])
+    for where, config in targets:
         section = (config.get('http') or {}).get('services') or {}
         if bare not in section:
             continue
         _def = section.get(bare)
-        if not _svc_own.is_owned(bare, _def, ledger) \
+        if not _svc_own.is_owned(bare, _def, ledger, agent_id) \
                 and not (isinstance(_def, dict) and 'loadBalancer' in _def):
             return jsonify({'ok': False, 'error': 'That service is not managed here'}), 403
         child_users = _children_still_in_use(configs, bare, set())
@@ -1668,10 +1718,13 @@ def api_service_delete(name):
             return _in_use_error(child_users)
         del section[bare]
         for gone in _composite.drop_orphan_children(section, bare, set()):
-            ledger.pop(_svc_ledger_key(gone), None)
-        ledger.pop(_svc_ledger_key(bare), None)
-        create_backup(path)
-        save_config(_strip_empty_sections(config), path)
+            ledger.pop(_svc_ledger_key(gone, agent_id), None)
+        ledger.pop(_svc_ledger_key(bare, agent_id), None)
+        if agent:
+            _agent_write_config(agent, where, config)
+        else:
+            create_backup(where)
+            save_config(_strip_empty_sections(config), where)
         removed = True
         break
     if not removed:
@@ -1684,7 +1737,11 @@ def api_service_delete(name):
     )
     logger.info(f"Service {bare!r} deleted by {request.remote_addr}")
     add_notification('warning', f'Service {bare} deleted', category='config')
-    threading.Thread(target=lambda: _git_push_if_enabled('service delete'), daemon=True).start()
+    if agent:
+        threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'service delete'),
+                         daemon=True).start()
+    else:
+        threading.Thread(target=lambda: _git_push_if_enabled('service delete'), daemon=True).start()
     return jsonify({'ok': True})
 
 
@@ -6414,7 +6471,8 @@ def api_agent_routes(agent_id):
                                     extra_http_svcs=combined_http,
                                     extra_tcp_svcs=combined_tcp,
                                     extra_udp_svcs=combined_udp,
-                                    api_svc_urls=svc_urls))
+                                    api_svc_urls=svc_urls,
+                                    agent_id=agent_id))
             middlewares.extend(_build_middlewares(config, config_file=fname))
 
         apps.extend(_build_external_routes(all_routers, svc_urls))
