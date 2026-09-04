@@ -110,6 +110,11 @@ When multiple config files are loaded, route `id` is prefixed as `configFile::na
 
 HTTP routes also carry `passHostHeader`, `tlsDomains`, `tlsOptionsProfile`, `insecureSkipVerify`, `streaming` and `serviceType`.
 
+A route whose service is composite additionally carries `compositeChildren` - one
+`{name, url, weight, percent}` per backend, with `url` filled only for children Traefik Manager
+generated - and `serviceOwned`, true when Traefik Manager manages the service so the route form can
+edit it. For a composite, `passHostHeader` and friends are read from the first generated child.
+
 ---
 
 ### `GET /api/routes/all`
@@ -125,7 +130,13 @@ Use this for everything Traefik is serving, and `/api/routes` for only what this
 Create or update a route. Accepts `application/x-www-form-urlencoded`.
 
 | Field | Type | Description |
-|---|---|---|
+|
+`backendsJsonHttp` may also carry `children` and `compositeType` to make the route's service a
+`weighted`, `mirroring` or `failover` composite - see the [OpenAPI spec](#openapi-spec) for the row
+shape. The key only takes effect when present, so older clients cannot flatten a composite, and
+`children: []` reverts to a plain `loadBalancer`.
+
+---|---|---|
 | `serviceName` | string | Route name. Required |
 | `protocol` | string | `http`, `tcp`, or `udp` (default: `http`) |
 | `subdomain` | string | Hostname. A value containing a dot is used as-is; a bare label is combined with the configured domain(s). Becomes `Host()` for HTTP and `HostSNI()` for TCP |
@@ -300,7 +311,13 @@ All routers across HTTP, TCP, and UDP, following Traefik's pagination.
 
 ### `GET /api/traefik/services`
 
-All services across HTTP, TCP, and UDP. Same shape as `GET /api/traefik/routers`.
+All services across HTTP, TCP, and UDP, in the same `{http, tcp, udp, reachable}` shape as
+`GET /api/traefik/routers`, plus two lists naming what Traefik Manager manages:
+
+| Field | Meaning |
+|---|---|
+| `ownedServices` | Composite services Traefik Manager manages, so they can be edited rather than being read only |
+| `ownedChildren` | The `<name>-backend-<n>` services it generated. Clients hide these from the list and show them on their parent |
 
 ---
 
@@ -509,7 +526,7 @@ So `Jellyfin-Service` and `jellyfin` both resolve to `jellyfin`. Fall back to a 
 
 ### `GET /api/settings`
 
-Get current application settings. Every secret is stripped and replaced by a `*_set` boolean: password hash, OIDC client secret, Traefik API password, CrowdSec key and machine password, webhook password, OTP secret, git token. The `agents` list is stripped too - use `GET /api/agents`.
+Get current application settings. Every secret is stripped. Five come back as a `*_set` boolean - `traefik_api_password_set`, `oidc_client_secret_set`, `crowdsec_api_key_set`, `crowdsec_machine_password_set`, `git_backup_token_set`; `password_hash` becomes `has_password`; `webhook_password` and `otp_secret` are removed with no replacement. The `agents` list is stripped too - use `GET /api/agents`.
 
 | Field                      | Description                                        |
 | ----------------------------| ----------------------------------------------------|
@@ -531,6 +548,7 @@ Get current application settings. Every secret is stripped and replaced by a `*_
 | `traefik_api_password_set` | `true` if a Traefik API password is saved          |
 | `crowdsec_lapi_url`        | CrowdSec LAPI URL                                  |
 | `crowdsec_api_key_set`     | `true` if a CrowdSec API key is saved              |
+| `crowdsec_alert_limit`     | Alert row limit, blank falls back to `CROWDSEC_ALERT_LIMIT` |
 | `crowdsec_enabled`         | `true` when a LAPI URL is set plus either a bouncer API key or machine credentials |
 
 ---
@@ -539,9 +557,9 @@ Get current application settings. Every secret is stripped and replaced by a `*_
 
 Update settings. Full replace, not a patch: `domains` is required (`400` without it) and any omitted field resets to its default, so send the current values you want to keep.
 
-Exceptions: `git_backup_*`, `backup_keep_count` and `default_theme` are updated only when present, and blank `traefik_api_password`, `crowdsec_api_key`, `crowdsec_machine_password`, `webhook_password` and `git_backup_token` keep the stored secret.
+Exceptions: `git_backup_*`, `backup_keep_count`, `default_theme` and `notification_channels` are updated only when present, and blank `traefik_api_password`, `crowdsec_api_key`, `crowdsec_machine_password`, `webhook_password` and `git_backup_token` keep the stored secret.
 
-Returns `{ "success": true, "settings": { ... } }` with secrets stripped. `400` for a missing domain, an invalid `traefik_api_url` or an unsupported `git_backup_repo` scheme.
+Returns `{ "success": true, "settings": { ... } }` with secrets stripped. `400` for a missing domain, an invalid `traefik_api_url`, an unsupported `git_backup_repo` scheme, a `crowdsec_alert_limit` that is not a whole number ("Alert limit must be a whole number") or one outside 0-100000 ("Alert limit must be between 0 and 100000").
 
 ---
 
@@ -914,17 +932,17 @@ Clear all notifications.
 
 ### `POST /api/notifications/add`
 
-Add a notification. Unlike `/log`, this also fires the configured webhook.
+Add a notification. Unlike `/log`, this also fires the configured webhook. `category` is one of the eight channel categories and falls back to `config`.
 
 ```json
-{ "type": "info", "message": "Deployment finished" }
+{ "type": "info", "message": "Deployment finished", "category": "config" }
 ```
 
 ---
 
 ### `POST /api/notifications/log`
 
-Record a UI toast in the notification history without firing a webhook. `type` is one of `info`, `success`, `warning`, `error` and falls back to `info`. The message is truncated to 300 characters.
+Record a UI toast in the notification history without firing a webhook. `type` is one of `info`, `success`, `warning`, `error` and falls back to `info`; `category` is one of the eight channel categories and falls back to `config`. The message is truncated to 300 characters.
 
 ```json
 { "ok": true, "stored": true }
@@ -948,11 +966,13 @@ Record an "update available" notification. `product` is `manager` for Traefik Ma
 
 Channels are where notifications are delivered. Each one has a `kind`, a category filter, a
 severity floor and an optional quiet window. Secrets (`token`, `token2`, `password`) read back
-as `***`.
+as `***`, and for `discord`, `slack`, `ntfy` and `generic` the `url` reads back as
+`scheme://host/***`. A `url` still containing `***` is ignored on write, so a channel can be
+echoed back unchanged.
 
 | Field | Values |
 | --- | --- |
-| `kind` | `discord`, `slack`, `ntfy`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
+| `kind` | `discord`, `slack`, `ntfy`, `unifiedpush`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
 | `categories` | any of `config`, `backup`, `security`, `traefik`, `certs`, `crowdsec`, `agent`, `update` |
 | `min_severity` | `info`, `success`, `warning`, `error` |
 | `digest` | `immediate`, `hourly`, `daily` |
@@ -967,7 +987,7 @@ List every channel, secrets redacted.
 
 ```json
 { "channels": [{ "id": "ch_1a2b3c4d", "name": "Ops Discord", "kind": "discord", "enabled": true,
-  "url": "https://discord.com/api/webhooks/...", "token": "", "token2": "", "password": "",
+  "url": "https://discord.com/***", "token": "", "token2": "", "password": "",
   "categories": ["certs", "crowdsec"], "min_severity": "warning", "digest": "immediate",
   "quiet_hours": "23:00-07:00", "break_through": true }] }
 ```
@@ -1291,7 +1311,13 @@ Returns `400` if the named entrypoint is absent or the config is not a mapping, 
 Get the deployed Traefik Manager version.
 
 ```json
-{ "version": "1.11.0", "repo": "chr0nzz/traefik-manager", "static_config_configured": true }
+{
+  "version": "1.13.0", "repo": "chr0nzz/traefik-manager", "static_config_configured": true,
+  "latest": "1.13.0", "release_url": "https://github.com/chr0nzz/traefik-manager/releases/tag/v1.13.0",
+  "release_notes": "...", "release_error": "",
+  "traefik_latest": "v3.6.25", "traefik_release_url": "https://github.com/traefik/traefik/releases/tag/v3.6.25",
+  "traefik_running": "v3.6.25"
+}
 ```
 
 ---
@@ -1316,6 +1342,26 @@ Test connectivity to a Traefik API URL during first-time setup. Accepts optional
 
 ---
 
+### `POST /setup/test-crowdsec`
+
+Test a CrowdSec LAPI URL and credentials during first-time setup. `404` once setup is complete, rate limited to 10/min.
+
+```json
+{ "url": "http://crowdsec:8080", "key": "..." }
+```
+
+---
+
+### `POST /setup/test-git`
+
+Test a git backup remote during first-time setup by running `git ls-remote`. `404` once setup is complete, rate limited to 10/min. Restricted by URL scheme (`https`, `http`, `ssh`, `git`) rather than by destination address.
+
+```json
+{ "repo_url": "https://github.com/you/traefik-backups.git", "username": "you", "token": "..." }
+```
+
+---
+
 ### `GET /api/ping`
 
 Send a `HEAD` request to a route's domain from the TM server and return latency. Backs the route health check in the Routes tab.
@@ -1332,6 +1378,100 @@ Send a `HEAD` request to a route's domain from the TM server and return latency.
 On failure: `{ "ok": false, "error": "Timeout", "latency_ms": null }`
 
 A URL pointing at TM's own hostname, or at the configured self-route domain, short-circuits to `{ "ok": true, "latency_ms": 0, "status_code": 200, "self": true }` without a request. A successful fallback adds `"via_target": true`. Targets that fail the SSRF guard return `400`.
+
+---
+
+### `POST /api/services`
+
+Create or update a composite service without going through a route.
+
+```json
+{
+  "name": "api-pool",
+  "type": "weighted",
+  "children": [
+    { "kind": "manual",  "address": "10.0.0.10:80", "scheme": "http", "weight": 9 },
+    { "kind": "service", "name": "canary-svc", "weight": 1 }
+  ]
+}
+```
+
+Each `manual` backend becomes its own child service named `<name>-backend-<n>`, so every row can
+carry its own weight. A `service` backend is referenced by name and never copied, so changes to it
+follow automatically.
+
+`type` is `loadBalancer`, `weighted`, `mirroring` or `failover`. For `mirroring` use `percent`
+instead of `weight`; the first backend is the one that serves. `failover` takes exactly two
+backends and refuses a third with `400`. Pass `originalName` to rename a managed service, which
+moves its children with it. `configFile` picks the file for a new service; an existing service is
+always rewritten in the file it already lives in.
+
+Pass `agent_id` to author on a remote agent instead of the Host. The service is written to that
+agent's config files and its ownership is recorded against that server, so the same name can be
+managed independently on the Host and on each agent.
+
+Refuses with `409` if a service of that name exists and Traefik Manager does not manage it, if one
+of its generated children is still used elsewhere, or if that child name already belongs to another
+service; with `403` when renaming something it does not manage; and with `400` for an invalid name,
+type, or a name that belongs to a TCP or UDP service.
+
+---
+
+### `DELETE /api/services/{name}`
+
+Delete a managed composite service and the child services it owns.
+
+Refuses with `409` while a router still points at it, while another service still lists it as a
+backend, or while one of its generated children is still used elsewhere; `403` if Traefik Manager
+does not manage it, and `404` if it does not exist.
+
+Pass `?agent_id=<id>` to delete on a remote agent.
+
+---
+
+### `POST /api/services/{name}/ownership`
+
+Take over or release management of a composite service.
+
+```json
+{ "adopt": true }
+```
+
+Pass `?agent_id=<id>` to manage a service on a remote agent.
+
+Records a ledger entry only. **No YAML is written**, so adopting a hand-written service leaves the
+config file byte for byte unchanged. Once managed, routes pointing at the service can edit their
+backends from the route form instead of being read only.
+
+Settings inside the type block that Traefik Manager does not author, such as `sticky` and
+`healthCheck` on a weighted service, are preserved on later saves.
+
+Only `weighted`, `mirroring`, `failover` and `highestRandomWeight` services can be managed. Anything
+else returns `400`, and an unknown name returns `404`.
+
+```json
+{ "ok": true, "owned": true }
+```
+
+---
+
+### `GET /api/storage/status`
+
+Whether the directories Traefik Manager writes to are writable. It writes and removes a temporary file
+in the configuration, backup and dynamic config directories, so it reports what a real save would do
+rather than what the permission bits claim. The result is cached for 30 seconds.
+
+```json
+{ "problems": [] }
+```
+
+An empty array means everything is writable. Otherwise each entry names the directory and the error:
+
+```json
+{ "problems": [
+  { "label": "Configuration", "path": "/app/config", "error": "read-only file system" }
+] }
+```
 
 ---
 
@@ -1557,7 +1697,7 @@ Manage remote TMA agents registered in TM.
 
 ### `GET /api/agents`
 
-List all registered agents. The agent API key, CrowdSec secrets and git token are redacted to `***`.
+List all registered agents. The agent API key, the Traefik API password, the CrowdSec secrets and the git token are redacted to `***`.
 
 **Response**
 
@@ -1581,16 +1721,21 @@ List all registered agents. The agent API key, CrowdSec secrets and git token ar
 
 ### `POST /api/agents`
 
-Register a new agent. `name` and `url` are required; every other agent field can be set here and otherwise takes its default. TM generates the API key and returns it once as `api_key_raw` - store it immediately, it is never returned again.
+Register a new agent. `name` and `url` are required, and most other agent fields can be set here. `traefik_api_user`, `traefik_api_password`, `traefik_insecure_skip_verify`, `backup_dir`, `domains`, `visible_tabs`, `git_host_backup`, `git_host_branch`, `tma_port` and `tma_rate_limit` are `PUT`-only; everything not sent takes its default. TM generates the API key and returns it once as `api_key_raw` - store it immediately, it is never returned again.
+
+`install_method` records which path added the agent: `"cli"` for the tm CLI install, `"manual"` for the compose generator. Anything else is stored as `"manual"`.
 
 **Request body**
 
 ```json
 {
   "name": "Server 2",
-  "url": "https://server2.example.com:8090"
+  "url": "https://server2.example.com:8090",
+  "install_method": "cli"
 }
 ```
+
+`400` when `name` or `url` is missing, when the URL has no `http://` or `https://` scheme, or when it has a scheme but no host. The message names which of the three it is.
 
 **Response**
 
@@ -1611,13 +1756,21 @@ Register a new agent. `name` and `url` are required; every other agent field can
 
 ### `PUT /api/agents/{id}`
 
-Update an agent's config fields (name, URL, paths, restart method, CrowdSec, git backup, visible tabs). Send only the fields you want to change. Secrets sent as `""` or `"***"` keep their stored value. `404` for an unknown id, `400` if the git branch collides with the Host's or another agent's.
+Update an agent's config fields (name, URL, paths, restart method, Traefik API basic auth, CrowdSec, git backup, visible tabs, `install_method`). Send only the fields you want to change. Secrets sent as `""` or `"***"` keep their stored value, including `traefik_api_password`. `name` is trimmed to 100 characters.
+
+`404` for an unknown id. `400` for an empty `name`, for a `url` with no scheme or no host, or if the git branch collides with the Host's or another agent's.
+
+::: warning
+`traefik_api_password` is stored unencrypted in `agents.yml`. The agent API key, CrowdSec API key, CrowdSec machine password and git token are all encrypted; this one is not.
+:::
 
 ---
 
 ### `DELETE /api/agents/{id}`
 
-Remove an agent from TM. Does not stop the agent service on the remote server.
+Remove an agent from TM, along with the Host's per-agent git clone at `{BACKUP_DIR}/git-agent-<id>` and that agent's `disabled_routes` and `managed_middlewares` entries in `manager.yml`. Does not stop the agent service on the remote server.
+
+Idempotent: an unknown id returns `200` with `{"ok": true}`, not `404`.
 
 ---
 
@@ -1631,7 +1784,7 @@ Check connectivity to an agent by calling its `/health`.
 { "ok": true, "latency_ms": 12, "version": "1.5.1", "status": 200 }
 ```
 
-If the agent is unreachable, `ok` is `false` and `latency_ms` is `-1`.
+If the agent is unreachable, `ok` is `false` and `latency_ms` is `-1`. A TLS failure returns `ok: false` with `error` naming the untrusted agent certificate, so a certificate problem is distinguishable from a refused connection.
 
 ---
 
@@ -1682,11 +1835,13 @@ Proxy a request to the agent's API. TM injects the `X-Api-Key` header, so a brow
 
 Accepts `GET`, `POST`, `PUT`, `DELETE` and `PATCH`. Method, query string and body are forwarded; the agent's status code and body come back as-is.
 
+The agent's `X-*` response headers are passed back too, except `x-api-key`, `x-csrf-token`, `x-frame-options` and `x-powered-by`. This is how `X-CS-Alert-Limit` and `X-CS-Alert-Capped` reach the browser.
+
 For example, `GET /api/agents/proxy/abc123/traefik/routers` proxies to `GET https://agent-host:8090/api/traefik/routers`.
 
 A successful write to the agent's config, route, middleware, static or backup paths also triggers that agent's git backup push, when configured.
 
-Returns `404` for an unknown agent, `502` if the agent refuses the connection, `504` if it times out, and `500` for any other proxy error.
+Returns `404` for an unknown agent, `502` if the agent refuses the connection or if its TLS certificate is not trusted by TM, `504` if it times out, and `500` for any other proxy error.
 
 See the [Agent API Reference](api-agent.md) for every endpoint an agent exposes.
 

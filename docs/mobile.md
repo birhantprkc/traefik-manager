@@ -105,18 +105,30 @@ The overview: router, service and middleware counts with their health, the provi
 - Add a route with the form, or drop to raw YAML for anything the form does not cover
 - Multiple backends, sticky sessions, health checks and router priority
 - Per-route certificate resolver, wildcard domains, and **Skip TLS verification** for self-signed backends
+- Composite services (`weighted`, `mirroring`, `failover`) are shown but edited on the web - the app keeps their configuration intact when saving a route
 
 ### Middleware
 
 - Every middleware with its type, protocol and config
 - Search, and filter by type
-- **24 built-in wizards** covering Basic and Digest Auth, Forward Auth with Authentik, Authelia and Gatekeeper presets, OIDC Auth, IP Allow List, Rate Limit, In-Flight Requests, Secure Headers, CORS, redirects, prefix and path rewriting, Retry, Circuit Breaker, Buffering, Compress, Chain and Encoded Characters - the same set as the web app
+- **30 built-in wizards** covering Basic and Digest Auth, Forward Auth with Authentik, Authelia and Gatekeeper presets, OIDC Auth, IP Allow List, Rate Limit, In-Flight Requests, Secure Headers, CORS, redirects, prefix and path rewriting including the regex forms, Retry, Circuit Breaker, Buffering, Compress, Chain, Encoded Characters, Custom Error Pages, Content Type, gRPC-Web and Pass TLS Client Cert - the same set as the web app
 - **Templates** - your saved YAML templates, managed from the middleware screen
 - Raw YAML for anything the wizards do not cover
 
 ### Services
 
 Every service Traefik knows about, with its backends, health and the routers using it. Search and filter by provider. Tap for the detail pane.
+
+From 1.13.0 the tab also authors them. **+** builds a load balancer, weighted, mirroring or failover service; each backend row takes an address or a reference to another service, with per-row weights and mirror percentages. The detail pane edits, renames and deletes, and offers to manage a composite Traefik Manager did not write, or to hand it back.
+
+| | |
+|---|---|
+| Managed here | Editable, and marked as managed by Traefik Manager |
+| In the config file | Read only until you choose **Manage this service** |
+| TCP and UDP | Read only. Authoring writes HTTP services |
+| Highest random weight | Read only. Traefik Manager does not author this type anywhere |
+
+Works against the host or any agent. A service written to an agent lives in that agent's config files and is managed independently, so the same name can exist on both.
 
 ### Logs
 
@@ -295,8 +307,12 @@ http:
           - url: http://traefik-manager:5000
 ```
 
-::: warning Keep built-in auth enabled
-With this split-route pattern, keep Traefik Manager's built-in auth **enabled** and generate API keys for your mobile devices. Without built-in auth, the `/api/*` route has no protection.
+::: warning Keep one form of auth enabled
+Generate API keys for your mobile devices. A valid key is accepted in every mode, so the `/api/*`
+route stays protected whether you sign in with the built-in password or with OIDC.
+
+The one combination that leaves it open is turning **both** off: with built-in auth disabled and no
+OIDC provider configured, `/api/*` answers without a key at all.
 :::
 
 ---

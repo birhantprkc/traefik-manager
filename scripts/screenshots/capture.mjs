@@ -29,7 +29,10 @@ async function capture(theme) {
     await shot('routes-add-http');
     await js(`setProtocol('tcp')`); await sleep(500); await shot('routes-add-tcp');
     await js(`setProtocol('udp')`); await sleep(500); await shot('routes-add-udp');
-    await js(`closeModal()`);
+    await js(`setProtocol('http'); setServiceRefMode('http', true)`); await sleep(600);
+    await js(`_populateServiceRefSelect('http', 'jellyfin-service')`); await sleep(1200);
+    await shot('routes-add-service');
+    await js(`setServiceRefMode('http', false); closeModal()`);
 
     await tab('middlewares');
     await shot('middlewares-cards');
@@ -40,6 +43,25 @@ async function capture(theme) {
     await tab('live', 2500);
     await shot('services-cards');
     await js(`toggleSvcView()`); await sleep(700); await shot('services-list'); await js(`toggleSvcView()`); await sleep(400);
+    await js(`_openServiceByName('jellyfin-service')`); await sleep(1100); await shot('services-detail');
+    await js(`closeSvcDetail()`); await sleep(400);
+    await js(`openServiceModal()`); await sleep(1100);
+    await js(`(() => {
+        const name = document.getElementById('svcName');
+        if (name) name.value = 'media-pool';
+        const type = document.getElementById('svcType');
+        if (type) { type.value = 'weighted'; if (typeof _svcTypeChanged === 'function') _svcTypeChanged(); }
+    })()`);
+    await sleep(500);
+    await js(`addServiceRow()`); await sleep(700); await shot('services-add');
+    await js(`closeServiceModal()`); await sleep(500);
+    const svcIdx = await js(`_allServices.findIndex(s => (s.name || '').split('@')[0] === 'jellyfin-service')`);
+    if (svcIdx >= 0) {
+        await js(`openServiceModal(_allServices[${svcIdx}])`); await sleep(1200); await shot('services-edit');
+        await js(`closeServiceModal()`); await sleep(500);
+    } else {
+        console.log('  ! jellyfin-service not in the list, skipping services-edit');
+    }
 
     await tab('dashboard', 4500);
     await shot('dashboard');

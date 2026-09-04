@@ -110,6 +110,33 @@ _merge_trusted_ips             = _rb._merge_trusted_ips
 _apply_managed_keys            = _rb._apply_managed_keys
 _merge_router                  = _rb._merge_router
 _merge_service                 = _rb._merge_service
+from core import composite_services as _composite
+from core import service_ownership as _svc_own
+
+
+def _router_resolves_to_composite(router_name: str, agent=None) -> bool:
+    if not router_name:
+        return False
+    try:
+        configs = list(_agent_load_configs(agent).values()) if agent else [
+            load_config(p) for p in env.CONFIG_PATHS]
+    except Exception:
+        return False
+    for cfg in configs:
+        for section in ('http', 'tcp', 'udp'):
+            routers = (cfg.get(section) or {}).get('routers') or {}
+            router = routers.get(router_name)
+            if not isinstance(router, dict):
+                continue
+            svc = str(router.get('service') or '').split('@')[0]
+            svc_def = ((cfg.get(section) or {}).get('services') or {}).get(svc)
+            if _svc_own.composite_type(svc_def):
+                return True
+    return False
+
+
+def _svc_ledger_key(name, agent_id=''):
+    return _svc_own.ledger_key(name, agent_id)
 _json_plain                    = _rb._json_plain
 _headers_preset_defaults       = _rb._headers_preset_defaults
 _build_permissions_policy      = _rb._build_permissions_policy
@@ -185,8 +212,24 @@ _agent_write_config          = _agen._agent_write_config
 _notifications = _noti._notifications
 _notif_lock    = _noti._notif_lock
 
+class _BasePathMiddleware:
+    def __init__(self, wsgi_app, prefix):
+        self.wsgi_app = wsgi_app
+        self.prefix = prefix
+
+    def __call__(self, environ, start_response):
+        path = environ.get('PATH_INFO', '')
+        if path == self.prefix or path.startswith(self.prefix + '/'):
+            environ['PATH_INFO'] = path[len(self.prefix):] or '/'
+        environ['SCRIPT_NAME'] = self.prefix
+        return self.wsgi_app(environ, start_response)
+
+
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=PROXY_FIX_HOPS, x_proto=1, x_host=1)
+if env.BASE_PATH:
+    app.wsgi_app = _BasePathMiddleware(app.wsgi_app, env.BASE_PATH)
+    app.config['APPLICATION_ROOT'] = env.BASE_PATH
 
 _CONFIG_DIR      = os.path.dirname(os.environ.get('SETTINGS_PATH', '/app/config/manager.yml'))
 _SECRET_KEY_PATH = os.path.join(_CONFIG_DIR, '.secret_key')
@@ -508,9 +551,30 @@ def inject_csrf():
     return {'csrf_token': _get_csrf_token()}
 
 
+def _static_build_stamp() -> str:
+    newest = 0.0
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+    for sub in ('css', 'js'):
+        root = os.path.join(static_dir, sub)
+        for dirpath, _dirs, files in os.walk(root):
+            for name in files:
+                try:
+                    newest = max(newest, os.path.getmtime(os.path.join(dirpath, name)))
+                except OSError:
+                    pass
+    return str(int(newest))
+
+
+ASSET_VERSION = f"{APP_VERSION}-{_static_build_stamp()}"
+
+
 @app.context_processor
 def inject_asset_version():
-    return {'asset_version': APP_VERSION}
+    return {'asset_version': ASSET_VERSION}
+
+@app.context_processor
+def inject_base_path():
+    return {'base_path': env.BASE_PATH}
 
 
 def _hash_api_key(key: str) -> str:
@@ -546,6 +610,49 @@ _monitor.register('crowdsec', _crowd.CS_ALERT_INTERVAL,
                   lambda: _crowd.check_local_alerts(_crowd.CS_ALERT_WINDOW))
 _monitor.register('updates', _updates.UPDATE_INTERVAL, _updates.check_updates)
 _monitor.register('notify-flush', _noti.FLUSH_INTERVAL, _noti.flush_due)
+
+
+def _reencrypt_file(name, read, write):
+    crypto.clear_plaintext_seen()
+    content = read()
+    if not crypto.plaintext_secrets_seen():
+        return False
+    crypto.clear_plaintext_seen()
+    try:
+        write(content)
+    except Exception:
+        logger.exception(f"Could not re-encrypt the secrets in {name}")
+        return False
+    logger.info(f"Secrets written in plain text were re-encrypted in {name}")
+    return True
+
+
+def _reencrypt_plaintext_secrets():
+    rewritten = []
+    if _reencrypt_file('manager.yml', load_settings, lambda s: save_settings(
+            domains=s['domains'], cert_resolver=s['cert_resolver'],
+            traefik_api_url=s['traefik_api_url'], auth_enabled=s['auth_enabled'],
+            password_hash=s['password_hash'], visible_tabs=s['visible_tabs'])):
+        rewritten.append('manager.yml')
+    if _reencrypt_file('agents.yml', _ag.load_agents, _ag.save_agents_file):
+        rewritten.append('agents.yml')
+    crypto.clear_plaintext_seen()
+    return rewritten
+
+
+_reencrypted = _reencrypt_plaintext_secrets()
+if _reencrypted:
+    add_notification(
+        'warning',
+        f"A secret was written to {' and '.join(_reencrypted)} in plain text. It has been "
+        f"encrypted in place and is no longer stored in the clear",
+        category='security')
+
+for _label, _path, _err in env.unwritable_storage():
+    logger.error(f"{_label} storage at {_path} is not writable ({_err}). "
+                 f"Settings, backups and scheduled checks will not survive a restart. "
+                 f"Check the volume or bind mount for this path.")
+
 _monitor.start()
 
 _SILENT_PREFIXES = (
@@ -587,6 +694,20 @@ def set_security_headers(response):
     if app.config.get('SESSION_COOKIE_SECURE'):
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
+
+
+def _close_reset_window(settings):
+    if not settings.get('setup_password_reset'):
+        return
+    save_settings(
+        domains=settings['domains'], cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'],
+        auth_enabled=settings.get('auth_enabled', True),
+        password_hash=settings.get('password_hash', ''),
+        visible_tabs=settings['visible_tabs'],
+        setup_password_reset=False,
+    )
+    logger.warning("Password reset window closed after a successful login")
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -646,6 +767,7 @@ def login():
             session.permanent = remember
             logger.info(f"Successful login from {request.remote_addr}")
             add_notification('info', f"Login from {request.remote_addr}", category='security')
+            _close_reset_window(settings)
 
             if settings.get('must_change_password', False) and not admin_pw:
                 if not settings.get('setup_complete', False):
@@ -934,6 +1056,7 @@ def force_change_password():
                 password_hash=_hash_password(new_pw),
                 visible_tabs=settings['visible_tabs'],
                 must_change_password=False,
+                setup_password_reset=False,
                 setup_complete=True,
             )
             logger.info(f"Forced password change completed from {request.remote_addr}")
@@ -1053,6 +1176,7 @@ def api_change_password():
         password_hash=_hash_password(new_pw),
         visible_tabs=settings['visible_tabs'],
         must_change_password=False,
+        setup_password_reset=False,
     )
     logger.info(f"Password changed successfully from {request.remote_addr}")
     return jsonify({'success': True})
@@ -1307,10 +1431,377 @@ def _traefik_proto_payload(kind):
 def api_routers():
     return jsonify(_traefik_proto_payload('routers'))
 
+@app.route('/api/services/<path:name>/ownership', methods=['POST'])
+@csrf_protect
+@login_required
+def api_service_ownership(name):
+    data   = request.get_json(silent=True) or {}
+    adopt  = bool(data.get('adopt'))
+    bare   = str(name).split('@')[0]
+    agent_id, agent, err = _svc_agent_ctx()
+    if err:
+        return err
+    if agent:
+        pairs = [(fname, cfg) for fname, cfg in _agent_load_configs(agent).items()]
+    else:
+        pairs = [(os.path.basename(p), load_config(p)) for p in env.CONFIG_PATHS]
+    svc_def, cfg_file = None, ''
+    for fname, cfg in pairs:
+        found = ((cfg.get('http') or {}).get('services') or {}).get(bare)
+        if isinstance(found, dict):
+            svc_def, cfg_file = found, fname
+            break
+    if svc_def is None:
+        return jsonify({'ok': False, 'error': 'Service not found'}), 404
+    if adopt and not _svc_own.composite_type(svc_def):
+        return jsonify({'ok': False,
+                        'error': 'Only weighted, mirroring, failover and '
+                                 'highestRandomWeight services can be managed here'}), 400
+    settings = load_settings()
+    ledger   = dict(settings.get('managed_middlewares') or {})
+    key      = _svc_own.ledger_key(bare, agent_id)
+    if adopt:
+        ledger[key] = _svc_own.ledger_entry(svc_def, cfg_file)
+    elif key in ledger:
+        del ledger[key]
+    else:
+        return jsonify({'ok': True, 'owned': False})
+    save_settings(
+        domains=settings['domains'], cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'], auth_enabled=settings['auth_enabled'],
+        password_hash=settings['password_hash'], visible_tabs=settings['visible_tabs'],
+        managed_middlewares=ledger,
+    )
+    logger.info(f"Service {bare!r} {'adopted' if adopt else 'released'} by {request.remote_addr}")
+    return jsonify({'ok': True, 'owned': adopt})
+
+
+_SERVICE_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$')
+
+
+def _service_routers_using(configs, name: str) -> list:
+    out = []
+    for cfg in configs:
+        for section in ('http', 'tcp', 'udp'):
+            for rname, rdata in ((cfg.get(section) or {}).get('routers') or {}).items():
+                if isinstance(rdata, dict) and str(rdata.get('service') or '').split('@')[0] == name:
+                    out.append(rname)
+    return out
+
+
+def _stream_service_proto(name: str) -> str:
+    bare = str(name or '').split('@')[0]
+    if not bare:
+        return ''
+    for path in env.CONFIG_PATHS:
+        config = load_config(path)
+        for section, label in (('tcp', 'TCP'), ('udp', 'UDP')):
+            if bare in ((config.get(section) or {}).get('services') or {}):
+                return label
+    return ''
+
+
+def _service_referenced_by(configs, name: str) -> list:
+    out = []
+    for cfg in configs:
+        for sname, sdef in ((cfg.get('http') or {}).get('services') or {}).items():
+            if sname == name:
+                continue
+            if name in _svc_own.child_names(sdef):
+                out.append(sname)
+    return out
+
+
+def _service_home_path(name: str) -> str:
+    bare = str(name or '').split('@')[0]
+    if not bare:
+        return ''
+    for path in env.CONFIG_PATHS:
+        if bare in ((load_config(path).get('http') or {}).get('services') or {}):
+            return path
+    return ''
+
+
+def _children_claimed_by_another(ledger, parent: str, agent_id: str = ''):
+    prefix = f'{parent}-backend-'
+    for key, value in (ledger or {}).items():
+        if not (isinstance(key, str) and isinstance(value, dict)):
+            continue
+        bare = key.split('svc::', 1)[-1]
+        if not bare.startswith(prefix) or not value.get('child'):
+            continue
+        owner = value.get('parent')
+        if owner and owner != parent:
+            return (bare, owner)
+    return None
+
+
+def _children_still_in_use(configs, parent: str, keep) -> list:
+    prefix = f'{parent}-backend-'
+    keep   = set(keep or ())
+    blocked = []
+    for cfg in configs:
+        for child in ((cfg.get('http') or {}).get('services') or {}):
+            if not (isinstance(child, str) and child.startswith(prefix)) or child in keep:
+                continue
+            users = _service_routers_using(configs, child)
+            owners = [o for o in _service_referenced_by(configs, child) if o != parent]
+            if users or owners:
+                blocked.append((child, sorted(set(users + owners))))
+    return blocked
+
+
+def _in_use_error(blocked):
+    child, users = blocked[0]
+    return jsonify({'ok': False,
+                    'error': f"{child} is still used by " + ', '.join(users[:5])}), 409
+
+
+def _agent_service_home(agent_configs: dict, name: str) -> str:
+    bare = str(name or '').split('@')[0]
+    if not bare:
+        return ''
+    for fname, cfg in (agent_configs or {}).items():
+        if bare in (((cfg or {}).get('http') or {}).get('services') or {}):
+            return fname
+    return ''
+
+
+def _svc_agent_ctx():
+    agent_id = (request.args.get('agent_id')
+                or (request.get_json(silent=True) or {}).get('agent_id') or '').strip()
+    if not agent_id:
+        return '', None, None
+    agent = _agent_by_id(agent_id)
+    if not agent:
+        return agent_id, None, (jsonify({'ok': False, 'error': 'Agent not found'}), 404)
+    return agent_id, agent, None
+
+
+@app.route('/api/services', methods=['POST'])
+@csrf_protect
+@login_required
+def api_service_save():
+    data      = request.get_json(silent=True) or {}
+    name      = str(data.get('name') or '').strip()
+    kind      = str(data.get('type') or '').strip()
+    original  = str(data.get('originalName') or '').strip()
+    cfg_raw   = str(data.get('configFile') or '').strip()
+    children  = data.get('children') or []
+    if not _SERVICE_NAME_RE.match(name):
+        return jsonify({'ok': False, 'error': 'Use letters, numbers, dots, dashes or underscores'}), 400
+    if kind not in _composite.TYPES + ('loadBalancer',):
+        return jsonify({'ok': False,
+                        'error': 'Choose load balancer, weighted, mirroring or failover'}), 400
+    if kind == 'failover' and len(_composite.normalise_children(children)) > 2:
+        return jsonify({'ok': False,
+                        'error': 'Failover takes two backends: the one that serves and the '
+                                 'one that takes over'}), 400
+    block, owned, _names = _composite.build(name, kind, children)
+    if not block:
+        return jsonify({'ok': False, 'error': 'Add at least one backend'}), 400
+    clash = _stream_service_proto(name) or (_stream_service_proto(original) if original else '')
+    if clash:
+        return jsonify({'ok': False,
+                        'error': f'That name belongs to a {clash} service, '
+                                 f'and only HTTP services can be edited here'}), 400
+
+    agent_id, agent, err = _svc_agent_ctx()
+    if err:
+        return err
+
+    if agent:
+        agent_configs = _agent_load_configs(agent)
+        cfg_filename = _agent_service_home(agent_configs, original or name) \
+            or (cfg_raw if cfg_raw in agent_configs else next(iter(agent_configs), 'dynamic.yml'))
+        config = agent_configs.get(cfg_filename) or {}
+        target_path = None
+    else:
+        target_path = _service_home_path(original or name) \
+            or (_resolve_config_path(cfg_raw) if cfg_raw else env.CONFIG_PATH)
+        if not target_path:
+            return jsonify({'ok': False, 'error': f"Cannot write to '{cfg_raw}'"}), 400
+        cfg_filename = os.path.basename(target_path)
+        config       = load_config(target_path)
+    section = config.setdefault('http', {}).setdefault('services', {})
+
+    settings = load_settings()
+    ledger   = dict(settings.get('managed_middlewares') or {})
+    existing = section.get(name)
+    if isinstance(existing, dict) and name != original \
+            and not _svc_own.is_owned(name, existing, ledger, agent_id) \
+            and not (kind == 'loadBalancer' and 'loadBalancer' in existing):
+        return jsonify({'ok': False, 'error': f"A service named '{name}' already exists"}), 409
+    if original and original != name:
+        _orig_def = section.get(original)
+        if not _svc_own.is_owned(original, _orig_def, ledger, agent_id) \
+                and not (isinstance(_orig_def, dict) and 'loadBalancer' in _orig_def):
+            return jsonify({'ok': False, 'error': 'That service is not managed here'}), 403
+        section.pop(original, None)
+        for gone in _composite.drop_orphan_children(section, original, set()):
+            ledger.pop(_svc_ledger_key(gone, agent_id), None)
+        ledger.pop(_svc_ledger_key(original, agent_id), None)
+
+    blocked = _children_still_in_use([config], name, owned)
+    if blocked:
+        return _in_use_error(blocked)
+
+    claimed = _children_claimed_by_another(ledger, name, agent_id)
+    if claimed:
+        return jsonify({'ok': False,
+                        'error': f"{claimed[0]} already belongs to {claimed[1]}. "
+                                 f"Pick a different name"}), 409
+
+    _composite.merge_into(section, name, block, owned)
+    for gone in _composite.drop_orphan_children(section, name, set(owned)):
+        ledger.pop(_svc_ledger_key(gone, agent_id), None)
+    if kind in _composite.TYPES:
+        ledger.update(_composite.ledger_entries(name, block, owned, cfg_filename, agent_id))
+    else:
+        ledger.pop(_svc_ledger_key(name, agent_id), None)
+
+    if agent:
+        _agent_write_config(agent, cfg_filename, config)
+    else:
+        create_backup(target_path)
+        save_config(_strip_empty_sections(config), target_path)
+    save_settings(
+        domains=settings['domains'], cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'], auth_enabled=settings['auth_enabled'],
+        password_hash=settings['password_hash'], visible_tabs=settings['visible_tabs'],
+        managed_middlewares=ledger,
+    )
+    logger.info(f"Service {name!r} saved by {request.remote_addr}")
+    add_notification('success', f'Service {name} saved', category='config')
+    if agent:
+        threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'service save'),
+                         daemon=True).start()
+    else:
+        threading.Thread(target=lambda: _git_push_if_enabled('service save'), daemon=True).start()
+    return jsonify({'ok': True, 'name': name})
+
+
+@app.route('/api/services/<path:name>', methods=['DELETE'])
+@csrf_protect
+@login_required
+def api_service_delete(name):
+    bare     = str(name).split('@')[0]
+    agent_id, agent, err = _svc_agent_ctx()
+    if err:
+        return err
+    agent_configs = _agent_load_configs(agent) if agent else {}
+    configs  = list(agent_configs.values()) if agent else [load_config(p) for p in env.CONFIG_PATHS]
+    used_by  = _service_routers_using(configs, bare)
+    if used_by:
+        return jsonify({'ok': False,
+                        'error': 'Still used by ' + ', '.join(sorted(set(used_by))[:5])}), 409
+    parents = _service_referenced_by(configs, bare)
+    if parents:
+        return jsonify({'ok': False,
+                        'error': 'Still a backend of ' + ', '.join(sorted(set(parents))[:5])}), 409
+
+    settings = load_settings()
+    ledger   = dict(settings.get('managed_middlewares') or {})
+    removed  = False
+    targets = ([(fname, cfg) for fname, cfg in agent_configs.items()] if agent
+               else [(path, load_config(path)) for path in env.CONFIG_PATHS])
+    for where, config in targets:
+        section = (config.get('http') or {}).get('services') or {}
+        if bare not in section:
+            continue
+        _def = section.get(bare)
+        if not _svc_own.is_owned(bare, _def, ledger, agent_id) \
+                and not (isinstance(_def, dict) and 'loadBalancer' in _def):
+            return jsonify({'ok': False, 'error': 'That service is not managed here'}), 403
+        child_users = _children_still_in_use(configs, bare, set())
+        if child_users:
+            return _in_use_error(child_users)
+        del section[bare]
+        for gone in _composite.drop_orphan_children(section, bare, set()):
+            ledger.pop(_svc_ledger_key(gone, agent_id), None)
+        ledger.pop(_svc_ledger_key(bare, agent_id), None)
+        if agent:
+            _agent_write_config(agent, where, config)
+        else:
+            create_backup(where)
+            save_config(_strip_empty_sections(config), where)
+        removed = True
+        break
+    if not removed:
+        return jsonify({'ok': False, 'error': 'Service not found'}), 404
+    save_settings(
+        domains=settings['domains'], cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'], auth_enabled=settings['auth_enabled'],
+        password_hash=settings['password_hash'], visible_tabs=settings['visible_tabs'],
+        managed_middlewares=ledger,
+    )
+    logger.info(f"Service {bare!r} deleted by {request.remote_addr}")
+    add_notification('warning', f'Service {bare} deleted', category='config')
+    if agent:
+        threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'service delete'),
+                         daemon=True).start()
+    else:
+        threading.Thread(target=lambda: _git_push_if_enabled('service delete'), daemon=True).start()
+    return jsonify({'ok': True})
+
+
+def _owned_child_services(agent_id: str = '') -> list:
+    prefix = f'agent_{agent_id}::svc::' if agent_id else 'svc::'
+    ledger = load_settings().get('managed_middlewares') or {}
+    return sorted(
+        key[len(prefix):] for key, value in ledger.items()
+        if isinstance(key, str) and key.startswith(prefix)
+        and isinstance(value, dict) and value.get('kind') == _svc_own.LEDGER_KIND
+        and value.get('child') is True)
+
+
+def _owned_parent_services(agent_id: str = '') -> list:
+    prefix = f'agent_{agent_id}::svc::' if agent_id else 'svc::'
+    ledger = load_settings().get('managed_middlewares') or {}
+    return sorted(
+        key[len(prefix):] for key, value in ledger.items()
+        if isinstance(key, str) and key.startswith(prefix)
+        and isinstance(value, dict) and value.get('kind') == _svc_own.LEDGER_KIND
+        and value.get('child') is not True)
+
+
+def _prune_service_ledger(agent_id: str = ''):
+    settings = load_settings()
+    ledger   = settings.get('managed_middlewares') or {}
+    if not any(isinstance(k, str) and 'svc::' in k for k in ledger):
+        return
+    if _get_config_parse_errors():
+        return
+    configs = [load_config(p) for p in env.CONFIG_PATHS]
+    if not any(cfg for cfg in configs):
+        return
+    kept, dropped = _svc_own.prune(ledger, configs, agent_id)
+    if not dropped:
+        return
+    save_settings(
+        domains=settings['domains'], cert_resolver=settings['cert_resolver'],
+        traefik_api_url=settings['traefik_api_url'], auth_enabled=settings['auth_enabled'],
+        password_hash=settings['password_hash'], visible_tabs=settings['visible_tabs'],
+        managed_middlewares=kept,
+    )
+
+
 @app.route('/api/traefik/services')
 @login_required
 def api_services():
-    return jsonify(_traefik_proto_payload('services'))
+    agent_id, agent, err = _svc_agent_ctx()
+    if err:
+        return err
+    if agent:
+        resp = _agent_request(agent, 'GET', '/api/traefik/services')
+        payload = resp.json() if resp.ok else {'http': [], 'tcp': [], 'udp': [],
+                                               'reachable': False}
+    else:
+        payload = _traefik_proto_payload('services')
+        _prune_service_ledger()
+    payload['ownedChildren'] = _owned_child_services(agent_id)
+    payload['ownedServices'] = _owned_parent_services(agent_id)
+    return jsonify(payload)
 
 @app.route('/api/traefik/middlewares')
 @login_required
@@ -1453,11 +1944,15 @@ def api_cs_alerts():
         else:
             headers = {'X-Api-Key': _cs_api_key(), 'Accept': 'application/json'}
         _limit = cs_alert_limit()
-        resp = requests.get(
-            f"{lapi.rstrip('/')}/v1/alerts?limit={_limit}&with_decisions=false",
-            headers=headers,
-            timeout=cs_timeout(), **_cs_tls_kwargs(),
-        )
+        _url = f"{lapi.rstrip('/')}/v1/alerts?limit={_limit}&with_decisions=false"
+        resp = requests.get(_url, headers=headers, timeout=cs_timeout(), **_cs_tls_kwargs())
+        if resp.status_code == 401 and _cs_has_machine():
+            logger.info("CrowdSec refused the machine token on /v1/alerts, logging in again")
+            _crowd.cs_jwt_reset()
+            token = _cs_jwt(lapi)
+            if token:
+                headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
+                resp = requests.get(_url, headers=headers, timeout=cs_timeout(), **_cs_tls_kwargs())
         if not resp.ok:
             try:
                 msg = resp.json().get('message') or resp.json().get('error') or resp.text
@@ -1495,7 +1990,7 @@ def api_cs_add_decision():
     now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     payload = [{
         'capacity': 0,
-        'decisions': [{'duration': duration, 'origin': 'cscli', 'scenario': reason,
+        'decisions': [{'duration': duration, 'origin': 'manual', 'scenario': reason,
                        'scope': 'Ip', 'type': dtype, 'value': ip, 'simulated': False}],
         'events': [], 'events_count': 1, 'labels': None, 'leakspeed': '0',
         'message': reason, 'scenario': reason, 'scenario_hash': '', 'scenario_version': '',
@@ -1509,6 +2004,7 @@ def api_cs_add_decision():
         result = _cs_request('POST', '/v1/alerts', lapi=lapi, key=key, json=payload)
     if result is None:
         return jsonify({'error': 'Failed to add decision - check LAPI permissions'}), 502
+    _crowd.cs_stream_reset()
     return jsonify({'ok': True})
 
 @app.route('/api/crowdsec/decisions/<int:decision_id>', methods=['DELETE'])
@@ -1523,6 +2019,7 @@ def api_cs_unban(decision_id):
         result = _cs_request('DELETE', f'/v1/decisions/{decision_id}')
     if result is None:
         return jsonify({'error': 'Failed to delete decision'}), 500
+    _crowd.cs_stream_reset()
     add_notification('success', f'Decision {decision_id} deleted (IP unbanned)', category='crowdsec')
     return jsonify({'ok': True})
 
@@ -1637,6 +2134,27 @@ def api_manager_version():
         "traefik_release_url": tfk.get('url', ''),
         "traefik_running": _updates.running_traefik_version(),
     })
+
+@app.route('/static/manifest.json')
+def static_manifest():
+    body = render_template('manifest.json')
+    return app.response_class(body, mimetype='application/manifest+json')
+
+_storage_probe_cache = {'at': 0.0, 'problems': []}
+STORAGE_PROBE_TTL = 30
+
+
+@app.route('/api/storage/status')
+@login_required
+def api_storage_status():
+    now = time.time()
+    if now - _storage_probe_cache['at'] >= STORAGE_PROBE_TTL:
+        _storage_probe_cache['problems'] = [
+            {'label': label, 'path': path, 'error': err}
+            for label, path, err in env.unwritable_storage()
+        ]
+        _storage_probe_cache['at'] = now
+    return jsonify({'problems': _storage_probe_cache['problems']})
 
 @app.route('/api/health')
 def api_health():
@@ -2954,6 +3472,11 @@ def api_git_backup_push():
     add_notification('error', f'Git push failed: {err}', category='backup')
     return jsonify({'ok': False, 'error': err}), 400
 
+def _same_git_remote(a: str, b: str) -> bool:
+    a, b = (a or '').strip().rstrip('/'), (b or '').strip().rstrip('/')
+    return bool(a) and bool(b) and a.lower() == b.lower()
+
+
 @app.route('/api/backup/git/test', methods=['POST'])
 @csrf_protect
 @login_required
@@ -2962,7 +3485,9 @@ def api_git_backup_test():
     s        = load_settings()
     repo_url = (body.get('repo_url') or s.get('git_backup_repo', '')).strip()
     username = (body.get('username') or s.get('git_backup_username', '')).strip()
-    token    = (body.get('token') or s.get('git_backup_token', '')).strip()
+    token    = (body.get('token') or '').strip()
+    if not token and _same_git_remote(repo_url, s.get('git_backup_repo', '')):
+        token = str(s.get('git_backup_token', '')).strip()
     if not repo_url:
         return jsonify({'ok': False, 'error': 'No repository URL configured'}), 400
     if not _valid_git_url(repo_url):
@@ -3682,6 +4207,15 @@ def api_save_settings():
         webhook_password     = str(data.get('webhook_password', ''))
         crowdsec_lapi_url    = str(data.get('crowdsec_lapi_url', '')).strip()
         crowdsec_api_key     = str(data.get('crowdsec_api_key', ''))
+        crowdsec_alert_limit = str(data.get('crowdsec_alert_limit', '')).strip()
+        if crowdsec_alert_limit:
+            try:
+                _lim = int(crowdsec_alert_limit)
+                if _lim < 0 or _lim > 100000:
+                    return jsonify({'error': 'Alert limit must be between 0 and 100000'}), 400
+                crowdsec_alert_limit = str(_lim)
+            except ValueError:
+                return jsonify({'error': 'Alert limit must be a whole number'}), 400
         crowdsec_machine_id       = str(data.get('crowdsec_machine_id', '')).strip()
         crowdsec_machine_password = str(data.get('crowdsec_machine_password', ''))
         crowdsec_client_cert      = str(data.get('crowdsec_client_cert', '')).strip()
@@ -3728,6 +4262,7 @@ def api_save_settings():
                       webhook_password=webhook_password,
                       crowdsec_lapi_url=crowdsec_lapi_url,
                       crowdsec_api_key=crowdsec_api_key,
+                      crowdsec_alert_limit=crowdsec_alert_limit,
                       crowdsec_machine_id=crowdsec_machine_id,
                       crowdsec_machine_password=crowdsec_machine_password,
                       crowdsec_client_cert=crowdsec_client_cert,
@@ -4319,12 +4854,21 @@ def _toggle_route(route_id: str, enable: bool):
     )
 
 
+def _self_route_service_name() -> str:
+    try:
+        return str((load_settings().get('self_route') or {}).get('router_name')
+                   or 'traefik-manager')
+    except Exception:
+        return 'traefik-manager'
+
+
 def _collect_file_services(configs):
     out = {'http': set(), 'tcp': set(), 'udp': set()}
+    skip = _self_route_service_name()
     for cfg in configs:
         for sec in out:
             out[sec].update(k for k in ((cfg.get(sec) or {}).get('services') or {})
-                            if isinstance(k, str) and k)
+                            if isinstance(k, str) and k and k != skip)
     return {sec: sorted(names) for sec, names in out.items()}
 
 
@@ -4767,7 +5311,10 @@ def save_entry():
                 return jsonify({'ok': False, 'message': _msg}), 400
             flash(_msg, "error")
             return redirect(url_for('index'))
-        if not target_ip and not _has_backends_json and not service_ref:
+        _existing_is_composite = _router_resolves_to_composite(
+            request.form.get('originalName', '').strip() or svc_name, agent)
+        if not target_ip and not _has_backends_json and not service_ref \
+                and not _existing_is_composite:
             _msg = (f"A backend host is required for {protocol.upper()} routes. "
                     f"Send targetIp (repeated per protocol, index "
                     f"{ {'http': 0, 'tcp': 1, 'udp': 2}[protocol] }) or {_backends_field}.")
@@ -4995,6 +5542,16 @@ def save_entry():
             else:
                 _be = _parse_backends_json(request.form.get('backendsJsonHttp'))
                 _managed_backends = False
+                _composite_posted = isinstance(_be, dict) and 'children' in _be
+                _composite_type = str((_be or {}).get('compositeType') or 'weighted').strip()
+                if _composite_posted and _composite_type == 'failover' \
+                        and len(_composite.normalise_children(_be.get('children'))) > 2:
+                    _fo_msg = ('Failover takes two backends: the one that serves '
+                               'and the one that takes over')
+                    if fetch:
+                        return jsonify({'ok': False, 'message': _fo_msg}), 400
+                    flash(_fo_msg, "error")
+                    return redirect(url_for('index'))
                 if _be is not None:
                     _servers = _backend_servers(_be.get('servers'), 'url', scheme)
                     if _servers:
@@ -5051,8 +5608,39 @@ def save_entry():
                 _http_managed = ('rule', 'entryPoints', 'service', 'middlewares', 'tls', 'priority') \
                     if _managed_backends else ('rule', 'entryPoints', 'service', 'middlewares', 'tls')
                 _merge_router(config['http']['routers'], router_name, r, _http_managed)
-                _merge_service(config['http']['services'], service_name, lb, 'url', transport_name,
-                               managed_backends=_managed_backends)
+                _svc_section = config['http']['services']
+                _cmp_block, _cmp_owned, _cmp_names = (
+                    _composite.build(router_name, _composite_type, _be.get('children'),
+                                     lb_extra={k: v for k, v in lb.items() if k != 'servers'})
+                    if _composite_posted else (None, {}, []))
+                if _cmp_block:
+                    _composite.merge_into(_svc_section, service_name, _cmp_block, _cmp_owned)
+                    _stale_prefixes = [router_name]
+                    if is_edit and plain_original_id and plain_original_id != router_name:
+                        _stale_prefixes.append(plain_original_id)
+                    for _prefix in _stale_prefixes:
+                        for _gone in _composite.drop_orphan_children(_svc_section, _prefix,
+                                                                     set(_cmp_owned)):
+                            _ledger.pop(_svc_ledger_key(_gone, agent_id), None)
+                            _ledger_changed = True
+                    for _k, _v in _composite.ledger_entries(service_name, _cmp_block, _cmp_owned,
+                                                            cfg_filename, agent_id).items():
+                        _ledger[_k] = _v
+                    _ledger_changed = True
+                else:
+                    if _composite_posted:
+                        for _gone in _composite.drop_orphan_children(_svc_section, router_name, set()):
+                            _ledger.pop(_svc_ledger_key(_gone, agent_id), None)
+                            _ledger_changed = True
+                        if _svc_ledger_key(service_name, agent_id) in _ledger:
+                            del _ledger[_svc_ledger_key(service_name, agent_id)]
+                            _ledger_changed = True
+                            _existing_svc = _svc_section.get(service_name)
+                            if isinstance(_existing_svc, dict):
+                                for _stale in _composite.TYPES + ('highestRandomWeight',):
+                                    _existing_svc.pop(_stale, None)
+                    _merge_service(_svc_section, service_name, lb, 'url', transport_name,
+                                   managed_backends=_managed_backends)
 
         elif protocol == 'tcp':
             if tcp_rule:
@@ -5168,6 +5756,49 @@ def save_entry():
     return redirect(url_for('index'))
 
 
+def _transport_in_use(config, name, exclude_service=''):
+    http = config.get('http') or {}
+    for sname, sdef in (http.get('services') or {}).items():
+        if sname == exclude_service or not isinstance(sdef, dict):
+            continue
+        lb = sdef.get('loadBalancer')
+        if isinstance(lb, dict) and lb.get('serversTransport') == name:
+            return True
+    try:
+        disabled = load_settings().get('disabled_routes', {}) or {}
+    except Exception:
+        return True
+    for snap in disabled.values():
+        if not isinstance(snap, dict):
+            continue
+        svc = snap.get('service')
+        if not isinstance(svc, dict):
+            continue
+        lb = svc.get('loadBalancer')
+        if isinstance(lb, dict) and lb.get('serversTransport') == name:
+            return True
+    return False
+
+
+def _drop_owned_transport(config, svc_name, ledger, agent_id=''):
+    if not svc_name:
+        return False
+    name = f"{svc_name}-transport"
+    key = f"agent_{agent_id}::tp::{name}" if agent_id else f"tp::{name}"
+    if key not in ledger:
+        return False
+    http = config.get('http') or {}
+    transports = http.get('serversTransports') or {}
+    if name in transports:
+        if _transport_in_use(config, name, exclude_service=svc_name):
+            return False
+        del transports[name]
+        if not transports and 'serversTransports' in http:
+            del http['serversTransports']
+    ledger.pop(key, None)
+    return True
+
+
 @app.route('/delete/<router_id>', methods=['POST'])
 @csrf_protect
 @login_required
@@ -5180,6 +5811,8 @@ def delete_entry(router_id):
         agent           = _agent_by_id(agent_id) if agent_id else None
         plain_id = router_id.split('::', 1)[1] if '::' in router_id else router_id
         deleted = False
+        _del_ledger = dict(settings.get('managed_middlewares', {}) or {})
+        _del_ledger_changed = False
         if agent:
             all_configs = _agent_load_configs(agent)
             for fname, config in all_configs.items():
@@ -5193,6 +5826,8 @@ def delete_entry(router_id):
                         if (svc and 'services' in s and svc in s['services']
                                 and not _service_shared(config, svc, plain_id)):
                             del s['services'][svc]
+                            if _drop_owned_transport(config, svc, _del_ledger, agent_id):
+                                _del_ledger_changed = True
                         _agent_write_config(agent, fname, config)
                         deleted = True
                         break
@@ -5213,6 +5848,15 @@ def delete_entry(router_id):
                         if (svc and 'services' in s and svc in s['services']
                                 and not _service_shared(config, svc, plain_id)):
                             del s['services'][svc]
+                            if _drop_owned_transport(config, svc, _del_ledger):
+                                _del_ledger_changed = True
+                            if sec == 'http':
+                                for _gone in _composite.drop_orphan_children(
+                                        s['services'], plain_id, set()):
+                                    _del_ledger.pop(_svc_ledger_key(_gone, agent_id), None)
+                                    _del_ledger_changed = True
+                                if _del_ledger.pop(_svc_ledger_key(svc, agent_id), None):
+                                    _del_ledger_changed = True
                         create_backup(target_path)
                         save_config(_strip_empty_sections(config), target_path)
                         deleted = True
@@ -5240,6 +5884,14 @@ def delete_entry(router_id):
             threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'route delete'), daemon=True).start()
         else:
             threading.Thread(target=lambda: _git_push_if_enabled('route delete'), daemon=True).start()
+        if _del_ledger_changed:
+            _s = load_settings()
+            save_settings(
+                domains=_s['domains'], cert_resolver=_s['cert_resolver'],
+                traefik_api_url=_s['traefik_api_url'], auth_enabled=_s['auth_enabled'],
+                password_hash=_s['password_hash'], visible_tabs=_s['visible_tabs'],
+                managed_middlewares=_del_ledger,
+            )
         msg = f"Route {plain_id} deleted"
         add_notification('warning', msg)
         if fetch:
@@ -5724,6 +6376,7 @@ def api_test_oidc():
 def _redact_agent(a: dict) -> dict:
     out = dict(a)
     out['api_key'] = '***' if out.get('api_key') else ''
+    out['traefik_api_password'] = '***' if out.get('traefik_api_password') else ''
     out['crowdsec_api_key'] = '***' if out.get('crowdsec_api_key') else ''
     out['crowdsec_machine_password'] = '***' if out.get('crowdsec_machine_password') else ''
     out['git_backup_token'] = '***' if out.get('git_backup_token') else ''
@@ -5826,7 +6479,8 @@ def api_agent_routes(agent_id):
                                     extra_http_svcs=combined_http,
                                     extra_tcp_svcs=combined_tcp,
                                     extra_udp_svcs=combined_udp,
-                                    api_svc_urls=svc_urls))
+                                    api_svc_urls=svc_urls,
+                                    agent_id=agent_id))
             middlewares.extend(_build_middlewares(config, config_file=fname))
 
         apps.extend(_build_external_routes(all_routers, svc_urls))
@@ -5887,6 +6541,9 @@ def api_agent_routes(agent_id):
 
         return jsonify({'apps': apps, 'middlewares': middlewares, 'configErrors': config_errors,
                         'services': _collect_file_services(all_configs.values())})
+    except requests.exceptions.SSLError as e:
+        return jsonify({'error': 'TLS verification failed - the agent certificate is not trusted '
+                                 'by Traefik Manager (%s)' % str(e)[:100]}), 502
     except requests.exceptions.ConnectionError:
         return jsonify({'error': 'Cannot reach agent'}), 502
     except Exception as e:
@@ -5960,6 +6617,9 @@ def api_agents_create():
     url  = str(data.get('url', '')).strip().rstrip('/')
     if not name or not url:
         return jsonify({'error': 'name and url are required'}), 400
+    url_err = _agent_url_error(url)
+    if url_err:
+        return jsonify({'error': url_err}), 400
     raw_key = secrets.token_urlsafe(32)
     agent = {
         'id':         str(_uuid.uuid4()),
@@ -5967,6 +6627,7 @@ def api_agents_create():
         'url':        url,
         'api_key':    raw_key,
         'created_at': datetime.now(timezone.utc).isoformat(),
+        'install_method':        'cli' if str(data.get('install_method', '')).strip() == 'cli' else 'manual',
         'traefik_api_url':       str(data.get('traefik_api_url', 'http://traefik:8080')).strip(),
         'cert_resolver':         str(data.get('cert_resolver', '')).strip(),
         'config_path':           str(data.get('config_path', '/app/config')).strip(),
@@ -6002,12 +6663,33 @@ def api_agents_create():
     return jsonify({'ok': True, 'agent': result})
 
 
+def _agent_url_error(url: str) -> str:
+    value = str(url or '').strip()
+    if not value:
+        return 'Agent URL must not be empty.'
+    if not value.startswith(('http://', 'https://')):
+        return 'Agent URL must start with http:// or https:// - without a scheme the agent cannot be reached.'
+    rest = value.split('://', 1)[1]
+    if not rest or rest.startswith('/'):
+        return 'Agent URL must include a host, for example http://10.0.0.5:8090'
+    return ''
+
+
 @app.route('/api/agents/<agent_id>', methods=['PUT'])
 @csrf_protect
 @login_required
 def api_agents_update(agent_id):
     data    = request.get_json(silent=True) or {}
     agents  = load_agents()
+    if 'url' in data:
+        url_err = _agent_url_error(str(data.get('url', '')).strip())
+        if url_err:
+            return jsonify({'ok': False, 'error': url_err}), 400
+        data['url'] = str(data.get('url', '')).strip().rstrip('/')
+    if 'name' in data:
+        data['name'] = str(data.get('name', '')).strip()[:100]
+        if not data['name']:
+            return jsonify({'ok': False, 'error': 'Name must not be empty.'}), 400
     target  = next((a for a in agents if a.get('id') == agent_id), {})
     renames_derived_branch = ('name' in data
                               and target.get('git_host_backup')
@@ -6042,12 +6724,16 @@ def api_agents_update(agent_id):
                 'git_backup_branch', 'git_backup_username', 'git_backup_auto_push',
                 'git_backup_commit_message', 'tma_port', 'tma_rate_limit', 'domains',
                 'git_host_backup', 'git_host_branch',
+                'traefik_api_user', 'git_backup_commit_message',
+                'install_method',
             ]
             for field in updatable:
                 if field in data:
                     agents[i][field] = data[field]
             if 'visible_tabs' in data:
                 agents[i]['visible_tabs'] = _settings.sanitize_visible_tabs(data['visible_tabs'])
+            if 'traefik_api_password' in data and data['traefik_api_password'] not in ('', '***'):
+                agents[i]['traefik_api_password'] = str(data['traefik_api_password'])
             if 'crowdsec_api_key' in data and data['crowdsec_api_key'] not in ('', '***'):
                 agents[i]['crowdsec_api_key'] = str(data['crowdsec_api_key'])
             if 'crowdsec_machine_password' in data and data['crowdsec_machine_password'] not in ('', '***'):
@@ -6062,12 +6748,53 @@ def api_agents_update(agent_id):
     return jsonify({'ok': True})
 
 
+def _remove_agent_git_clone(agent_id: str) -> bool:
+    try:
+        target = os.path.abspath(_git_agent_repo_dir(agent_id))
+        base   = os.path.abspath(env.BACKUP_DIR)
+        if not target.startswith(base + os.sep):
+            return False
+        if not os.path.basename(target).startswith('git-agent-'):
+            return False
+        if not os.path.isdir(target):
+            return False
+        shutil.rmtree(target, ignore_errors=True)
+        return True
+    except Exception:
+        logger.exception("Could not remove the git clone for agent %s" % agent_id)
+        return False
+
+
+def _forget_agent_settings(agent_id: str) -> bool:
+    prefix = f"agent_{agent_id}::"
+    s = load_settings()
+    disabled = {k: v for k, v in (s.get('disabled_routes') or {}).items()
+                if not str(k).startswith(prefix)}
+    ledger   = {k: v for k, v in (s.get('managed_middlewares') or {}).items()
+                if not str(k).startswith(prefix)}
+    if (len(disabled) == len(s.get('disabled_routes') or {})
+            and len(ledger) == len(s.get('managed_middlewares') or {})):
+        return False
+    save_settings(
+        domains=s['domains'], cert_resolver=s['cert_resolver'],
+        traefik_api_url=s['traefik_api_url'], auth_enabled=s['auth_enabled'],
+        password_hash=s['password_hash'], visible_tabs=s['visible_tabs'],
+        disabled_routes=disabled, managed_middlewares=ledger,
+    )
+    return True
+
+
 @app.route('/api/agents/<agent_id>', methods=['DELETE'])
 @csrf_protect
 @login_required
 def api_agents_delete(agent_id):
-    agents = [a for a in load_agents() if a.get('id') != agent_id]
+    before = load_agents()
+    agents = [a for a in before if a.get('id') != agent_id]
+    if len(agents) == len(before):
+        return jsonify({'ok': True})
     save_agents_file(agents)
+    _remove_agent_git_clone(agent_id)
+    _forget_agent_settings(agent_id)
     return jsonify({'ok': True})
 
 
@@ -6105,10 +6832,19 @@ def api_agents_health(agent_id):
         ms   = int((time.time() - t0) * 1000)
         body = resp.json() if resp.headers.get('content-type', '').startswith('application/json') else {}
         return jsonify({'ok': resp.status_code == 200, 'latency_ms': ms, 'version': body.get('version', ''), 'status': resp.status_code})
+    except requests.exceptions.SSLError as e:
+        return jsonify({'ok': False, 'latency_ms': -1,
+                        'error': 'TLS verification failed - the agent certificate is not trusted '
+                                 'by Traefik Manager (%s)' % str(e)[:100]})
     except requests.exceptions.ConnectionError:
         return jsonify({'ok': False, 'latency_ms': -1, 'error': 'Connection refused'})
     except Exception as e:
         return jsonify({'ok': False, 'latency_ms': -1, 'error': str(e)})
+
+
+_PROXY_HEADER_DENY = frozenset({
+    'x-api-key', 'x-csrf-token', 'x-frame-options', 'x-powered-by',
+})
 
 
 @app.route('/api/agents/proxy/<agent_id>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
@@ -6133,7 +6869,14 @@ def api_agents_proxy(agent_id, path):
                 and any(agent_path.startswith(x) for x in ('/api/configs', '/api/routes', '/api/middlewares', '/api/static', '/api/restore/', '/api/backup/'))):
             threading.Thread(target=lambda: _git_push_agent_if_enabled(agent, 'config change'), daemon=True).start()
         content_type = resp.headers.get('content-type', 'application/json')
-        return resp.content, resp.status_code, {'Content-Type': content_type}
+        out_headers = {'Content-Type': content_type}
+        for key, value in resp.headers.items():
+            if key.lower().startswith('x-') and key.lower() not in _PROXY_HEADER_DENY:
+                out_headers[key] = value
+        return resp.content, resp.status_code, out_headers
+    except requests.exceptions.SSLError as e:
+        return jsonify({'error': 'TLS verification failed - the agent certificate is not trusted '
+                                 'by Traefik Manager (%s)' % str(e)[:100]}), 502
     except requests.exceptions.ConnectionError:
         return jsonify({'error': 'Cannot reach agent - check URL and network'}), 502
     except requests.exceptions.Timeout:

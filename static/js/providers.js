@@ -104,7 +104,7 @@ function _tmProviderCard(r, opts, ctx) {
     ].filter(Boolean).join('<span class="tm-sep"> · </span>');
 
     const rail = `<span class="tm-rail tm-rail-sm" onclick="event.stopPropagation()">` +
-        (extUrl ? `<a href="${extUrl}" target="_blank" rel="noopener" class="tm-btn" title="Open site" onclick="event.stopPropagation()"><i class="ph-bold ph-arrow-square-out"></i></a>` : '') +
+        (extUrl ? `<a href="${_esc(extUrl)}" target="_blank" rel="noopener" class="tm-btn" title="Open site" onclick="event.stopPropagation()"><i class="ph-bold ph-arrow-square-out"></i></a>` : '') +
         (opts.onDetailClick ? `<button type="button" class="tm-btn" title="Details" onclick="event.stopPropagation();${opts.onDetailClick}"><i class="ph-bold ph-info"></i></button>` : '') +
         '</span>';
 

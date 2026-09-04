@@ -19,14 +19,15 @@ What it does:
 
 1. Seeds demo data: 20 routes named after real apps (so dashboard groups and
    icons resolve), middlewares, multi-backend/TCP/UDP/shared-service examples,
-   six self-signed certificates with staggered expiries, and a generated JSON
-   access log (`gen_data.py`).
+   a weighted and a mirroring service (one of them managed by Traefik Manager,
+   so the ownership and edit paths are shot), six self-signed certificates with
+   staggered expiries, and a generated JSON access log (`gen_data.py`).
 2. Boots Traefik v3.6 + Traefik Manager on a private docker network so live
    stats, entry points and router status are real. Traefik gets a copy of the
    dynamic config without `certResolver` so no router shows an ACME error.
 3. Logs in through the real login page (password `screenshots`) and drives
    headless Chrome through every tab, view mode, modal and settings panel in
-   dark and light (`capture.mjs` - 26 views per theme).
+   dark and light (`capture.mjs` - 38 views per theme).
 4. Resizes to 1920x1080, installs into `docs/public/images/` under the
    existing names, and rebuilds both README carousel GIFs
    (`install_images.py`).

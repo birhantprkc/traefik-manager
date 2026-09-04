@@ -55,5 +55,12 @@ else {
     }
 }
 
+for (const a of ADVISORIES) {
+    if (!/v\d+\.\d+\.\d+/.test(a.fixedIn || '')) {
+        console.error(`FAIL ${a.id} has no fixedIn, so the UI cannot say which release to move to`);
+        failed++;
+    }
+}
+
 if (failed) { console.error(`${failed} advisory check(s) failed`); process.exit(1); }
 console.log(`ok - ${cases.length} version boundaries and 4 field checks`);

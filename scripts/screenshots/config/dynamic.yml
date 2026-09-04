@@ -114,9 +114,30 @@ http:
         certResolver: letsencrypt
   services:
     jellyfin-service:
+      weighted:
+        services:
+          - name: jellyfin-service-backend-1
+            weight: 3
+          - name: jellyfin-service-backend-2
+            weight: 1
+    jellyfin-service-backend-1:
       loadBalancer:
         servers:
           - url: http://10.0.10.11:8096
+    jellyfin-service-backend-2:
+      loadBalancer:
+        servers:
+          - url: http://10.0.10.13:8096
+    nextcloud-service-mirror:
+      mirroring:
+        service: nextcloud-service
+        mirrors:
+          - name: nextcloud-staging
+            percent: 10
+    nextcloud-staging:
+      loadBalancer:
+        servers:
+          - url: http://10.0.10.31:11000
     sonarr-service:
       loadBalancer:
         servers:

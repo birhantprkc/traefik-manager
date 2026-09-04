@@ -57,6 +57,54 @@ def _merge_router(section: dict, name: str, new: dict, managed: tuple) -> None:
         return
     _apply_managed_keys(existing, new, managed)
 
+def _service_is_owned(name: str, svc_def, agent_id: str = '') -> bool:
+    from core import service_ownership as own_mod
+    from core import settings as settings_mod
+    try:
+        ledger = settings_mod.load_settings().get('managed_middlewares') or {}
+    except Exception:
+        return False
+    return own_mod.is_owned(str(name).split('@')[0], svc_def, ledger, agent_id)
+
+
+def _composite_children_rows(services: dict, svc_def) -> list:
+    from core import service_ownership as own_mod
+    kind = own_mod.composite_type(svc_def)
+    if not kind:
+        return []
+    block = cfg_mod.as_dict(svc_def).get(kind) or {}
+    rows = []
+    if kind in ('weighted', 'highestRandomWeight'):
+        entries = [(c.get('name'), c.get('weight'), None)
+                   for c in (block.get('services') or []) if isinstance(c, dict)]
+    elif kind == 'mirroring':
+        entries = [(block.get('service'), None, None)]
+        entries += [(c.get('name'), None, c.get('percent'))
+                    for c in (block.get('mirrors') or []) if isinstance(c, dict)]
+    else:
+        entries = [(block.get('service'), None, None), (block.get('fallback'), None, None)]
+    for name, weight, percent in entries:
+        if not name:
+            continue
+        child_lb = cfg_mod.as_dict(cfg_mod.as_dict(services.get(cfg_mod.svc_key(name))).get('loadBalancer'))
+        url = next((str(sv.get('url')) for sv in (child_lb.get('servers') or [])
+                    if isinstance(sv, dict) and sv.get('url')), '')
+        rows.append({'name': str(name), 'url': url,
+                     'weight': weight if weight is not None else 1,
+                     'percent': percent if percent is not None else 0})
+    return rows
+
+
+def _composite_child_lb(services: dict, svc_def) -> dict:
+    from core import service_ownership as own_mod
+    for child in own_mod.child_names(svc_def):
+        child_def = services.get(cfg_mod.svc_key(child))
+        child_lb = cfg_mod.as_dict(cfg_mod.as_dict(child_def).get('loadBalancer'))
+        if child_lb:
+            return child_lb
+    return {}
+
+
 def _merge_service(section: dict, name: str, new_lb: dict, server_key: str, transport_name: str,
                    managed_backends: bool = False) -> None:
     existing = section.get(name)
@@ -205,7 +253,7 @@ def _service_type(svc_def) -> str:
                 return t
     return 'loadBalancer'
 
-def _build_apps(config, config_file='', extra_http_svcs=None, extra_tcp_svcs=None, extra_udp_svcs=None, api_svc_urls=None):
+def _build_apps(config, config_file='', extra_http_svcs=None, extra_tcp_svcs=None, extra_udp_svcs=None, api_svc_urls=None, agent_id=''):
     apps = []
     http_config = config.get('http') or {}
     http_svcs = dict(http_config.get('services') or {})
@@ -222,6 +270,8 @@ def _build_apps(config, config_file='', extra_http_svcs=None, extra_tcp_svcs=Non
         lb = {}
         if svc_key in http_svcs:
             lb = cfg_mod.as_dict(cfg_mod.as_dict(http_svcs[svc_key]).get('loadBalancer'))
+            if not lb:
+                lb = _composite_child_lb(http_svcs, http_svcs[svc_key])
             servers = lb.get('servers', [])
             if servers:
                 target_url = _server_field(servers, 'url', 'Unknown')
@@ -252,6 +302,8 @@ def _build_apps(config, config_file='', extra_http_svcs=None, extra_tcp_svcs=Non
                      'healthCheck': lb.get('healthCheck') if isinstance(lb.get('healthCheck'), dict) else {},
                      'priority': rdata.get('priority'),
                      'serviceType': _service_type(http_svcs.get(svc_key)),
+                     'compositeChildren': _composite_children_rows(http_svcs, http_svcs.get(svc_key)),
+                     'serviceOwned': _service_is_owned(svc_key, http_svcs.get(svc_key), agent_id),
                      'configFile': config_file, 'provider': 'file'})
     tcp_config = config.get('tcp') or {}
     tcp_svcs = dict(tcp_config.get('services') or {})

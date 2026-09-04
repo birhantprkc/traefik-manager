@@ -52,6 +52,11 @@ Adding a route is a slide-in form. HTTP routes get domains, backends, load balan
 <img class="screenshot dark-only" src="/images/dark-routes-add-udp.png" alt="Add UDP route">
 <img class="screenshot light-only" src="/images/light-routes-add-udp.png" alt="Add UDP route">
 
+A route can point at an existing service instead of building its own backends.
+
+<img class="screenshot dark-only" src="/images/dark-routes-add-service.png" alt="Point a route at an existing service">
+<img class="screenshot light-only" src="/images/light-routes-add-service.png" alt="Point a route at an existing service">
+
 ## Middlewares
 
 The same card and list treatment for middlewares, with usage counts, and a form that knows the config shape of every middleware type.
@@ -74,6 +79,19 @@ Every service with its backends, health and the routers using it.
 
 <img class="screenshot dark-only" src="/images/dark-services-list.png" alt="Services list view">
 <img class="screenshot light-only" src="/images/light-services-list.png" alt="Services list view">
+
+The detail panel lists a composite service's backends with the role and share of each, and offers to manage a service Traefik Manager did not write.
+
+<img class="screenshot dark-only" src="/images/dark-services-detail.png" alt="Service detail panel">
+<img class="screenshot light-only" src="/images/light-services-detail.png" alt="Service detail panel">
+
+Services can be built on their own, without a route: a load balancer, or a weighted, mirroring or failover service over other services.
+
+<img class="screenshot dark-only" src="/images/dark-services-add.png" alt="Add service">
+<img class="screenshot light-only" src="/images/light-services-add.png" alt="Add service">
+
+<img class="screenshot dark-only" src="/images/dark-services-edit.png" alt="Edit service">
+<img class="screenshot light-only" src="/images/light-services-edit.png" alt="Edit service">
 
 ## Route Map
 

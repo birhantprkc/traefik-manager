@@ -188,7 +188,7 @@ function _tmTlsOptCard(o, i) {
     const rail = `<span class="tm-rail" onclick="event.stopPropagation()">` +
         `<button type="button" class="tm-btn" title="Details" data-idx="${i}" onclick="event.stopPropagation();_tlsOptInfo(this)"><i class="ph-bold ph-info"></i></button>` +
         `<button type="button" class="tm-btn" title="Edit" data-idx="${i}" onclick="event.stopPropagation();_tlsOptEdit(this)"><i class="ph-bold ph-pencil-simple"></i></button>` +
-        `<button type="button" class="tm-btn" title="Delete" onclick="event.stopPropagation();deleteTlsOption('${_esc(o.name)}','${_esc(o.configFile || '')}')"><i class="ph-bold ph-trash"></i></button>` +
+        `<button type="button" class="tm-btn" title="Delete" onclick="event.stopPropagation();deleteTlsOption(${_jsArg(o.name)},${_jsArg(o.configFile || '')})"><i class="ph-bold ph-trash"></i></button>` +
         '</span>';
 
     return `<div class="tm-card tls-opt-card" data-name="${_esc(o.name.toLowerCase())}" data-idx="${i}" style="--tm-accent:var(--green)" onclick="openTlsOptDetail(_tlsOptions[${i}])">
@@ -254,7 +254,7 @@ function openTlsOptDetail(o) {
     const usedByHtml = renderDetailBlock('Used by', 'ph-arrows-split',
         usedBy.length
             ? `<div class="flex flex-wrap gap-1.5">${usedBy.map(r =>
-                `<button type="button" class="route-deep-chip" onclick="_openRouteByName('${_esc(String(r.name))}')" title="Open route"><i class="ph-bold ph-arrows-split"></i>${_esc(String(r.name).split('@')[0])}</button>`).join('')}</div>`
+                `<button type="button" class="route-deep-chip" onclick="_openRouteByName(${_jsArg(String(r.name))})" title="Open route"><i class="ph-bold ph-arrows-split"></i>${_esc(String(r.name).split('@')[0])}</button>`).join('')}</div>`
             : `<div class="text-xs" style="color:var(--muted)">No routes using this profile.</div>`,
         _dCount(usedBy.length));
     const yamlHtml = o.yaml ? renderDetailBlock('Raw YAML', 'ph-code',

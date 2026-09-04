@@ -38,7 +38,7 @@ The Static Config editor's **Providers** section has a File card with a **Direct
 
 ### Where does Traefik Manager write my routes, and are my hand edits kept?
 
-To the file chosen in the **Config File** selector on the Add/Edit Route form, defaulting to `CONFIG_PATH` (or the first entry of `CONFIG_PATHS`). Saves merge rather than rewrite: comments, key order and anything Traefik Manager does not manage survive. Editing an existing router touches only `rule`, `entryPoints`, `service`, `middlewares` and `tls`. A timestamped copy goes to `BACKUP_DIR` before every write.
+To the file chosen in the **Config File** selector on the Add/Edit Route form, defaulting to `CONFIG_PATH` (or the first entry of `CONFIG_PATHS`). Saves merge rather than rewrite: comments, key order and anything Traefik Manager does not manage survive. Editing an existing router touches only `rule`, `entryPoints`, `service`, `middlewares`, `tls` and, when Traefik Manager manages the route's backends, `priority`. A timestamped copy goes to `BACKUP_DIR` before every write.
 
 ### Can I manage several dynamic config files? Several static configs?
 
@@ -66,6 +66,14 @@ The route form, and nothing else. Neither changes Traefik's configuration, your 
 Both seed `manager.yml` on first start only. After that the Settings values win and changing the variable does nothing.
 
 ---
+
+### Why can't I edit this route's backend?
+
+The route points at a `weighted`, `mirroring`, `failover` or `highestRandomWeight` service that
+Traefik Manager does not manage, so the target field is locked rather than silently ignored. Edit
+the service on the [Services tab](tab-services.md), or open its detail panel and choose **Manage
+this service** to let Traefik Manager take it over. Composites built by Traefik Manager itself are
+editable directly from the route form.
 
 ## Certificates
 
@@ -168,7 +176,7 @@ It writes to a fixed set of paths, and backs up every config file before it touc
 |---|---|
 | `CONFIG_PATH` / `CONFIG_PATHS` / `CONFIG_DIR` | Routers, services and middlewares you add or edit, merged into the existing YAML |
 | `BACKUP_DIR` (`/app/backups`) | A timestamped copy of each config file before every write. `BACKUP_KEEP_COUNT` prunes old ones |
-| The `SETTINGS_PATH` directory (`/app/config`) | `manager.yml` plus `agents.yml`, `templates.yml`, `notifications.yml`, `dashboard.yml`, `.secret_key`, `.otp_key` and a `cache/` directory |
+| The `SETTINGS_PATH` directory (`/app/config`) | `manager.yml` plus `agents.yml`, `templates.yml`, `notifications.yml`, `dashboard.yml`, `.secret_key`, `.otp_key`, a `cache/` directory, and a `geoip/` directory with a `.geoip.lock` beside it when IP geolocation is on |
 | `STATIC_CONFIG_PATH` | Your `traefik.yml`, only when it is mounted read-write and only when you save in the Static Config editor |
 
 `acme.json` and the access log are read-only. Leave `STATIC_CONFIG_PATH` unset and Traefik's own config file is never opened for writing.

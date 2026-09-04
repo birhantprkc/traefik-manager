@@ -4,7 +4,7 @@ function _showSelfRouteEpWarning(badEp, fixEp) {
     el.id = 'selfRouteEpWarning';
     el.className = 'toast-item error';
     el.style.cssText = 'animation:none;cursor:default;align-items:flex-start;gap:10px';
-    el.innerHTML = `<i class="ph-fill ph-warning-circle text-red-400 text-lg" style="margin-top:2px;flex-shrink:0"></i><span style="flex:1;line-height:1.5">Self-route entrypoint <b style="font-family:monospace">${_esc(badEp)}</b> does not exist in Traefik.<br><span style="font-size:12px;opacity:0.8">Your TM domain may not be accessible. Use <b style="font-family:monospace">${_esc(fixEp)}</b> instead?</span></span><div style="display:flex;gap:6px;flex-shrink:0;margin-top:2px"><button onclick="_fixSelfRouteEp('${_esc(fixEp)}')" style="padding:3px 10px;border-radius:5px;background:var(--red);color:#fff;font-size:12px;border:none;cursor:pointer">Fix</button><button onclick="document.getElementById('selfRouteEpWarning').remove()" style="padding:3px 8px;border-radius:5px;background:transparent;color:var(--muted);font-size:12px;border:1px solid var(--border);cursor:pointer">Dismiss</button></div>`;
+    el.innerHTML = `<i class="ph-fill ph-warning-circle text-red-400 text-lg" style="margin-top:2px;flex-shrink:0"></i><span style="flex:1;line-height:1.5">Self-route entrypoint <b style="font-family:monospace">${_esc(badEp)}</b> does not exist in Traefik.<br><span style="font-size:12px;opacity:0.8">Your TM domain may not be accessible. Use <b style="font-family:monospace">${_esc(fixEp)}</b> instead?</span></span><div style="display:flex;gap:6px;flex-shrink:0;margin-top:2px"><button onclick="_fixSelfRouteEp(${_jsArg(fixEp)})" style="padding:3px 10px;border-radius:5px;background:var(--red);color:#fff;font-size:12px;border:none;cursor:pointer">Fix</button><button onclick="document.getElementById('selfRouteEpWarning').remove()" style="padding:3px 8px;border-radius:5px;background:transparent;color:var(--muted);font-size:12px;border:1px solid var(--border);cursor:pointer">Dismiss</button></div>`;
     document.getElementById('toastContainer').appendChild(el);
 }
 
@@ -366,6 +366,7 @@ const TRAEFIK_ADVISORIES = [
         url: 'https://github.com/traefik/traefik/security/advisories/GHSA-5m6w-wvh7-57vm',
         forwardAuthRelated: true,
         summary: 'ForwardAuth authentication bypass via forwarded header aliases',
+        fixedIn: 'v3.6.14 or v2.11.43',
         affected: (p) => {
             const [maj, min, pat] = p;
             if (maj < 2) return true;

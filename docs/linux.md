@@ -324,6 +324,8 @@ See the [Environment Variables](env-vars.md) reference for the full priority ord
 
 When serving Traefik Manager over HTTPS through a reverse proxy, set `COOKIE_SECURE=true` in the service unit and remove the direct port binding.
 
+To serve Traefik Manager under a path rather than its own hostname, set [`BASE_PATH`](env-vars.md#base-path).
+
 ### nginx
 
 ```nginx

@@ -38,6 +38,21 @@ from `manager.yml` and restart.
 | `AUTH_ENABLED` | `true` | Overrides `auth_enabled` | Set to `false` to disable built-in login entirely |
 | `ADMIN_PASSWORD` | _(unset)_ | Overrides `password_hash` | Admin password in plain text |
 
+### OIDC
+
+| Variable | Default | Precedence | Description |
+|---|---|---|---|
+| `OIDC_ENABLED` | `false` | Seeds `oidc_enabled` | Turn on OIDC login |
+| `OIDC_PROVIDER_URL` | _(unset)_ | Seeds `oidc_provider_url` | Issuer URL, without `/.well-known/openid-configuration` |
+| `OIDC_CLIENT_ID` | _(unset)_ | Seeds `oidc_client_id` | Client ID from your provider |
+| `OIDC_CLIENT_SECRET` | _(unset)_ | Seeds `oidc_client_secret` | Client secret (stored encrypted) |
+| `OIDC_DISPLAY_NAME` | `OIDC` | Seeds `oidc_display_name` | Name on the login button |
+| `OIDC_ALLOWED_EMAILS` | _(unset)_ | Seeds `oidc_allowed_emails` | Comma-separated email allowlist |
+| `OIDC_ALLOWED_GROUPS` | _(unset)_ | Seeds `oidc_allowed_groups` | Comma-separated group allowlist |
+| `OIDC_GROUPS_CLAIM` | `groups` | Seeds `oidc_groups_claim` | Claim holding the user's groups |
+| `OIDC_ALLOW_ANY_AUTHENTICATED` | `false` | Seeds `oidc_allow_any_authenticated` | Accept any account the provider authenticates |
+| `OIDC_AUTO_LOGIN` | `false` | Seeds `oidc_auto_login` | Skip the login page and go straight to the provider |
+
 ### Routes & Domains
 
 | Variable | Default | Precedence | Description |
@@ -83,7 +98,7 @@ from `manager.yml` and restart.
 | `CROWDSEC_CA_CERT` | _(unset)_ | Fallback `crowdsec_ca_cert` | Path to the CA certificate that signed the LAPI's own certificate (private PKI) |
 | `CROWDSEC_READ_TIMEOUT` | `20` | - | Seconds to wait for the LAPI to answer. Capped at 25 |
 | `CROWDSEC_CONNECT_TIMEOUT` | `5` | - | Seconds to wait for the TCP/TLS connection itself |
-| `CROWDSEC_ALERT_LIMIT` | `500` | - | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
+| `CROWDSEC_ALERT_LIMIT` | `500` | Fallback `crowdsec_alert_limit` | How many of the most recent alerts to read. `0` reads every alert, which is slow on a large LAPI |
 
 ### Agents
 
@@ -99,6 +114,7 @@ from `manager.yml` and restart.
 | `INACTIVITY_TIMEOUT_MINUTES` | `120` | - | Log out after this many minutes of inactivity |
 | `OTP_ENCRYPTION_KEY` | _(auto-generated)_ | - | Fernet key for every secret stored encrypted in `manager.yml` |
 | `PROXY_FIX_HOPS` | `1` | - | Number of trusted proxy hops in front of Traefik Manager for `X-Forwarded-For` |
+| `BASE_PATH` | _(none)_ | - | Serve Traefik Manager under a sub path, for example `/traefik-manager` |
 | `LOG_LEVEL` | `INFO` | - | Python log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
 ---
@@ -209,6 +225,44 @@ Environment=ADMIN_PASSWORD=mysecretpassword
 
 ::: info
 When set, the in-UI password change and 2FA are bypassed. `flask reset-password` with `--prompt`, `--stdin` or `--password` exits with an error and writes nothing; with no password option it still writes a temporary password, which login then ignores. Remove the variable to switch back to `manager.yml`-managed passwords.
+:::
+
+---
+
+## OIDC
+
+### `OIDC_*`
+
+**Seeds:** the ten `oidc_*` keys in `manager.yml`
+
+Configure OIDC without opening Settings. Each variable seeds its matching key, so it applies while that key is absent from `manager.yml` and stops applying once the key is written there. Booleans accept `true`/`1`/`yes`/`on` and `false`/`0`/`no`/`off`.
+
+:::tabs
+== Docker / Podman
+```yaml
+environment:
+  - OIDC_ENABLED=true
+  - OIDC_PROVIDER_URL=https://id.example.com/application/o/tm/
+  - OIDC_CLIENT_ID=traefik-manager
+  - OIDC_CLIENT_SECRET=your-client-secret
+  - OIDC_DISPLAY_NAME=Authentik
+  - OIDC_ALLOWED_GROUPS=admins
+```
+== Linux (systemd)
+```ini
+Environment=OIDC_ENABLED=true
+Environment=OIDC_PROVIDER_URL=https://id.example.com/application/o/tm/
+Environment=OIDC_CLIENT_ID=traefik-manager
+Environment=OIDC_CLIENT_SECRET=your-client-secret
+Environment=OIDC_DISPLAY_NAME=Authentik
+Environment=OIDC_ALLOWED_GROUPS=admins
+```
+:::
+
+`OIDC_CLIENT_SECRET` is encrypted the first time it is written to `manager.yml`. See [OIDC](oidc.md) for the provider setup and [manager.yml](manager-yml.md) for each key.
+
+::: warning
+Leaving both `OIDC_ALLOWED_EMAILS` and `OIDC_ALLOWED_GROUPS` empty denies every login unless `OIDC_ALLOW_ANY_AUTHENTICATED` is `true`.
 :::
 
 ---
@@ -528,6 +582,16 @@ Traefik writes one storage file per certificate resolver. Give them comma-separa
 
 Certificates from every file are shown together, each tagged with the file it came from.
 
+This is also how you read certificates out of a Docker named volume. Docker cannot mount a single
+file from one, so mount the volume as a directory and name the file here:
+
+```yaml
+environment:
+  ACME_JSON_PATH: /traefik-certs/acme.json
+volumes:
+  - traefik_certs:/traefik-certs:ro
+```
+
 :::tabs
 == Docker / Podman
 ```yaml
@@ -569,6 +633,16 @@ volumes:
 Environment=ACCESS_LOG_PATH=/var/log/traefik/access.log
 ```
 :::
+
+If Traefik writes its log into a Docker named volume, mount the volume as a directory and name the
+file here, since Docker cannot mount a single file out of one:
+
+```yaml
+environment:
+  ACCESS_LOG_PATH: /traefik-logs/access.log
+volumes:
+  - traefik_logs:/traefik-logs:ro
+```
 
 ---
 
@@ -710,6 +784,8 @@ environment:
 
 How many of the most recent alerts the CrowdSec tab reads, newest first. The default keeps the tab responsive on a LAPI holding a large community blocklist. Set it to `0` to read every alert the LAPI still retains - on a large instance that can take longer than the read timeout allows, which is what the limit exists to prevent.
 
+**Alert limit** under **Settings - System Monitoring - CrowdSec** wins when it is set. It is written to `manager.yml` as `crowdsec_alert_limit` and survives a Settings save; this env var applies when the field is blank.
+
 ```yaml
 environment:
   - CROWDSEC_ALERT_LIMIT=1000
@@ -774,6 +850,36 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 ::: warning
 Lose this key and every stored secret becomes unreadable - 2FA must be re-enrolled and the other credentials re-entered. Back up `.otp_key` alongside your config volume.
 :::
+
+---
+
+### `BASE_PATH`
+
+**Default:** _(none)_
+
+Serves Traefik Manager under a sub path instead of the root of a host, for example
+`https://example.com/traefik-manager`. Leave it unset to serve from the root, which is the default
+and needs no configuration.
+
+The value must be a path starting with a single `/`, with no trailing slash and no scheme. Anything
+else is ignored and logged at startup.
+
+```yaml
+services:
+  traefik-manager:
+    environment:
+      BASE_PATH: /traefik-manager
+```
+
+A `stripPrefix` middleware in front is optional. Traefik Manager accepts the prefixed path whether or
+not Traefik has already removed it.
+
+::: warning OIDC redirect URI
+If you use OIDC, the callback URL changes when you set this. Update the redirect URI at your identity
+provider to include the prefix, or sign in will fail after the redirect.
+:::
+
+Use a sub domain instead where you can. It needs no configuration on either side.
 
 ---
 

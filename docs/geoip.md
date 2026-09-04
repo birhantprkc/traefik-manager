@@ -28,7 +28,7 @@ By default TM uses the free **[DB-IP Lite](https://db-ip.com) IP-to-Country** da
 
 - **License:** CC-BY 4.0 - the only requirement is the visible "IP Geolocation by DB-IP" credit shown in the app.
 - **Size:** ~4 MB, country-level.
-- **Updates:** published monthly. TM checks once at startup and re-downloads if the database is missing or more than 35 days old; between restarts, use **Download / Update** in Settings.
+- **Updates:** published monthly. TM checks at startup and once a day after that, and re-downloads if the database is missing or more than 35 days old. **Download / Update** in Settings does it on demand.
 - **Download:** keyless, no account needed.
 
 The database lives in a `geoip/` folder next to `manager.yml` - `/app/config/geoip/dbip-country-lite.mmdb` by default. The location follows `SETTINGS_PATH`, not the `CONFIG_DIR` environment variable.
@@ -44,7 +44,7 @@ volumes:
   - /path/to/GeoLite2-Country.mmdb:/data/GeoLite2-Country.mmdb:ro
 ```
 
-`GEOIP_DB_PATH` only changes which file TM reads. The DB-IP auto-download still targets that same path, so if the file is more than 35 days old at startup - or you click Download / Update - your custom database is overwritten with DB-IP Lite. Mount it read-only to prevent that.
+`GEOIP_DB_PATH` only changes which file TM reads. The DB-IP auto-download still targets that same path, so once the file is more than 35 days old - or you click Download / Update - your custom database is overwritten with DB-IP Lite. Mount it read-only to prevent that.
 
 ## Settings reference
 

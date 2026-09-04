@@ -19,11 +19,11 @@ The filter bar has a name search, an All / HTTP / TCP protocol filter, the templ
 
 ## Creating a middleware
 
-Click **Add Middleware** in the top bar.
+Click **Middleware** in the top bar.
 
 | Field | Description |
 |---|---|
-| Protocol | **HTTP** (default) or **TCP**. TCP middlewares are written to `tcp.middlewares` and support only `ipAllowList` and `inFlightConn` - the template selector and wizard are HTTP-only, so TCP uses the YAML editor. |
+| Protocol | **HTTP** (default) or **TCP**. TCP middlewares are written to `tcp.middlewares` and support `ipAllowList`, `inFlightConn` and the deprecated `ipWhiteList` - the template selector and wizard are HTTP-only, so TCP uses the YAML editor. |
 | Name | Unique identifier - referenced in routes as `name@file` |
 | Template | Pick a preset or choose Custom to write raw YAML |
 | Config File | Shown when multiple config files are mounted (`CONFIG_DIR` / `CONFIG_PATHS`). Select an existing file or choose **+ New file...** to type a filename - the file is created automatically in `CONFIG_DIR`. Auto-suggests `middlewares-<name>.yml`. |
@@ -40,10 +40,17 @@ Every template switches to **Wizard** mode - a structured form with labeled fiel
 |---|---|
 | Auth | Basic Auth, Digest Auth, Forward Auth, Forward Auth (Authentik), Forward Auth (Authelia), Forward Auth (Gatekeeper), OIDC Auth (traefik-oidc-auth) |
 | Security | IP Allow List, IP Allow List (Private Ranges), Rate Limit, Secure Headers, CORS Headers, Encoded Characters (Traefik 3.7+) |
-| Routing | Redirect to HTTPS, Redirect Regex, Strip Prefix, Add Prefix, Replace Path |
-| Advanced | Gzip Compress, Retry, Circuit Breaker, Buffering, Middleware Chain, In-Flight Limit |
+| Routing | Redirect to HTTPS, Redirect Regex, Strip Prefix, Strip Prefix Regex, Add Prefix, Replace Path, Replace Path Regex |
+| Advanced | Gzip Compress, Retry, Circuit Breaker, Buffering, Middleware Chain, In-Flight Limit, Custom Error Pages, Content Type, gRPC-Web, Pass TLS Client Cert |
 
 The Forward Auth wizards (including Authentik, Authelia, and Gatekeeper) expose an optional **Max Response Body Size** field (`maxResponseBodySize`, Traefik 3.7+) to cap the auth server's response. See [Traefik Security Hardening](hardening.md) for the recommended hardening middlewares and options.
+
+The **Custom Error Pages** wizard picks the service that serves the page from the services already
+defined in your config, so create that service first. Use `{status}` in the query to substitute the
+response code.
+
+The **Pass TLS Client Cert** wizard covers the whole certificate (`pem`) and the four most used
+`info` fields. Traefik supports more, use YAML mode for the rest.
 
 The **IP Allow List** wizard includes a **Client IP source** (`ipStrategy`) selector. When Traefik is exposed directly, leave it on **Direct connection**. When a reverse proxy (Cloudflare, another Traefik, nginx) sits in front, the allow-list would otherwise match the proxy's IP on every request - pick **trusted hop depth** to set `ipStrategy.depth` (the number of proxies in front), or **exclude proxy IPs** to set `ipStrategy.excludedIPs` when the proxy's own addresses vary. Depth and excluded IPs are mutually exclusive, matching Traefik's own constraint.
 
@@ -67,7 +74,7 @@ Click the pencil icon on any middleware card. Editing always opens the YAML edit
 
 ## Attaching a middleware to a route
 
-In the route form, click a chip in the **Middlewares** selector to attach or detach it. The form falls back to a comma-separated text field only when the Traefik API returns no middlewares. The `@file` suffix tells Traefik the middleware is defined in the file provider.
+In the route form, click a chip in the **Middlewares** selector to attach or detach it. The chips come from the Traefik API and your config files; the form falls back to a comma-separated text field only when neither yields any. The `@file` suffix tells Traefik the middleware is defined in the file provider.
 
 TCP routes have their own **Middlewares** chip selector in the route form, offering the TCP middlewares defined in your config; HTTP routes only offer HTTP middlewares.
 

@@ -150,6 +150,15 @@ def _dump_channels(channels):
     return out
 
 
+def _env_bool(name: str, fallback: bool) -> bool:
+    raw = os.environ.get(name, '').strip().lower()
+    if raw in ('1', 'true', 'yes', 'on'):
+        return True
+    if raw in ('0', 'false', 'no', 'off'):
+        return False
+    return fallback
+
+
 def _new_channel_id():
     import secrets as _s
     return 'ch_' + _s.token_hex(4)
@@ -177,16 +186,16 @@ def load_settings() -> dict:
         'acme_json_path':       '',
         'access_log_path':      '',
         'static_config_path':   '',
-        'oidc_enabled':         False,
-        'oidc_provider_url':    '',
-        'oidc_client_id':       '',
-        'oidc_client_secret':   '',
-        'oidc_display_name':    'OIDC',
-        'oidc_allowed_emails':  '',
-        'oidc_allowed_groups':  '',
-        'oidc_groups_claim':    'groups',
-        'oidc_allow_any_authenticated': False,
-        'oidc_auto_login':      False,
+        'oidc_enabled':         _env_bool('OIDC_ENABLED', False),
+        'oidc_provider_url':    os.environ.get('OIDC_PROVIDER_URL', ''),
+        'oidc_client_id':       os.environ.get('OIDC_CLIENT_ID', ''),
+        'oidc_client_secret':   os.environ.get('OIDC_CLIENT_SECRET', ''),
+        'oidc_display_name':    os.environ.get('OIDC_DISPLAY_NAME', 'OIDC'),
+        'oidc_allowed_emails':  os.environ.get('OIDC_ALLOWED_EMAILS', ''),
+        'oidc_allowed_groups':  os.environ.get('OIDC_ALLOWED_GROUPS', ''),
+        'oidc_groups_claim':    os.environ.get('OIDC_GROUPS_CLAIM', 'groups'),
+        'oidc_allow_any_authenticated': _env_bool('OIDC_ALLOW_ANY_AUTHENTICATED', False),
+        'oidc_auto_login':      _env_bool('OIDC_AUTO_LOGIN', False),
         'default_theme':        'dark',
         'ui_prefs':             {},
         'geoip_enabled':        False,
@@ -428,7 +437,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
                   notification_channels=None, notifications_read_until=None,
                   oidc_groups_claim=None, webhook_url=None, webhook_type=None,
                   webhook_username=None, webhook_password=None,
-                  crowdsec_lapi_url=None, crowdsec_api_key=None,
+                  crowdsec_lapi_url=None, crowdsec_api_key=None, crowdsec_alert_limit=None,
                   crowdsec_machine_id=None, crowdsec_machine_password=None,
                   crowdsec_client_cert=None, crowdsec_client_key=None,
                   crowdsec_ca_cert=None,
@@ -517,6 +526,8 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         crowdsec_lapi_url = _cur.get('crowdsec_lapi_url', '')
     if crowdsec_api_key is None:
         crowdsec_api_key = _cur.get('crowdsec_api_key', '')
+    if crowdsec_alert_limit is None:
+        crowdsec_alert_limit = _cur.get('crowdsec_alert_limit', '')
     if crowdsec_machine_id is None:
         crowdsec_machine_id = _cur.get('crowdsec_machine_id', '')
     if crowdsec_machine_password is None:
@@ -602,6 +613,7 @@ def save_settings(domains, cert_resolver, traefik_api_url,
         'webhook_password':     crypto.encrypt_secret(webhook_password) if webhook_password else '',
         'crowdsec_lapi_url':    crowdsec_lapi_url,
         'crowdsec_api_key':     crypto.encrypt_secret(crowdsec_api_key) if crowdsec_api_key else '',
+        'crowdsec_alert_limit':  str(crowdsec_alert_limit or '').strip(),
         'crowdsec_machine_id':       crowdsec_machine_id,
         'crowdsec_machine_password': crypto.encrypt_secret(crowdsec_machine_password) if crowdsec_machine_password else '',
         'crowdsec_client_cert':      str(crowdsec_client_cert).strip(),

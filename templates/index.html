@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Traefik Manager</title>
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon.png">
-    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
-    <link rel="manifest" href="/static/manifest.json">
+    <meta name="tm-base-path" content="{{ base_path }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ base_path }}/static/icons/icon.png">
+    <link rel="apple-touch-icon" href="{{ base_path }}/static/icons/icon-192x192.png">
+    <link rel="manifest" href="{{ base_path }}/static/manifest.json">
     <meta name="theme-color" content="#0d1117">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -75,15 +76,15 @@
         .tm-worldmap path.tm-geo-selected { stroke: var(--text); stroke-width: 0.8; }
         .tm-geo-tooltip { position: fixed; z-index: 400; pointer-events: none; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; color: var(--text); box-shadow: 0 2px 10px rgba(0,0,0,0.3); white-space: nowrap; }
     </style>
-    <link rel="preload" href="/static/vendor/phosphor/Phosphor-Bold.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="/static/vendor/phosphor/Phosphor-Fill.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="/static/vendor/phosphor/Phosphor-Light.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="/static/vendor/fonts/inter.css">
-    <link rel="stylesheet" href="/static/vendor/fonts/jetbrains-mono.css">
-    <link rel="stylesheet" href="/static/vendor/phosphor.css">
-    <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version }}">
-    <link rel="stylesheet" href="/static/css/tailwind.css">
-    <script src="/static/vendor/qrcode.min.js"></script>
+    <link rel="preload" href="{{ base_path }}/static/vendor/phosphor/Phosphor-Bold.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ base_path }}/static/vendor/phosphor/Phosphor-Fill.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ base_path }}/static/vendor/phosphor/Phosphor-Light.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="{{ base_path }}/static/vendor/fonts/inter.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/vendor/fonts/jetbrains-mono.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/vendor/phosphor.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/css/app.css?v={{ asset_version }}">
+    <link rel="stylesheet" href="{{ base_path }}/static/css/tailwind.css">
+    <script src="{{ base_path }}/static/vendor/qrcode.min.js"></script>
 </head>
 <body class="min-h-screen font-sans">
 
@@ -226,7 +227,7 @@
 <aside id="sideNav">
     <div class="side-nav-app" id="sideNavApp">
         <div class="side-nav-brand-row">
-            <img src="/static/icons/icon.png" alt="logo">
+            <img src="{{ base_path }}/static/icons/icon.png" alt="logo">
             <span>Traefik <span style="color:var(--blue)">Manager</span></span>
         </div>
         <div id="drawerServerWrap" style="display:none">
@@ -276,6 +277,8 @@
 </aside>
 
 <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+    <div id="storageBanner" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.35);border-radius:10px;padding:12px 16px;margin-bottom:16px"></div>
 
     {% include 'sections/stats.html' %}
 
@@ -340,6 +343,7 @@
 {% include 'modals/route_modal.html' %}
 
 {% include 'modals/mw_modal.html' %}
+{% include 'modals/service_modal.html' %}
 
 {% include 'modals/tls_options_modal.html' %}
 
@@ -566,11 +570,23 @@ function toggleDrawerServerList() {
 function _updateServerSwitcherList(agents) {
     agents.forEach(a => _agentRegistry[a.id] = a);
     _agentList = agents;
+    if (_activeAgent && _agentRegistry[_activeAgent.id]) _activeAgent = _agentRegistry[_activeAgent.id];
     _renderServerSwitcherList(true);
+}
+
+function _warnIfAgentUnreachable(agent) {
+    const d = _agentHealthInfo[agent.id];
+    if (!d || d.ok) return;
+    const why = d.error || 'it is not responding';
+    if (typeof showToast === 'function') {
+        showToast(`${agent.name} is offline - ${why}. Its tabs will stay empty until it responds.`,
+                  'error', false);
+    }
 }
 
 function switchServer(agentId) {
     const agent = agentId ? (_agentRegistry[agentId] || null) : null;
+    if (agent) _warnIfAgentUnreachable(agent);
     _activeAgent = agent;
     if (agent) localStorage.setItem('tm_active_agent', agent.id);
     else localStorage.removeItem('tm_active_agent');
@@ -578,6 +594,8 @@ function switchServer(agentId) {
     _cachedMiddlewares = null;
     _cachedCertResolvers = null;
     window._tmServices = null;
+    try { if (typeof renderRouteGrid === 'function') renderRouteGrid([]); } catch (e) {}
+    try { if (typeof renderMwGrid === 'function') renderMwGrid([]); } catch (e) {}
     _inflightEntrypoints = null;
     _inflightMiddlewares = null;
     _inflightCertResolvers = null;
@@ -640,17 +658,17 @@ document.addEventListener('click', e => {
 });
 </script>
 
-<script src="/static/js/core.js?v={{ asset_version }}"></script>
-<script src="/static/js/routes.js?v={{ asset_version }}"></script>
-<script src="/static/js/middlewares.js?v={{ asset_version }}"></script>
-<script src="/static/js/services.js?v={{ asset_version }}"></script>
-<script src="/static/js/settings.js?v={{ asset_version }}"></script>
-<script src="/static/js/logs.js?v={{ asset_version }}"></script>
-<script src="/static/js/crowdsec.js?v={{ asset_version }}"></script>
-<script src="/static/js/dashboard.js?v={{ asset_version }}"></script>
-<script src="/static/js/providers.js?v={{ asset_version }}"></script>
-<script src="/static/js/certs.js?v={{ asset_version }}"></script>
-<script src="/static/js/init.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/core.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/routes.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/middlewares.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/services.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/settings.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/logs.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/crowdsec.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/dashboard.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/providers.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/certs.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/js/init.js?v={{ asset_version }}"></script>
 
 {% include 'modals/settings_modal.html' %}
 
@@ -667,9 +685,9 @@ document.addEventListener('click', e => {
 
 <div id="_copyToast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:6px 16px;border-radius:8px;font-size:13px;font-weight:500;pointer-events:none;opacity:0;transition:opacity 0.2s;z-index:9999"></div>
 
-<script src="/static/vendor/dagre.min.js"></script>
-<script src="/static/vendor/monaco/vs/loader.js"></script>
-<script src="/static/js/static-config.js?v={{ asset_version }}"></script>
+<script src="{{ base_path }}/static/vendor/dagre.min.js"></script>
+<script src="{{ base_path }}/static/vendor/monaco/vs/loader.js"></script>
+<script src="{{ base_path }}/static/js/static-config.js?v={{ asset_version }}"></script>
 
 <div id="routeActionsMenu" class="route-ctx-menu" style="display:none;background:var(--card);border:1px solid var(--border)"></div>
 </body>

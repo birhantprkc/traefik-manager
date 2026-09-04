@@ -14,6 +14,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,6 +53,19 @@ func (a *App) applyTraefikAuth(req *http.Request) {
 
 func (a *App) healthHandler(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"ok": true, "version": Version})
+}
+
+func (a *App) routerDetailHandler(w http.ResponseWriter, r *http.Request, rest string) {
+	parts := strings.SplitN(rest, "/", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		jsonError(w, "router name is required", http.StatusBadRequest)
+		return
+	}
+	proto := strings.ToLower(parts[0])
+	if proto != "http" && proto != "tcp" && proto != "udp" {
+		proto = "http"
+	}
+	a.traefikProxy(w, r, "/api/"+proto+"/routers/"+url.PathEscape(parts[1]))
 }
 
 func (a *App) traefikProxy(w http.ResponseWriter, r *http.Request, traefikPath string) {
@@ -244,7 +258,9 @@ func (a *App) configsWriteHandler(w http.ResponseWriter, r *http.Request) {
 		targetPath = cfgPath
 	}
 	if err := a.createFileBak(targetPath, body.Name); err != nil {
-		log.Printf("pre-write backup failed: %v", err)
+		a.failuref("backup", "pre-write backup of %s failed: %v", targetPath, err)
+		jsonError(w, "backup failed, nothing was written: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	if err := atomicWrite(targetPath, []byte(body.Content)); err != nil {
 		jsonError(w, "write failed: "+err.Error(), http.StatusInternalServerError)
@@ -253,7 +269,7 @@ func (a *App) configsWriteHandler(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.GitBackupEnabled && a.cfg.GitBackupAutoPush && a.cfg.GitBackupRepo != "" {
 		go func() {
 			if err := a.gitPush("config save", ""); err != nil {
-				log.Printf("git auto-push failed: %v", err)
+				a.failuref("git", "auto-push failed: %v", err)
 			}
 		}()
 	}
@@ -298,7 +314,9 @@ func (a *App) staticWriteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.createFileBak(a.cfg.StaticConfigPath, ""); err != nil {
-		log.Printf("pre-write static backup failed: %v", err)
+		a.failuref("backup", "pre-write backup of %s failed: %v", a.cfg.StaticConfigPath, err)
+		jsonError(w, "backup failed, nothing was written: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	if err := atomicWrite(a.cfg.StaticConfigPath, []byte(body.Content)); err != nil {
 		jsonError(w, "write failed: "+err.Error(), http.StatusInternalServerError)
@@ -374,7 +392,7 @@ func (a *App) staticRestartHandler(w http.ResponseWriter, r *http.Request) {
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 			if err := a.dockerRestart(ctx); err != nil {
-				log.Printf("traefik restart failed: %v", err)
+				a.failuref("restart", "Traefik restart failed: %v", err)
 			}
 		}()
 
@@ -507,8 +525,14 @@ func (a *App) csHasMachine() bool {
 	return (a.cfg.CrowdSecMachineID != "" && a.cfg.CrowdSecMachinePassword != "") || a.csHasCert()
 }
 
-func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Reader, useJWT bool) (*http.Response, error) {
-	target := strings.TrimRight(a.cfg.CrowdSecLAPIURL, "/") + csPath
+func csJWTReset() {
+	csJWTMu.Lock()
+	defer csJWTMu.Unlock()
+	csJWT = ""
+	csJWTExpiry = time.Time{}
+}
+
+func (a *App) csSend(ctx context.Context, method, target string, body io.Reader, useJWT bool) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, target, body)
 	if err != nil {
 		return nil, err
@@ -526,6 +550,34 @@ func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Read
 		req.Header.Set("Content-Type", "application/json")
 	}
 	return a.cs().Do(req)
+}
+
+func (a *App) csRequest(ctx context.Context, method, csPath string, body io.Reader, useJWT bool) (*http.Response, error) {
+	target := strings.TrimRight(a.cfg.CrowdSecLAPIURL, "/") + csPath
+	var buf []byte
+	if body != nil {
+		var err error
+		if buf, err = io.ReadAll(body); err != nil {
+			return nil, err
+		}
+	}
+	replay := func() io.Reader {
+		if body == nil {
+			return nil
+		}
+		return bytes.NewReader(buf)
+	}
+	resp, err := a.csSend(ctx, method, target, replay(), useJWT)
+	if err != nil || resp == nil {
+		return resp, err
+	}
+	if resp.StatusCode != http.StatusUnauthorized || !useJWT || !a.csHasMachine() {
+		return resp, nil
+	}
+	resp.Body.Close()
+	log.Printf("crowdsec: machine token refused, logging in again")
+	csJWTReset()
+	return a.csSend(ctx, method, target, replay(), useJWT)
 }
 
 func (a *App) csPageJSON(ctx context.Context, path string, useJWT bool) ([]json.RawMessage, error) {
@@ -620,12 +672,19 @@ func (a *App) crowdsecAlertsHandler(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "CROWDSEC_LAPI_URL not configured", http.StatusNotFound)
 		return
 	}
+	limit := a.cfg.CrowdSecAlertLimit
+	if q := r.URL.Query().Get("limit"); q != "" {
+		if n, err := strconv.Atoi(q); err == nil && n >= 0 && n <= 100000 {
+			limit = n
+		}
+	}
 	chunk, err := a.csPageJSON(r.Context(),
-		fmt.Sprintf("/v1/alerts?limit=%d&with_decisions=false", a.cfg.CrowdSecAlertLimit), true)
+		fmt.Sprintf("/v1/alerts?limit=%d&with_decisions=false", limit), true)
 	if err != nil {
 		jsonError(w, "crowdsec unavailable: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	capped := limit > 0 && len(chunk) >= limit
 	out := make([]json.RawMessage, 0, len(chunk))
 	for _, raw := range chunk {
 		var meta struct {
@@ -639,6 +698,12 @@ func (a *App) crowdsecAlertsHandler(w http.ResponseWriter, r *http.Request) {
 		out = append(out, raw)
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-CS-Alert-Limit", strconv.Itoa(limit))
+	if capped {
+		w.Header().Set("X-CS-Alert-Capped", "1")
+	} else {
+		w.Header().Set("X-CS-Alert-Capped", "0")
+	}
 	json.NewEncoder(w).Encode(out)
 }
 
@@ -703,6 +768,7 @@ func (a *App) crowdsecAddDecisionHandler(w http.ResponseWriter, r *http.Request)
 		jsonError(w, "failed to add decision: "+strings.TrimSpace(string(b)), resp.StatusCode)
 		return
 	}
+	csCacheReset()
 	jsonOK(w, map[string]any{"ok": true})
 }
 
@@ -897,7 +963,9 @@ func (a *App) restoreHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := a.createFileBak(dest, origName); err != nil {
-		log.Printf("pre-restore backup failed: %v", err)
+		a.failuref("backup", "pre-restore backup of %s failed: %v", dest, err)
+		jsonError(w, "backup failed, nothing was restored: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	if err := atomicWrite(dest, data); err != nil {
 		jsonError(w, "restore failed: "+err.Error(), http.StatusInternalServerError)
@@ -935,6 +1003,13 @@ func validGitURL(u string) bool {
 		strings.HasPrefix(l, "http://") ||
 		strings.HasPrefix(l, "ssh://") ||
 		strings.HasPrefix(l, "git://")
+}
+
+func sameGitRemote(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	return strings.EqualFold(strings.TrimRight(a, "/"), strings.TrimRight(b, "/"))
 }
 
 func (a *App) gitAskpassScript() (string, error) {
@@ -1148,7 +1223,7 @@ func (a *App) gitTestHandler(w http.ResponseWriter, r *http.Request) {
 		username = a.cfg.GitBackupUsername
 	}
 	token := body.Token
-	if token == "" {
+	if token == "" && sameGitRemote(repo, a.cfg.GitBackupRepo) {
 		token = a.cfg.GitBackupToken
 	}
 	if repo == "" {
@@ -1265,7 +1340,9 @@ func (a *App) gitRestoreHandler(w http.ResponseWriter, r *http.Request, sha stri
 		return
 	}
 	if _, err := a.createBackup(); err != nil {
-		log.Printf("pre-restore backup failed: %v", err)
+		a.failuref("backup", "pre-restore backup failed: %v", err)
+		jsonError(w, "backup failed, nothing was restored: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	cfgPath := a.cfg.ConfigPath
 	info, _ := os.Stat(cfgPath)
@@ -1635,7 +1712,9 @@ func (a *App) routeRawSaveHandler(w http.ResponseWriter, r *http.Request, routeI
 	}
 
 	if err := a.createFileBak(targetPath, filepath.Base(targetPath)); err != nil {
-		log.Printf("pre-write backup failed: %v", err)
+		a.failuref("backup", "pre-write backup of %s failed: %v", targetPath, err)
+		jsonError(w, "backup failed, nothing was written: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	out, err := yaml.Marshal(config)
 	if err != nil {
@@ -1649,7 +1728,7 @@ func (a *App) routeRawSaveHandler(w http.ResponseWriter, r *http.Request, routeI
 	if a.cfg.GitBackupEnabled && a.cfg.GitBackupAutoPush && a.cfg.GitBackupRepo != "" {
 		go func() {
 			if err := a.gitPush("route raw save", ""); err != nil {
-				log.Printf("git auto-push failed: %v", err)
+				a.failuref("git", "auto-push failed: %v", err)
 			}
 		}()
 	}
@@ -1749,6 +1828,14 @@ func decID(raw json.RawMessage) int64 {
 		return 0
 	}
 	return d.ID
+}
+
+func csCacheReset() {
+	csCache.mu.Lock()
+	defer csCache.mu.Unlock()
+	csCache.items = map[int64]json.RawMessage{}
+	csCache.ready = false
+	csCache.sync = time.Time{}
 }
 
 func (a *App) csDecisionsStream(ctx context.Context, forceFull bool) ([]json.RawMessage, bool, error) {

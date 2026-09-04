@@ -24,7 +24,7 @@ After installing, a banner prompts you to restart Traefik so the plugin is downl
 
 ## Editing and removing
 
-With the static config path set and the file present, the tab gains **Add**, **Edit** and **Delete**. Edit changes the name, module and version of an existing declaration. Mount the file read-write for those writes to succeed; with a read-only mount the buttons appear but saving fails. Without a path, plugins are read-only and must be managed by hand in `traefik.yml`.
+With the static config path set and the file present, the tab gains **Add Plugin**, **Edit** and **Remove**. Edit changes the name, module and version of an existing declaration. Mount the file read-write for those writes to succeed; with a read-only mount the buttons appear but saving fails. Without a path, plugins are read-only and must be managed by hand in `traefik.yml`.
 
 ## Enabling the tab
 

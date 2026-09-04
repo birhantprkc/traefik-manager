@@ -35,7 +35,7 @@
                 </div>
                 <div class="flex gap-1.5">
                     <button type="button" data-mw='{{ mw|tojson|safe }}' onclick="openMwDetail(this)" class="pill-btn pill-btn-blue" title="View details"><i class="ph-bold ph-info text-sm"></i></button>
-                    <button type="button" onclick="deleteMw('{{ mw.name }}','{{ mw.configFile }}')" class="pill-btn pill-btn-red" title="Delete"><i class="ph-bold ph-trash text-sm"></i></button>
+                    <button type="button" onclick='deleteMw({{ mw.name|tojson }},{{ (mw.configFile or "")|tojson }})' class="pill-btn pill-btn-red" title="Delete"><i class="ph-bold ph-trash text-sm"></i></button>
                     <button type="button" data-mw='{{ mw|tojson|safe }}' onclick="handleMwEdit(this)" class="pill-btn pill-btn-blue" title="Edit">
                         <i class="ph-bold ph-pencil-simple text-sm"></i>
                     </button>

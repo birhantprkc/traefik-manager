@@ -49,6 +49,7 @@ Paste your Discord webhook URL (`https://discord.com/api/webhooks/...`).
 {
   "embeds": [{
     "title": "Route my-app updated",
+    "author": { "name": "Traefik Manager - Config" },
     "color": 4176208,
     "footer": { "text": "Traefik Manager - 2026-05-18 12:00:00" }
   }]
@@ -184,7 +185,7 @@ A channel with no categories selected hears all of them.
 
 ### Minimum severity
 
-`info` - `success` - `warning` - `error`, lowest to highest. A channel set to `warning` hears warnings and errors only.
+Three levels: `info` and `success` rank the same, then `warning`, then `error`. A channel set to `warning` hears warnings and errors only; one set to `success` still hears every `info` message.
 
 ### Schedule
 
@@ -205,13 +206,15 @@ Quiet hours use the container's timezone. Set `TZ` if that is not yours.
 Messages raised during the window are **queued, not dropped**. When the window ends the channel gets **one** report that collapses everything held, grouped by category. It is a summary, not a replay.
 
 ```
-Traefik Manager - held during quiet hours 22:00-07:00
-
-config    6 events - 4 routes saved, 1 route deleted, 1 static config saved
-certs     2 events - renewed app.example.com, wiki.example.com
-crowdsec  1 event  - 14 local decisions
-backup    1 event  - nightly backup created
+Summary 2026-08-31 22:04:11 to 2026-09-01 06:58:02
+Config: 6 events, latest Route jellyfin saved
+Certificates: 2 events, latest Renewed app.example.com
+CrowdSec: 14 local decisions
+Backups: Nightly backup created
 ```
+
+One line per category: the count and the most recent message, or just the message when a category
+held only one. A category that overflowed the queue adds an `and N more` line.
 
 Hourly and daily digests collapse the same way. Nothing held means nothing sent.
 
@@ -241,18 +244,20 @@ These run inside the container on their own schedule, so an instance nobody has 
 |---|---|---|---|
 | Certificates | daily | Host and agents | expiry at 14 days, 3 days and on the day |
 | Traefik | 1 min | Host and agents | reachability changes |
-| Agents | 2 min | agents | agent unreachable, agent back online |
+| Agents | 2 min | agents | agent unreachable, agent rejected the API key, agent back online |
 | GeoIP | daily | Host | database refreshed or too old to refresh |
 | CrowdSec | 5 min | Host and agents | one aggregated message per window |
 | Updates | daily | Host | a new Traefik Manager or Traefik release, once per version |
+| Storage | 5 min | Host and agents | a config, backup or static config directory that cannot be written |
 
 Each fires once per change, not once per cycle.
 
 Messages from an agent are prefixed with its name, so `VPS One: Traefik API is unreachable`
 tells you which server without opening the app. Host messages carry no prefix.
 
-An agent that is unreachable reports once. Its certificate, Traefik and CrowdSec checks are
-skipped for that cycle rather than each reporting the same outage separately.
+An agent that is unreachable, or that answers but refuses the API key, reports once. Its
+certificate, Traefik and CrowdSec checks are skipped for that cycle rather than each reporting the
+same outage separately.
 
 ---
 
@@ -260,13 +265,7 @@ skipped for that cycle rather than each reporting the same outage separately.
 
 Channels live in `manager.yml` under `notification_channels`, with every credential encrypted at rest. See [`notification_channels`](./manager-yml#notification-channels).
 
-The notification log lives in `notifications.yml` in the config directory and keeps the 200 newest entries. An empty `notifications.yml.lock` sits beside it and can be ignored.
-
----
-
-## Storage
-
-The notification log lives in `notifications.yml` in the config directory and keeps the 200 newest entries. An empty `notifications.yml.lock` sits beside it and can be ignored.
+The notification log lives in `notifications.yml` in the config directory and keeps the 200 newest entries. An empty `notifications.yml.lock` sits beside it, along with `notifications.yml.next_id` and a `notification_queue.json` holding whatever a digest or quiet-hours window is still sitting on. All three can be ignored.
 
 ---
 

@@ -19,6 +19,7 @@ ${icons}
 let _notifData = [];
 let _notifCatFilter = '';
 const _esc = s => String(s);
+const _jsArg = v => JSON.stringify(v == null ? '' : String(v));
 const document = { getElementById: () => row };
 ${fn}
 return {
@@ -60,7 +61,9 @@ check('the active chip is marked', row.innerHTML.includes('notif-cat-chip active
 api.run([{category:'security'},{category:'certs'}]);
 check('All leads the row and is active when nothing is filtered',
       /^<button class="notif-cat-chip active"[^>]*title="All/.test(row.innerHTML), row.innerHTML.slice(0, 70));
-check('All clears the filter when clicked', /onclick="setNotifCategory\('', event\)"/.test(row.innerHTML));
+check('All clears the filter when clicked',
+      /onclick="setNotifCategory\(("|&quot;){2}, event\)"/.test(row.innerHTML),
+      row.innerHTML.match(/onclick="setNotifCategory[^"]*/)?.[0]);
 const TABS = new Function(tabDefs + '; return TAB_DEFS;')();
 const ICONS = new Function(icons + '; return NOTIF_CATEGORY_ICONS;')();
 const tabIconOf = id => (TABS.find(t => t.id === id) || {}).icon;

@@ -40,7 +40,7 @@ Supported platforms: GitHub, Gitea, Forgejo, GitLab, and any Git host accessible
 | Username | Your Git username (required for most hosts) |
 | Token / Password | The access token you generated |
 | Commit message template | Use `{action}` and `{timestamp}` as placeholders |
-| Auto-push on save | Push automatically after every route, middleware, or static config change |
+| Auto-push on save | Push automatically after every route, service, middleware, or static config change |
 
 **5. Click "Test"** to verify the connection, then **"Save Git Settings"**.
 
@@ -54,7 +54,9 @@ When auto-push is enabled, Traefik Manager pushes to your repository in the back
 
 - Adding, editing, deleting, enabling, or disabling a **route** (including raw-YAML route edits)
 - Adding, editing, or deleting a **middleware**
+- Adding, editing, renaming or deleting a **service**
 - Saving the **static config** (via the Static Config editor)
+- Any config change made on an **agent** through Traefik Manager
 
 The push runs in the background and does not block the UI. If it fails, a warning is logged and the config change is still saved locally.
 
@@ -98,7 +100,7 @@ The default template is:
 traefik-manager: {action} at {timestamp}
 ```
 
-`{action}` is the operation (`route save`, `route delete`, `route toggle`, `route raw save`, `middleware save`, `middleware delete`, `static config save`, or `manual`) and `{timestamp}` is the current date and time.
+`{action}` is the operation (`route save`, `route delete`, `route toggle`, `route raw save`, `middleware save`, `middleware delete`, `service save`, `service delete`, `static config save`, `config change` for an agent, or `manual`) and `{timestamp}` is the current date and time.
 
 Custom examples:
 - `[TM] {action} - {timestamp}`
@@ -126,13 +128,18 @@ traefik-backups/
 
 Dynamic config files contain everything you define through the Traefik file provider - routes, middlewares, services, and `tls` options blocks. If you split them into multiple files (e.g. `routes.yml`, `middlewares.yml`, `tls.yml`), all files are backed up. TLS options defined inside any dynamic config file are included automatically.
 
+`manager.yml` is **not** part of the backup, and it holds the record of which composite services
+Traefik Manager manages. After a restore those services come back but read as not managed, so their
+routes go read only. Open the service's detail panel and choose **Manage this service** to take
+them back - it records ownership only and leaves the restored file byte for byte unchanged.
+
 ---
 
 ## Docker setup
 
 No extra configuration is needed. The `git` binary is included in the Traefik Manager Docker image.
 
-The local clone lives at `{BACKUP_DIR}/git-repo/` (default `/app/backups/git-repo/`), and each agent that uses the Host repository gets its own clone at `{BACKUP_DIR}/git-agent-<id>/`. To persist them across container restarts, mount `BACKUP_DIR` as a volume:
+The local clone lives at `{BACKUP_DIR}/git-repo/` (default `/app/backups/git-repo/`), and each agent that uses the Host repository gets its own clone at `{BACKUP_DIR}/git-agent-<id>/`. Removing an agent deletes its clone; the branch already pushed to the remote is left alone. To persist them across container restarts, mount `BACKUP_DIR` as a volume:
 
 ```yaml
 volumes:

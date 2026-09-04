@@ -137,7 +137,7 @@ async function openDockerRouteDetail(idx) {
     try {
         const proto = (r._proto || 'HTTP').toLowerCase();
         const routerName = encodeURIComponent(r.name || '');
-        const detail = await fetch(`/api/traefik/router/${proto}/${routerName}`).then(res => res.json());
+        const detail = await agentFetch(`/api/traefik/router/${proto}/${routerName}`).then(res => res.json());
         if (detail && detail.provider === 'docker') {
             rawLabels = detail.labels || null;
         }

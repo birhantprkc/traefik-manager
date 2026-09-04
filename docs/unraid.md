@@ -60,6 +60,12 @@ Traefik Manager installs on Unraid from a custom template hosted at [unraid.xyzl
 | **CrowdSec LAPI URL, API Key, Machine ID, Machine Password** | Credentials for the CrowdSec tab |
 | **Backup Retention** | Keep only the last N backups per config file. `0` keeps everything |
 | **GeoIP Database Path** | Custom MaxMind-format `.mmdb`. Leave empty to use the free DB-IP Lite database, downloaded on demand under the config directory once GeoIP is enabled in Settings |
+| **Backup Directory Path** | Container-side backup directory (`BACKUP_DIR`), when it is not the default `/app/backups` |
+| **Static Config Path** | Container-side path to `traefik.yml` (`STATIC_CONFIG_PATH`), for the Static Config and Plugins tabs |
+| **Restart Method** | How Traefik is restarted after a static config change - see [Static config editor](#static-config-editor) below |
+| **Traefik Container Name**, **Docker Host (socket proxy)**, **Signal File Path (poison pill)** | The settings each restart method needs |
+
+Four path mappings are optional and only needed for the tabs that read those files: **Certs Tab - acme.json**, **Static Config / Plugins Tab - traefik.yml** (mount read-write), **Logs Tab - access.log**, and **Docker Socket (direct)** for the Docker restart method.
 
 Every field maps to an environment variable - see [Environment Variables](env-vars.md) for the full reference and defaults.
 
@@ -148,6 +154,8 @@ Add an extra path mapping: host `/var/run/docker.sock` → container `/var/run/d
 3. Complete the setup wizard - it configures your domains, Traefik API connection and password
 
 ::: tip Set COOKIE_SECURE if using HTTPS
+To serve Traefik Manager under a path rather than its own hostname, set [`BASE_PATH`](env-vars.md#base-path).
+
 If you reach Traefik Manager through a Traefik reverse proxy with TLS, set **Cookie Secure** to `true`. This marks the session cookie `Secure` so it is never sent over plain HTTP, and enables the HSTS response header. Sessions still work without it, but the cookie is not protected.
 :::
 

@@ -26,6 +26,9 @@ You need a **client ID** and **client secret**. The redirect URI to register is:
 https://your-traefik-manager.example.com/auth/oidc/callback
 ```
 
+If you set [`BASE_PATH`](env-vars.md#base-path), include it:
+`https://example.com/traefik-manager/auth/oidc/callback`.
+
 ### 2. Configure OIDC in Traefik Manager
 
 Go to **Settings → Authentication → OIDC / SSO** and fill in:
@@ -43,6 +46,22 @@ Go to **Settings → Authentication → OIDC / SSO** and fill in:
 | Automatic sign-in | Off by default. The login page silently tries OIDC first and signs you in with zero clicks when your provider already has a session |
 
 Click **Test** next to the Provider URL to verify the discovery document is reachable, then click **Save OIDC Config** and toggle **Enable**.
+
+### Configure with environment variables
+
+Every field above has a matching variable, so OIDC can be set up without opening Settings:
+
+```yaml
+environment:
+  - OIDC_ENABLED=true
+  - OIDC_PROVIDER_URL=https://id.example.com/application/o/tm/
+  - OIDC_CLIENT_ID=traefik-manager
+  - OIDC_CLIENT_SECRET=your-client-secret
+  - OIDC_DISPLAY_NAME=Authentik
+  - OIDC_ALLOWED_GROUPS=admins
+```
+
+Each one applies while its key is absent from `manager.yml`, and stops applying once you save OIDC settings in the UI. See [Environment Variables](env-vars.md#oidc) for the full list.
 
 ---
 
@@ -98,7 +117,7 @@ In Authentik: create an OAuth2/OpenID Provider and a corresponding Application. 
 
 Both filters are optional and independent:
 
-- **Allowed Emails** - if set, the user's `email` claim must be in this list, and the provider must report it as verified. Useful for allowing specific people from a shared provider (e.g. a Google Workspace domain).
+- **Allowed Emails** - if set, the user's `email` claim must be in this list, and the provider must not report it as unverified. A provider that omits `email_verified` is accepted. Useful for allowing specific people from a shared provider (e.g. a Google Workspace domain).
 - **Allowed Groups** - if set, at least one of the user's groups must match. Useful for restricting by Keycloak or Authentik role.
 
 If both are set, **both** conditions must pass.

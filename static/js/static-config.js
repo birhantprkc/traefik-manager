@@ -1,4 +1,4 @@
-require.config({ paths: { vs: '/static/vendor/monaco/vs' } });
+require.config({ paths: { vs: tmUrl('/static/vendor/monaco/vs') } });
 
 let _staticMonaco          = null;
 let _staticRawContent      = '';
@@ -1413,7 +1413,7 @@ function _renderStaticProviders(providersData) {
                             <i class="ph-bold ph-cloud" style="color:var(--teal)"></i>
                             <span class="font-medium">${_esc(k)}</span>
                         </div>
-                        <button onclick="removeStaticItem('providers','${_esc(k)}')" class="btn-secondary text-xs flex items-center gap-1" style="height:24px;padding:0 8px;color:var(--red)">
+                        <button onclick="removeStaticItem('providers',${_jsArg(k)})" class="btn-secondary text-xs flex items-center gap-1" style="height:24px;padding:0 8px;color:var(--red)">
                             <i class="ph-bold ph-trash text-sm"></i>
                         </button>
                     </div>`).join('') +
@@ -1427,7 +1427,7 @@ function _renderStaticProviders(providersData) {
 const PROVIDER_TEMPLATES = {
     swarm:              `endpoint: "unix:///var/run/docker.sock"\nexposedByDefault: false\nwatch: true`,
     http:               `endpoint: "http://your-config-server/api/config"\npollInterval: "5s"\npollTimeout: "5s"`,
-    kubernetes:         `endpoint: ""\ntoken: ""\ncertAuthFilePath: ""\nnamespaces: []\nlabelselector: ""`,
+    kubernetesCRD:      `endpoint: ""\ntoken: ""\ncertAuthFilePath: ""\nnamespaces: []\nlabelselector: ""`,
     kubernetesIngress:  `endpoint: ""\ntoken: ""\nnamespaces: []\ningressClass: ""\ningressEndpoint:\n  publishedService: ""`,
     kubernetesGateway:  `endpoint: ""\nexperimentalChannel: false`,
     nomad:              `endpoint: "http://localhost:4646"\nprefix: "traefik"\nstale: false\nnamespaces: []`,
@@ -2186,7 +2186,7 @@ function _buildStaticClassicHTML() {
                     <option value="">Select provider...</option>
                     <option value="swarm">Docker Swarm</option>
                     <option value="http">HTTP</option>
-                    <option value="kubernetes">Kubernetes (CRD)</option>
+                    <option value="kubernetesCRD">Kubernetes (CRD)</option>
                     <option value="kubernetesIngress">Kubernetes Ingress</option>
                     <option value="kubernetesGateway">Kubernetes Gateway</option>
                     <option value="nomad">HashiCorp Nomad</option>

@@ -94,7 +94,7 @@ accessLog:
   format: common
 ```
 
-Both the `common` (CLF text) and `json` formats are parsed into cards. Lines that match neither are shown as-is and excluded from the analytics panel, which reports how many were skipped.
+The `common` (CLF text) and `json` formats are both parsed into cards, and so is a generic CLF fallback for a log Traefik did not write - the runtime footer names it `generic clf access log`. Lines that match none of the three are shown as-is and excluded from the analytics panel, which reports how many were skipped.
 
 ### What `format: common` cannot tell you
 
@@ -106,6 +106,8 @@ Traefik's `common` writer emits a fixed field list, so some cards degrade rather
 | Services | ranks `ServiceName` | renamed **Routers**, because CLF field 11 is the router name, not the service |
 | Response Time | nanosecond precision, `p50 / p95 / max` | whole milliseconds |
 | TLS, retries, origin status | available | not logged |
+
+A generic CLF log degrades further still: it carries no router, no service and no duration, so the Response Time, Services and Routers cards stay empty.
 
 `accessLog.fields.names` only applies to the JSON formatter, so it cannot add these back to a `common` log. Switch to `format: json` for the full panel:
 

@@ -47,7 +47,8 @@ def test_crypto_round_trips_through_core():
     assert crypto.decrypt_secret(token) == 'hunter2'
     assert crypto.encrypt_secret('') == ''
     assert crypto.decrypt_secret('') == ''
-    assert crypto.decrypt_secret('not-a-valid-token') == ''
+    assert crypto.decrypt_secret('not-a-valid-token') == 'not-a-valid-token'
+    assert crypto.decrypt_secret(token[:-4] + 'AAAA') == ''
 
 
 def test_app_crypto_aliases_point_at_core(app_module):

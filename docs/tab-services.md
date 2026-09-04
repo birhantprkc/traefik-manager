@@ -1,6 +1,6 @@
 # Services Tab
 
-The **Services** tab shows all services registered in Traefik across every provider - `@file`, `@docker`, `@kubernetes`, and so on. It is a read-only view pulled live from the Traefik API.
+The **Services** tab shows all services registered in Traefik across every provider - `@file`, `@docker`, `@kubernetes`, and so on - pulled live from the Traefik API. HTTP services from your own config files can be created and edited here; TCP and UDP services, and services from other providers, are read only.
 
 ## What it shows
 
@@ -21,13 +21,65 @@ Grid view shows the service name with its type and provider below it, a status d
 - **Protocol** - the protocols actually present
 - **Provider** - the providers actually present
 
+The bar also carries a button to clear every filter and one to refresh the list.
+
 A service Traefik reports as `enabled` counts as a warning when any of its backends is not `UP`, which is what the stat panel's **backends down** count measures. Services whose status Traefik does not report at all also land in the Warnings filter, so the two counts can differ.
+
+Composite services (`weighted`, `mirroring`, `failover`, `highestRandomWeight`) carry no backend
+status of their own in Traefik - their health lives on the services they point at. They are counted
+separately rather than as unchecked, and never move the backends up and down numbers.
+
+## Creating and editing services
+
+The **+** button in the filter bar creates a service without needing a route first. Pick a type:
+
+| Type | Backends |
+|---|---|
+| Load Balancer | A list of addresses, each with its scheme |
+| Weighted | Rows that are each an IP:Port or an existing service, split by weight |
+| Mirroring | The first row serves; the rest receive a copy by percentage |
+| Failover | The first row serves; the second takes over if it fails |
+
+Each IP:Port row in a composite becomes its own child service named `<name>-backend-<n>`, so every
+row carries its own weight. A row referencing an existing service is stored by name and never
+copied, so changes to that service follow automatically. The generated children are hidden from
+the list and shown on their parent's card; searching reveals them.
+
+An HTTP `@file` service opened from its card or detail panel shows an **Edit** button, whoever
+wrote it. Editing keeps settings the form does not manage - `sticky`, `healthCheck`,
+`service.middlewares`, mirror body options - and only replaces what you changed. Change the name
+in that form to rename the service: the old key and its generated children go, and the new name
+takes over their ownership.
+
+Deleting refuses while a route still points at the service, while another service lists it as a
+backend, when one of its generated children is still used elsewhere, or when it is a composite
+Traefik Manager does not manage. Editing always writes to the config file the service already
+lives in, whichever file is selected.
+
+**Manage this service** in the detail panel records ownership of a hand-written composite without
+touching the file - it stays byte for byte unchanged. Ownership is what deleting, renaming and
+choosing that service as a route backend require; editing it in place does not.
+
+## Detail panel
+
+Clicking a card opens the panel on the right.
+
+| Block | Shows |
+|---|---|
+| Service Details | Type, provider, status, pass host header, and a **backend of** chip on a generated child |
+| Backends | For a composite, each backend with its role and share; for a load balancer, its servers |
+| Management | Composites only: whether Traefik Manager manages it, and the button to change that |
+| Used by Routers | Every router pointing at the service |
 
 ## Requirements
 
-No volume mounts required. Data is read directly from the Traefik API (`/api/http/services`, `/api/tcp/services`, `/api/udp/services`). The Traefik API URL must be configured in **Settings - Connection**.
+Viewing needs no volume mounts: the list is read from the Traefik API (`/api/http/services`, `/api/tcp/services`, `/api/udp/services`), and the Traefik API URL must be configured in **Settings - Connection**.
+
+Creating, editing and deleting write to your dynamic config files, so those need the same mount the Routes tab uses. Without it the tab still works as a read-only view.
+
+With a remote agent selected, the same actions write to that agent's config files instead, and ownership is recorded against that server.
 
 ## Notes
 
 - This tab is always visible - it cannot be disabled
-- Use the **Routes** tab to create and manage routes stored in your dynamic config
+- Use the **Routes** tab to create and manage routes; a route's backend rows can reference services created here

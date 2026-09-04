@@ -13,8 +13,9 @@ for theme in ("dark", "light"):
 CAROUSEL = (
     "dashboard", "dashboard-icons", "dashboard-hover",
     "routes-cards", "routes-list", "routes-add-http", "routes-add-tcp", "routes-add-udp",
+    "routes-add-service",
     "middlewares-cards", "middlewares-list", "middlewares-add",
-    "services-cards", "services-list",
+    "services-cards", "services-list", "services-detail", "services-add", "services-edit",
     "route-map", "tls-options", "certs",
     "logs", "crowdsec",
     "plugins", "plugins-add",

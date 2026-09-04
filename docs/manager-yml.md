@@ -18,10 +18,29 @@ TM stores some data in separate files alongside `manager.yml` in the same config
 | `notifications.yml`         | Recent notification history, capped at the 200 newest entries                                                                   |
 | `notifications.yml.lock`    | Empty lock file that keeps the workers from overwriting each other's notifications. Safe to delete while TM is stopped          |
 | `notifications.yml.next_id` | The next notification id, so ids are never reused after a clear. Safe to delete while TM is stopped                             |
+| `notification_queue.json`   | What a digest or quiet-hours window is holding, up to 500 per channel. Safe to delete while TM is stopped                        |
 | `dashboard.yml`             | Dashboard custom groups and per-card overrides, kept per server                                                                 |
 | `.secret_key`, `.otp_key`   | Auto-generated session key and the Fernet key for every encrypted field below. Lose `.otp_key` and those secrets are unreadable |
 
 None of these need to be edited by hand. Back up the entire config directory to preserve all TM state.
+
+---
+
+## Hand-written secrets
+
+Encrypted fields are marked **Fernet-encrypted** below. You can write any of them in plain text and TM will read the value as written. On the next start TM encrypts it in place and raises a Security notification saying it did.
+
+| You write | TM does |
+| ---| ---|
+| `oidc_client_secret: my-secret` | Reads `my-secret`, rewrites the key encrypted on next start |
+| `oidc_client_secret: gAAAAA...` | Decrypts it, leaves the file alone |
+| A value encrypted with a different `.otp_key` | Reads it as empty and logs a warning |
+
+`agents.yml` works the same way, so a hand-written `api_key`, `crowdsec_api_key`, `crowdsec_machine_password` or `git_backup_token` is read and then encrypted.
+
+The rewrite needs the config directory to be writable. If it is not, the plain text keeps working and TM keeps the file as it is.
+
+Prefer [environment variables](env-vars.md) for scripted deployments: `OIDC_CLIENT_SECRET` and the other `OIDC_*` variables never put the secret in the file in the clear.
 
 ---
 
@@ -198,9 +217,10 @@ When `true`, the user is redirected to a forced password-change screen after log
 **Type:** boolean - **Default:** `false`
 
 When `true`, opening Traefik Manager asks for a new password and nothing else - the setup wizard is
-skipped and the rest of `manager.yml` is left alone. Clears itself once the password is set. Set by the
-CLI reset command when run with no password option, or by hand to recover from a lost password (see
-[Reset Password](/reset-password#method-3-manual-reset-via-manager-yml)).
+skipped and the rest of `manager.yml` is left alone. While it is `true` that page is open to anyone who
+can reach Traefik Manager, so use it promptly. It clears on any password change and on the next
+successful login. Set by the CLI reset command when run with no password option, or by hand to recover
+from a lost password (see [Reset Password](/reset-password#method-3-manual-reset-via-manager-yml)).
 
 ---
 
@@ -291,7 +311,7 @@ The client ID registered with your OIDC provider.
 
 **Type:** string (Fernet-encrypted) - **Default:** `""`
 
-The client secret. Stored encrypted at rest. Always set through the Settings UI, never edit by hand.
+The client secret. Stored encrypted at rest. Set it in the Settings UI, with `OIDC_CLIENT_SECRET`, or in plain text here - see [Hand-written secrets](#hand-written-secrets).
 
 ---
 
@@ -355,7 +375,7 @@ Notification destinations, each with its own type, credentials, filters and sche
 |---|---|---|
 | `id` | string | Generated, e.g. `ch_1a2b3c4d` |
 | `name` | string | Label shown in the UI |
-| `kind` | string | `discord`, `slack`, `ntfy`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
+| `kind` | string | `discord`, `slack`, `ntfy`, `unifiedpush`, `generic`, `gotify`, `pushover`, `pushbullet`, `telegram` |
 | `enabled` | boolean | Default `true` |
 | `url` | string | Webhook, topic or server URL |
 | `token` | string (Fernet-encrypted) | Gotify app token, Pushover app token, Pushbullet access token, Telegram bot token |
@@ -545,13 +565,21 @@ Controls which optional tabs are shown. Managed via the setup wizard, **Settings
 
 ---
 
+### `notifications_read_until`
+
+**Type:** integer - **Default:** `0`
+
+Epoch seconds of the last time notifications were marked read, so the unread badge survives a restart. Set by the bell menu; do not edit by hand.
+
+---
+
 ## Route State
 
 ### `disabled_routes`
 
 **Type:** map - **Default:** `{}`
 
-Stores the full config of disabled routes so they can be re-enabled without data loss. Managed automatically by the enable/disable toggle. Do not edit by hand.
+Stores the full config of disabled routes so they can be re-enabled without data loss. Managed automatically by the enable/disable toggle. Do not edit by hand. An agent's snapshots are keyed `agent_<id>::` and are removed when that agent is removed.
 
 ---
 
@@ -559,7 +587,16 @@ Stores the full config of disabled routes so they can be re-enabled without data
 
 **Type:** map - **Default:** `{}`
 
-Ownership ledger for middlewares that traefik-manager generated on your behalf - currently the `<route>-headers` middleware created by the [Security headers preset](./tab-routes#security-headers-preset). Each entry records that the tool created that middleware, so it will only ever update or remove middlewares it owns, and refuses to overwrite a same-named middleware you wrote by hand. Middlewares created on a remote agent are recorded with an `agent_<id>::` key prefix, so each server's generated middlewares are tracked separately. Managed automatically; do not edit by hand.
+Ownership ledger for the middlewares and `serversTransports` that traefik-manager generated on your behalf. Each entry records that the tool created it, so it will only ever update or remove what it owns, and refuses to overwrite a same-named entry you wrote by hand. Managed automatically; do not edit by hand.
+
+| Key | What it owns |
+|---|---|
+| `<route>-headers` | The middleware created by the [Security headers preset](./tab-routes#security-headers-preset) |
+| `tp::<name>` | A generated `serversTransport`. Written whenever a route needs one, including Skip TLS verification as well as the streaming preset |
+| `svc::<name>` | A composite service ([Services tab](./tab-services)) - the parent, and one entry per generated `<name>-backend-<n>` child. The entry records the type and child list, and ownership only holds while the file still matches it, so a hand edit or a restore makes the service read only instead of being overwritten |
+| `agent_<id>::...` | The same, on a remote agent - each server is tracked separately |
+
+Deleting a route removes the `<service>-transport` it owns and its ledger entry, unless another service or a disabled route still references it. Removing an agent drops every `agent_<id>::` entry.
 
 ```yaml
 managed_middlewares:
@@ -594,10 +631,10 @@ These sections are documented on their own pages. All are set through the UI and
 
 | Keys | Set in | Reference |
 |---|---|---|
-| `crowdsec_lapi_url`, `crowdsec_api_key`, `crowdsec_machine_id`, `crowdsec_machine_password`, `crowdsec_client_cert`, `crowdsec_client_key`, `crowdsec_ca_cert` | Settings - System Monitoring - CrowdSec | [CrowdSec tab](tab-crowdsec.md) |
+| `crowdsec_lapi_url`, `crowdsec_api_key`, `crowdsec_machine_id`, `crowdsec_machine_password`, `crowdsec_client_cert`, `crowdsec_client_key`, `crowdsec_ca_cert`, `crowdsec_alert_limit` | Settings - System Monitoring - CrowdSec | [CrowdSec tab](tab-crowdsec.md) |
 | `git_backup_enabled`, `git_backup_repo`, `git_backup_branch`, `git_backup_username`, `git_backup_token`, `git_backup_commit_message`, `git_backup_auto_push` | Settings - Backups - Git | [Git Backup](git-backup.md) |
 
-`crowdsec_read_timeout` and `crowdsec_alert_limit` are read from this file if you add them by hand, but TM never writes them - the next Settings save drops them. Use [`CROWDSEC_READ_TIMEOUT`](env-vars.md) and `CROWDSEC_ALERT_LIMIT` instead.
+`crowdsec_read_timeout` is read from this file if you add it by hand, but TM never writes it - the next Settings save drops it. Use [`CROWDSEC_READ_TIMEOUT`](env-vars.md) instead.
 
 `agent_api_rate_limit` is stored here but not enforced in this release. Registered agents live in `agents.yml`, not in this file.
 

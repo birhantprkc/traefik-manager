@@ -9,7 +9,7 @@ import { withBase } from 'vitepress'
       <span class="hh-name">Traefik Manager</span>
     </div>
     <h1 class="hh-headline">The self-hosted UI for Traefik</h1>
-    <p class="hh-tagline">Manage routes, middlewares, static config, backups, and remote servers - without editing YAML.</p>
+    <p class="hh-tagline">Manage routes, services, middlewares, static config, backups and remote servers - without editing YAML.</p>
     <div class="hh-actions">
       <a class="hh-btn hh-btn-brand" :href="withBase('/overview')">Get Started</a>
       <a class="hh-btn" href="#features">Features</a>

@@ -4,11 +4,17 @@
 # Restart the container after any manual changes.
 # Full reference: https://traefik-manager.xyzlab.dev/manager-yml
 #
+# Secrets below are encrypted at rest. You can write one in plain text here and
+# it is read as written, then encrypted in place on the next start.
+#
 # Some state lives in companion files next to this one and is not shown here:
-#   agents.yml         registered remote servers (secrets encrypted)
-#   templates.yml      custom middleware templates
-#   notifications.yml  recent notification history
-#   dashboard.yml      dashboard groups and per-card overrides
+#   agents.yml               registered remote servers (secrets encrypted)
+#   templates.yml            custom middleware templates
+#   notifications.yml        recent notification history
+#   notification_queue.json  what a digest or quiet-hours window is holding
+#   dashboard.yml            dashboard groups and per-card overrides
+#   .secret_key, .otp_key    session signing key and the key for every secret
+#   cache/, geoip/           dashboard group cache and the GeoIP database
 # -----------------------------------------------------------------------------
 
 # -- Domains ------------------------------------------------------------------
@@ -70,9 +76,10 @@ api_key_enabled: false
 api_keys: []
 
 # -- OIDC / SSO ---------------------------------------------------------------
-# Managed via Settings -> Authentication -> OIDC. Do not edit by hand.
-# Leave oidc_allowed_emails and oidc_allowed_groups empty to allow any account,
-# or set oidc_allow_any_authenticated: true to be explicit about it.
+# Managed via Settings -> Authentication -> OIDC, or seeded from the OIDC_*
+# environment variables while the key below is absent from this file.
+# Leaving oidc_allowed_emails and oidc_allowed_groups BOTH empty denies every
+# login. Set oidc_allow_any_authenticated: true to admit any account instead.
 oidc_enabled: false
 oidc_provider_url: ""
 oidc_client_id: ""
@@ -83,9 +90,22 @@ oidc_allowed_groups: ""
 oidc_groups_claim: "groups"
 oidc_allow_any_authenticated: false
 
-# -- Notification Webhooks ----------------------------------------------------
-# Managed via Settings -> Notifications.
-# webhook_type: discord | slack | ntfy | generic
+# Skip the login page and go straight to the provider.
+oidc_auto_login: false
+
+# -- Notification Channels ----------------------------------------------------
+# Managed via Settings -> Notifications. Each channel picks a kind, the
+# categories it hears, a severity floor and an optional quiet window.
+# kind: discord | slack | ntfy | unifiedpush | generic | gotify | pushover |
+#       pushbullet | telegram
+notification_channels: []
+
+# Epoch seconds of the last time notifications were marked read. Managed
+# automatically by the bell menu.
+notifications_read_until: 0
+
+# The single-webhook fields below predate notification_channels and are migrated
+# into it on load. Leave them empty on a new install.
 webhook_url: ""
 webhook_type: "discord"
 webhook_username: ""
@@ -198,7 +218,8 @@ self_route:
 disabled_routes: {}
 
 # -- Managed Middlewares ------------------------------------------------------
-# Ownership ledger for middlewares the guided route presets generated. TM only
-# updates or removes middlewares listed here, so a hand-written middleware of
-# the same name is never overwritten. Managed automatically.
+# Ownership ledger. Entries record the middlewares the guided route presets
+# generated, and, under svc:: keys, the composite services TM authored. TM only
+# updates or removes what is listed here, so a hand-written middleware or
+# service of the same name is never overwritten. Managed automatically.
 managed_middlewares: {}

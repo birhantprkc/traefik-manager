@@ -12,8 +12,8 @@ curl -fsSL https://get-traefik.xyzlab.dev | bash
 
 | Command | What it does |
 |---|---|
-| `tm status` | Mode, directory, services, URLs, health |
-| `tm update` | Pulls images, `git pull`, or downloads the agent binary, then restarts |
+| `tm status` | Mode, directory, services, URLs, health, release channel |
+| `tm update` | Pulls images, `git pull`, or downloads the agent binary, then restarts. On a Linux service install it skips reinstalling dependencies and rebuilding assets when git reports no change, `--force` does it anyway. `--channel beta` and `--channel stable` switch release channel, see [Beta releases](beta.md) |
 | `tm logs [service]` | Follows the logs (`--no-follow`, `-n <lines>`) |
 | `tm restart`, `tm start`, `tm stop` | Whole install, or one service |
 | `tm password` | Prints the temporary password from the logs |
@@ -21,9 +21,20 @@ curl -fsSL https://get-traefik.xyzlab.dev | bash
 | `tm add crowdsec` | Adds CrowdSec to an existing install |
 | `tm doctor` | Checks Docker, ports, DNS, `acme.json`, health endpoints, CrowdSec |
 | `tm uninstall` | Stops the services and removes the files tm wrote, keeping any you changed. `--purge` also removes configs, data and volumes |
+| `tm uninstall --self` | Removes `tm` itself. Any installs keep running, they just stop being managed |
 | `tm self-update` | Updates `tm` itself |
 
 Commands find the install from `--dir` or `TM_DIR`, then the current directory, then the installs `tm` already knows about.
+
+### Removing tm
+
+`tm uninstall` removes an install, not the CLI. To remove `tm` itself:
+
+```bash
+tm uninstall --self
+```
+
+It names any installs it still knows about first, since those keep running and serving traffic without it. Uninstall them first if that was the intent.
 
 | Mode | Secrets | tm's record of the install |
 |---|---|---|
@@ -64,7 +75,7 @@ Installs both via Docker Compose. Best for a fresh server with nothing running y
 
 ### Prerequisites
 
-- A Linux server (amd64, arm64 or armv7). Docker is installed for you on Debian/Ubuntu, RHEL/Fedora and Arch; anything else falls back to the `get.docker.com` script.
+- A Linux server (amd64 or arm64 - the container images are built for those two; only the standalone agent binary is built for armv7). Docker is installed for you on Debian/Ubuntu, RHEL/Fedora and Arch; anything else falls back to the `get.docker.com` script.
 - A domain name with DNS pointing to your server
 - Ports 80 and 443 open for internet-facing deployments
 
@@ -487,8 +498,8 @@ sudo systemctl restart tma
 
 ### Next steps after install
 
-1. In TM **Settings → Agents**, click **Add Agent**
-2. Enter a name and the agent URL (e.g. `http://server-ip:8090`). Traefik Manager generates the API key and shows it once - copy it and set it as `TMA_API_KEY` on the agent (`tm reconfigure --section apikey`, or edit the agent's env if you already installed it with a different key).
+1. In TM **Settings → Agents**, click **Add Agent** and choose **Install with the tm CLI**
+2. Enter a name and the agent URL (e.g. `http://server-ip:8090`). Traefik Manager mints the key and hands you the whole install command; **Verify connection** checks it once the agent is up. If the agent is already installed with a different key, take the key from that screen and run `tm reconfigure --section apikey`. **Configure manually** is the other path, and prints a compose file instead.
 3. Use the **server switcher** in the TM nav bar to switch to this agent
 
 ---

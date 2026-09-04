@@ -339,15 +339,16 @@ function _buildConfigSelectOptions(sel, files, allowNew) {
 async function _populateConfigFileSelect(which) {
     const isRoute = which === 'route';
     const isPluginMw = which === 'pluginMw';
-    const wrapId     = isPluginMw ? 'pluginMwFileSelectWrap' : isRoute ? 'configFileSelectWrap' : 'mwConfigFileSelectWrap';
-    const selId      = isPluginMw ? 'pluginMwFileSelect' : isRoute ? 'configFileSelect' : 'mwConfigFileSelect';
-    const newInputId = isPluginMw ? 'pluginMwNewFileName' : isRoute ? 'newRouteFileName' : 'newMwFileName';
+    const isService = which === 'service';
+    const wrapId     = isService ? 'svcConfigFileSelectWrap' : isPluginMw ? 'pluginMwFileSelectWrap' : isRoute ? 'configFileSelectWrap' : 'mwConfigFileSelectWrap';
+    const selId      = isService ? 'svcConfigFileSelect' : isPluginMw ? 'pluginMwFileSelect' : isRoute ? 'configFileSelect' : 'mwConfigFileSelect';
+    const newInputId = isService ? 'newSvcFileName' : isPluginMw ? 'pluginMwNewFileName' : isRoute ? 'newRouteFileName' : 'newMwFileName';
     const wrap    = document.getElementById(wrapId);
     const sel     = document.getElementById(selId);
     const newInput = document.getElementById(newInputId);
     if (!sel) return;
     if (newInput) { newInput.style.display = 'none'; newInput.value = ''; }
-    const onChange = isPluginMw ? onPluginMwFileChange : isRoute ? onRouteConfigFileChange : onMwConfigFileChange;
+    const onChange = isService ? onSvcConfigFileChange : isPluginMw ? onPluginMwFileChange : isRoute ? onRouteConfigFileChange : onMwConfigFileChange;
     if (_activeAgent) {
         if (wrap) wrap.style.display = '';
         try {
@@ -459,6 +460,10 @@ function _esc(s) {
     return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+function _jsArg(v) {
+    return _esc(JSON.stringify(v == null ? '' : String(v)));
+}
+
 let _backdropMd = null;
 function _onBackdropClick(e, fn) {
     if (e.target === e.currentTarget && _backdropMd === e.currentTarget) fn();
@@ -475,24 +480,64 @@ function toggleLiveDd(id) {
     if (!isOpen) { menu.classList.add('open'); btn.classList.add('open'); }
 }
 
+async function refreshStorageBanner() {
+    const el = document.getElementById('storageBanner');
+    if (!el) return;
+    let problems = [];
+    try {
+        const res = await fetch('/api/storage/status', { headers: { 'X-Requested-With': 'fetch' } });
+        if (!res.ok) return;
+        problems = (await res.json()).problems || [];
+    } catch (e) {
+        return;
+    }
+    if (!problems.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'block';
+    el.innerHTML = `<div class="flex items-start gap-2">
+            <i class="ph-bold ph-warning-octagon flex-shrink-0 mt-0.5" style="color:var(--red)"></i>
+            <div class="text-xs">
+                <div class="font-semibold" style="color:var(--text)">Storage is not writable</div>
+                <div class="mt-1" style="color:var(--muted)">Settings, backups and scheduled checks will not survive a restart. Check the volume or bind mount for:</div>
+                ${problems.map(p => `<div class="mt-1 font-mono" style="color:var(--muted)">${_esc(p.label)}: ${_esc(p.path)} <span style="opacity:.75">(${_esc(p.error)})</span></div>`).join('')}
+            </div>
+        </div>`;
+}
+
 let _tmAuthLost = false;
+
+const TM_BASE = (document.querySelector('meta[name="tm-base-path"]')?.content || '').replace(/\/$/, '');
+
+function tmUrl(path) {
+    if (!TM_BASE) return path;
+    if (typeof path !== 'string' || !path.startsWith('/')) return path;
+    if (path === TM_BASE || path.startsWith(TM_BASE + '/')) return path;
+    return TM_BASE + path;
+}
+
+function _tmAppPath(pathname) {
+    if (TM_BASE && pathname.startsWith(TM_BASE)) return pathname.slice(TM_BASE.length) || '/';
+    return pathname;
+}
 
 function _tmHandleAuthLoss() {
     if (_tmAuthLost) return;
     _tmAuthLost = true;
-    const here = window.location.pathname + window.location.search;
-    window.location.href = '/login?next=' + encodeURIComponent(here);
+    const here = _tmAppPath(window.location.pathname) + window.location.search;
+    window.location.href = tmUrl('/login') + '?next=' + encodeURIComponent(here);
 }
 
 (function () {
     const orig = window.fetch;
     window.fetch = function (input, init) {
+        if (typeof input === 'string') input = tmUrl(input);
         return orig.call(this, input, init).then(res => {
             if (res.status !== 401) return res;
             let url = '';
             try { url = new URL(typeof input === 'string' ? input : input.url, window.location.origin).pathname; }
             catch (e) { url = String(input || ''); }
-            if (url.startsWith('/api/') && !window.location.pathname.startsWith('/login')) _tmHandleAuthLoss();
+            if (_tmAppPath(url).startsWith('/api/') && !_tmAppPath(window.location.pathname).startsWith('/login')) {
+                _tmHandleAuthLoss();
+            }
             return res;
         });
     };
@@ -1171,7 +1216,7 @@ function _renderNotifFilters() {
     row.style.display = '';
     const chip = (cat, label, icon, count) => {
         const on = _notifCatFilter === cat;
-        return `<button class="notif-cat-chip${on ? ' active' : ''}" onclick="setNotifCategory('${_esc(cat)}', event)"`
+        return `<button class="notif-cat-chip${on ? ' active' : ''}" onclick="setNotifCategory(${_jsArg(cat)}, event)"`
              + ` title="${_esc(label)} (${count})" aria-label="${_esc(label)}"><i class="ph-bold ${icon}"></i></button>`;
     };
     row.innerHTML = chip('', 'All', 'ph-stack', _notifData.length)
@@ -1222,7 +1267,7 @@ function _renderNotifPanel() {
                 <div class="notif-msg">${_esc(n.msg)}</div>
                 <div class="notif-ts">${_notifRelTime(n.ts)}<span class="notif-cat">${_esc(NOTIF_CATEGORY_LABELS[n.category] || n.category || 'Config')}</span></div>
             </div>
-            <button class="notif-delete-btn" onclick="deleteNotification('${_esc(n.ts)}', ${Number(n.id) || 0})" title="Dismiss"><i class="ph-bold ph-x"></i></button>
+            <button class="notif-delete-btn" onclick="deleteNotification(${_jsArg(n.ts)}, ${Number(n.id) || 0})" title="Dismiss"><i class="ph-bold ph-x"></i></button>
         </div>`;
     }).join('');
 }
@@ -1373,7 +1418,7 @@ function _showBrowserNotif(type, body, tag) {
         const notif = new Notification(_BROWSER_NOTIF_TITLES[type] || _BROWSER_NOTIF_TITLES.info, {
             body: body,
             tag:  'tm-' + tag,
-            icon: '/static/icons/icon-192x192.png',
+            icon: tmUrl('/static/icons/icon-192x192.png'),
         });
         notif.onclick = () => {
             window.focus();

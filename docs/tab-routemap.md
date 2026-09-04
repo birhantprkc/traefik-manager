@@ -58,7 +58,7 @@ Routes from a non-file provider are collapsed into a single group node per provi
 | Provider | Filter by Traefik provider. The list of providers appears only when routes come from more than one |
 | Entry Point | Filter to routes that use a specific entry point |
 
-The **clear filters** button resets all four. The Entry Points lane shows only the entry points used by the routes still visible.
+The **clear filters** button resets all four, and **refresh** re-reads the map. The Entry Points lane shows only the entry points used by the routes still visible.
 
 ---
 

@@ -20,9 +20,16 @@ const sections = [
   {
     kicker: 'Middlewares',
     title: 'Wizards that know every config shape',
-    desc: '24 guided forms for every common middleware type, from Basic Auth to OIDC to rate limiting, plus one-click presets that attach the right stack to a route.',
+    desc: '30 guided forms for every common middleware type, from Basic Auth to OIDC to rate limiting, plus one-click presets that attach the right stack to a route.',
     img: 'middlewares-add',
     link: '/tab-middlewares',
+  },
+  {
+    kicker: 'Services',
+    title: 'Build a backend pool without touching a route',
+    desc: 'Create a load balancer, or a weighted, mirroring or failover service, from raw addresses and other services in any mix. Services written by hand stay read only until you take them over, which records ownership without rewriting the file.',
+    img: 'services-add',
+    link: '/tab-services',
   },
   {
     kicker: 'Route Map',
@@ -83,9 +90,9 @@ const extras = [
     link: '/security',
   },
   {
-    title: 'Services',
-    desc: 'Every service with its backends, health and the routers using it.',
-    link: '/tab-services',
+    title: 'tm CLI',
+    desc: 'Install the whole stack, add an agent, reset a password or switch to the beta channel from one command.',
+    link: '/tm-cli',
   },
   {
     title: 'TLS Options',
@@ -99,7 +106,7 @@ const extras = [
   },
   {
     title: 'Notification Webhooks',
-    desc: 'Ping Discord, Slack, ntfy and friends whenever your config changes.',
+    desc: 'Discord, Slack, ntfy, Gotify, Pushover, Pushbullet, Telegram or your phone, whenever your config changes.',
     link: '/webhooks',
   },
 ]

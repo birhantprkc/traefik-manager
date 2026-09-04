@@ -30,12 +30,12 @@ Everything else the tab knows - backend target, provider, entry points, server c
 
 ### The status dot
 
-The dot on the icon plate has five states:
+The dot on the icon plate has six states:
 
 | Dot | Meaning |
 |-----|---------|
 | Quiet grey square | Router loaded and, where Traefik reports backend health, every server up |
-| Hollow square | Route disabled, or the Traefik API did not answer |
+| Hollow square | Route disabled, loaded but not enabled, or the Traefik API did not answer |
 | Hollow circle | Traefik is answering but has never reported this router |
 | Yellow | Backend degraded, some servers up and some down |
 | Red with a glow | Router errored, or every backend server down |

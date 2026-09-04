@@ -75,7 +75,7 @@ See the [OIDC setup guide](oidc.md) for full configuration details.
 
 TM supports TOTP-based 2FA compatible with any standard authenticator app (Google Authenticator, Authy, etc.).
 
-The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encryption key is independent of the session signing key: it is taken from the `OTP_ENCRYPTION_KEY` environment variable, or generated once and persisted to `/app/config/.otp_key`. The same key encrypts every other stored secret - OIDC client secret, Traefik API password, CrowdSec keys, webhook password, git backup token. Only the encrypted values are stored in `manager.yml`.
+The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encryption key is independent of the session signing key: it is taken from the `OTP_ENCRYPTION_KEY` environment variable, or generated once and persisted to `/app/config/.otp_key`. The same key encrypts every other stored secret - OIDC client secret, Traefik API password, CrowdSec keys, webhook password, git backup token, and each notification channel's tokens and password. A secret you write to `manager.yml` in plain text is read as written and encrypted in place on the next start, with a Security notification when that happens.
 
 2FA can be reset via the [reset password page](reset-password.md) if you lose access to your authenticator.
 
@@ -83,7 +83,10 @@ The TOTP secret is encrypted at rest using Fernet symmetric encryption. The encr
 
 ## API keys
 
-API keys are used by the mobile app and scripts to access the API without a browser session.
+API keys are used by the mobile app and scripts to access the API without a browser session. A key
+grants the same access as a signed-in session - there are no per-key scopes - so a valid key can
+create, edit and delete routes, middlewares and services. Treat keys like passwords and revoke any
+you no longer use.
 
 - Up to **10 keys** can exist simultaneously, each with a **device name** for identification
 - Each key is **hashed with SHA-256** - the plaintext is shown once at creation and never stored
@@ -143,18 +146,20 @@ The sign-in form is deliberately untouched, so your password manager still works
 
 ## Outbound requests (SSRF protection)
 
-Several features make TM issue outbound HTTP requests on your behalf - the Traefik connection tests, the CrowdSec and git setup tests, the webhook test, the URL ping tool, and the OIDC provider test. To prevent these from being used to reach cloud metadata endpoints, these fetchers reject:
+Several features make TM issue outbound HTTP requests on your behalf - the Traefik connection tests, the CrowdSec setup test, the webhook test, the URL ping tool, and the OIDC provider test. To prevent these from being used to reach cloud metadata endpoints, these fetchers reject:
 
 - Link-local addresses (`169.254.0.0/16`, including the `169.254.169.254` cloud metadata IP)
 - Multicast, reserved, and unspecified addresses
 
 Private and loopback targets are still allowed, because reaching internal services (e.g. `http://traefik:8080`) is the normal, legitimate use for a self-hosted reverse-proxy manager. Redirects are not followed on the ping tool.
 
+The git setup test is the exception: it runs `git ls-remote`, so it is restricted by URL scheme rather than by destination address.
+
 ---
 
 ## IP geolocation
 
-[IP geolocation](geoip.md) (off by default) resolves client IPs to countries entirely **on the server against a local database** - IP addresses are never sent to any third-party geolocation API. The only outbound request downloads the database file itself from `download.db-ip.com`, and only when the feature is enabled: at startup TM re-downloads it if the local file is older than 35 days. Point `GEOIP_DB_PATH` at your own `.mmdb` to control which database is used, and keep its mtime fresh (or leave the feature disabled) to stay fully offline.
+[IP geolocation](geoip.md) (off by default) resolves client IPs to countries entirely **on the server against a local database** - IP addresses are never sent to any third-party geolocation API. The only outbound request downloads the database file itself from `download.db-ip.com`, and only when the feature is enabled: at startup and once a day after that, TM re-downloads it if the local file is older than 35 days. Point `GEOIP_DB_PATH` at your own `.mmdb` to control which database is used, and keep its mtime fresh (or leave the feature disabled) to stay fully offline.
 
 ---
 
@@ -209,6 +214,12 @@ TM writes to these locations (default paths - they follow `SETTINGS_PATH`):
 | `/app/config/manager.yml` | Settings, hashed password, API key hashes, encrypted secrets |
 | `/app/config/.secret_key` | Session signing key (generated once, written `0600`) |
 | `/app/config/.otp_key` | Fernet key for the TOTP secret and every other stored secret |
+| `/app/config/agents.yml` | Agent registrations. The agent API key, CrowdSec API key, CrowdSec machine password and git token are encrypted; other fields, including the Traefik API password, are stored as written |
+| `/app/config/dashboard.yml` | Dashboard groups and card overrides, kept per server |
+| `/app/config/notifications.yml` | Notification history, its `.lock` and `.next_id` companions, and the digest queue |
+| `/app/config/templates.yml` | Custom middleware templates |
+| `/app/config/cache/` | Dashboard group cache |
+| `/app/config/geoip/` | The GeoIP database and a `.geoip.lock` beside it, when IP geolocation is on |
 | `CONFIG_DIR` / `CONFIG_PATHS` | Dynamic Traefik config files |
 
 `/app/config/` is the most sensitive directory: it holds the password hash and both encryption keys. Own it as the container user and keep it out of world-readable host directories - `.secret_key` is created `0600`, but `.otp_key` is written with the process umask.
