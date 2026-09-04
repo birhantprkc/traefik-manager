@@ -84,6 +84,8 @@ ENV TRAEFIK_API_URL=http://traefik:8080
 
 EXPOSE 5000
 
+ENV HOME=/tmp
+
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:5000/ || exit 1
 

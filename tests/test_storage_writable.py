@@ -202,3 +202,47 @@ def test_the_banner_is_refreshed_on_load():
         js = fh.read()
     assert 'refreshStorageBanner()' in js
     assert 'setInterval(refreshStorageBanner' in js
+
+
+def test_a_writable_static_file_in_a_read_only_directory_is_fine(storage, tmp_path, monkeypatch):
+    appdir = tmp_path / 'app'
+    appdir.mkdir()
+    static = appdir / 'traefik.yml'
+    static.write_text('api: {}\n')
+    os.chmod(static, 0o666)
+    os.chmod(appdir, 0o555)
+    monkeypatch.setattr(env, 'STATIC_CONFIG_DIRS', [str(static)])
+    try:
+        bad = env.unwritable_storage()
+    finally:
+        os.chmod(appdir, 0o755)
+    assert bad == [], (
+        'a bind-mounted traefik.yml sits in the image directory, which is never writable. '
+        'The file is what gets written, so probing its parent is a false alarm: %r' % bad)
+
+
+def test_a_read_only_static_file_is_still_reported(storage, tmp_path, monkeypatch):
+    appdir = tmp_path / 'app2'
+    appdir.mkdir()
+    static = appdir / 'traefik.yml'
+    static.write_text('api: {}\n')
+    os.chmod(static, 0o444)
+    monkeypatch.setattr(env, 'STATIC_CONFIG_DIRS', [str(static)])
+    bad = env.unwritable_storage()
+    labels = [label for label, _p, _e in bad]
+    assert 'Static config' in labels, 'a genuinely read-only traefik.yml must still be reported'
+    assert str(static) in [p for _l, p, _e in bad], 'the message should name the file, not its parent'
+
+
+def test_a_missing_static_file_falls_back_to_its_directory(storage, tmp_path, monkeypatch):
+    appdir = tmp_path / 'app3'
+    appdir.mkdir()
+    missing = appdir / 'traefik.yml'
+    os.chmod(appdir, 0o555)
+    monkeypatch.setattr(env, 'STATIC_CONFIG_DIRS', [str(missing)])
+    try:
+        bad = env.unwritable_storage()
+    finally:
+        os.chmod(appdir, 0o755)
+    assert [label for label, _p, _e in bad] == ['Static config'], \
+        'creating a file that does not exist yet needs the directory writable'

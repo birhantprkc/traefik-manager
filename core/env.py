@@ -2,7 +2,7 @@ import logging
 import os
 
 GITHUB_REPO = "chr0nzz/traefik-manager"
-APP_VERSION = "1.13.0"
+APP_VERSION = "1.13.2"
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
@@ -67,6 +67,8 @@ MULTI_CONFIG = len(CONFIG_PATHS) > 1
 
 
 def _probe_writable(path: str) -> str:
+    if os.path.isfile(path):
+        return '' if os.access(path, os.W_OK) else f'no write permission on {path}'
     if not os.path.isdir(path):
         try:
             os.makedirs(path, exist_ok=True)
@@ -93,7 +95,8 @@ def storage_targets():
     for _p in CONFIG_PATHS:
         _add('Dynamic config', os.path.dirname(os.path.abspath(_p)))
     for _p in STATIC_CONFIG_DIRS:
-        _add('Static config', os.path.dirname(os.path.abspath(_p)))
+        full = os.path.abspath(_p)
+        _add('Static config', full if os.path.isfile(full) else os.path.dirname(full))
     return seen
 
 
