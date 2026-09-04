@@ -119,6 +119,17 @@ The overview: router, service and middleware counts with their health, the provi
 
 Every service Traefik knows about, with its backends, health and the routers using it. Search and filter by provider. Tap for the detail pane.
 
+From 1.13.0 the tab also authors them. **+** builds a load balancer, weighted, mirroring or failover service; each backend row takes an address or a reference to another service, with per-row weights and mirror percentages. The detail pane edits, renames and deletes, and offers to manage a composite Traefik Manager did not write, or to hand it back.
+
+| | |
+|---|---|
+| Managed here | Editable, and marked as managed by Traefik Manager |
+| In the config file | Read only until you choose **Manage this service** |
+| TCP and UDP | Read only. Authoring writes HTTP services |
+| Highest random weight | Read only. Traefik Manager does not author this type anywhere |
+
+Works against the host or any agent. A service written to an agent lives in that agent's config files and is managed independently, so the same name can exist on both.
+
 ### Logs
 
 The access log as analytics rather than a wall of text, mirroring the web app. Seven cards - status codes, response time, methods, domains, paths, clients and services - each with counts you can tap to filter the list. A **Where it fails** panel names the worst status-and-path pairs. Tap any entry for its full detail.
